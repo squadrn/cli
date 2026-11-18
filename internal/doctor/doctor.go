@@ -244,7 +244,7 @@ func (e Env) branchProtection(ctx context.Context) []Check {
 func (e Env) recommendedDeny() []string {
 	var rules []string
 	for _, dir := range []string{e.Layout.DataDir, config.DirsFor(e.Store.Home, config.Slug).Config} {
-		p := e.tilde(dir)
+		p := filepath.ToSlash(e.tilde(dir)) // Claude's permission rules use / on every platform
 		rules = append(rules, "Edit("+p+"/**)", "Write("+p+"/**)")
 	}
 	return rules
