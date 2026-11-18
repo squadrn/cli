@@ -49,3 +49,4 @@ exec sh -c 'chmod 700 home/.claude-personal'
 {"hooks":{
   "PreToolUse":[{"hooks":[{"type":"command","command":"$HOME/missing-hook.sh"},{"type":"command","command":"$HOME/.claude/hooks/guard-git.sh"}]}],
   "Stop":[{"hooks":[{"type":"command","command":"notify"},{"type":"command","command":"notify"}]}]}}
+-- home/.claude-personal/.sprawl-account --

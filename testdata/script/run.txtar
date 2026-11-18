@@ -45,3 +45,4 @@ exitcode 2 sprawl -a Bad_Name
 exitcode 1 sprawl -a ghost
 ! exec sprawl -a ghost
 stderr 'account not found: claude/ghost \(run: sprawl account add claude/ghost\)'
+-- home/.claude-personal/.sprawl-account --

@@ -51,6 +51,9 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 		if err := os.Chmod(a.Dir, 0o700); err != nil {
 			return r, err
 		}
+		if err := Mark(a); err != nil {
+			return r, err
+		}
 	}
 	if err := p.linkShared(a, &r); err != nil {
 		return r, err
@@ -77,25 +80,62 @@ func (p Provisioner) linkShared(a Account, r *Report) error {
 		}
 	}
 	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
-		entries, err := os.ReadDir(filepath.Join(main, dir))
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		} else if err != nil {
+		if err := linkEntries(filepath.Join(main, dir), filepath.Join(a.Dir, dir), a.Spec.SharedPerEntry[dir], r); err != nil {
 			return err
-		}
-		if err := os.MkdirAll(filepath.Join(a.Dir, dir), 0o755); err != nil {
-			return err
-		}
-		for _, e := range entries {
-			if slices.Contains(a.Spec.SharedPerEntry[dir], e.Name()) {
-				continue
-			}
-			if err := linkOne(filepath.Join(main, dir, e.Name()), filepath.Join(a.Dir, dir, e.Name()), r); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
+}
+
+// linkEntries links every entry of main's dir src into dst, except skip, and removes the links
+// it made to entries main no longer has (a deleted skill).
+func linkEntries(src, dst string, skip []string, r *Report) error {
+	entries, err := os.ReadDir(src)
+	if errors.Is(err, fs.ErrNotExist) {
+		entries = nil
+	} else if err != nil {
+		return err
+	}
+	if len(entries) > 0 {
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			return err
+		}
+	}
+	for _, e := range entries {
+		if slices.Contains(skip, e.Name()) {
+			continue
+		}
+		if err := linkOne(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name()), r); err != nil {
+			return err
+		}
+	}
+	own, err := os.ReadDir(dst)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	for _, e := range own {
+		p := filepath.Join(dst, e.Name())
+		target, ok := linkTarget(p)
+		if !ok || !within(src, target) {
+			continue // not a link sprawl made
+		}
+		if _, err := os.Stat(target); !errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err := os.Remove(p); err != nil {
+			return err
+		}
+		r.Unlinked = append(r.Unlinked, p)
+	}
+	return nil
+}
+
+// within reports whether path is inside dir (not dir itself).
+func within(dir, path string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
 }
 
 func linkOne(src, dst string, r *Report) error {
@@ -276,17 +316,48 @@ func listNames(ctx context.Context, c provider.Runner, configDir, field string, 
 	return set, nil
 }
 
-// RefreshShared brings copies of main's shared files up to date in account a. Copies exist only
-// where links are not available (Windows without Developer Mode); elsewhere this does nothing.
-// Copies edited in the account are left alone and returned.
-func (s Store) RefreshShared(a Account) []string {
-	if a.IsMain() {
-		return nil
+// Refresh is what RefreshShared found that the user should know about.
+type Refresh struct {
+	// Conflicts are copies of main's files (Windows without links) edited in the account.
+	Conflicts []string
+	// Replaced are shared items the account has its own file or dir for instead of the link.
+	Replaced []string
+}
+
+// RefreshShared keeps account a following main before a session: per-entry links (skills) are
+// added for new entries and removed for deleted ones, copies of main's files (where links are
+// not available) are brought up to date. Items it must not touch are reported.
+func (s Store) RefreshShared(a Account) Refresh {
+	var out Refresh
+	if a.IsMain() || !isDir(a.Dir) {
+		return out
 	}
 	main := s.MainDir(a.Spec)
 	sources := map[string]string{}
 	for _, item := range a.Spec.Shared {
 		sources[item] = filepath.Join(main, item)
 	}
-	return refreshCopies(a.Dir, sources)
+	out.Conflicts = refreshCopies(a.Dir, sources)
+	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
+		var r Report
+		src, dst := filepath.Join(main, dir), filepath.Join(a.Dir, dir)
+		_ = linkEntries(src, dst, a.Spec.SharedPerEntry[dir], &r)
+		entries, _ := os.ReadDir(src)
+		perEntry := map[string]string{}
+		for _, e := range entries {
+			perEntry[e.Name()] = filepath.Join(src, e.Name())
+		}
+		out.Conflicts = append(out.Conflicts, refreshCopies(dst, perEntry)...)
+	}
+	for _, item := range a.Spec.Shared {
+		dst, src := filepath.Join(a.Dir, item), sources[item]
+		fi, err := os.Lstat(dst)
+		if err != nil || (!fi.Mode().IsRegular() && !fi.IsDir()) || slices.Contains(out.Conflicts, dst) {
+			continue
+		}
+		if _, err := os.Stat(src); err == nil && !linksTo(dst, src) {
+			out.Replaced = append(out.Replaced, dst)
+		}
+	}
+	return out
 }

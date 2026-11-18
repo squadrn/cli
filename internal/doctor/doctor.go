@@ -88,6 +88,7 @@ type Env struct {
 func Run(ctx context.Context, e Env) []Check {
 	var checks []Check
 	checks = append(checks, e.install()...)
+	checks = append(checks, e.versions(ctx)...)
 	checks = append(checks, e.guard(ctx)...)
 	checks = append(checks, e.settings()...)
 	checks = append(checks, e.accounts(ctx)...)
@@ -184,6 +185,30 @@ func (e Env) install() []Check {
 		out = append(out, bad(g, Warn, "sprawl plugin files not installed in "+e.tilde(e.Layout.DataDir), "re-run install.sh"))
 	} else {
 		out = append(out, ok(g, "plugin marketplace"))
+	}
+	return out
+}
+
+// versions reports each installed agent CLI's version, for bug reports. Information only.
+func (e Env) versions(ctx context.Context) []Check {
+	var out []Check
+	for _, spec := range provider.All() {
+		if _, err := e.LookPath(spec.Binary); err != nil || e.Agent == nil {
+			continue
+		}
+		ag, err := e.Agent(spec)
+		if err != nil {
+			continue
+		}
+		vctx, cancel := context.WithTimeout(ctx, e.Timeout)
+		b, err := ag.Output(vctx, "", "--version")
+		cancel()
+		v := strings.TrimSpace(string(b))
+		if err != nil || v == "" {
+			out = append(out, bad("install", Warn, spec.Binary+" --version failed", spec.InstallHint))
+			continue
+		}
+		out = append(out, ok("install", spec.Binary+" "+v))
 	}
 	return out
 }

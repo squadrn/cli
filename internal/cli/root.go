@@ -105,6 +105,18 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
 	}
+	// Accounts provisioned before account markers carry sprawl's plugin (or a previous name's).
+	store.HasPlugin = func(spec provider.Spec, dir string) bool {
+		if spec.ID != provider.Claude.ID {
+			return false
+		}
+		for _, id := range append([]string{account.PluginID}, account.LegacyPluginIDs()...) {
+			if claude.HasPlugin(dir, id) {
+				return true
+			}
+		}
+		return false
+	}
 	noColor := os.Getenv("NO_COLOR") != "" || !enableVT()
 	a := &app{
 		cmd:         cfg.CommandName(),
@@ -392,11 +404,22 @@ func (a *app) banner(acct account.Account) {
 // session starts an interactive agent session as acct: shared-file copies are refreshed first
 // (Windows without links) and executables left over from earlier updates are cleaned up.
 func (a *app) session(ag provider.Agent, acct account.Account, args []string) error {
-	for _, c := range a.store.RefreshShared(acct) {
+	return a.sessionIn(ag, acct, args, "")
+}
+
+// sessionIn is session for `wt <name>`: the session is recorded as using that worktree, which
+// the agent CLI may only create once it runs.
+func (a *app) sessionIn(ag provider.Agent, acct account.Account, args []string, wt string) error {
+	r := a.store.RefreshShared(acct)
+	for _, c := range r.Conflicts {
 		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+	}
+	for _, c := range r.Replaced {
+		a.warnf("%s was replaced in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
 	}
 	fsx.CleanOld(filepath.Dir(a.layout.Binary()))
 	fsx.CleanOld(a.layout.BinDir)
+	defer a.markInUse(acct, wt)()
 	return ag.Exec(acct.ConfigDir(), args)
 }
 

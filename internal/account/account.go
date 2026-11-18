@@ -5,6 +5,7 @@ package account
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/provider"
 )
 
@@ -33,7 +35,7 @@ var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,23}$`)
 // be account names: `sprawl <word> ...` would be ambiguous.
 var Commands = []string{
 	"account", "completion", "config", "deps", "doctor", "gc", "grid", "help", "hook", "ps",
-	"self-install", "self-uninstall", "self-update", "swap", "version", "wt",
+	"self-install", "self-uninstall", "self-update", "swap", "usage", "version", "wt",
 }
 
 func reserved(name string) bool {
@@ -106,7 +108,14 @@ type Store struct {
 	DefaultProvider string
 	// Providers overrides the registry (tests); nil means provider.All().
 	Providers []provider.Spec
+	// HasPlugin reports whether the sprawl plugin is installed in a config dir. Dirs sprawl
+	// provisioned before it wrote Marker are recognised by it; nil adopts nothing.
+	HasPlugin func(spec provider.Spec, dir string) bool
 }
+
+// Marker marks a config dir as an account sprawl manages. Other tools use the same naming
+// (~/.claude-<x>), so a matching dir alone is not an account. Main accounts need none.
+const Marker = ".sprawl-account"
 
 func (s Store) providers() []provider.Spec {
 	if s.Providers != nil {
@@ -150,10 +159,65 @@ func (s Store) account(spec provider.Spec, name string) Account {
 	return Account{Ref: Ref{Provider: spec.ID, Name: name}, Spec: spec, Dir: dir}
 }
 
-// exists: the default provider's main always exists; every other account needs its dir.
+// exists: the default provider's main always exists; another main needs its dir; every other
+// account needs its dir with Marker (written now for dirs sprawl provisioned before markers).
 func (s Store) exists(a Account) bool {
-	return (a.IsMain() && a.Provider == s.defaultProvider()) || isDir(a.Dir)
+	switch {
+	case a.IsMain():
+		return a.Provider == s.defaultProvider() || isDir(a.Dir)
+	case !isDir(a.Dir):
+		return false
+	case isFile(filepath.Join(a.Dir, Marker)):
+		return true
+	case s.HasPlugin != nil && s.HasPlugin(a.Spec, a.Dir):
+		return Mark(a) == nil
+	}
+	return false
 }
+
+// Mark records a's dir as managed by sprawl.
+func Mark(a Account) error {
+	if a.IsMain() {
+		return nil
+	}
+	return fsx.WriteBytes(filepath.Join(a.Dir, Marker), []byte("This directory is an account managed by Sprawling Agents.\n"), 0o600)
+}
+
+// ErrUnmanaged means a dir is named like an account but sprawl did not create it.
+var ErrUnmanaged = errors.New("not a sprawl account")
+
+// Unmanaged lists dirs named like accounts (~/.claude-<name>) that are not accounts: created by
+// another tool, or by hand. Adopt turns one into an account.
+func (s Store) Unmanaged() ([]Account, error) {
+	var out []Account
+	for _, spec := range s.providers() {
+		names, err := s.candidates(spec)
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range names {
+			if a := s.account(spec, n); !s.exists(a) {
+				out = append(out, a)
+			}
+		}
+	}
+	return out, nil
+}
+
+// Adopt makes an existing dir named like an account an account (writes Marker).
+func (s Store) Adopt(input string) (Account, error) {
+	a, err := s.Define(input)
+	if err != nil {
+		return Account{}, err
+	}
+	if !isDir(a.Dir) {
+		return Account{}, NotFoundError{a.Ref}
+	}
+	return a, Mark(a)
+}
+
+// Managed reports whether a's dir exists and is an account (false for an unmanaged dir).
+func (s Store) Managed(a Account) bool { return s.exists(a) }
 
 func (s Store) defaultProvider() string {
 	if s.DefaultProvider == "" {
@@ -234,44 +298,71 @@ func (s Store) List() ([]Account, error) {
 		if main := s.account(spec, Main); s.exists(main) {
 			out = append(out, main)
 		}
-		matches, err := filepath.Glob(filepath.Join(s.Home, spec.DirPrefix+"*"))
+		names, err := s.candidates(spec)
 		if err != nil {
 			return nil, err
 		}
-		var names []string
-		for _, m := range matches {
-			name := strings.TrimPrefix(filepath.Base(m), spec.DirPrefix)
-			if isDir(m) && ValidateName(name) == nil && name != Main {
-				names = append(names, name)
-			}
-		}
-		sort.Strings(names)
 		for _, n := range names {
-			out = append(out, s.account(spec, n))
+			if a := s.account(spec, n); s.exists(a) {
+				out = append(out, a)
+			}
 		}
 	}
 	return out, nil
 }
 
-// MoveToTrash moves a secondary account dir into the user's trash, keeping it recoverable.
+// candidates are the sorted names of dirs named like spec's secondary accounts.
+func (s Store) candidates(spec provider.Spec) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(s.Home, spec.DirPrefix+"*"))
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, m := range matches {
+		name := strings.TrimPrefix(filepath.Base(m), spec.DirPrefix)
+		if isDir(m) && ValidateName(name) == nil && name != Main {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// MoveToTrash moves a secondary account dir into the user's trash, keeping it recoverable. In
+// the freedesktop trash it also writes the .trashinfo file desktop trash tools need to restore it.
 func (s Store) MoveToTrash(a Account, now time.Time) (string, error) {
 	if a.IsMain() {
 		return "", fmt.Errorf("%w %q: refusing to remove a provider's default account", ErrReserved, a.Label())
 	}
-	trash := TrashDir(s.Home)
-	if err := os.MkdirAll(trash, 0o700); err != nil {
+	files, info := trashDirs(s.Home)
+	if err := os.MkdirAll(files, 0o700); err != nil {
 		return "", err
 	}
-	dst := filepath.Join(trash, filepath.Base(a.Dir)+"-"+now.Format("20060102-150405"))
+	name := filepath.Base(a.Dir) + "-" + now.Format("20060102-150405")
+	dst := filepath.Join(files, name)
+	infoFile := ""
+	if info != "" {
+		if err := os.MkdirAll(info, 0o700); err != nil {
+			return "", err
+		}
+		infoFile = filepath.Join(info, name+".trashinfo")
+		u := url.URL{Path: filepath.ToSlash(a.Dir)}
+		body := "[Trash Info]\nPath=" + u.EscapedPath() + "\nDeletionDate=" + now.Format("2006-01-02T15:04:05") + "\n"
+		if err := fsx.WriteBytes(infoFile, []byte(body), 0o600); err != nil {
+			return "", err
+		}
+	}
 	if err := os.Rename(a.Dir, dst); err != nil {
+		if infoFile != "" {
+			_ = os.Remove(infoFile)
+		}
 		return "", fmt.Errorf("move %s to trash: %w", a.Dir, err)
 	}
 	return dst, nil
 }
 
-// Rename moves a secondary account to a new name. The CLI keys its stored login to the config
-// dir, so the account usually has to log in again.
-func (s Store) Rename(a Account, newName string) (Account, error) {
+// RenameTarget checks that a can be renamed to newName and returns the account it would become.
+func (s Store) RenameTarget(a Account, newName string) (Account, error) {
 	if a.IsMain() {
 		return Account{}, fmt.Errorf("%w %q: a provider's default account cannot be renamed", ErrReserved, a.Label())
 	}
@@ -282,21 +373,44 @@ func (s Store) Rename(a Account, newName string) (Account, error) {
 	if _, err := os.Lstat(to.Dir); err == nil {
 		return Account{}, fmt.Errorf("account %s already exists (%s)", to.Label(), to.Dir)
 	}
+	return to, nil
+}
+
+// Rename moves a secondary account to a new name. The CLI keys its stored login to the config
+// dir, so the account usually has to log in again.
+func (s Store) Rename(a Account, newName string) (Account, error) {
+	to, err := s.RenameTarget(a, newName)
+	if err != nil {
+		return Account{}, err
+	}
 	if err := os.Rename(a.Dir, to.Dir); err != nil {
 		return Account{}, err
 	}
 	return to, nil
 }
 
-// TrashDir is ~/.Trash on macOS and the freedesktop trash elsewhere.
+// TrashDir is ~/.Trash on macOS and the freedesktop trash's files dir elsewhere.
 func TrashDir(home string) string {
+	files, _ := trashDirs(home)
+	return files
+}
+
+// trashDirs returns where trashed files go and, for the freedesktop trash, where their
+// .trashinfo files go ("" on macOS).
+func trashDirs(home string) (files, info string) {
 	if mac := filepath.Join(home, ".Trash"); isDir(mac) {
-		return mac
+		return mac, ""
 	}
-	return filepath.Join(config.DirsFor(home, "Trash").Data, "files")
+	base := config.DirsFor(home, "Trash").Data
+	return filepath.Join(base, "files"), filepath.Join(base, "info")
 }
 
 func isDir(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()
+}
+
+func isFile(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsRegular()
 }

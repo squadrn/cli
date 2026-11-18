@@ -22,9 +22,36 @@ const (
 	optAccount = "@sprawl_acct" // pane: account label, e.g. claude/personal
 	optName    = "@sprawl_name" // pane: worktree name
 	// fieldSep separates -F fields. Not a tab: tmux < 3.5 rewrites tabs in output to '_'.
-	// Paths, labels and worktree names never contain it.
+	// Fields that may contain it (paths, session names, commands) are printed with the q:
+	// modifier, which escapes it with a backslash; splitFields undoes that.
 	fieldSep = "|"
 )
+
+// q prints a format variable shell-escaped, so fieldSep inside it cannot split the line.
+func q(name string) string { return "#{q:" + name + "}" }
+
+// splitFields splits a line of q-escaped fields at unescaped separators and unescapes them.
+func splitFields(line string) []string {
+	var fields []string
+	var cur strings.Builder
+	for i := 0; i < len(line); i++ {
+		switch c := line[i]; {
+		case c == '\\' && i+1 < len(line):
+			i++
+			cur.WriteByte(line[i])
+		case c == fieldSep[0]:
+			fields = append(fields, cur.String())
+			cur.Reset()
+		default:
+			cur.WriteByte(c)
+		}
+	}
+	return append(fields, cur.String())
+}
+
+// startDir escapes a directory for -c, which tmux expands as a format: '#' must be doubled or
+// a path containing "#{" or "##" names another directory.
+func startDir(dir string) string { return strings.ReplaceAll(dir, "#", "##") }
 
 var unsafeSessionChars = regexp.MustCompile(`[^A-Za-z0-9_-]`)
 
@@ -107,7 +134,7 @@ func (t Tmux) FindSession(ctx context.Context, root string) (string, error) {
 
 // Sessions lists grid sessions (those tagged with a repository). No server means none.
 func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
-	format := strings.Join([]string{"#{session_name}", "#{" + optRepo + "}", "#{session_attached}"}, fieldSep)
+	format := strings.Join([]string{q("session_name"), q(optRepo), "#{session_attached}"}, fieldSep)
 	out, err := t.run(ctx, "list-sessions", "-F", format)
 	if errors.Is(err, ErrNoServer) {
 		return nil, nil
@@ -116,7 +143,7 @@ func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
 	}
 	var sessions []Session
 	for _, line := range strings.Split(out, "\n") {
-		f := strings.Split(line, fieldSep)
+		f := splitFields(line)
 		if len(f) != 3 || f[1] == "" {
 			continue
 		}
@@ -125,13 +152,13 @@ func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
 	if len(sessions) == 0 {
 		return sessions, nil
 	}
-	panes, err := t.run(ctx, "list-panes", "-a", "-F", "#{session_name}")
+	panes, err := t.run(ctx, "list-panes", "-a", "-F", q("session_name"))
 	if err != nil && !errors.Is(err, ErrNoServer) {
 		return nil, err
 	}
 	count := map[string]int{}
 	for _, name := range strings.Split(panes, "\n") {
-		count[name]++
+		count[splitFields(name)[0]]++
 	}
 	for i := range sessions {
 		sessions[i].Panes = count[sessions[i].Name]
@@ -141,7 +168,7 @@ func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
 
 // Panes lists sprawl agent panes, of one session or ("") of every session.
 func (t Tmux) Panes(ctx context.Context, session string) ([]Pane, error) {
-	format := strings.Join([]string{"#{pane_id}", "#{session_name}", "#{" + optAccount + "}", "#{" + optName + "}", "#{pane_current_command}"}, fieldSep)
+	format := strings.Join([]string{"#{pane_id}", q("session_name"), q(optAccount), q(optName), q("pane_current_command")}, fieldSep)
 	args := []string{"list-panes", "-F", format}
 	if session == "" {
 		args = append(args, "-a")
@@ -156,7 +183,7 @@ func (t Tmux) Panes(ctx context.Context, session string) ([]Pane, error) {
 	}
 	var panes []Pane
 	for _, line := range strings.Split(out, "\n") {
-		f := strings.SplitN(line, fieldSep, 5)
+		f := splitFields(line)
 		if len(f) != 5 || f[3] == "" {
 			continue
 		}
@@ -172,6 +199,15 @@ func tagCmds(pane string, a Agent) [][]string {
 	}
 }
 
+// tagNewPane tags the pane the preceding command of the same batch created: tmux makes it the
+// current pane, and no other client can run in between, so the pane is never seen untagged.
+func tagNewPane(a Agent) [][]string {
+	return [][]string{
+		{"set", "-p", optAccount, a.Account},
+		{"set", "-p", optName, a.Name},
+	}
+}
+
 // Start opens a pane running command in dir for root's grid and returns the session it is in.
 // Without a grid session for root it creates one named after prefix (cols×rows); when another
 // sprawl creates the same session at the same time, the pane joins that one instead.
@@ -182,11 +218,9 @@ func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows in
 			return "", err
 		}
 		if session != "" {
-			id, err := t.run(ctx, "split-window", "-t", "="+session+":", "-c", dir, "-P", "-F", "#{pane_id}", command)
-			if err != nil {
-				return "", err
-			}
-			cmds := append(tagCmds(id, a), []string{"select-layout", "-t", "=" + session + ":", "tiled"})
+			cmds := [][]string{{"split-window", "-t", "=" + session + ":", "-c", startDir(dir), command}}
+			cmds = append(cmds, tagNewPane(a)...)
+			cmds = append(cmds, []string{"select-layout", "-t", "=" + session + ":", "tiled"})
 			if _, err := t.batch(ctx, cmds...); err != nil && !isGone(err) {
 				return "", err
 			}
@@ -200,7 +234,7 @@ func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows in
 		// can look for it. Targets in the same sequence cannot use the exact-match "=" prefix
 		// (tmux has not indexed the new session yet); an exact name still matches first.
 		cmds := [][]string{
-			{"new-session", "-d", "-s", name, "-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows), "-c", dir, command},
+			{"new-session", "-d", "-s", name, "-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows), "-c", startDir(dir), command},
 			{"set", "-t", name, optRepo, root},
 			{"set", "-t", name, "pane-border-status", "top"},
 			{"set", "-t", name, "pane-border-format", " #{" + optAccount + "} · #{" + optName + "} "},
@@ -229,7 +263,7 @@ func isGone(err error) bool {
 
 // Respawn replaces a pane's process with command, keeping the pane in place.
 func (t Tmux) Respawn(ctx context.Context, pane, dir string, a Agent, command string) error {
-	cmds := append([][]string{{"respawn-pane", "-k", "-t", pane, "-c", dir, command}}, tagCmds(pane, a)...)
+	cmds := append([][]string{{"respawn-pane", "-k", "-t", pane, "-c", startDir(dir), command}}, tagCmds(pane, a)...)
 	_, err := t.batch(ctx, cmds...)
 	return err
 }

@@ -67,3 +67,5 @@ shared_mcp = ["codegraph"]
 [{"id":"squad@squad","enabled":true}]
 -- squad-markets.json --
 [{"name":"squad"}]
+-- home/.claude-personal/plugins/installed_plugins.json --
+{"version":2,"plugins":{"squad@squad":[{"scope":"user"}]}}
