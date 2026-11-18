@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"slices"
-	"syscall"
 	"time"
 
 	"sprawling-agents/internal/update"
@@ -61,7 +60,7 @@ func startBackgroundCheck() {
 	}
 	cmd := exec.Command(self, "self-update", "--background")
 	cmd.Env = append(os.Environ(), "SPRAWL_NO_UPDATE_CHECK=1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	detach(cmd)
 	if cmd.Start() == nil {
 		_ = cmd.Process.Release()
 	}

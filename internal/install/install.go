@@ -95,15 +95,8 @@ func (n NameCheck) Check(cfg config.Config) error {
 }
 
 func (n NameCheck) isSelf(path string) bool {
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return false
-	}
 	for _, own := range []string{n.Layout.Binary(), n.Self} {
-		if own == "" {
-			continue
-		}
-		if r, err := filepath.EvalSymlinks(own); err == nil && r == resolved {
+		if own != "" && fsx.SameFile(path, own) {
 			return true
 		}
 	}

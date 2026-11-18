@@ -102,3 +102,32 @@ func TestReplaceDirAndCleanStale(t *testing.T) {
 		t.Fatal("CleanStale did not restore dst")
 	}
 }
+
+func TestSameFileAndReplaceExecutable(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a")
+	if err := os.WriteFile(a, []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(a, link); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(dir, "other")
+	if err := os.WriteFile(other, []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !SameFile(a, link) || SameFile(a, other) || SameFile(a, filepath.Join(dir, "missing")) || SameFile(filepath.Join(dir, "missing"), a) {
+		t.Fatal("SameFile")
+	}
+	dst := filepath.Join(dir, "bin", "tool")
+	if err := ReplaceExecutable(a, dst); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(dst); string(b) != "v1" {
+		t.Fatalf("content %q", b)
+	}
+	if fi, _ := os.Stat(dst); fi.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("not executable: %v", fi.Mode())
+	}
+}

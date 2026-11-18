@@ -32,11 +32,15 @@ import (
 
 // AssetName is the archive goreleaser publishes for one platform.
 func AssetName(version, goos, goarch string) string {
-	return fmt.Sprintf("sprawl_%s_%s_%s.tar.gz", strings.TrimPrefix(version, "v"), goos, goarch)
+	ext := ".tar.gz"
+	if goos == "windows" {
+		ext = ".zip"
+	}
+	return fmt.Sprintf("sprawl_%s_%s_%s%s", strings.TrimPrefix(version, "v"), goos, goarch, ext)
 }
 
-// BinaryName is the executable inside a release and in the data dir; commands link to it.
-const BinaryName = "sprawl"
+// BinaryName (per platform: sprawl, sprawl.exe) is the executable inside a release and in the
+// data dir; commands link to it.
 
 const ChecksumsName = "checksums.txt"
 
@@ -190,10 +194,7 @@ func (l Layout) Install(src, version string) error {
 			return fmt.Errorf("not a sprawl release: missing %s", p)
 		}
 	}
-	if err := fsx.CopyFile(filepath.Join(src, BinaryName), l.Binary(), 0o755, false); err != nil {
-		return err
-	}
-	if err := os.Chmod(l.Binary(), 0o755); err != nil {
+	if err := fsx.ReplaceExecutable(filepath.Join(src, BinaryName), l.Binary()); err != nil {
 		return err
 	}
 	for _, dir := range []string{"plugin", ".claude-plugin"} {

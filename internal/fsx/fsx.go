@@ -139,3 +139,21 @@ func IsFile(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.Mode().IsRegular()
 }
+
+// SameFile reports whether a and b are the same file after following links (symbolic links,
+// and on Windows hard links and junctions, which path comparison cannot see).
+func SameFile(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(fa, fb)
+}
+
+// ReplaceExecutable installs src at dst as an executable, replacing dst even while it runs
+// (platform: replaceExecutable).
+func ReplaceExecutable(src, dst string) error { return replaceExecutable(src, dst) }

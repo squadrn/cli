@@ -181,7 +181,8 @@ func (h hookEnv) git(name string, args []string) int {
 	if hook == "" {
 		return exitOK
 	}
-	c := exec.Command(hook, args...) // runs as long as the repository's hook needs, on the tty
+	bin, argv := githook.HookCommand(hook, args)
+	c := exec.Command(bin, argv...) // runs as long as the repository's hook needs, on the tty
 	c.Stdout, c.Stderr = h.stdout, h.stderr
 	c.Stdin = h.stdin
 	if input != nil {

@@ -17,6 +17,7 @@ import (
 
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/githook"
 	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/guard"
@@ -147,7 +148,7 @@ func (e Env) install() []Check {
 	for _, n := range e.Names {
 		if p, err := e.LookPath(n); err != nil {
 			out = append(out, bad(g, Warn, n+" not on PATH", fmt.Sprintf("export PATH=\"%s:$PATH\"", e.tilde(e.Layout.BinDir))))
-		} else if real, _ := filepath.EvalSymlinks(p); real != resolve(e.Self) {
+		} else if !fsx.SameFile(p, e.Self) {
 			out = append(out, bad(g, Warn, n+" on PATH ("+e.tilde(p)+") is a different program than this sprawl", e.Command+" config set command <name>"))
 		} else {
 			out = append(out, ok(g, n+" on PATH"))
@@ -410,7 +411,7 @@ func (e Env) links(a account.Account, g string) []Check {
 		if _, err := os.Stat(src); err != nil {
 			continue
 		}
-		if target, err := os.Readlink(filepath.Join(a.Dir, item)); err != nil || target != src {
+		if !account.LinksTo(filepath.Join(a.Dir, item), src) {
 			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account add "+a.Label()))
 		}
 	}

@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -48,23 +47,13 @@ func Output(ctx context.Context, opts Options, name string, args ...string) ([]b
 	return stdout.Bytes(), err
 }
 
-// Command prepares a command whose cancellation kills its whole process group.
+// Command prepares a command whose cancellation kills its whole process tree.
 func Command(ctx context.Context, opts Options, name string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = opts.Dir
 	cmd.Env = opts.Env
 	cmd.Stdin = opts.Stdin
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
-			return nil
-		}
-		// Negative pid: signal the group, so grandchildren holding our pipes die too.
-		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
-			return cmd.Process.Kill()
-		}
-		return nil
-	}
+	setup(cmd) // platform: the whole process tree dies on cancel
 	cmd.WaitDelay = waitDelay
 	return cmd
 }
