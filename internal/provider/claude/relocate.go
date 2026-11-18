@@ -17,29 +17,37 @@ func (CLI) Relocate(oldDir, newDir string) error {
 	if err != nil {
 		return err
 	}
-	from, err := json.Marshal(oldDir + "/")
-	if err != nil {
-		return err
+	// Match the opening quote and the path prefix of a JSON string value, followed by either
+	// separator (Claude Code writes \\ on Windows).
+	var pairs [][2][]byte
+	for _, sep := range []string{"/", `\`} {
+		from, err := json.Marshal(oldDir + sep)
+		if err != nil {
+			return err
+		}
+		to, err := json.Marshal(newDir + sep)
+		if err != nil {
+			return err
+		}
+		pairs = append(pairs, [2][]byte{from[:len(from)-1], to[:len(to)-1]})
 	}
-	to, err := json.Marshal(newDir + "/")
-	if err != nil {
-		return err
-	}
-	// Match the opening quote and the path prefix of a JSON string value.
-	from, to = from[:len(from)-1], to[:len(to)-1]
 	for _, f := range files {
 		b, err := os.ReadFile(f)
 		if err != nil {
 			return err
 		}
-		if !bytes.Contains(b, from) {
+		out := b
+		for _, p := range pairs {
+			out = bytes.ReplaceAll(out, p[0], p[1])
+		}
+		if bytes.Equal(out, b) {
 			continue
 		}
 		fi, err := os.Stat(f)
 		if err != nil {
 			return err
 		}
-		if err := fsx.WriteBytes(f, bytes.ReplaceAll(b, from, to), fi.Mode().Perm()); err != nil {
+		if err := fsx.WriteBytes(f, out, fi.Mode().Perm()); err != nil {
 			return err
 		}
 	}
