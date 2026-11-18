@@ -42,7 +42,7 @@ func Install(dir, binary string) error {
 	}
 	for _, n := range Names {
 		script := fmt.Sprintf("#!/bin/sh\n%s: runs the push check, then the repository's own %s hook.\nexec %s hook git %s \"$@\"\n",
-			marker, n, shellQuote(binary), n)
+			marker, n, shellQuote(filepath.ToSlash(binary)), n)
 		if err := fsx.WriteBytes(filepath.Join(dir, n), []byte(script), 0o755); err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func Install(dir, binary string) error {
 // Installed reports whether dir holds current shims for binary.
 func Installed(dir, binary string) bool {
 	b, err := os.ReadFile(filepath.Join(dir, "pre-push"))
-	return err == nil && strings.Contains(string(b), shellQuote(binary)+" hook git pre-push")
+	return err == nil && strings.Contains(string(b), shellQuote(filepath.ToSlash(binary))+" hook git pre-push")
 }
 
 // Entries returns the environment entries that add core.hooksPath=dir after the GIT_CONFIG_*
