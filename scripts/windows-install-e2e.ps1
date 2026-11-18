@@ -14,6 +14,12 @@ function Check([bool]$ok, [string]$what, [string]$detail = "") {
     Write-Host "ok  $what"
 }
 
+function ProfileOf([string]$out) {
+    $m = [regex]::Match($out, '(?m)^PROFILE=(.*?)\s*$')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ""
+}
+
 $version = $Tag.TrimStart("v")
 $root = Join-Path ([IO.Path]::GetTempPath()) ("sprawl-ps1-" + [guid]::NewGuid())
 $pub = Join-Path $root "pub"
@@ -77,17 +83,30 @@ foreach ($shell in "powershell.exe", "pwsh") {
     New-Item -ItemType Directory -Force -Path (Join-Path $env:USERPROFILE ".claude") | Out-Null
     $bin = Join-Path $env:USERPROFILE ".local\bin"
 
-    # No -Version: the script installs its own release, not the latest stable one.
-    $out = & $shell -NoProfile -Command "$doc -AddToProfile; 'EAP=' + `$ErrorActionPreference; `$PROFILE.CurrentUserAllHosts" 2>&1 | Out-String
+    # No -Version: the script installs its own release, not the latest stable one. The fake home
+    # has no Documents yet: Windows PowerShell 5.1 then has no profile path, which must only cost
+    # completion.
+    $run = "$doc -AddToProfile; 'EAP=' + `$ErrorActionPreference; 'PROFILE=' + `$PROFILE.CurrentUserAllHosts"
+    $out = & $shell -NoProfile -Command $run 2>&1 | Out-String
     Write-Host $out
     Check ($out -match "verified release signature") "${shell}: signature verified" $out
     Check ((& "$bin\sprawl.exe" version) -eq "sprawl $version") "${shell}: installed $Tag without -Version"
+    Check ($out -notmatch "install\.ps1:") "${shell}: the install reports no error" $out
     Check ($out -match "EAP=Continue") "${shell}: the session keeps its ErrorActionPreference" $out
     Check ($out -match "following the beta channel") "${shell}: a pre-release follows the beta channel" $out
     $cfg = Join-Path $env:USERPROFILE ".config\sprawl\config.toml"
-    Check ((Get-Content -Raw $cfg) -match 'update_channel = "beta"') "${shell}: update_channel = beta"
-    $profilePath = ($out -split "`r?`n" | Where-Object { $_ -like "*profile.ps1" } | Select-Object -Last 1).Trim()
-    Check ((Get-Content -Raw $profilePath) -match [regex]::Escape("if (Test-Path '")) "${shell}: guarded completion line in $profilePath"
+    Check ((Test-Path $cfg) -and ((Get-Content -Raw $cfg) -match 'update_channel = "beta"')) "${shell}: update_channel = beta"
+    $profilePath = ProfileOf $out
+    if (-not $profilePath) {
+        Check ($out -match "PowerShell has no profile path here") "${shell}: no profile path is a hint, not a failure" $out
+        New-Item -ItemType Directory -Force -Path (Join-Path $env:USERPROFILE "Documents") | Out-Null
+        $out = & $shell -NoProfile -Command $run 2>&1 | Out-String
+        Write-Host $out
+        Check ($out -notmatch "install\.ps1:") "${shell}: the reinstall reports no error" $out
+        $profilePath = ProfileOf $out
+        Check ([bool]$profilePath) "${shell}: a profile path once Documents exists" $out
+    }
+    Check ((Test-Path $profilePath) -and ((Get-Content -Raw $profilePath) -match [regex]::Escape("if (Test-Path '"))) "${shell}: guarded completion line in $profilePath" $out
 
     # A failure is reported in red and the session goes on.
     $out = & $shell -NoProfile -Command "$doc -Version v9.9.9; 'still here'" 2>&1 | Out-String
@@ -97,7 +116,7 @@ foreach ($shell in "powershell.exe", "pwsh") {
     # Uninstall takes sprawl's line out of the profile, so PowerShell still starts cleanly.
     & "$bin\sprawl.exe" self-uninstall --yes --purge
     Check ($LASTEXITCODE -eq 0) "${shell}: self-uninstall"
-    Check (-not ((Get-Content -Raw $profilePath) -match "sprawl\\completion\.ps1")) "${shell}: completion line removed from $profilePath"
+    Check (-not ((Test-Path $profilePath) -and ((Get-Content -Raw $profilePath) -match "sprawl\\completion\.ps1"))) "${shell}: completion line removed from $profilePath"
     $out = & $shell -Command "'profile ok'" 2>&1 | Out-String
     Check ($out -match "profile ok" -and $out -notmatch "completion\.ps1") "${shell}: the profile loads after uninstall" $out
     Start-Sleep -Seconds 6

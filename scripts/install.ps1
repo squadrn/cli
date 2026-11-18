@@ -29,6 +29,40 @@ function Invoke-Native {
     else { & $FilePath @ArgumentList }
 }
 
+function Add-Completion {
+    param([string]$Completion, [string]$Line, [bool]$AddToProfile)
+    if (-not (Test-Path $Completion)) { return }
+    # Windows PowerShell 5.1 leaves the profile path empty when Documents does not exist.
+    $profilePath = ""
+    if ($null -ne $PROFILE -and $PROFILE.PSObject.Properties["CurrentUserAllHosts"]) { $profilePath = [string]$PROFILE.CurrentUserAllHosts }
+    if (-not $profilePath) {
+        Write-Host "tab completion: PowerShell has no profile path here; add this line to your profile yourself:  $Line"
+        return
+    }
+    if ((Test-Path $profilePath) -and ((Get-Content $profilePath -Raw) -like "*$Completion*")) { return }
+    if (-not $AddToProfile -and -not $env:CI -and [Environment]::UserInteractive -and $Host.UI.RawUI) {
+        $answer = Read-Host "Load sprawl tab completion from your PowerShell profile? [Y/n]"
+        $AddToProfile = ($answer -eq "" -or $answer -match "^[Yy]")
+    }
+    if (-not $AddToProfile) {
+        Write-Host "tab completion: add this line to $profilePath :  $Line"
+        return
+    }
+    # Documents can be redirected (OneDrive) or guarded (Controlled Folder Access).
+    try {
+        New-Item -ItemType Directory -Force -Path (Split-Path $profilePath) | Out-Null
+        Add-Content -Path $profilePath -Value $Line
+    } catch {
+        Write-Host "warning: cannot write $profilePath ($($_.Exception.Message))" -ForegroundColor Yellow
+        Write-Host "sprawl is installed; for tab completion add this line to your profile yourself:  $Line"
+        return
+    }
+    Write-Host "tab completion added to $profilePath"
+    if ((Get-ExecutionPolicy) -eq "Restricted") {
+        Write-Host "note: profiles do not load under the Restricted policy; run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned" -ForegroundColor Yellow
+    }
+}
+
 function Install-Sprawl {
     param([string]$Name, [AllowNull()][string]$Alias, [bool]$AliasGiven, [string]$Version, [bool]$Force, [bool]$AddToProfile, [string]$Repo)
     # Both are local to this function: nothing leaks into the session that ran the script.
@@ -154,30 +188,11 @@ __SPRAWL_SIGNERS__
         $completion = Join-Path $dataHome "sprawl\completion.ps1"
         $quoted = "'" + ($completion -replace "'", "''") + "'"
         $line = "if (Test-Path $quoted) { . $quoted }"
-        $profilePath = $PROFILE.CurrentUserAllHosts
-        $loaded = (Test-Path $profilePath) -and ((Get-Content $profilePath -Raw) -like "*$completion*")
-        if (-not $loaded -and (Test-Path $completion)) {
-            if (-not $AddToProfile -and -not $env:CI -and [Environment]::UserInteractive -and $Host.UI.RawUI) {
-                $answer = Read-Host "Load sprawl tab completion from your PowerShell profile? [Y/n]"
-                $AddToProfile = ($answer -eq "" -or $answer -match "^[Yy]")
-            }
-            if ($AddToProfile) {
-                # Documents can be redirected (OneDrive) or guarded (Controlled Folder Access); sprawl
-                # is installed by now, so a profile that cannot be written only costs completion.
-                try {
-                    New-Item -ItemType Directory -Force -Path (Split-Path $profilePath) | Out-Null
-                    Add-Content -Path $profilePath -Value $line
-                    Write-Host "tab completion added to $profilePath"
-                    if ((Get-ExecutionPolicy) -eq "Restricted") {
-                        Write-Host "note: profiles do not load under the Restricted policy; run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned" -ForegroundColor Yellow
-                    }
-                } catch {
-                    Write-Host "warning: cannot write $profilePath ($($_.Exception.Message))" -ForegroundColor Yellow
-                    Write-Host "sprawl is installed; for tab completion add this line to your profile yourself:  $line"
-                }
-            } else {
-                Write-Host "tab completion: add this line to $profilePath :  $line"
-            }
+        # sprawl is installed by now: the profile step only ever costs completion, never the install.
+        try { Add-Completion -Completion $completion -Line $line -AddToProfile $AddToProfile }
+        catch {
+            Write-Host "warning: tab completion not set up ($($_.Exception.Message))" -ForegroundColor Yellow
+            Write-Host "for tab completion add this line to your PowerShell profile yourself:  $line"
         }
     } finally {
         Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
