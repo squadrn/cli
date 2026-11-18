@@ -15,3 +15,6 @@ func linksTo(dst, src string) bool {
 
 // LinksTo reports whether dst in an account shares src from the main account.
 func LinksTo(dst, src string) bool { return linksTo(dst, src) }
+
+// refreshCopies has nothing to refresh: shared items are symbolic links on Unix.
+func refreshCopies(string, map[string]string) []string { return nil }
