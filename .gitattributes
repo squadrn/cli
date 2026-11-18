@@ -1,0 +1,5 @@
+# Line endings stay LF everywhere: shell scripts, hooks and test scripts break with CRLF.
+* text=auto eol=lf
+*.png binary
+*.zip binary
+*.gz binary
