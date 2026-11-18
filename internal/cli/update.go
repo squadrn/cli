@@ -405,6 +405,10 @@ func completionFile(shell, dir, name string) string {
 func (a *app) writeCompletions(names, removedLinks []string) {
 	use := a.root.Use
 	defer func() { a.root.Use = use }()
+	if runtime.GOOS == "windows" {
+		a.writePowerShellCompletion(names)
+		return
+	}
 	for shell, dir := range a.completionDirs() {
 		if !fsx.IsDir(dir) {
 			continue
@@ -432,6 +436,26 @@ func (a *app) writeCompletions(names, removedLinks []string) {
 			}
 		}
 		a.out("  %s completion → %s\n", shell, a.tilde(dir))
+	}
+}
+
+// PowerShellCompletion is the completion script for every command name, which install.ps1 offers
+// to load from the user's PowerShell profile.
+func (a *app) powerShellCompletionPath() string {
+	return filepath.Join(a.layout.DataDir, "completion.ps1")
+}
+
+func (a *app) writePowerShellCompletion(names []string) {
+	var buf bytes.Buffer
+	for _, n := range names {
+		a.root.Use = n
+		if err := a.root.GenPowerShellCompletionWithDesc(&buf); err != nil {
+			return
+		}
+		buf.WriteString("\n")
+	}
+	if fsx.WriteBytes(a.powerShellCompletionPath(), buf.Bytes(), 0o644) == nil {
+		a.out("  PowerShell completion → %s (install.ps1 -AddToProfile loads it)\n", a.tilde(a.powerShellCompletionPath()))
 	}
 }
 

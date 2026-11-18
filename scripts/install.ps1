@@ -5,13 +5,15 @@
 #   & ([scriptblock]::Create((gh release download -R __SPRAWL_REPO__ -p install.ps1 -O - | Out-String))) -Name ai -Alias sx
 #
 # Parameters mirror install.sh: -Name (command name), -Alias (comma separated; '' for none),
-# -Version vX.Y.Z, -Force (accept a name another program uses), -Repo OWNER/NAME.
+# -Version vX.Y.Z, -Force (accept a name another program uses), -Repo OWNER/NAME, and
+# -AddToProfile (load tab completion from your PowerShell profile).
 # Keep this file ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 param(
     [string]$Name = "",
     [string]$Alias = $null,
     [string]$Version = "",
     [switch]$Force,
+    [switch]$AddToProfile,
     [string]$Repo = "__SPRAWL_REPO__"
 )
 $ErrorActionPreference = "Stop"
@@ -112,7 +114,26 @@ try {
         [Environment]::SetEnvironmentVariable("Path", (($path.TrimEnd(";"), $bin) -join ";").TrimStart(";"), "User")
         Write-Host "added $bin to your PATH; open a new terminal"
     }
-    Write-Host "PowerShell completion: add to your profile:  sprawl completion powershell | Out-String | Invoke-Expression"
+    $completion = Join-Path $env:USERPROFILE ".local\share\sprawl\completion.ps1"
+    $line = ". `"$completion`""
+    $profilePath = $PROFILE.CurrentUserAllHosts
+    $loaded = (Test-Path $profilePath) -and ((Get-Content $profilePath -Raw) -like "*$completion*")
+    if (-not $loaded -and (Test-Path $completion)) {
+        if (-not $AddToProfile -and [Environment]::UserInteractive -and $Host.UI.RawUI) {
+            $answer = Read-Host "Load sprawl tab completion from your PowerShell profile? [Y/n]"
+            $AddToProfile = ($answer -eq "" -or $answer -match "^[Yy]")
+        }
+        if ($AddToProfile) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $profilePath) | Out-Null
+            Add-Content -Path $profilePath -Value $line
+            Write-Host "tab completion added to $profilePath"
+            if ((Get-ExecutionPolicy) -eq "Restricted") {
+                Write-Host "note: profiles do not load under the Restricted policy; run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "tab completion: add this line to $profilePath :  $line"
+        }
+    }
 } finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
