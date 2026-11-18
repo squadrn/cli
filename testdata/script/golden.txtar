@@ -1439,7 +1439,7 @@ complete -k -c sprawl -n '__sprawl_requires_order_preservation && __sprawl_prepa
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" guard-git", "timeout": 5 }]
       }
     ],

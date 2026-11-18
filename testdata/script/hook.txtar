@@ -52,6 +52,21 @@ stdin feat-staging.json
 exec sprawl hook guard-git
 stdout '"permissionDecision":"deny"'
 
+# The PowerShell tool (Windows) goes through the PowerShell analyser; unknown tools ask.
+stdin ps-force.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+stdin ps-iex.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"ask"'
+stdin ps-ok.json
+exec sprawl hook guard-git
+! stdout .
+stdin other-tool.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"ask"'
+stdout 'does not know the Python tool'
+
 # Broken input never fails open.
 stdin garbage.txt
 exec sprawl hook guard-git
@@ -136,5 +151,13 @@ exit 1
 protected_branches = ["main", "staging"]
 -- broken.toml --
 protected_branches = [
+-- ps-force.json --
+{"cwd":"feat","tool_name":"PowerShell","tool_input":{"command":"& git push -f origin feat-x"}}
+-- ps-iex.json --
+{"cwd":"feat","tool_name":"PowerShell","tool_input":{"command":"iex ('git pu'+'sh')"}}
+-- ps-ok.json --
+{"cwd":"feat","tool_name":"PowerShell","tool_input":{"command":"Get-ChildItem; git push -u origin feat-x"}}
+-- other-tool.json --
+{"cwd":"feat","tool_name":"Python","tool_input":{"command":"print(1)"}}
 -- garbage.txt --
 not json

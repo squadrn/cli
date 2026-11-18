@@ -74,6 +74,12 @@ func newGuard(r repos) Guard {
 	return Guard{Protected: []string{"main", "master", "develop", "release/*"}, Git: GitCLI{}, Home: r.root, GitHooks: true}
 }
 
+func decidePS(g Guard, cmd, dir string) Decision {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return g.DecidePowerShell(ctx, cmd, dir)
+}
+
 func decide(g Guard, cmd, dir string) Decision {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -599,6 +605,23 @@ func TestDecideEdgeForms(t *testing.T) {
 		{Deny, `find . -name x -exec git push -f {} +`},
 		{Allow, `find . -name x -exec`},
 		{Ask, deep},
+		// Windows forms (Git Bash): git by path or with .exe, wsl, winpty, cmd, start, PowerShell.
+		{Deny, `"C:\Program Files\Git\cmd\git.exe" push origin main`},
+		{Deny, `git.exe push -f`},
+		{Deny, `/mingw64/bin/git push origin main`},
+		{Deny, `wsl git push origin main`},
+		{Deny, `wsl -d Ubuntu -e git push -f`},
+		{Ask, `wsl`},
+		{Deny, `winpty git push -f`},
+		{Ask, `cmd //c "git push origin main"`},
+		{Ask, `cmd.exe /c git push origin main`},
+		{Allow, `cmd /c dir`},
+		{Ask, `start git push origin main`},
+		{Deny, `pwsh -c 'git push origin main'`},
+		{Deny, `powershell -Command "git push -f"`},
+		{Ask, `pwsh -EncodedCommand ZwBpAHQA`},
+		{Allow, `pwsh -File ./build.ps1`},
+		{Ask, `git_config_count=1 git push origin feat-x`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.cmd, func(t *testing.T) {
