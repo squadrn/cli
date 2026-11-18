@@ -78,7 +78,16 @@ func TestGuardLayers(t *testing.T) {
 	if c, _ := find(checks, "layer 2"); c.Status != Warn || c.Fix != "re-run install.sh" {
 		t.Errorf("layer 2 missing: %+v", c)
 	}
-	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary()); err != nil {
+	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary(), e.configFile()); err != nil {
+		t.Fatal(err)
+	}
+	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary(), "/elsewhere/config.toml"); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := find(e.guard(context.Background()), "layer 2"); c.Status != Warn {
+		t.Errorf("layer 2 for another config file: %+v", c)
+	}
+	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary(), e.configFile()); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ := find(e.guard(context.Background()), "layer 2"); c.Status != OK {

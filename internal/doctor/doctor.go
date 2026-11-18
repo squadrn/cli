@@ -202,13 +202,17 @@ func (e Env) guard(ctx context.Context) []Check {
 	switch {
 	case !e.Config.GitHooksEnabled():
 		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is off", e.Command+" config set git_hooks true"))
-	case !githook.Installed(e.Layout.GitHooks(), e.Layout.Binary()):
-		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is not installed in "+e.tilde(e.Layout.GitHooks()), "re-run install.sh"))
+	case !githook.Installed(e.Layout.GitHooks(), e.Layout.Binary(), e.configFile()):
+		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is not installed or outdated in "+e.tilde(e.Layout.GitHooks()), "re-run install.sh"))
 	default:
 		out = append(out, ok(g, "layer 2 (git pre-push hook) installed for sessions sprawl starts"))
 	}
 	out = append(out, e.branchProtection(ctx)...)
 	return out
+}
+
+func (e Env) configFile() string {
+	return filepath.Join(config.DirsFor(e.Store.Home, config.Slug).Config, "config.toml")
 }
 
 // branchProtection checks layer 3, the server: whether the current repository's default

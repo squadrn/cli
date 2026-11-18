@@ -347,7 +347,12 @@ func (a *app) sessionEnv() []string {
 		return nil
 	}
 	dir := a.layout.GitHooks()
-	if !githook.Installed(dir, a.layout.Binary()) {
+	cfg, err := config.Path()
+	if err != nil || !fsx.IsFile(a.layout.Binary()) {
+		return nil
+	}
+	// Shims from an older release, or for another config path, are rewritten before use.
+	if !githook.Installed(dir, a.layout.Binary(), cfg) && githook.Install(dir, a.layout.Binary(), cfg) != nil {
 		return nil
 	}
 	return githook.Entries(os.Environ(), dir)

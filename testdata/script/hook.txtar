@@ -127,6 +127,25 @@ exists home/.local/share/sprawl/git-hooks/pre-push
 stderr 'sprawl guard: direct push to protected branch "main"'
 exec git -C feat -c core.hooksPath=$HOME/.local/share/sprawl/git-hooks push -q origin feat-x:feat-y
 
+# The shims pass the config file baked in at install: the pushing process's environment cannot
+# point the hook at a weaker policy, and an explicit --config file is honoured.
+grep ' hook git --config .*/.config/sprawl/config.toml.* pre-push ' home/.local/share/sprawl/git-hooks/pre-push
+mkdir evil/sprawl
+cp evil-config evil/sprawl/config.toml
+env XDG_CONFIG_HOME=$WORK/evil
+! exec git -C feat -c core.hooksPath=$HOME/.local/share/sprawl/git-hooks push origin feat-x:main
+stderr 'sprawl guard: direct push to protected branch "main"'
+env XDG_CONFIG_HOME=
+cd feat
+stdin ../pp-feat.txt
+! exec sprawl hook git --config ../strict-config pre-push origin ../remote.git
+stderr 'direct push to protected branch "feat-x"'
+cd $WORK
+
+-- evil-config --
+protected_branches = ["nothing"]
+-- strict-config --
+protected_branches = ["feat-x"]
 -- allow.json --
 {"cwd":"feat","tool_input":{"command":"npm test && git push -u origin feat-x"}}
 -- force.json --

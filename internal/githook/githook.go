@@ -5,6 +5,7 @@
 package githook
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -34,16 +35,15 @@ const marker = "# sprawl git-level guard"
 // Dir is where the shims live inside sprawl's data dir.
 func Dir(dataDir string) string { return filepath.Join(dataDir, "git-hooks") }
 
-// Install writes one shim per hook name into dir, each calling binary. Files that are not
-// sprawl shims are left alone.
-func Install(dir, binary string) error {
+// Install writes one shim per hook name into dir, each calling binary with the absolute path of
+// sprawl's config file: the hook reads its policy from there, never from the environment of the
+// process that runs git (XDG_CONFIG_HOME, HOME). Files that are not sprawl shims are left alone.
+func Install(dir, binary, configFile string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	for _, n := range Names {
-		script := fmt.Sprintf("#!/bin/sh\n%s: runs the push check, then the repository's own %s hook.\nexec %s hook git %s \"$@\"\n",
-			marker, n, shellQuote(filepath.ToSlash(binary)), n)
-		if err := fsx.WriteBytes(filepath.Join(dir, n), []byte(script), 0o755); err != nil {
+		if err := fsx.WriteBytes(filepath.Join(dir, n), shim(n, binary, configFile), 0o755); err != nil {
 			return err
 		}
 	}
@@ -63,10 +63,28 @@ func Install(dir, binary string) error {
 	return nil
 }
 
-// Installed reports whether dir holds current shims for binary.
-func Installed(dir, binary string) bool {
-	b, err := os.ReadFile(filepath.Join(dir, "pre-push"))
-	return err == nil && strings.Contains(string(b), shellQuote(filepath.ToSlash(binary))+" hook git pre-push")
+func shim(name, binary, configFile string) []byte {
+	return fmt.Appendf(nil, "#!/bin/sh\n%s: runs the push check, then the repository's own %s hook.\nexec %s hook git %s %s %s \"$@\"\n",
+		marker, name, shellQuote(filepath.ToSlash(binary)), ConfigFlag, shellQuote(filepath.ToSlash(configFile)), name)
+}
+
+// ConfigFlag passes the config file baked into a shim to `sprawl hook git`.
+const ConfigFlag = "--config"
+
+// Installed reports whether dir holds exactly the current shims for binary and configFile, each
+// runnable by git.
+func Installed(dir, binary, configFile string) bool {
+	for _, n := range Names {
+		p := filepath.Join(dir, n)
+		b, err := os.ReadFile(p)
+		if err != nil || !bytes.Equal(b, shim(n, binary, configFile)) {
+			return false
+		}
+		if fi, err := os.Stat(p); err != nil || !isRunnable(p, fi) {
+			return false
+		}
+	}
+	return true
 }
 
 // Entries returns the environment entries that add core.hooksPath=dir after the GIT_CONFIG_*

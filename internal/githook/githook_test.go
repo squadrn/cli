@@ -24,18 +24,39 @@ func TestInstall(t *testing.T) {
 	if err := os.WriteFile(foreign, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if Installed(dir, "/opt/it's/sprawl") {
+	const bin, cfg = "/opt/it's/sprawl", "/home/u/.config/sprawl/config.toml"
+	if Installed(dir, bin, cfg) {
 		t.Fatal("Installed before Install")
 	}
-	if err := Install(dir, "/opt/it's/sprawl"); err != nil {
+	if err := Install(dir, bin, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !Installed(dir, "/opt/it's/sprawl") || Installed(dir, "/other") {
+	if !Installed(dir, bin, cfg) || Installed(dir, "/other", cfg) || Installed(dir, bin, "/other.toml") {
 		t.Fatal("Installed")
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "pre-push"))
-	if err != nil || !strings.Contains(string(b), `exec '/opt/it'\''s/sprawl' hook git pre-push "$@"`) {
+	if err != nil || !strings.Contains(string(b), `exec '/opt/it'\''s/sprawl' hook git --config '/home/u/.config/sprawl/config.toml' pre-push "$@"`) {
 		t.Fatalf("pre-push shim = %q, %v", b, err)
+	}
+	// A shim that was edited, or lost its execute bit, is not the guard.
+	commitMsg := filepath.Join(dir, "commit-msg")
+	if err := os.WriteFile(commitMsg, append(shim("commit-msg", bin, cfg), '#'), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if Installed(dir, bin, cfg) {
+		t.Fatal("edited shim accepted")
+	}
+	if err := os.WriteFile(commitMsg, shim("commit-msg", bin, cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(commitMsg, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && Installed(dir, bin, cfg) {
+		t.Fatal("shim without execute bit accepted")
+	}
+	if err := Install(dir, bin, cfg); err != nil {
+		t.Fatal(err)
 	}
 	if fi, _ := os.Stat(filepath.Join(dir, "commit-msg")); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o755 {
 		t.Errorf("shim mode = %v", fi.Mode())
