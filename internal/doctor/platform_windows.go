@@ -44,6 +44,15 @@ func pathext() string {
 	return ".COM;.EXE;.BAT;.CMD"
 }
 
+// PathFix is the PowerShell command that appends dir to the user PATH; it takes effect in new
+// terminals.
+func PathFix(dir string) string {
+	return `[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";` + dir + `", "User")`
+}
+
+// pathFix: PowerShell does not expand ~, so the full path.
+func (e Env) pathFix() string { return PathFix(e.Layout.BinDir) }
+
 // onPath lists distinct executables named name (with any PATHEXT extension) across PATH.
 func onPath(name string) []string {
 	var out []string

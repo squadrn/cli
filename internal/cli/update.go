@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/doctor"
 	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/install"
@@ -346,7 +347,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		a.warnf("%v", err)
 	}
 	if !onPATH(a.layout.BinDir) {
-		a.out("add to your shell rc: export PATH=\"%s:$PATH\"\n", a.layout.BinDir)
+		a.out("%s: %s\n", pathWhere, doctor.PathFix(a.layout.BinDir))
 	}
 	a.out("next: %s doctor\n", cfg.Command)
 	return nil
