@@ -98,24 +98,9 @@ func Run(args []string) int {
 func isTerminal(f *os.File) bool { return term.IsTerminal(f.Fd()) }
 
 func run(args []string, cfg config.Config, cfgErr error) error {
-	store, err := account.NewStore()
+	store, err := newStore(cfg, cfgErr)
 	if err != nil {
 		return err
-	}
-	if cfgErr == nil {
-		store.DefaultProvider = cfg.DefaultProvider
-	}
-	// Accounts provisioned before account markers carry sprawl's plugin (or a previous name's).
-	store.HasPlugin = func(spec provider.Spec, dir string) bool {
-		if spec.ID != provider.Claude.ID {
-			return false
-		}
-		for _, id := range append([]string{account.PluginID}, account.LegacyPluginIDs()...) {
-			if claude.HasPlugin(dir, id) {
-				return true
-			}
-		}
-		return false
 	}
 	noColor := os.Getenv("NO_COLOR") != "" || !enableVT()
 	a := &app{
@@ -162,6 +147,30 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 		root.SetArgs(append([]string{r.sub}, r.args...))
 		return root.Execute()
 	}
+}
+
+// newStore is the account store every entry point (commands and hooks) uses.
+func newStore(cfg config.Config, cfgErr error) (account.Store, error) {
+	store, err := account.NewStore()
+	if err != nil {
+		return store, err
+	}
+	if cfgErr == nil {
+		store.DefaultProvider = cfg.DefaultProvider
+	}
+	// Accounts provisioned before account markers carry sprawl's plugin (or a previous name's).
+	store.HasPlugin = func(spec provider.Spec, dir string) bool {
+		if spec.ID != provider.Claude.ID {
+			return false
+		}
+		for _, id := range append([]string{account.PluginID}, account.LegacyPluginIDs()...) {
+			if claude.HasPlugin(dir, id) {
+				return true
+			}
+		}
+		return false
+	}
+	return store, nil
 }
 
 func (a *app) routeTable() routeTable {
