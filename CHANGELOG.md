@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0-rc.2
+
+- `install.ps1` no longer fails when the PowerShell profile cannot be written (Documents redirected
+  or protected by Controlled Folder Access); it warns and prints the line to add instead.
+
 ## 1.2.0-rc.1
 
 Native Windows support, beta (ADR 0008). macOS and Linux behave as in 1.1.0 (golden tests).
