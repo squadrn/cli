@@ -232,3 +232,15 @@ func TestGitCheck(t *testing.T) {
 		t.Errorf("broken: %+v", c)
 	}
 }
+
+func TestPathFixNamesTheDirectory(t *testing.T) {
+	dir := filepath.Join("home", "u", ".local", "bin")
+	fix := PathFix(dir)
+	want := `export PATH="` + dir + `:$PATH"`
+	if runtime.GOOS == "windows" {
+		want = `[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";` + dir + `", "User")`
+	}
+	if fix != want {
+		t.Fatalf("PathFix = %s, want %s", fix, want)
+	}
+}

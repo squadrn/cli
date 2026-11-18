@@ -8,6 +8,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// pathWhere says where the PATH fix goes.
+const pathWhere = "add sprawl to your PATH (then open a new terminal)"
+
 // enableVT turns on ANSI sequence processing for stdout and stderr (Windows Terminal has it on;
 // the classic console needs it). false means colors and the picker's redraw must stay off.
 func enableVT() bool {

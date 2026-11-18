@@ -15,6 +15,11 @@ func executable(_ string, fi fs.FileInfo) bool { return fi.Mode().Perm()&0o111 !
 // private: no permissions for group or others.
 func private(fi fs.FileInfo) bool { return fi.Mode().Perm()&0o077 == 0 }
 
+// PathFix is the command that puts dir on PATH (shown with the home directory as ~).
+func PathFix(dir string) string { return `export PATH="` + dir + `:$PATH"` }
+
+func (e Env) pathFix() string { return PathFix(e.tilde(e.Layout.BinDir)) }
+
 // onPath lists distinct executables named name across PATH.
 func onPath(name string) []string {
 	var out []string

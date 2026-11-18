@@ -96,6 +96,18 @@ try {
 
     $release = Join-Path $tmp "release"
     Expand-Archive -Path (Join-Path $tmp $asset) -DestinationPath $release
+    # %USERPROFILE%\.local\bin on the user PATH (Claude Code's installer usually added it), before
+    # self-install so it does not tell the user to do it.
+    $bin = Join-Path $env:USERPROFILE ".local\bin"
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+    $path = [string]$key.GetValue("Path", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    $key.Close()
+    if (-not (($path -split ";") -contains $bin)) {
+        [Environment]::SetEnvironmentVariable("Path", (($path.TrimEnd(";"), $bin) -join ";").TrimStart(";"), "User")
+        Write-Host "added $bin to your PATH; open a new terminal"
+    }
+    # This session too, so self-install (and the user, right after) finds the command.
+    if (-not (($env:Path -split ";") -contains $bin)) { $env:Path = "$env:Path;$bin" }
     $installArgs = @("self-install", $release)
     if ($Name) { $installArgs += @("--command", $Name) }
     if ($PSBoundParameters.ContainsKey("Alias")) { $installArgs += "--alias=$Alias" }
@@ -105,15 +117,6 @@ try {
     # Pre-release installs follow the beta channel, or they would never be offered the next rc.
     if ($Version -match '-') { & (Join-Path $release "sprawl.exe") config set update_channel beta | Out-Null }
 
-    # %USERPROFILE%\.local\bin on the user PATH (Claude Code's installer usually added it).
-    $bin = Join-Path $env:USERPROFILE ".local\bin"
-    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
-    $path = [string]$key.GetValue("Path", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-    $key.Close()
-    if (-not (($path -split ";") -contains $bin)) {
-        [Environment]::SetEnvironmentVariable("Path", (($path.TrimEnd(";"), $bin) -join ";").TrimStart(";"), "User")
-        Write-Host "added $bin to your PATH; open a new terminal"
-    }
     $completion = Join-Path $env:USERPROFILE ".local\share\sprawl\completion.ps1"
     $line = ". `"$completion`""
     $profilePath = $PROFILE.CurrentUserAllHosts

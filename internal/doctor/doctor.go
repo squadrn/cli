@@ -148,7 +148,7 @@ func (e Env) install() []Check {
 	}
 	for _, n := range e.Names {
 		if p, err := e.LookPath(n); err != nil {
-			out = append(out, bad(g, Warn, n+" not on PATH", fmt.Sprintf("export PATH=\"%s:$PATH\"", e.tilde(e.Layout.BinDir))))
+			out = append(out, bad(g, Warn, n+" not on PATH", e.pathFix()))
 		} else if !fsx.SameFile(p, e.Self) {
 			out = append(out, bad(g, Warn, n+" on PATH ("+e.tilde(p)+") is a different program than this sprawl", e.Command+" config set command <name>"))
 		} else {
