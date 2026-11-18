@@ -244,3 +244,16 @@ func TestPathFixNamesTheDirectory(t *testing.T) {
 		t.Fatalf("PathFix = %s, want %s", fix, want)
 	}
 }
+
+func TestUsageTrackingLine(t *testing.T) {
+	e := env(t, fakeAgent{loggedIn: true}, nil)
+	e.Command = "sra"
+	e.Usage = func(account.Account) bool { return false }
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (sra usage --setup claude/main)"); !ok || c.Status != OK {
+		t.Errorf("off: %+v", c)
+	}
+	e.Usage = func(account.Account) bool { return true }
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: on"); !ok || c.Status != OK {
+		t.Errorf("on: %+v", c)
+	}
+}

@@ -71,6 +71,7 @@ func (a *app) uninstall(purge bool) error {
 		}
 		cancel()
 	}
+	a.restoreStatusLines()
 	links, err := a.layout.Unlink()
 	if err != nil {
 		return err
