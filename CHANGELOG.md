@@ -29,6 +29,7 @@ Native Windows support, beta (ADR 0008). macOS and Linux behave as in 1.1.0 (gol
   `permissions.deny` rules use `/`.
 - Install a release candidate on Windows with `-Version v1.2.0-rc.1`; it follows the beta channel.
 
+## 1.1.0
 
 Groundwork for native Windows support (ADR 0008); no behaviour change on macOS or Linux.
 

@@ -19,8 +19,17 @@ logged in to the account that was invited:
 gh release download -R OWNER/sprawl-releases -p install.sh -O - | sh
 ```
 
-The default command is **`sprawl`** with the short alias **`sra`**. The installer lets you pick
-other names, or pass them up front (`--alias ''` installs no alias):
+This installs the latest stable release. For another one, a pre-release included, name its tag
+(`gh release list -R OWNER/sprawl-releases` lists them); from 1.2.0-rc.3 on the installer installs
+the release it comes from (with older ones, also pass `--version`):
+
+```sh
+gh release download vX.Y.Z -R OWNER/sprawl-releases -p install.sh -O - | sh -s -- --version vX.Y.Z
+```
+
+The default command is **`sprawl`** with the short alias **`sra`**. At a terminal the installer
+asks for other names (Enter keeps the default); or pass them up front (`--alias ''` installs no
+alias):
 
 ```sh
 gh release download -R OWNER/sprawl-releases -p install.sh -O - | sh -s -- --name ai --alias ''
@@ -32,13 +41,21 @@ the sprawl plugin into every Claude account.
 
 ### Windows (beta)
 
-Requires [Git for Windows](https://git-scm.com/download/win) 2.31+ and `gh`. In PowerShell:
+Requires [Git for Windows](https://git-scm.com/download/win) 2.31+ and `gh`. Windows builds ship
+in pre-releases until 1.2.0, so name the release (the newest one below; any tag from
+`gh release list -R OWNER/sprawl-releases` that has a `.zip`). In PowerShell:
 
 ```powershell
-gh release download -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String | Invoke-Expression
+$tag = gh release list -R OWNER/sprawl-releases --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName'
+& ([scriptblock]::Create((gh release download $tag -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String))) -Version $tag
 # with options:
-& ([scriptblock]::Create((gh release download -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String))) -Name ai -Alias ''
+& ([scriptblock]::Create((gh release download $tag -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String))) -Version $tag -Name ai -Alias ''
 ```
+
+From 1.2.0-rc.3 on, the installer installs the release it was downloaded from and `-Version` is
+only needed for another one. A failed install prints the reason in red and leaves the window
+open. `-AddToProfile` loads tab completion from your PowerShell profile; `self-uninstall` removes
+that line again.
 
 Everything above works the same, with these differences:
 - `grid`, `ps` and `swap` inside a pane need tmux and are not available; run each agent with
