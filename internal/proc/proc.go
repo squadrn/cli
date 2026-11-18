@@ -32,7 +32,7 @@ func Output(ctx context.Context, opts Options, name string, args ...string) ([]b
 	cmd := Command(ctx, opts, name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
+	err := run(cmd)
 	if err != nil {
 		if ctx.Err() != nil {
 			err = fmt.Errorf("%w (%w)", ctx.Err(), err)

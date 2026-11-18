@@ -23,3 +23,6 @@ func setup(cmd *exec.Cmd) {
 		return nil
 	}
 }
+
+// run starts cmd and waits for it.
+func run(cmd *exec.Cmd) error { return cmd.Run() }
