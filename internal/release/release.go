@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -54,7 +55,8 @@ func VerifyChecksum(checksums, file string) error {
 	want := ""
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		if sum, n, ok := strings.Cut(sc.Text(), "  "); ok && n == name {
+		line := strings.TrimPrefix(sc.Text(), `\`) // GNU coreutils escaping marker
+		if sum, n, ok := strings.Cut(line, "  "); ok && strings.TrimPrefix(n, "*") == name {
 			want = sum
 		}
 	}
@@ -116,9 +118,9 @@ func Extract(tarball, dst string) error {
 		} else if err != nil {
 			return fmt.Errorf("%s: %w", filepath.Base(tarball), err)
 		}
-		name := filepath.Clean(hdr.Name)
-		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("unsafe path in archive: %s", hdr.Name)
+		name, err := safeName(hdr.Name)
+		if err != nil {
+			return err
 		}
 		target := filepath.Join(dst, name)
 		switch hdr.Typeflag {
@@ -143,6 +145,27 @@ func Extract(tarball, dst string) error {
 			return fmt.Errorf("unsupported entry in archive: %s", hdr.Name)
 		}
 	}
+}
+
+// safeName validates an archive member name the same way on every platform: relative, no "..",
+// no drive letters, colons (alternate data streams), backslashes or Windows reserved names.
+func safeName(raw string) (string, error) {
+	bad := func() (string, error) { return "", fmt.Errorf("unsafe path in archive: %s", raw) }
+	if raw == "" || strings.HasPrefix(raw, "/") || strings.ContainsAny(raw, `\:`) {
+		return bad()
+	}
+	for _, part := range strings.Split(strings.TrimSuffix(raw, "/"), "/") {
+		upper := strings.ToUpper(strings.TrimRight(part, ". "))
+		base, _, _ := strings.Cut(upper, ".")
+		switch {
+		case part == "..", part != "." && strings.TrimRight(part, ". ") != part:
+			return bad()
+		case base == "CON" || base == "PRN" || base == "AUX" || base == "NUL",
+			len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '0' && base[3] <= '9':
+			return bad()
+		}
+	}
+	return filepath.FromSlash(path.Clean(raw)), nil
 }
 
 type Layout struct {
