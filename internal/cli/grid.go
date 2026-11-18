@@ -20,9 +20,9 @@ import (
 	"sprawling-agents/internal/worktree"
 )
 
-func requireTmux(what string) error {
+func (a *app) requireTmux(what string) error {
 	if runtime.GOOS == "windows" {
-		return fmt.Errorf("%s is not available on Windows: it runs agents in tmux panes; start each agent in its own terminal with: sprawl wt <name>", what)
+		return fmt.Errorf("%s is not available on Windows: it runs agents in tmux panes; start each agent in its own terminal with: %s wt <name>", what, a.cmd)
 	}
 	if _, err := exec.LookPath("tmux"); err != nil {
 		return fmt.Errorf("tmux is required for %s", what)
@@ -46,6 +46,9 @@ func (a *app) gridCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(_ *cobra.Command, args []string) error {
+			if spread && a.account != "" {
+				return usagef("--spread picks the accounts itself; it cannot be combined with an account")
+			}
 			return a.grid(args[0], args[1:], a.account, spread)
 		},
 	}
@@ -55,7 +58,7 @@ func (a *app) gridCmd() *cobra.Command {
 }
 
 func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool) error {
-	if err := requireTmux("grid"); err != nil {
+	if err := a.requireTmux("grid"); err != nil {
 		return err
 	}
 	ctx := context.Background()
@@ -198,7 +201,7 @@ func (a *app) gridAttachCmd() *cobra.Command {
 		Short: "Attach to the grid of a repository (default: this one)",
 		Args:  optionalRepo,
 		RunE: func(_ *cobra.Command, args []string) error {
-			if err := requireTmux("grid attach"); err != nil {
+			if err := a.requireTmux("grid attach"); err != nil {
 				return err
 			}
 			session, err := a.gridSession(context.Background(), firstOr(args))
@@ -217,7 +220,7 @@ func (a *app) gridStopCmd() *cobra.Command {
 		Short: "Stop the grid of a repository and every agent in it (worktrees are kept)",
 		Args:  optionalRepo,
 		RunE: func(_ *cobra.Command, args []string) error {
-			if err := requireTmux("grid stop"); err != nil {
+			if err := a.requireTmux("grid stop"); err != nil {
 				return err
 			}
 			ctx := context.Background()
@@ -247,7 +250,7 @@ func (a *app) gridLsCmd() *cobra.Command {
 		Short: "List running grids",
 		Args:  noArgs,
 		RunE: func(*cobra.Command, []string) error {
-			if err := requireTmux("grid ls"); err != nil {
+			if err := a.requireTmux("grid ls"); err != nil {
 				return err
 			}
 			sessions, err := grid.Tmux{}.Sessions(context.Background())
@@ -283,7 +286,7 @@ func (a *app) psCmd() *cobra.Command {
 		Short: "List running agents: session, account, worktree",
 		Args:  noArgs,
 		RunE: func(*cobra.Command, []string) error {
-			if err := requireTmux("ps"); err != nil {
+			if err := a.requireTmux("ps"); err != nil {
 				return err
 			}
 			panes, err := grid.Tmux{}.Panes(context.Background(), "")

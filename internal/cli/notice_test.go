@@ -22,7 +22,7 @@ func TestUpdateNotice(t *testing.T) {
 	started := 0
 	a := &app{
 		cmd: "sprawl", store: account.Store{Home: t.TempDir()}, stderr: &stderr,
-		interactive: true, colorErr: true, now: func() time.Time { return now },
+		interactive: true, colorErr: true, ttyErr: true, now: func() time.Time { return now },
 		backgroundCheck: func() { started++ },
 	}
 	// Nothing known yet: no notice, one background check, not repeated within the interval.

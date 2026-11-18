@@ -666,14 +666,20 @@ func (a *app) configCmd() *cobra.Command {
 				return a.printJSON(values)
 			}
 			a.out("%-19s %s\n", "file", a.tilde(path))
+			env := config.EnvOverrides()
 			for _, k := range config.Keys {
+				if v, ok := env[k]; ok {
+					a.out("%-19s %s  (from %s)\n", k, values[k], v)
+					continue
+				}
 				a.out("%-19s %s\n", k, values[k])
 			}
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
-	cmd.AddCommand(&cobra.Command{
+	var getJSON bool
+	get := &cobra.Command{
 		Use:       "get <key>",
 		Short:     "Print one setting",
 		Args:      oneArg,
@@ -686,14 +692,19 @@ func (a *app) configCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if getJSON {
+				return a.printJSON(map[string]string{"key": args[0], "value": v})
+			}
 			a.out("%s\n", v)
 			return nil
 		},
-	})
+	}
+	get.Flags().BoolVar(&getJSON, "json", false, "print JSON")
+	cmd.AddCommand(get)
 	var force bool
 	set := &cobra.Command{
 		Use:       "set <key> <value>",
-		Short:     "Change one setting (lists are comma separated; \"\" clears)",
+		Short:     "Change one setting (lists are comma separated; \"\" clears a list, or restores the default protected_branches)",
 		Args:      exactArgs(2),
 		ValidArgs: config.Keys,
 		RunE: func(_ *cobra.Command, args []string) error {

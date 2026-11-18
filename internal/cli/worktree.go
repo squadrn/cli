@@ -227,6 +227,27 @@ func (a *app) gcCmd() *cobra.Command {
 				}
 				return a.printJSON(map[string]any{"base": base, "worktrees": rows})
 			}
+			if asJSON {
+				removed := []string{}
+				errs := []string{}
+				_, rerrs := repo.RemoveAll(ctx, cands)
+				for _, c := range cands {
+					if _, err := os.Stat(c.Path); c.Action != worktree.Keep && errors.Is(err, os.ErrNotExist) {
+						name, _ := repo.Name(c.Worktree)
+						removed = append(removed, name)
+					}
+				}
+				for _, e := range rerrs {
+					errs = append(errs, e.Error())
+				}
+				if err := a.printJSON(map[string]any{"base": base, "removed": removed, "errors": errs}); err != nil {
+					return err
+				}
+				if len(rerrs) > 0 {
+					return errQuiet
+				}
+				return nil
+			}
 			a.out("base: %s\n", base)
 			for _, c := range cands {
 				name, _ := repo.Name(c.Worktree)
