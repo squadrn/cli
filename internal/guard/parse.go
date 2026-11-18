@@ -189,6 +189,8 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 		}
 	case base == "source" || base == ".":
 		e.source(argv[1:], *dir)
+	case base == "gh":
+		e.gh(argv[1:])
 	case e.names[base]:
 		e.sprawl(argv[1:])
 	case base == "pwsh" || base == "powershell":

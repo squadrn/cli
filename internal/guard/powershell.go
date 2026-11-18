@@ -135,6 +135,8 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 		}
 	case name == "pwsh" || name == "powershell":
 		e.psNested(words[1:], *dir, depth)
+	case name == "gh":
+		e.gh(args)
 	case e.names[name]:
 		e.sprawl(args)
 	case psEnvWrite(name, words[1:]):
