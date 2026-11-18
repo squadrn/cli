@@ -374,6 +374,7 @@ func (e *extractor) nested(parts []arg, dir string, depth int, what string) erro
 }
 
 func (e *extractor) resolve(dir, p string) string {
+	p = nativePath(p)
 	switch {
 	case p == "~" || strings.HasPrefix(p, "~/"):
 		return filepath.Join(e.home, strings.TrimPrefix(p, "~"))
