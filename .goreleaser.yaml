@@ -5,7 +5,7 @@ project_name: sprawl
 # SPRAWL_RELEASES_OWNER/SPRAWL_RELEASES_NAME. Users get read access to it, never to the source.
 before:
   hooks:
-    - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+    - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }} {{ .Tag }}
 
 builds:
   - id: unix

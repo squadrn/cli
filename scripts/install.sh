@@ -5,15 +5,20 @@
 #   gh release download -R __SPRAWL_REPO__ -p install.sh -O - | sh
 #   gh release download -R __SPRAWL_REPO__ -p install.sh -O - | sh -s -- --name ai --alias sx
 #
+# It installs the release it was downloaded from (gh downloads from the latest release unless a
+# tag is given: gh release download vX.Y.Z -R ...).
+#
 # Options (or environment):
 #   --name NAME       command name (SPRAWL_COMMAND; default: asked, else "sprawl")
 #   --alias A,B       short aliases (SPRAWL_ALIASES; default: asked, else "sra"; '' for none)
-#   --version vX.Y.Z  a specific release (SPRAWL_VERSION; default: latest)
+#   --version vX.Y.Z  another release (SPRAWL_VERSION; default: this script's release)
 #   --repo OWNER/NAME the repository to install from (default: the one this script came from)
 #   --force           accept a name that another program on PATH already uses
 set -eu
 
 repo=__SPRAWL_REPO__
+# The release this script was published with; a placeholder in a source checkout.
+release_tag=__SPRAWL_VERSION__
 # Public keys allowed to sign releases (ssh-ed25519 lines); empty in unreleased builds.
 signers=$(
   cat <<'SIGNERS'
@@ -53,7 +58,7 @@ command -v tar >/dev/null || die "tar is required"
 case $(uname -s) in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
-  MINGW* | MSYS* | CYGWIN*) die "this is Windows: use PowerShell instead: gh release download -R $repo -p install.ps1 -O - | Out-String | Invoke-Expression" ;;
+  MINGW* | MSYS* | CYGWIN*) die "this is Windows: use install.ps1 in PowerShell instead: & ([scriptblock]::Create((gh release download TAG -R $repo -p install.ps1 -O - | Out-String)))" ;;
   *) die "unsupported OS $(uname -s); sprawl supports macOS and Linux" ;;
 esac
 case $(uname -m) in
@@ -62,42 +67,7 @@ case $(uname -m) in
   *) die "unsupported CPU $(uname -m)" ;;
 esac
 
-valid_name() { printf '%s' "$1" | grep -Eq '^[a-z][a-z0-9-]{0,15}$'; }
-
-# First install with a terminal: ask for the command name. Upgrades keep the saved one.
-config="${XDG_CONFIG_HOME:-$HOME/.config}/sprawl/config.toml"
-# /dev/tty can exist yet fail to open (no controlling terminal: CI, ssh -T), so try opening it.
-if [ -z "$name" ] && [ ! -f "$config" ] && (: </dev/tty >/dev/tty) 2>/dev/null; then
-  while :; do
-    printf 'Command name for sprawl [sprawl]: ' >/dev/tty
-    IFS= read -r answer </dev/tty || answer=""
-    name=${answer:-sprawl}
-    if ! valid_name "$name"; then
-      printf '  use lowercase letters, digits and -, starting with a letter (max 16)\n' >/dev/tty
-      continue
-    fi
-    existing=$(command -v "$name" 2>/dev/null || true)
-    if [ -n "$existing" ] && [ "$(dirname "$existing")" != "$HOME/.local/bin" ] && [ -z "$force" ]; then
-      printf '  %s is already a command (%s). Use it anyway? [y/N] ' "$name" "$existing" >/dev/tty
-      IFS= read -r yn </dev/tty || yn=""
-      case "$yn" in y | Y) force=--force ;; *) continue ;; esac
-    fi
-    break
-  done
-  if [ -z "$alias_set" ]; then
-    while :; do
-      printf "Short alias [sra] ('-' for none): " >/dev/tty
-      IFS= read -r answer </dev/tty || answer=""
-      case "${answer:-sra}" in
-        -) aliases=""; alias_set=yes; break ;;
-        *) if valid_name "${answer:-sra}"; then aliases=${answer:-sra}; alias_set=yes; break; fi
-           printf '  use lowercase letters, digits and -, starting with a letter (max 16)\n' >/dev/tty ;;
-      esac
-    done
-  fi
-fi
-[ -z "$name" ] || valid_name "$name" || die "invalid command name: $name"
-
+case $release_tag in v[0-9]*) [ -n "$tag" ] || tag=$release_tag ;; esac
 if [ -z "$tag" ]; then
   tag=$(gh release view --repo "$repo" --json tagName --jq .tagName) ||
     die "cannot read releases of $repo; check gh auth status and your access to the repo"
@@ -105,7 +75,8 @@ fi
 asset="sprawl_${tag#v}_${os}_${arch}.tar.gz"
 
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT INT TERM
+trap 'rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"; exit 130' INT TERM
 signed=""
 if printf '%s\n' "$signers" | grep -q '^ssh-ed25519 '; then signed=yes; fi
 if [ -n "$signed" ]; then
@@ -150,4 +121,9 @@ set -- "$tmp/release/sprawl" self-install "$tmp/release"
 [ -z "$name" ] || set -- "$@" --command "$name"
 [ -z "$alias_set" ] || set -- "$@" --alias "$aliases"
 [ -z "$force" ] || set -- "$@" "$force"
+# sprawl asks for the names itself (on the terminal) unless they were given. /dev/tty can exist
+# yet fail to open (no controlling terminal: CI, ssh -T), so try opening it.
+if [ -z "$name" ] && [ -z "$alias_set" ] && (: </dev/tty >/dev/tty) 2>/dev/null; then
+  set -- "$@" --interactive
+fi
 "$@"

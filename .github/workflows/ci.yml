@@ -149,6 +149,15 @@ jobs:
       - name: Install, update, rollback and uninstall on Windows
         shell: pwsh
         run: ./scripts/windows-e2e.ps1
+      # The documented script block against a release built here and served by a fake gh.
+      - name: install.ps1 as documented, in Windows PowerShell 5.1 and PowerShell 7
+        shell: bash
+        run: |
+          fixture="$RUNNER_TEMP/ps1-fixture"
+          mkdir -p "$fixture"
+          ssh-keygen -q -t ed25519 -N '' -C test -f "$fixture/key"
+          sh scripts/render-install.sh test/sprawl-releases v1.2.0-rc.99 "$fixture/key.pub"
+          pwsh -NoProfile -File scripts/windows-install-e2e.ps1 -Fixture "$(cygpath -w "$fixture")" -Tag v1.2.0-rc.99
       - name: install.ps1 parses in Windows PowerShell 5.1 and PowerShell 7
         run: |
           powershell -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1)); "5.1 ok"'
