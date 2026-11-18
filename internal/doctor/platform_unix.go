@@ -3,6 +3,7 @@
 package doctor
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -30,3 +31,9 @@ func onPath(name string) []string {
 	}
 	return out
 }
+
+// platform has no extra checks on Unix.
+func (Env) platform(context.Context) []Check { return nil }
+
+// powerShellOnly: Unix agents always use the shell tool.
+func powerShellOnly() bool { return false }
