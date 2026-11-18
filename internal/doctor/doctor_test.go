@@ -12,6 +12,7 @@ import (
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/config"
 	"sprawling-agents/internal/githook"
+	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/release"
 )
@@ -206,5 +207,27 @@ func TestRunWithEverythingMissing(t *testing.T) {
 		if _, ok := find(checks, want); !ok {
 			t.Errorf("missing check %q", want)
 		}
+	}
+}
+
+func TestGitCheck(t *testing.T) {
+	e := env(t, fakeAgent{}, nil)
+	if c := e.gitCheck(context.Background()); c.Status != OK || c.Name != "git" {
+		t.Errorf("no detector: %+v", c)
+	}
+	e.GitHint = "brew install git"
+	e.Git = func(context.Context) (gitver.Version, error) {
+		return gitver.Version{Major: 2, Minor: 30, Patch: 2}, nil
+	}
+	if c := e.gitCheck(context.Background()); c.Status != Fail || !strings.Contains(c.Name, "git 2.30.2 is too old (sprawl needs 2.31 or newer)") || c.Fix != "brew install git" {
+		t.Errorf("too old: %+v", c)
+	}
+	e.Git = func(context.Context) (gitver.Version, error) { return gitver.Version{Major: 2, Minor: 47}, nil }
+	if c := e.gitCheck(context.Background()); c.Status != OK || c.Name != "git 2.47.0" {
+		t.Errorf("current: %+v", c)
+	}
+	e.Git = func(context.Context) (gitver.Version, error) { return gitver.Version{}, errors.New("git is broken") }
+	if c := e.gitCheck(context.Background()); c.Status != Fail {
+		t.Errorf("broken: %+v", c)
 	}
 }

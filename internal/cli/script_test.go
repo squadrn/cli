@@ -173,7 +173,7 @@ func TestScript(t *testing.T) {
 				root := ts.MkAbs(args[0])
 				work := ts.Getenv("WORK")
 				var lines []string
-				err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+				err := filepath.WalkDir(root, func(p string, _ fs.DirEntry, err error) error {
 					if err != nil || p == root {
 						return err
 					}

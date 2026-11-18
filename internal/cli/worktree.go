@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
+	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/worktree"
 )
@@ -28,7 +30,19 @@ func (a *app) repoHere(ctx context.Context, spec provider.Spec) (worktree.Repo, 
 	if err != nil {
 		return worktree.Repo{}, err
 	}
-	return worktree.Open(ctx, cwd, spec.WorktreeDir)
+	return a.openRepo(ctx, cwd, spec.WorktreeDir)
+}
+
+// openRepo opens the repository at dir after checking, once per run, that Git is new enough:
+// an old Git gets an upgrade command instead of a raw git error.
+func (a *app) openRepo(ctx context.Context, dir, subdir string) (worktree.Repo, error) {
+	if !a.gitChecked {
+		if err := gitver.Require(ctx, runtime.GOOS); err != nil {
+			return worktree.Repo{}, err
+		}
+		a.gitChecked = true
+	}
+	return worktree.Open(ctx, dir, subdir)
 }
 
 func (a *app) wtCmd() *cobra.Command {

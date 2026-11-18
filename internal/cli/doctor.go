@@ -4,11 +4,13 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"sprawling-agents/internal/doctor"
+	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/proc"
 	"sprawling-agents/internal/update"
 	"sprawling-agents/internal/worktree"
@@ -34,6 +36,8 @@ func (a *app) doctorCmd() *cobra.Command {
 				Timeout:  10 * time.Second,
 				Version:  Version,
 				Signed:   a.signers != "",
+				Git:      gitver.Detect,
+				GitHint:  gitver.Hint(runtime.GOOS),
 			}
 			if latest, ok := update.Available(Version, update.Load(a.updateStatePath())); ok {
 				env.Latest = latest

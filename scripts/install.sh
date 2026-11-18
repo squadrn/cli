@@ -40,6 +40,14 @@ while [ $# -gt 0 ]; do
 done
 
 command -v gh >/dev/null || die "gh is required: https://cli.github.com (then: gh auth login)"
+command -v git >/dev/null || die "git is required"
+# sprawl needs Git 2.31 or newer (gitver.Min); sprawl doctor prints the upgrade command.
+git_version=$(git version | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
+git_major=${git_version% *}
+git_minor=${git_version#* }
+if [ -z "$git_version" ] || [ "$git_major" -lt 2 ] || { [ "$git_major" -eq 2 ] && [ "$git_minor" -lt 31 ]; }; then
+  die "$(git version) is too old; sprawl needs git 2.31 or newer (macOS: brew install git; Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt install git; Debian: sudo apt install -t <codename>-backports git)"
+fi
 command -v tar >/dev/null || die "tar is required"
 
 case $(uname -s) in
