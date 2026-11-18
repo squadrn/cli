@@ -2,6 +2,7 @@
 package doctor
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,7 +21,7 @@ import (
 	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/githook"
 	"sprawling-agents/internal/gitver"
-	"sprawling-agents/internal/guard"
+	"sprawling-agents/internal/proc"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/release"
 )
@@ -190,20 +191,12 @@ func (e Env) install() []Check {
 // guard checks the three push-guard layers.
 func (e Env) guard(ctx context.Context) []Check {
 	const g = "push guard"
-	var out []Check
-	gd := guard.Guard{Protected: []string{"main"}, Git: guard.GitCLI{}}
-	sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if d := gd.Decide(sctx, "git pu''sh --forc origin main", os.TempDir()); d.Verdict == guard.Deny {
-		out = append(out, ok(g, "layer 1 (pre-tool hook) denies force pushes"))
-	} else {
-		out = append(out, bad(g, Fail, "layer 1 self-test did not deny a force push", "report a bug"))
-	}
+	out := []Check{e.hookProbe(ctx)}
 	switch {
 	case !e.Config.GitHooksEnabled():
 		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is off", e.Command+" config set git_hooks true"))
 	case !githook.Installed(e.Layout.GitHooks(), e.Layout.Binary(), e.configFile()):
-		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is not installed or outdated in "+e.tilde(e.Layout.GitHooks()), "re-run install.sh"))
+		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is not installed or outdated in "+e.tilde(e.Layout.GitHooks()), reinstallHint))
 	default:
 		out = append(out, ok(g, "layer 2 (git pre-push hook) installed for sessions sprawl starts"))
 	}
@@ -215,8 +208,81 @@ func (e Env) configFile() string {
 	return filepath.Join(config.DirsFor(e.Store.Home, config.Slug).Config, "config.toml")
 }
 
-// branchProtection checks layer 3, the server: whether the current repository's default
-// branch is protected on GitHub. Only the server can stop a push made outside sprawl.
+// hookProbe runs the installed plugin's guard hook exactly as its hooks.json declares it, the
+// way Claude Code does, with a force-push payload: it must deny, or layer 1 is not active.
+func (e Env) hookProbe(ctx context.Context) Check {
+	const g = "push guard"
+	if !fsx.IsFile(e.Layout.Binary()) {
+		return bad(g, Fail, "layer 1 (pre-tool hook): sprawl is not installed in "+e.tilde(e.Layout.Binary()), reinstallHint)
+	}
+	root := filepath.Join(e.Layout.DataDir, "plugin")
+	bin, args, err := guardHookCommand(filepath.Join(root, "hooks", "hooks.json"), root)
+	if err != nil {
+		return bad(g, Fail, "layer 1 (pre-tool hook): "+err.Error(), reinstallHint)
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"cwd":        filepath.ToSlash(os.TempDir()),
+		"tool_name":  probeTool,
+		"tool_input": map[string]string{"command": "git push --force origin main"},
+	})
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	env := append(os.Environ(), "CLAUDE_PLUGIN_ROOT="+root)
+	out, err := proc.Output(ctx, proc.Options{Stdin: bytes.NewReader(payload), Env: env}, bin, args...)
+	if err != nil || !strings.Contains(string(out), `"permissionDecision":"deny"`) {
+		return bad(g, Fail, "layer 1 (pre-tool hook) did not deny a force push when run like Claude Code runs it", reinstallHint+"; then "+e.Command+" doctor")
+	}
+	return ok(g, "layer 1 (pre-tool hook) denies force pushes")
+}
+
+// guardHookCommand reads the PreToolUse guard hook from hooks.json and returns how to start it:
+// exec form (command + args) as written, shell form through the platform's shell.
+func guardHookCommand(path, root string) (string, []string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", nil, fmt.Errorf("plugin hooks not installed (%w)", err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string   `json:"command"`
+				Args    []string `json:"args"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		return "", nil, fmt.Errorf("plugin hooks.json is invalid: %w", err)
+	}
+	expand := func(s string) string { return strings.ReplaceAll(s, "${CLAUDE_PLUGIN_ROOT}", root) }
+	for _, grp := range doc.Hooks["PreToolUse"] {
+		for _, h := range grp.Hooks {
+			if !strings.Contains(h.Command+" "+strings.Join(h.Args, " "), "guard-git") {
+				continue
+			}
+			if h.Args == nil {
+				sh, args := shellForm(h.Command)
+				return sh, args, nil
+			}
+			args := make([]string, len(h.Args))
+			for i, a := range h.Args {
+				args[i] = expand(a)
+			}
+			return expand(h.Command), args, nil
+		}
+	}
+	return "", nil, errors.New("plugin hooks.json has no guard-git PreToolUse hook")
+}
+
+// protection is the part of GitHub's classic branch protection doctor reads.
+type protection struct {
+	AllowForcePushes struct{ Enabled bool } `json:"allow_force_pushes"`
+	AllowDeletions   struct{ Enabled bool } `json:"allow_deletions"`
+	EnforceAdmins    struct{ Enabled bool } `json:"enforce_admins"`
+}
+
+// branchProtection checks layer 3, the server: whether the current repository's default branch
+// is protected on GitHub against force pushes and deletion, by classic branch protection or a
+// ruleset. Only the server can stop a push made outside sprawl.
 func (e Env) branchProtection(ctx context.Context) []Check {
 	const g = "push guard"
 	if e.Repo == "" || e.GH == nil {
@@ -232,23 +298,62 @@ func (e Env) branchProtection(ctx context.Context) []Check {
 	if !okSplit || branch == "" {
 		return nil
 	}
-	name := fmt.Sprintf("layer 3 (server) protects %s on %s", branch, repo)
-	if _, err := e.GH(ctx, "api", fmt.Sprintf("repos/%s/branches/%s/protection", repo, branch), "--silent"); err != nil {
+	weak := Warn
+	if powerShellOnly() {
+		weak = Fail // the weaker PowerShell analyser is the only layer 1 here
+	}
+	fix := fmt.Sprintf("protect it: https://github.com/%s/settings/branches", repo)
+	if e.rulesetProtects(ctx, repo, branch) {
+		return []Check{ok(g, fmt.Sprintf("layer 3 (server) protects %s on %s (ruleset)", branch, repo))}
+	}
+	body, err := e.GH(ctx, "api", fmt.Sprintf("repos/%s/branches/%s/protection", repo, branch))
+	if err != nil {
 		msg := err.Error()
 		switch {
 		case strings.Contains(msg, "404") || strings.Contains(msg, "Branch not protected"):
-			status := Warn
-			if powerShellOnly() {
-				status = Fail // the weaker PowerShell analyser is the only layer 1 here
-			}
-			return []Check{bad(g, status, fmt.Sprintf("layer 3 (server): %s on %s is not protected", branch, repo),
-				fmt.Sprintf("protect it: https://github.com/%s/settings/branches", repo))}
+			return []Check{bad(g, weak, fmt.Sprintf("layer 3 (server): %s on %s is not protected", branch, repo), fix)}
+		case strings.Contains(msg, "Upgrade to GitHub Pro") || strings.Contains(msg, "GitHub Pro"):
+			return []Check{bad(g, weak, fmt.Sprintf("layer 3 (server): %s on %s cannot be protected on this plan (needs GitHub Pro or a public repository)", branch, repo), "make the repository public or upgrade the plan")}
 		case strings.Contains(msg, "403"):
 			return []Check{bad(g, Warn, "layer 3 (server): cannot read branch protection of "+repo+" (needs admin)", "ask a repository admin to protect "+branch)}
 		}
 		return []Check{bad(g, Warn, "layer 3 (server): branch protection unknown: "+msg, "")}
 	}
-	return []Check{ok(g, name)}
+	var p protection
+	if err := json.Unmarshal(body, &p); err != nil {
+		return []Check{bad(g, Warn, "layer 3 (server): unreadable branch protection of "+repo, "")}
+	}
+	switch {
+	case p.AllowForcePushes.Enabled:
+		return []Check{bad(g, weak, fmt.Sprintf("layer 3 (server): %s on %s allows force pushes", branch, repo), fix)}
+	case p.AllowDeletions.Enabled:
+		return []Check{bad(g, weak, fmt.Sprintf("layer 3 (server): %s on %s can be deleted", branch, repo), fix)}
+	}
+	out2 := []Check{ok(g, fmt.Sprintf("layer 3 (server) protects %s on %s", branch, repo))}
+	if !p.EnforceAdmins.Enabled {
+		out2 = append(out2, bad(g, Warn, fmt.Sprintf("layer 3 (server): admins can bypass the protection of %s on %s", branch, repo), "enable \"Do not allow bypassing the above settings\": https://github.com/"+repo+"/settings/branches"))
+	}
+	return out2
+}
+
+// rulesetProtects reports rulesets that block both force pushes and deletion of branch.
+func (e Env) rulesetProtects(ctx context.Context, repo, branch string) bool {
+	body, err := e.GH(ctx, "api", fmt.Sprintf("repos/%s/rules/branches/%s", repo, branch))
+	if err != nil {
+		return false
+	}
+	var rules []struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(body, &rules) != nil {
+		return false
+	}
+	nonFF, del := false, false
+	for _, r := range rules {
+		nonFF = nonFF || r.Type == "non_fast_forward"
+		del = del || r.Type == "deletion"
+	}
+	return nonFF && del
 }
 
 // recommendedDeny keeps an agent from editing the guard itself through its file tools.
