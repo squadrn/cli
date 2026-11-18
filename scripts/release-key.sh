@@ -2,6 +2,11 @@
 # Creates the release signing key (ed25519, SSH signature format). Run it once, yourself:
 #
 #   scripts/release-key.sh OWNER/sprawling-agents [--backup FILE]
+#   scripts/release-key.sh OWNER/sprawling-agents --spare --backup FILE
+#
+# --spare creates a standby key: its public key is trusted by every build from the next release
+# on, but CI keeps signing with the current key. If the current key is ever lost, put the spare
+# into the secret (gh secret set SPRAWL_SIGNING_KEY < FILE) and nobody has to reinstall.
 #
 # The private key never reaches the terminal: it is stored as the GitHub Actions secret
 # SPRAWL_SIGNING_KEY of the source repository, in pass (sprawl/release-signing-key) when pass is
@@ -18,9 +23,11 @@ repo=${1:-}
 [ -n "$repo" ] || die "usage: scripts/release-key.sh OWNER/REPO [--backup FILE]"
 shift
 backup=""
+spare=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --backup) [ $# -ge 2 ] || die "--backup needs a file"; backup=$2; shift 2 ;;
+    --spare) spare=yes; shift ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -30,16 +37,21 @@ command -v gh >/dev/null || die "gh is required (logged in with admin access to 
 if ! command -v pass >/dev/null && [ -z "$backup" ]; then
   die "no backup: install pass or give --backup FILE (an encrypted volume)"
 fi
+[ -z "$spare" ] || [ -n "$backup" ] || command -v pass >/dev/null || die "--spare needs a backup"
 
 umask 077
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
-ssh-keygen -q -t ed25519 -N '' -C "sprawl-release-$(date +%Y%m%d)" -f "$tmp/key"
+kind=release
+[ -z "$spare" ] || kind=spare
+ssh-keygen -q -t ed25519 -N '' -C "sprawl-$kind-$(date +%Y%m%d)" -f "$tmp/key"
 
-gh secret set SPRAWL_SIGNING_KEY --repo "$repo" <"$tmp/key"
+if [ -z "$spare" ]; then
+  gh secret set SPRAWL_SIGNING_KEY --repo "$repo" <"$tmp/key"
+fi
 if command -v pass >/dev/null; then
-  pass insert -m -f sprawl/release-signing-key <"$tmp/key" >/dev/null
-  echo "private key stored in pass: sprawl/release-signing-key"
+  pass insert -m -f "sprawl/$kind-signing-key" <"$tmp/key" >/dev/null
+  echo "private key stored in pass: sprawl/$kind-signing-key"
 fi
 if [ -n "$backup" ]; then
   [ ! -e "$backup" ] || die "$backup exists; refusing to overwrite it"
@@ -47,6 +59,10 @@ if [ -n "$backup" ]; then
   echo "private key backed up to $backup"
 fi
 cat "$tmp/key.pub" >>internal/release/signers.pub
-echo "secret SPRAWL_SIGNING_KEY set on $repo"
+if [ -z "$spare" ]; then
+  echo "secret SPRAWL_SIGNING_KEY set on $repo"
+else
+  echo "spare key created; CI still signs with the current key. Commit signers.pub and release."
+fi
 echo "public key added to internal/release/signers.pub:"
 cat "$tmp/key.pub"
