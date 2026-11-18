@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"sprawling-agents/internal/proc"
@@ -25,14 +24,16 @@ type CLI struct {
 	ExtraEnv []string
 }
 
-// Find locates claude on PATH.
+// Find locates claude on PATH (platform: lookPath).
 func Find() (CLI, error) {
-	bin, err := exec.LookPath("claude")
+	bin, err := lookPath()
 	if err != nil {
-		return CLI{}, errors.New("claude is not installed or not on PATH (https://claude.ai/install.sh)")
+		return CLI{}, err
 	}
 	return CLI{Bin: bin}, nil
 }
+
+var errNotInstalled = errors.New("claude is not installed or not on PATH (https://claude.ai/install.sh)")
 
 // Env returns environ with CLAUDE_CONFIG_DIR set to configDir, or removed when configDir is "".
 // The default account must run with the variable unset: Claude Code keys its credential

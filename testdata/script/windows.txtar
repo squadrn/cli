@@ -50,3 +50,4 @@ exec sprawl self-uninstall --yes
 {"cwd":".","tool_name":"PowerShell","tool_input":{"command":"& git push -f origin x"}}
 -- ps-iex.json --
 {"cwd":".","tool_name":"PowerShell","tool_input":{"command":"iex 'git push'"}}
+-- home/.claude-personal/.sprawl-account --

@@ -45,17 +45,60 @@ stdout '"logged_in": true'
 exec sprawl account --json
 stdout '"account": "claude/main"'
 
-# logout keeps the dir; rename moves it and rewrites the plugin registry's paths.
+# Dirs named like accounts but not made by sprawl are not accounts; adopt makes them one.
+mkdir home/.claude-squad
+exec sprawl account ls
+stdout '^unmanaged: ~/.claude-squad \(sprawl account adopt claude/squad\)$'
+! stdout '^claude/squad '
+exitcode 2 sprawl squad
+! exec sprawl account add squad
+stderr 'exists but is not a sprawl account'
+exitcode 2 sprawl account adopt squad
+exec sprawl account adopt squad --yes
+stdout 'adopted claude/squad'
+exists home/.claude-squad/.sprawl-account
+exec sprawl account adopt squad
+stdout 'already an account'
+exitcode 1 sprawl account adopt ghost --yes
+exec sprawl account ls
+! stdout unmanaged
+
+# A session refreshes per-skill links and warns about a shared item replaced by a file.
+mkdir home/.claude/skills/new-skill
+rm home/.claude/skills/find-skills
+exec sprawl work
+exists home/.claude-work/skills/new-skill
+! exists home/.claude-work/skills/find-skills
+rm home/.claude-work/settings.json
+cp settings.json home/.claude-work/settings.json
+exec sprawl work
+stderr 'warning: ~/.claude-work/settings.json was replaced in claude/work, so it no longer follows the main account'
+rm home/.claude-work/settings.json
+exec sprawl account add work
+stdout 'linked ~/.claude-work/settings.json'
+
+# A session in progress blocks rename and rm unless --force.
+mkdir home/.claude-work/.sprawl-inuse
+cp inuse.json home/.claude-work/.sprawl-inuse/1.json
+! exec sprawl account rename work job
+stderr 'claude/work is in use by pid 1 \(claude/work\); stop it first \(or use --force\)'
+! exec sprawl account rm work --yes
+stderr 'in use by pid 1'
+rm home/.claude-work/.sprawl-inuse/1.json
+
+# logout keeps the dir; rename logs out first, moves it and rewrites the plugin registry's paths.
 exec sprawl account logout work
 stdout 'logged out claude/work'
 ! exists home/.claude-work/.loggedin
 exists home/.claude-work
 mkdir home/.claude-work/plugins
 exec sh -c 'printf "{\"installPath\":\"%s/.claude-work/plugins/cache/x\"}" "$HOME" > home/.claude-work/plugins/installed_plugins.json'
+cp empty home/.claude-work/.loggedin
 exec sprawl account rename work job
-stdout 'renamed claude/work → claude/job \(~/.claude-job\)'
+stdout 'renamed claude/work → claude/job \(~/.claude-job\), logged out'
 stdout 'next: sprawl account login claude/job'
 ! exists home/.claude-work
+! exists home/.claude-job/.loggedin
 grep '.claude-job/plugins/cache/x' home/.claude-job/plugins/installed_plugins.json
 exitcode 2 sprawl account rename job grid
 exitcode 2 sprawl account rename main x2
@@ -76,6 +119,10 @@ exitcode 2 sprawl account rm main --yes
 exec sprawl account rm claude/work --yes
 stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
 ! exists home/.claude-work
+exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
+stdout '^\[Trash Info\]$'
+stdout '^Path=/.*/home/.claude-work$'
+stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
 exitcode 1 sprawl account rm work --yes
 
 -- empty --
@@ -89,3 +136,5 @@ exitcode 1 sprawl account rm work --yes
 shared_mcp = ["codegraph", "secret", "absent"]
 -- market/.claude-plugin/marketplace.json --
 {"name":"sprawl","plugins":[]}
+-- inuse.json --
+{"pid":1,"account":"claude/work"}
