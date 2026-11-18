@@ -72,26 +72,46 @@ type NameCheck struct {
 }
 
 func (n NameCheck) Check(cfg config.Config) error {
-	lookPath := n.LookPath
-	if lookPath == nil {
-		lookPath = exec.LookPath
-	}
 	seen := map[string]bool{}
 	for _, name := range append([]string{cfg.Command}, cfg.Aliases...) {
-		if err := config.ValidateCommand(name); err != nil {
+		if err := n.Valid(name); err != nil {
 			return err
 		}
 		if seen[name] {
 			return fmt.Errorf("%w: %q", ErrDuplicateName, name)
 		}
 		seen[name] = true
-		p, err := lookPath(name)
-		if err != nil || filepath.Dir(p) == n.Layout.BinDir || n.Force || n.Accepted[name] || n.isSelf(p) {
-			continue
+		if p := n.Clash(name); p != "" && !n.Force {
+			return fmt.Errorf("%w: %q is already a command on PATH (%s); pick another name or pass --force", ErrNameTaken, name, p)
 		}
-		return fmt.Errorf("%w: %q is already a command on PATH (%s); pick another name or pass --force", ErrNameTaken, name, p)
 	}
 	return nil
+}
+
+// Valid checks the form of name; a name not accepted before must also be portable
+// (config.CheckPortable).
+func (n NameCheck) Valid(name string) error {
+	if err := config.ValidateCommand(name); err != nil {
+		return err
+	}
+	if n.Accepted[name] {
+		return nil
+	}
+	return config.CheckPortable(name)
+}
+
+// Clash returns the path of another program that already answers to name, "" when none does
+// (or the name was accepted before, or it is sprawl itself).
+func (n NameCheck) Clash(name string) string {
+	lookPath := n.LookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	p, err := lookPath(name)
+	if err != nil || filepath.Dir(p) == n.Layout.BinDir || n.Accepted[name] || n.isSelf(p) {
+		return ""
+	}
+	return p
 }
 
 func (n NameCheck) isSelf(path string) bool {

@@ -214,3 +214,14 @@ func TestDirsFor(t *testing.T) {
 		t.Fatalf("XDG: %+v", d)
 	}
 }
+
+func TestEnvOverrides(t *testing.T) {
+	t.Setenv("SPRAWL_SHARED_MCP", " ")
+	if len(EnvOverrides()) != 0 {
+		t.Fatal("a blank variable overrides nothing")
+	}
+	t.Setenv("SPRAWL_SHARED_MCP", "a b")
+	if EnvOverrides()["shared_mcp"] != "SPRAWL_SHARED_MCP" {
+		t.Fatal("shared_mcp override not reported")
+	}
+}

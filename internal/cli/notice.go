@@ -20,20 +20,20 @@ var quietCommands = []string{"self-update", "self-install", "self-uninstall", "c
 // blocking, never forcing. It also starts the daily background check when one is due. Only
 // for people at a terminal; never with --json, in CI or when turned off.
 func (a *app) updateNotice(r route) {
-	if !a.interactive || !a.colorErr || a.cfgErr != nil || !a.cfg.UpdateCheckEnabled() ||
+	if !a.interactive || !a.ttyErr || a.cfgErr != nil || !a.cfg.UpdateCheckEnabled() ||
 		update.Disabled(os.Getenv) || slices.Contains(quietCommands, r.sub) || slices.Contains(r.args, "--json") {
 		return
 	}
 	path := a.updateStatePath()
 	s := update.Load(path)
 	now := a.now()
-	if latest, ok := update.Available(Version, s); ok && now.Sub(s.NotifiedAt) >= noticeEvery {
-		a.errf("%s\n", a.paint(true, "1;36", "✦ sprawl "+latest+" is available")+
-			a.paint(true, "2", " (you have v"+trimV(Version)+") · "+a.cmd+" self-update · what's new: "+a.cmd+" self-update --check"))
+	if latest, ok := update.Available(Version, s, a.cfg.Channel()); ok && now.Sub(s.NotifiedAt) >= noticeEvery {
+		a.errf("%s\n", a.paint(a.colorErr, "1;36", "✦ sprawl "+latest+" is available")+
+			a.paint(a.colorErr, "2", " (you have v"+trimV(Version)+") · "+a.cmd+" self-update · what's new: "+a.cmd+" self-update --check"))
 		s.NotifiedAt = now
 		update.Save(path, s)
 	}
-	if Repo != "" && update.Due(s, now) {
+	if Repo != "" && update.Due(s, now, a.cfg.Channel()) {
 		s.CheckedAt = now // claim the slot so parallel invocations do not all start a check
 		update.Save(path, s)
 		if a.backgroundCheck != nil {

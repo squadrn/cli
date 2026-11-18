@@ -71,6 +71,16 @@ func TestNameCheck(t *testing.T) {
 	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"sprawl"}}); !errors.Is(err, ErrDuplicateName) {
 		t.Fatalf("duplicate: %v", err)
 	}
+	if err := n.Check(config.Config{Command: "con"}); !errors.Is(err, config.ErrInvalidCommand) {
+		t.Fatal("a Windows device name was accepted")
+	}
+	if n.Clash("sx") == "" || n.Clash("mine") != "" {
+		t.Fatal("Clash")
+	}
+	accepted := NameCheck{Layout: layout, Accepted: map[string]bool{"gc": true}, LookPath: look}
+	if err := accepted.Check(config.Config{Command: "gc"}); err != nil {
+		t.Fatalf("a name accepted before must not be re-checked for portability: %v", err)
+	}
 	if err := n.Check(config.Config{Command: "git"}); !errors.Is(err, config.ErrInvalidCommand) {
 		t.Fatalf("invalid: %v", err)
 	}

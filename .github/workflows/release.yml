@@ -48,9 +48,10 @@ jobs:
             found { print }
           ' CHANGELOG.md >"$RUNNER_TEMP/release-notes.md"
           [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "CHANGELOG.md has no section for $version"; exit 1; }
+      # Published as a draft: users see it only after the upgrade jobs pass (publish job).
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
-          version: "~> v2"
+          version: v2.20.2
           args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
         env:
           # Fine-grained token with contents:write on the releases repository only.
@@ -66,8 +67,10 @@ jobs:
             dist/*.zip
             dist/checksums.txt
 
-  # The real upgrade path: install the previous release with the published installer, then
-  # self-update to this one. Skipped for the first release.
+  # The real upgrade path, against the draft: install the previous release with this release's
+  # installer, then self-update to this one (and roll back on Linux). Drafts are visible to the
+  # publishing token only, so it is used here (read-only otherwise). Skipped without a previous
+  # release.
   upgrade:
     needs: release
     strategy:
@@ -81,12 +84,15 @@ jobs:
       TAG: ${{ github.ref_name }}
       SPRAWL_NO_UPDATE_CHECK: "1"
     steps:
-      - name: Previous release
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Previous release (semver, same channel)
         id: prev
         shell: bash
         run: |
-          prev=$(gh release list --repo "$RELEASES_REPO" --limit 20 --json tagName,isPrerelease \
-            --jq "[.[] | select(.tagName != \"$TAG\")][0].tagName // empty")
+          prev=$(gh release list --repo "$RELEASES_REPO" --limit 100 --json tagName,isPrerelease,isDraft |
+            jq -r -f scripts/previous-release.jq)
           # The first Windows release has no Windows predecessor to update from.
           if [ -n "$prev" ] && [ "$RUNNER_OS" = Windows ]; then
             zips=$(gh release view "$prev" --repo "$RELEASES_REPO" --json assets --jq '[.assets[].name | select(endswith(".zip"))] | length')
@@ -94,22 +100,65 @@ jobs:
           fi
           echo "tag=$prev" >>"$GITHUB_OUTPUT"
           echo "previous release: ${prev:-none}"
-      - name: Install the previous release and update (Linux)
+      - name: Install the previous release, update, roll back (Linux)
         if: steps.prev.outputs.tag != '' && runner.os == 'Linux'
+        env:
+          PREV: ${{ steps.prev.outputs.tag }}
         run: |
           gh release download "$TAG" -R "$RELEASES_REPO" -p install.sh -O install.sh
-          sh install.sh --version "${{ steps.prev.outputs.tag }}" --name sprawl --alias ''
+          sh install.sh --version "$PREV" --name sprawl --alias ''
           export PATH="$HOME/.local/bin:$PATH"
           sprawl version
           sprawl self-update --version "$TAG"
           test "$(sprawl version)" = "sprawl ${TAG#v}"
+          sprawl doctor --json >/dev/null || true
+          sprawl self-update --rollback
+          test "$(sprawl version)" = "sprawl ${PREV#v}"
+          sprawl self-update --rollback
+          test "$(sprawl version)" = "sprawl ${TAG#v}"
       - name: Install the previous release and update (Windows)
         if: steps.prev.outputs.tag != '' && runner.os == 'Windows'
         shell: pwsh
+        env:
+          PREV: ${{ steps.prev.outputs.tag }}
         run: |
           gh release download $env:TAG -R $env:RELEASES_REPO -p install.ps1 -O install.ps1
-          ./install.ps1 -Version "${{ steps.prev.outputs.tag }}" -Name sprawl -Alias ''
+          ./install.ps1 -Version $env:PREV -Name sprawl -Alias ''
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed" }
           $sprawl = Join-Path $env:USERPROFILE ".local\bin\sprawl.exe"
           & $sprawl version
           & $sprawl self-update --version $env:TAG
           if ((& $sprawl version) -ne "sprawl $($env:TAG.TrimStart('v'))") { throw "self-update did not reach $env:TAG" }
+
+  # Only a release whose upgrade path works becomes visible to users.
+  publish:
+    needs: upgrade
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
+      RELEASES_REPO: ${{ vars.SPRAWL_RELEASES_REPO }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Publish the draft
+        run: gh release edit "$TAG" --repo "$RELEASES_REPO" --draft=false
+
+  # After publishing: an install on the release's channel discovers it.
+  discover:
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
+      RELEASES_REPO: ${{ vars.SPRAWL_RELEASES_REPO }}
+      TAG: ${{ github.ref_name }}
+      SPRAWL_NO_UPDATE_CHECK: "1"
+    steps:
+      - name: self-update --check sees the release on its channel
+        run: |
+          gh release download "$TAG" -R "$RELEASES_REPO" -p install.sh -O install.sh
+          sh install.sh --name sprawl --alias ''
+          export PATH="$HOME/.local/bin:$PATH"
+          case $TAG in *-*) want=beta ;; *) want=stable ;; esac
+          test "$(sprawl config get update_channel)" = "$want"
+          sprawl self-update --check --json | tee check.json
+          test "$(jq -r .latest check.json)" = "$TAG"
+          test "$(jq -r .channel check.json)" = "$want"

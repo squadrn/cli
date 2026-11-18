@@ -11,6 +11,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 // WriteFile atomically replaces path with the contents of r. The directory is created with
@@ -121,6 +123,27 @@ func ReplaceDir(src, dst string, permMask fs.FileMode) error {
 	return os.RemoveAll(old)
 }
 
+// MoveDir replaces dst with the directory src by renaming it. Transient failures (a scanner
+// holding a file on Windows) are retried for about two seconds.
+func MoveDir(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		return err
+	}
+	var err error
+	for i := range 8 {
+		if i > 0 {
+			time.Sleep(time.Duration(50*i) * time.Millisecond)
+		}
+		if err = os.RemoveAll(dst); err != nil {
+			continue
+		}
+		if err = os.Rename(src, dst); err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
 // CleanStale removes leftovers of an interrupted ReplaceDir for dst.
 func CleanStale(dst string) {
 	_ = os.RemoveAll(dst + ".new")
@@ -159,5 +182,48 @@ func SameFile(a, b string) bool {
 func ReplaceExecutable(src, dst string) error { return replaceExecutable(src, dst) }
 
 // CleanOld removes executables that ReplaceExecutable moved aside in dir once they no longer
-// run (Windows); a no-op elsewhere.
-func CleanOld(dir string) { cleanOld(dir) }
+// run (Windows); a no-op elsewhere. Only leftovers of names (file names such as sprawl.exe) are
+// touched: dir may be a bin dir other programs share.
+func CleanOld(dir string, names []string) { cleanOld(dir, names, time.Now()) }
+
+// newGrace is how old a staged <name>.new-* file must be before CleanOld treats it as abandoned;
+// a younger one may belong to an update running right now.
+const newGrace = 10 * time.Minute
+
+// Leftovers lists the files in dir that ReplaceExecutable left behind for one of names: every
+// <name>.old-*, and <name>.new-* older than newGrace. Names compare case-insensitively (Windows).
+func Leftovers(dir string, names []string, now time.Time) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range entries {
+		kind, ok := leftoverKind(e.Name(), names)
+		if !ok {
+			continue
+		}
+		if kind == ".new-" {
+			info, err := e.Info()
+			if err != nil || now.Sub(info.ModTime()) < newGrace {
+				continue
+			}
+		}
+		out = append(out, filepath.Join(dir, e.Name()))
+	}
+	return out
+}
+
+// leftoverKind reports whether file is <name>.old-<stamp> or <name>.new-<stamp> for one of names.
+func leftoverKind(file string, names []string) (string, bool) {
+	lower := strings.ToLower(file)
+	for _, n := range names {
+		n = strings.ToLower(n)
+		for _, kind := range []string{".old-", ".new-"} {
+			if strings.HasPrefix(lower, n+kind) && len(lower) > len(n)+len(kind) {
+				return kind, true
+			}
+		}
+	}
+	return "", false
+}

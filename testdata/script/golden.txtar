@@ -484,7 +484,7 @@ Examples:
 
 Available Commands:
   get         Print one setting
-  set         Change one setting (lists are comma separated; "" clears)
+  set         Change one setting (lists are comma separated; "" clears a list, or restores the default protected_branches)
 
 Flags:
   -h, --help   help for config
@@ -504,13 +504,14 @@ Usage:
 
 Flags:
   -h, --help   help for get
+      --json   print JSON
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-config-set.txt --
-Change one setting (lists are comma separated; "" clears)
+Change one setting (lists are comma separated; "" clears a list, or restores the default protected_branches)
 
 Usage:
   sprawl config set <key> <value> [flags]
@@ -538,6 +539,7 @@ Flags:
       --allow-downgrade   install a release older than the running one
       --check             only report whether an update is available, with its release notes
   -h, --help              help for self-update
+      --json              with --check: print JSON (current, latest, channel, available, notes)
       --repo string       GitHub repository to update from (owner/name)
       --rollback          reinstall the release that was installed before this one
       --version string    install this release tag instead of the newest

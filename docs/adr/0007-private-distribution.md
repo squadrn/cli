@@ -45,3 +45,19 @@ so they cannot be the proof that a release is genuine. macOS ships LibreSSL with
 - Losing the signing key forces every user to reinstall once with `install.sh`; the key is backed
   up outside GitHub (pass or an encrypted file).
 - Anything handed to users can be copied; the license, not technology, covers redistribution.
+
+## Addendum (1.2.0): what the signature covers
+
+`checksums.txt` also lists `install.sh` and `install.ps1`, so the signature covers the installers
+too. That protects copies checked by hand (download the installer with `checksums.txt` and
+`checksums.txt.sig`, then `ssh-keygen -Y verify` as `install.sh` does). The one-line install
+pipes the installer from `gh` straight into a shell, so nothing verifies the installer itself
+before it runs: that first step trusts GitHub, the releases repository's write access and the
+user's gh login. Everything the installer then downloads is verified against the keys embedded
+in it, and every later update against the keys embedded in the installed binary.
+
+Each installer is rendered with the tag of the release it ships in and installs that release by
+default, so `gh release download vX.Y.Z -p install.ps1` installs vX.Y.Z even when the latest
+stable release has no build for the platform. Releases are published as drafts and made visible
+only after the release workflow's upgrade jobs (install the previous release, update, roll back)
+pass against the draft.

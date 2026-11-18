@@ -55,6 +55,15 @@ stdout '"action": "keep"'
 stdout '"name": "feat-open"'
 stdout '"ignored": 0'
 
+# --json --yes reports what was removed, as JSON only.
+exec git -C $WORK/repo worktree add -q -b worktree-feat-two .claude/worktrees/feat-two
+exec sprawl gc --json --yes
+stdout '"base": "main"'
+stdout '"removed": \[\n +"feat-two"\n +\]'
+stdout '"errors": \[\]'
+! stdout 'removed 1'
+! exists $WORK/repo/.claude/worktrees/feat-two
+
 # wt ls and wt rm.
 cd $WORK/repo
 exec sprawl wt ls

@@ -5,7 +5,7 @@ project_name: sprawl
 # SPRAWL_RELEASES_OWNER/SPRAWL_RELEASES_NAME. Users get read access to it, never to the source.
 before:
   hooks:
-    - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+    - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }} {{ .Tag }}
 
 builds:
   - id: unix
@@ -91,9 +91,13 @@ archives:
 sboms:
   - artifacts: archive
 
+# The installers are listed too, so the signature covers them (ADR 0007).
 checksum:
   name_template: checksums.txt
   algorithm: sha256
+  extra_files:
+    - glob: build/install.sh
+    - glob: build/install.ps1
 
 # checksums.txt.sig: SSH signature (namespace sprawl-release) that self-update and install.sh
 # verify against the keys in internal/release/signers.pub.
@@ -110,6 +114,9 @@ release:
     name: "{{ .Env.SPRAWL_RELEASES_NAME }}"
   # Tags with a pre-release suffix (v1.2.0-rc.1) reach the beta channel only.
   prerelease: auto
+  # A draft until the release workflow's upgrade jobs pass; its publish job makes it visible.
+  draft: true
+  replace_existing_draft: true
   extra_files:
     - glob: build/install.sh
     - glob: build/install.ps1

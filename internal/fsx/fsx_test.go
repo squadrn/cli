@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -180,17 +181,38 @@ func TestReplaceDirRecovery(t *testing.T) {
 
 func TestCleanOld(t *testing.T) {
 	dir := t.TempDir()
-	for _, n := range []string{"tool.old-1", "tool.new-2", "keep"} {
-		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o644); err != nil {
+	now := time.Now()
+	stale := now.Add(-time.Hour)
+	for n, mod := range map[string]time.Time{
+		"tool.exe.old-1": now, "tool.exe.new-2": stale, "keep": stale,
+		"other.exe.old-1": stale, "other.exe.new-1": stale, "tool.exe.new-3": now,
+	} {
+		p := filepath.Join(dir, n)
+		if err := os.WriteFile(p, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, mod, mod); err != nil {
 			t.Fatal(err)
 		}
 	}
-	CleanOld(dir)
-	CleanOld(filepath.Join(dir, "missing"))
-	if !IsFile(filepath.Join(dir, "keep")) {
-		t.Fatal("CleanOld removed an unrelated file")
+	got := Leftovers(dir, []string{"TOOL.exe"}, now)
+	want := []string{filepath.Join(dir, "tool.exe.new-2"), filepath.Join(dir, "tool.exe.old-1")}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Leftovers = %v, want %v", got, want)
 	}
-	if runtime.GOOS == "windows" && (IsFile(filepath.Join(dir, "tool.old-1")) || IsFile(filepath.Join(dir, "tool.new-2"))) {
+	if Leftovers(filepath.Join(dir, "missing"), []string{"tool.exe"}, now) != nil {
+		t.Fatal("leftovers in a missing dir")
+	}
+	if _, ok := leftoverKind("tool.exe.old-", []string{"tool.exe"}); ok {
+		t.Fatal("a name without a stamp counted as a leftover")
+	}
+	CleanOld(dir, []string{"tool.exe"})
+	for _, n := range []string{"keep", "other.exe.old-1", "other.exe.new-1", "tool.exe.new-3"} {
+		if !IsFile(filepath.Join(dir, n)) {
+			t.Fatalf("CleanOld removed %s, which sprawl does not own or is in flight", n)
+		}
+	}
+	if runtime.GOOS == "windows" && (IsFile(filepath.Join(dir, "tool.exe.old-1")) || IsFile(filepath.Join(dir, "tool.exe.new-2"))) {
 		t.Fatal("CleanOld left replaced executables")
 	}
 }
@@ -205,5 +227,27 @@ func TestCopyFileErrors(t *testing.T) {
 	}
 	if err := CopyTree(filepath.Join(dir, "missing"), filepath.Join(dir, "y"), 0o755, false); err == nil {
 		t.Fatal("copied a missing tree")
+	}
+}
+
+func TestMoveDir(t *testing.T) {
+	root := t.TempDir()
+	src, dst := filepath.Join(root, "src"), filepath.Join(root, "dst")
+	for _, f := range []string{filepath.Join(src, "new"), filepath.Join(dst, "old")} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := MoveDir(src, dst); err != nil {
+		t.Fatal(err)
+	}
+	if !IsFile(filepath.Join(dst, "new")) || IsFile(filepath.Join(dst, "old")) || IsDir(src) {
+		t.Fatal("MoveDir did not replace dst")
+	}
+	if err := MoveDir(filepath.Join(root, "missing"), dst); err == nil || !IsFile(filepath.Join(dst, "new")) {
+		t.Fatal("a missing source must fail and keep dst")
 	}
 }

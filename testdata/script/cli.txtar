@@ -1,0 +1,59 @@
+[windows] skip 'Unix script: sh, symlinks or mode bits'
+mkdir elsewhere
+
+# Globals right after the account are sprawl's, not the agent's.
+exec sprawl personal -C elsewhere --no-color -- here
+stdout '^cfg=.*/home/.claude-personal args=here$'
+grep 'pwd=.*/elsewhere args=here' home/calls.log
+exec sprawl personal --dir=elsewhere -p hi
+stdout 'args=-p hi$'
+exitcode 2 sprawl personal -a main
+! exec sprawl personal -a main
+stderr 'the account is given twice'
+
+# Commands that do not run as an account refuse one instead of ignoring it.
+exitcode 2 sprawl personal doctor
+! exec sprawl personal config
+stderr '^sprawl: config does not take an account$'
+! exec sprawl -a personal wt ls
+stderr 'wt ls does not take an account'
+! exec sprawl personal grid --spread repo a b
+stderr '--spread picks the accounts itself'
+
+# JSON for --version and config get.
+exec sprawl --version --json
+stdout '"version": "dev"'
+exec sprawl config get update_channel --json
+stdout '"key": "update_channel"'
+stdout '"value": "stable"'
+
+# Values an environment variable overrides are marked.
+env SPRAWL_SHARED_MCP='a b'
+exec sprawl config
+stdout '^shared_mcp +a,b  \(from SPRAWL_SHARED_MCP\)$'
+env SPRAWL_SHARED_MCP=
+exec sprawl config set --help
+stdout 'restores the default protected_branches'
+
+# An invalid config keeps the git-level guard on for sessions and says so once.
+release rel
+exec sprawl self-install rel
+cp printenv bin/claude
+chmod 755 bin/claude
+cp bad.toml home/.config/sprawl/config.toml
+exec sprawl -- hi
+stdout 'GIT_CONFIG_VALUE_0=.*git-hooks'
+stderr -count=1 'warning: config .*unknown key "colour"; the git push guard stays on'
+! exec sprawl doctor
+stdout 'config invalid: config .*unknown key "colour"'
+
+-- printenv --
+#!/bin/sh
+case "$*" in
+  "auth status") echo '{"loggedIn":true}'; exit 0 ;;
+  "plugin "*) echo '[]'; exit 0 ;;
+esac
+env | grep '^GIT_CONFIG' | sort
+-- bad.toml --
+colour = "blue"
+-- home/.claude-personal/.sprawl-account --

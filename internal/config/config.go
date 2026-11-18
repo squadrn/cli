@@ -163,6 +163,15 @@ func load(path string) (Config, error) {
 	return c, nil
 }
 
+// EnvOverrides maps the settings an environment variable currently overrides to that variable.
+func EnvOverrides() map[string]string {
+	out := map[string]string{}
+	if strings.TrimSpace(os.Getenv("SPRAWL_SHARED_MCP")) != "" {
+		out["shared_mcp"] = "SPRAWL_SHARED_MCP"
+	}
+	return out
+}
+
 // Read parses one config file as written, without defaults or environment overrides.
 func Read(path string) (Config, error) {
 	var c Config

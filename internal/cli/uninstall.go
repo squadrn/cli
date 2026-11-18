@@ -71,6 +71,7 @@ func (a *app) uninstall(purge bool) error {
 		}
 		cancel()
 	}
+	names := append([]string{a.cmd}, a.cfg.Aliases...)
 	a.restoreStatusLines()
 	links, err := a.layout.Unlink()
 	if err != nil {
@@ -78,17 +79,17 @@ func (a *app) uninstall(purge bool) error {
 	}
 	for _, l := range links {
 		a.out("  removed %s\n", a.tilde(l))
+		names = append(names, strings.TrimSuffix(filepath.Base(l), ".exe"))
 		a.removeCompletions(strings.TrimSuffix(filepath.Base(l), ".exe"))
 	}
+	a.removeProfileLines()
 	// Executables still running (this one, a session, a hook) cannot be deleted on Windows; they
 	// are removed once sprawl has exited.
 	var later []string
 	if err := os.RemoveAll(a.layout.DataDir); err != nil {
 		later = append(later, a.layout.DataDir)
 	}
-	if old, _ := filepath.Glob(filepath.Join(a.layout.BinDir, "*.old-*")); len(old) > 0 {
-		later = append(later, old...)
-	}
+	later = append(later, a.layout.Leftovers(names)...)
 	if len(later) > 0 {
 		if err := removeAfterExit(later); err != nil {
 			a.warnf("could not remove %s: %v", strings.Join(later, ", "), err)

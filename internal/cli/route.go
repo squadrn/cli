@@ -12,7 +12,7 @@ import (
 //	sprawl [globals] [<account>] <subcommand> ...
 //	sprawl [globals] [<account>] [agent flags | agent subcommand | -- args...]
 //
-// globals: -a/--account <account>, -C <dir>, --no-color. Subcommands win over account names; a
+// globals: -a/--account <account>, -C/--dir <dir>, --no-color, before or right after the account. Subcommands win over account names; a
 // word that is neither (nor an agent subcommand) is a usage error, so a typo never starts an
 // agent with the typo as its prompt. Prompts go after "--".
 type route struct {
@@ -37,33 +37,9 @@ type routeTable struct {
 
 func parseRoute(args []string, t routeTable) (route, error) {
 	var r route
-	rest := args
-globals:
-	for len(rest) > 0 {
-		v := rest[0]
-		switch {
-		case v == "-a" || v == "--account" || v == "-C":
-			if len(rest) < 2 || rest[1] == "" {
-				return r, usagef("%s requires a value", v)
-			}
-			if v == "-C" {
-				r.dir = rest[1]
-			} else {
-				r.account = rest[1]
-			}
-			rest = rest[2:]
-		case strings.HasPrefix(v, "--account="):
-			if r.account = strings.TrimPrefix(v, "--account="); r.account == "" {
-				return r, usagef("--account requires an account name")
-			}
-			rest = rest[1:]
-		case strings.HasPrefix(v, "-C") && len(v) > 2:
-			r.dir, rest = strings.TrimPrefix(v[2:], "="), rest[1:]
-		case v == "--no-color":
-			r.noColor, rest = true, rest[1:]
-		default:
-			break globals
-		}
+	rest, err := r.globals(args, false)
+	if err != nil {
+		return r, err
 	}
 	if len(rest) == 0 {
 		r.pick = r.account == "" && t.interactive
@@ -73,7 +49,12 @@ globals:
 		return r, nil
 	}
 	if r.account == "" && t.isAccount(rest[0]) {
-		r.account, rest = rest[0], rest[1:]
+		r.account = rest[0]
+		// Globals may also follow the account (sprawl personal -C ~/repo wt x); after them come
+		// the subcommand or the agent's own arguments.
+		if rest, err = r.globals(rest[1:], true); err != nil {
+			return r, err
+		}
 		if len(rest) == 0 || r.dispatch(rest, t) {
 			return r, nil
 		}
@@ -85,6 +66,45 @@ globals:
 	return r, unknownWord(rest[0], t)
 }
 
+// globals consumes sprawl's global flags at the start of args and returns the rest. After the
+// account name (afterAccount), naming an account again is an error.
+func (r *route) globals(args []string, afterAccount bool) ([]string, error) {
+	rest := args
+	for len(rest) > 0 {
+		v := rest[0]
+		name, value, inline := strings.Cut(v, "=")
+		switch {
+		case !inline && (v == "-a" || v == "--account" || v == "-C" || v == "--dir"):
+			if len(rest) < 2 || rest[1] == "" {
+				return nil, usagef("%s requires a value", v)
+			}
+			name, value, rest = v, rest[1], rest[2:]
+		case inline && (name == "--account" || name == "--dir"):
+			if value == "" {
+				return nil, usagef("%s requires a value", name)
+			}
+			rest = rest[1:]
+		case strings.HasPrefix(v, "-C") && len(v) > 2:
+			name, value, rest = "-C", strings.TrimPrefix(v[2:], "="), rest[1:]
+		case v == "--no-color":
+			r.noColor, rest = true, rest[1:]
+			continue
+		default:
+			return rest, nil
+		}
+		switch name {
+		case "-C", "--dir":
+			r.dir = value
+		default:
+			if afterAccount {
+				return nil, usagef("the account is given twice (%s and %s %s)", r.account, name, value)
+			}
+			r.account = value
+		}
+	}
+	return rest, nil
+}
+
 // dispatch handles what can follow the globals or the account; false means rest[0] is a word
 // still to be classified.
 func (r *route) dispatch(rest []string, t routeTable) bool {
@@ -94,7 +114,7 @@ func (r *route) dispatch(rest []string, t routeTable) bool {
 	case v == "-h" || v == "--help":
 		r.sub, r.args = "help", rest[1:]
 	case v == "--version" && r.account == "":
-		r.sub = "version"
+		r.sub, r.args = "version", rest[1:]
 	case t.subcommands[v]:
 		r.sub, r.args = v, rest[1:]
 	case strings.HasPrefix(v, "-"):
