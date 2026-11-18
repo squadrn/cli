@@ -68,9 +68,10 @@ func TestEnvOverridesSharedMCP(t *testing.T) {
 }
 
 func TestPathHonoursXDG(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/x/cfg")
+	cfg := filepath.Join(t.TempDir(), "cfg")
+	t.Setenv("XDG_CONFIG_HOME", cfg)
 	p, err := Path()
-	if err != nil || p != "/x/cfg/sprawl/config.toml" {
+	if err != nil || p != filepath.Join(cfg, "sprawl", "config.toml") {
 		t.Fatalf("Path() = %q, %v", p, err)
 	}
 }
@@ -139,9 +140,10 @@ func TestSaveRoundTrip(t *testing.T) {
 }
 
 func TestLegacyPaths(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/x/cfg")
+	cfg := filepath.Join(t.TempDir(), "cfg")
+	t.Setenv("XDG_CONFIG_HOME", cfg)
 	p, err := LegacyPaths()
-	if err != nil || !slices.Equal(p, []string{"/x/cfg/squad/config.toml"}) {
+	if err != nil || !slices.Equal(p, []string{filepath.Join(cfg, "squad", "config.toml")}) {
 		t.Fatalf("LegacyPaths() = %q, %v", p, err)
 	}
 }
@@ -198,14 +200,17 @@ func TestDirsFor(t *testing.T) {
 	for _, k := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
 		t.Setenv(k, "")
 	}
-	d := DirsFor("/h", "sprawl")
-	if d != (Dirs{Config: "/h/.config/sprawl", Data: "/h/.local/share/sprawl", State: "/h/.local/state/sprawl", Cache: "/h/.cache/sprawl"}) {
+	home := filepath.Join(t.TempDir(), "h")
+	j := filepath.Join
+	d := DirsFor(home, "sprawl")
+	if d != (Dirs{Config: j(home, ".config", "sprawl"), Data: j(home, ".local", "share", "sprawl"), State: j(home, ".local", "state", "sprawl"), Cache: j(home, ".cache", "sprawl")}) {
 		t.Fatalf("defaults: %+v", d)
 	}
-	t.Setenv("XDG_CACHE_HOME", "/c")
+	cache := filepath.Join(t.TempDir(), "c")
+	t.Setenv("XDG_CACHE_HOME", cache)
 	t.Setenv("XDG_DATA_HOME", "relative")
-	d = DirsFor("/h", "sprawl")
-	if d.Cache != "/c/sprawl" || d.Data != "/h/.local/share/sprawl" {
+	d = DirsFor(home, "sprawl")
+	if d.Cache != j(cache, "sprawl") || d.Data != j(home, ".local", "share", "sprawl") {
 		t.Fatalf("XDG: %+v", d)
 	}
 }

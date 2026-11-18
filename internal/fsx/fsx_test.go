@@ -3,6 +3,7 @@ package fsx
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -15,10 +16,10 @@ func TestWriteFileAtomicAndPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	fi, err := os.Stat(path)
-	if err != nil || fi.Mode().Perm() != 0o600 {
+	if err != nil || runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
 		t.Fatalf("stat = %v, %v", fi, err)
 	}
-	if fi, _ := os.Stat(filepath.Dir(path)); fi.Mode().Perm() != 0o700 {
+	if fi, _ := os.Stat(filepath.Dir(path)); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o700 {
 		t.Errorf("new dir mode = %v", fi.Mode().Perm())
 	}
 	if leftovers, _ := filepath.Glob(filepath.Join(dir, "sub", ".f.json.tmp-*")); len(leftovers) != 0 {
@@ -61,7 +62,7 @@ func TestCopyTreeRejectsSymlinksAndKeepsTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 	fi, err := os.Stat(filepath.Join(dst, "a", "x"))
-	if err != nil || !fi.ModTime().Equal(mod) || fi.Mode().Perm() != 0o755 {
+	if err != nil || !fi.ModTime().Equal(mod) || runtime.GOOS != "windows" && fi.Mode().Perm() != 0o755 {
 		t.Fatalf("copied = %v, %v", fi, err)
 	}
 	if err := os.Symlink("/etc/passwd", filepath.Join(src, "link")); err != nil {
@@ -127,7 +128,7 @@ func TestSameFileAndReplaceExecutable(t *testing.T) {
 	if b, _ := os.ReadFile(dst); string(b) != "v1" {
 		t.Fatalf("content %q", b)
 	}
-	if fi, _ := os.Stat(dst); fi.Mode().Perm()&0o111 == 0 {
+	if fi, _ := os.Stat(dst); runtime.GOOS != "windows" && fi.Mode().Perm()&0o111 == 0 {
 		t.Fatalf("not executable: %v", fi.Mode())
 	}
 }

@@ -3,9 +3,12 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -13,6 +16,9 @@ import (
 )
 
 func TestVerifyRelease(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake gh is a shell script")
+	}
 	if _, err := exec.LookPath("ssh-keygen"); err != nil {
 		t.Skip("ssh-keygen not installed")
 	}
@@ -29,11 +35,8 @@ func TestVerifyRelease(t *testing.T) {
 		}
 	}
 	write(asset, "archive")
-	out, _ := exec.Command("shasum", "-a", "256", filepath.Join(dir, asset)).Output()
-	if len(out) == 0 {
-		out, _ = exec.Command("sha256sum", filepath.Join(dir, asset)).Output()
-	}
-	write(release.ChecksumsName, strings.Fields(string(out))[0]+"  "+asset+"\n")
+	sum := sha256.Sum256([]byte("archive"))
+	write(release.ChecksumsName, hex.EncodeToString(sum[:])+"  "+asset+"\n")
 	if b, err := exec.Command("ssh-keygen", "-Y", "sign", "-q", "-f", key, "-n", release.SignatureNamespace, filepath.Join(dir, release.ChecksumsName)).CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, b)
 	}

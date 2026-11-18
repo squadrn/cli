@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -36,7 +37,7 @@ func TestInstall(t *testing.T) {
 	if err != nil || !strings.Contains(string(b), `exec '/opt/it'\''s/sprawl' hook git pre-push "$@"`) {
 		t.Fatalf("pre-push shim = %q, %v", b, err)
 	}
-	if fi, _ := os.Stat(filepath.Join(dir, "commit-msg")); fi.Mode().Perm() != 0o755 {
+	if fi, _ := os.Stat(filepath.Join(dir, "commit-msg")); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o755 {
 		t.Errorf("shim mode = %v", fi.Mode())
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
@@ -96,7 +97,8 @@ func TestRepoHook(t *testing.T) {
 	if err := os.WriteFile(def, []byte("#!/bin/sh\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); p != "" {
+	// Git for Windows has no execute bits: a #! script runs regardless.
+	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); runtime.GOOS != "windows" && p != "" {
 		t.Fatalf("non-executable hook returned: %q", p)
 	}
 	if err := os.Chmod(def, 0o755); err != nil {

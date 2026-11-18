@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -23,7 +24,7 @@ func TestProjectKey(t *testing.T) {
 	if got != want {
 		t.Fatalf("ProjectKey = %q, want %q", got, want)
 	}
-	if k, _ := ProjectKey("/Users/x/.claude-personal"); k != "-Users-x--claude-personal" {
+	if k, _ := ProjectKey("/Users/x/.claude-personal"); runtime.GOOS != "windows" && k != "-Users-x--claude-personal" {
 		t.Errorf("encoding = %q", k)
 	}
 }
