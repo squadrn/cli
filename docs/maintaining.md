@@ -24,11 +24,33 @@ matches `signers.pub`. GitHub also emails 7 days before a personal access token 
 2. Commit (Conventional Commits, see AGENTS.md) and push `main`.
 3. `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z` (`vX.Y.Z-rc.N` reaches the beta
    channel only).
-4. The `release` workflow runs the full CI matrix, then builds, signs and publishes to the
-   releases repository. Users get a notice within a day.
+4. The `release` workflow runs the full CI matrix, then builds, signs and creates a **draft**
+   release in the releases repository (GoReleaser v2.20.2, pinned). The `upgrade` jobs install
+   the previous release (the highest published one below the tag on the same channel, by semver:
+   `scripts/previous-release.jq`) with the new installer, `self-update` to the draft and, on
+   Linux, roll back and forward. Only then does `publish` make the release visible, and
+   `discover` checks that `self-update --check` on the release's channel finds it. Users get a
+   notice within a day.
 
-Pre-releases (`vX.Y.Z-rc.N`) need their own `## X.Y.Z-rc.N` CHANGELOG section; installs of a
-pre-release follow the beta channel.
+The installers (`install.sh`, `install.ps1`) are rendered with the release's own tag and install
+that release by default; their checksums are in the signed `checksums.txt`. Check what users
+will get:
+
+```sh
+gh release download vX.Y.Z -R hoangthaininh/sprawl-releases -p install.sh -O - | sh        # macOS, Linux
+```
+
+```powershell
+& ([scriptblock]::Create((gh release download vX.Y.Z -R hoangthaininh/sprawl-releases -p install.ps1 -O - | Out-String)))
+```
+
+Pre-releases (`vX.Y.Z-rc.N`) need their own `## X.Y.Z-rc.N` CHANGELOG section; installing a
+pre-release switches an install without a chosen channel to the beta channel (`self-install`).
+
+If `upgrade` fails, the draft stays invisible: fix the problem, delete the draft
+(`gh release delete vX.Y.Z -R hoangthaininh/sprawl-releases --yes`), then move the tag (below).
+The upgrade jobs read the draft with `SPRAWL_RELEASES_TOKEN`; GitHub shows drafts only to tokens
+with write access, so a read-only token cannot replace it there.
 
 ### Windows check (releases that touch Windows code)
 
@@ -36,7 +58,8 @@ CI installs, updates over a running command, rolls back and uninstalls on `windo
 announcing a release that changes Windows behaviour, also check by hand on Windows 10 and 11, as a
 standard (non-admin) user with Defender on:
 
-- `install.ps1` in Windows PowerShell 5.1 and PowerShell 7; a tampered `checksums.txt` is refused
+- `install.ps1` in Windows PowerShell 5.1 and PowerShell 7, run as documented (script block, no
+  `-Version`); a tampered `checksums.txt` is refused; a failure leaves the PowerShell window open
 - a new terminal finds `sprawl`; `sprawl doctor` is green
 - `sprawl account add`/`login`, run as an account, ctrl-c in a session returns to the prompt
 - `sprawl wt`, `sprawl gc`
@@ -46,7 +69,8 @@ standard (non-admin) user with Defender on:
 - colours and the account picker in Windows Terminal and the classic console
 - `scripts/windows-spike.ps1` once per Claude Code major version (hook and tool behaviour)
 
-If the release workflow fails before publishing, fix it, push `main`, then move the tag:
+If the release workflow fails before publishing, fix it (and delete a leftover draft), push
+`main`, then move the tag:
 `git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`, tag again and push it.
 
 ## Users
