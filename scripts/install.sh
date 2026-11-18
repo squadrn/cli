@@ -53,6 +53,7 @@ command -v tar >/dev/null || die "tar is required"
 case $(uname -s) in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
+  MINGW* | MSYS* | CYGWIN*) die "this is Windows: use PowerShell instead: gh release download -R $repo -p install.ps1 -O - | Out-String | Invoke-Expression" ;;
   *) die "unsupported OS $(uname -s); sprawl supports macOS and Linux" ;;
 esac
 case $(uname -m) in

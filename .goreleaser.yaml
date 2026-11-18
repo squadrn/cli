@@ -8,7 +8,8 @@ before:
     - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
 
 builds:
-  - main: ./cmd/sprawl
+  - id: unix
+    main: ./cmd/sprawl
     binary: sprawl
     env: [CGO_ENABLED=0]
     goos: [linux, darwin]
@@ -19,8 +20,21 @@ builds:
     ldflags:
       - -s -w -X sprawling-agents/internal/cli.Version={{ .Version }} -X sprawling-agents/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
 
+  - id: windows
+    main: ./cmd/sprawl
+    binary: sprawl
+    env: [CGO_ENABLED=0]
+    goos: [windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    # Reproducible: file times come from the commit, not the build machine.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X sprawling-agents/internal/cli.Version={{ .Version }} -X sprawling-agents/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
 archives:
-  - formats: [tar.gz]
+  - id: unix
+    ids: [unix]
+    formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     builds_info:
       owner: root
@@ -44,6 +58,35 @@ archives:
       - src: plugin/README.md
         dst: plugin/README.md
         info: *fileinfo
+
+  # Windows: a zip with sprawl.exe, the same plugin files, and hooks that run through cmd.exe so
+  # a binary that cannot start blocks the tool call (ADR 0008).
+  - id: windows
+    ids: [windows]
+    formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    builds_info:
+      mtime: "{{ .CommitDate }}"
+    files:
+      - src: plugin/.claude-plugin/*
+        info: &wininfo
+          mtime: "{{ .CommitDate }}"
+      - src: plugin/agents/*
+        info: *wininfo
+      - src: plugin/bin/*
+        info: *wininfo
+      - src: plugin/README.md
+        dst: plugin/README.md
+        info: *wininfo
+      - src: scripts/hooks.windows.json
+        dst: plugin/hooks/hooks.json
+        info: *wininfo
+      - src: .claude-plugin/*
+        info: *wininfo
+      - src: README.md
+        info: *wininfo
+      - src: LICENSE
+        info: *wininfo
 
 sboms:
   - artifacts: archive
@@ -69,6 +112,7 @@ release:
   prerelease: auto
   extra_files:
     - glob: build/install.sh
+    - glob: build/install.ps1
 
 # Release notes come from CHANGELOG.md (--release-notes), never from commit messages.
 changelog:
