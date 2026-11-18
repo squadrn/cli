@@ -78,7 +78,7 @@ func (a *app) wtCmd() *cobra.Command {
 				return err
 			}
 			a.banner(acct)
-			return a.session(ag, acct, ag.WorktreeArgs(args[0]))
+			return a.sessionIn(ag, acct, ag.WorktreeArgs(args[0]), args[0])
 		},
 	}
 	cmd.AddCommand(a.wtLsCmd(), a.wtRmCmd())
@@ -146,14 +146,15 @@ func (a *app) wtLsCmd() *cobra.Command {
 }
 
 func (a *app) wtRmCmd() *cobra.Command {
-	var force, yes bool
+	var force, forceBranch, yes bool
 	cmd := &cobra.Command{
 		Use:               "rm <name>",
-		Short:             "Remove a worktree and its branch if merged (--force: even if modified or unmerged)",
+		Short:             "Remove a worktree and its branch if merged (--force: even if modified; --force-branch: even if unmerged)",
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
-			if err := worktree.ValidateName(args[0]); err != nil {
+			name := args[0]
+			if err := worktree.ValidateName(name); err != nil {
 				return err
 			}
 			ctx := context.Background()
@@ -161,43 +162,65 @@ func (a *app) wtRmCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			w, err := repo.Find(ctx, name)
+			if err != nil {
+				return err
+			}
 			for _, p := range a.panes(repo.Root) {
-				if p.Name == args[0] {
-					return fmt.Errorf("%s is running in tmux pane %s; stop it first", args[0], p.ID)
+				if p.Name == name {
+					return fmt.Errorf("%s is running in tmux pane %s; stop it first", name, p.ID)
 				}
 			}
-			if force {
-				if err := a.confirm(yes, "Remove %s with its uncommitted changes and unmerged commits", a.tilde(repo.Dir(args[0]))); err != nil {
-					return err
-				}
+			if used := repo.InUse(w); len(used) > 0 && !force {
+				return fmt.Errorf("%s is in use by %s; stop it first (or use --force)", name, a.sessionDesc(used[0]))
 			}
-			err = repo.RemoveOne(ctx, args[0], force)
-			if errors.Is(err, worktree.ErrUnmerged) {
-				a.out("removed worktree %s\n", args[0])
-				a.warnf("%v; delete it with --force once you no longer need it", err)
-				return nil
+			switch {
+			case force && forceBranch:
+				err = a.confirm(yes, "Remove %s with its uncommitted changes and unmerged commits", a.tilde(w.Path))
+			case force:
+				err = a.confirm(yes, "Remove %s with its uncommitted changes", a.tilde(w.Path))
+			case forceBranch:
+				err = a.confirm(yes, "Remove %s and delete its branch even if unmerged", a.tilde(w.Path))
 			}
 			if err != nil {
 				return err
 			}
-			a.out("removed worktree %s\n", args[0])
+			ignored, _ := worktree.Ignored(ctx, w.Path)
+			err = repo.RemoveOne(ctx, name, force, forceBranch)
+			if err != nil && !errors.Is(err, worktree.ErrUnmerged) {
+				return err
+			}
+			a.out("removed worktree %s%s\n", name, ignoredNote(ignored))
+			if err != nil {
+				a.warnf("%v; delete it with --force-branch once you no longer need it", err)
+			}
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "also remove modified worktrees and unmerged branches")
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation with --force")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "also remove a modified worktree (or one containing submodules, or in use)")
+	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "also delete the branch when it is not merged")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation with --force or --force-branch")
 	return cmd
 }
 
+// ignoredNote tells that ignored files (build output, dependencies) went with a worktree.
+func ignoredNote(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" (with %d ignored path(s))", n)
+}
+
 type gcRow struct {
-	Name   string          `json:"name"`
-	Branch string          `json:"branch"`
-	Action worktree.Action `json:"action"`
-	Reason string          `json:"reason"`
+	Name    string          `json:"name"`
+	Branch  string          `json:"branch"`
+	Action  worktree.Action `json:"action"`
+	Reason  string          `json:"reason"`
+	Ignored int             `json:"ignored"`
 }
 
 func (a *app) gcCmd() *cobra.Command {
-	var yes, asJSON bool
+	var yes, asJSON, force bool
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Remove clean worktrees that are merged or empty (dry run without --yes)",
@@ -223,14 +246,14 @@ func (a *app) gcCmd() *cobra.Command {
 				rows := make([]gcRow, len(cands))
 				for i, c := range cands {
 					name, _ := repo.Name(c.Worktree)
-					rows[i] = gcRow{Name: name, Branch: c.Branch, Action: c.Action, Reason: c.Reason}
+					rows[i] = gcRow{Name: name, Branch: c.Branch, Action: c.Action, Reason: c.Reason, Ignored: c.Ignored}
 				}
 				return a.printJSON(map[string]any{"base": base, "worktrees": rows})
 			}
 			if asJSON {
 				removed := []string{}
 				errs := []string{}
-				_, rerrs := repo.RemoveAll(ctx, cands)
+				_, rerrs := repo.RemoveAll(ctx, cands, force)
 				for _, c := range cands {
 					if _, err := os.Stat(c.Path); c.Action != worktree.Keep && errors.Is(err, os.ErrNotExist) {
 						name, _ := repo.Name(c.Worktree)
@@ -251,13 +274,13 @@ func (a *app) gcCmd() *cobra.Command {
 			a.out("base: %s\n", base)
 			for _, c := range cands {
 				name, _ := repo.Name(c.Worktree)
-				a.out("  %-16s %-32s %s\n", c.Action, name, c.Reason)
+				a.out("  %-16s %-32s %s%s\n", c.Action, name, c.Reason, ignoredNote(c.Ignored))
 			}
 			if !yes {
 				a.out("dry run; re-run with --yes to remove\n")
 				return nil
 			}
-			removed, errs := repo.RemoveAll(ctx, cands)
+			removed, errs := repo.RemoveAll(ctx, cands, force)
 			for _, e := range errs {
 				a.errf("%s: %v\n", a.cmd, e)
 			}
@@ -270,6 +293,7 @@ func (a *app) gcCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "remove instead of only listing")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print the plan as JSON")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "let git remove clean worktrees it refuses (those containing submodules)")
 	return cmd
 }
 

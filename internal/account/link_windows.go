@@ -19,10 +19,11 @@ import (
 	"sprawling-agents/internal/fsx"
 )
 
-// Without Developer Mode (or admin rights) Windows refuses symbolic links. link then falls back,
-// in order, to what needs no privilege: a junction for a directory, a hard link for a file, and
-// a copy for a file on another volume. Copies are recorded with their hash so a later refresh
-// never overwrites edits made in the account (refreshCopies).
+// Without Developer Mode (or admin rights) Windows refuses symbolic links. link then falls back
+// to what needs no privilege: a junction for a directory and a copy for a file. Copies are
+// recorded with their hash so a later refresh never overwrites edits made in the account
+// (refreshCopies). Hard links are not used: editors and Claude Code save by replacing the file,
+// which silently breaks a hard link, while a recorded copy is refreshed or reported.
 var symlink = os.Symlink
 
 // copiesFile records the shared files that are copies: name -> sha256 at copy time.
@@ -39,9 +40,6 @@ func link(src, dst string) error {
 	}
 	if fi.IsDir() {
 		return junction(src, dst)
-	}
-	if err := os.Link(src, dst); err == nil {
-		return nil
 	}
 	return copyShared(src, dst)
 }
@@ -60,6 +58,15 @@ func linksTo(dst, src string) bool {
 	}
 	sum, ok := readCopies(filepath.Dir(dst))[filepath.Base(dst)]
 	return ok && sum == hashFile(dst)
+}
+
+// linkTarget is where the symbolic link or junction dst points.
+func linkTarget(dst string) (string, bool) {
+	t, err := os.Readlink(dst)
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimPrefix(strings.TrimPrefix(t, `\\?\`), `\??\`), true
 }
 
 // LinksTo reports whether dst in an account shares src from the main account.

@@ -4,6 +4,7 @@ package claude
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,6 +13,18 @@ import (
 
 	"sprawling-agents/internal/provider"
 )
+
+// lookPath finds the native claude.exe. A claude.cmd or claude.bat (the npm shim) is refused:
+// cmd.exe re-parses the arguments it passes on, so prompts and paths would be mangled.
+func lookPath() (string, error) {
+	if bin, err := exec.LookPath("claude.exe"); err == nil {
+		return bin, nil
+	}
+	if shim, err := exec.LookPath("claude"); err == nil {
+		return "", fmt.Errorf("found %s, but sprawl needs the native claude.exe; install it with: irm https://claude.ai/install.ps1 | iex", shim)
+	}
+	return "", errNotInstalled
+}
 
 // run starts bin as a child on the same console and waits for it. Windows has no exec(2).
 //

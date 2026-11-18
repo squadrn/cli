@@ -129,6 +129,7 @@ stdout 'not set up'
 # An account with its own settings and no status line gets one; undo removes it again.
 mkdir home/.claude-solo
 cp emptyobj home/.claude-solo/settings.json
+exec sprawl account adopt solo --yes
 exec sprawl account add solo --usage
 stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
 grep '"command": ".* hook statusline"' home/.claude-solo/settings.json

@@ -98,6 +98,18 @@ exitcode 2 sprawl grid repo Bad_Name
 exitcode 1 sprawl grid repo ghost:feat-y
 exitcode 1 sprawl grid nowhere feat-a
 
+# Two grid runs at once never start the same worktree twice.
+exec git init -q -b main repo2
+exec git -C repo2 commit -q --allow-empty -m init
+exec sprawl grid repo2 feat-x &
+exec sprawl grid repo2 feat-x &
+wait
+exec sh -c 'tmux list-panes -s -t ai-repo2 | wc -l'
+stdout '^ *1$'
+! exists repo2/.git/sprawl-grid.lock
+
 -- empty --
 -- ai.toml --
 command = "ai"
+-- home/.claude-personal/.sprawl-account --
+-- home/.claude-idle/.sprawl-account --

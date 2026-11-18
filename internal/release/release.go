@@ -327,7 +327,11 @@ func (l Layout) Install(src, version string) error {
 	if err := fsx.WriteBytes(filepath.Join(l.DataDir, versionFile), []byte(strings.TrimPrefix(version, "v")+"\n"), 0o644); err != nil {
 		return err
 	}
-	return githook.Install(l.GitHooks(), l.Binary())
+	cfg, err := config.Path()
+	if err != nil {
+		return err
+	}
+	return githook.Install(l.GitHooks(), l.Binary(), cfg)
 }
 
 // versionFile records the installed version next to the binary.

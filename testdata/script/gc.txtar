@@ -8,12 +8,24 @@ exec git -C repo/.claude/worktrees/feat-open commit -q --allow-empty -m wip
 exec git -C repo worktree add -q -b worktree-fix-dirty .claude/worktrees/fix-dirty
 cp empty repo/.claude/worktrees/fix-dirty/x
 exec git -C repo worktree add -q -b other ../outside
+exec git -C repo worktree add -q -b worktree-feat-busy .claude/worktrees/feat-busy
+mkdir repo/.claude/worktrees/feat-busy/.sprawl-inuse repo/.claude/worktrees/feat-merged/build
+cp inuse.json repo/.claude/worktrees/feat-busy/.sprawl-inuse/1.json
+exec git -C repo worktree add -q -b worktree-feat-hidden .claude/worktrees/feat-hidden
+exec git -C repo config status.showUntrackedFiles no
+cp empty repo/.claude/worktrees/feat-hidden/untracked.txt
+exec git -C repo worktree add -q -b keep-me .claude/worktrees/feat-foreign
+exec sh -c 'printf "build/\n.sprawl-inuse/\n" >> repo/.git/info/exclude'
+cp empty repo/.claude/worktrees/feat-merged/build/out.o
 
 # Dry run classifies and removes nothing; worktrees outside .claude/worktrees are ignored.
 cd repo
 exec sprawl gc
 stdout '^base: main$'
-stdout 'remove +feat-merged +merged or no commits'
+stdout 'remove +feat-merged +merged or no commits \(with 1 ignored path\(s\)\)'
+stdout 'keep +feat-busy +in use \(pid 1, claude/main\)'
+stdout 'keep +feat-hidden +uncommitted changes'
+stdout 'remove +feat-foreign +merged or no commits'
 stdout 'keep +feat-open +unmerged commits'
 stdout 'keep +fix-dirty +uncommitted changes'
 ! stdout outside
@@ -21,8 +33,13 @@ stdout 'dry run; re-run with --yes to remove'
 exists .claude/worktrees/feat-merged
 
 exec sprawl gc --yes
-stdout 'removed 1 worktree\(s\)'
+stdout 'removed 2 worktree\(s\)'
 ! exists .claude/worktrees/feat-merged
+exists .claude/worktrees/feat-busy
+exists .claude/worktrees/feat-hidden/untracked.txt
+# Only branches named worktree-<name> are ever deleted.
+exec git branch --list keep-me
+stdout keep-me
 exists .claude/worktrees/feat-open
 exists .claude/worktrees/fix-dirty
 exec git branch --list worktree-feat-merged
@@ -36,6 +53,7 @@ stdout 'keep +feat-open'
 exec sprawl gc --json
 stdout '"action": "keep"'
 stdout '"name": "feat-open"'
+stdout '"ignored": 0'
 
 # --json --yes reports what was removed, as JSON only.
 exec git -C $WORK/repo worktree add -q -b worktree-feat-two .claude/worktrees/feat-two
@@ -57,9 +75,26 @@ stdout '"dirty": true'
 exists .claude/worktrees/fix-dirty
 exec sprawl wt rm fix-dirty --force --yes
 ! exists .claude/worktrees/fix-dirty
+
+# A worktree a session uses is kept unless --force.
+! exec sprawl wt rm feat-busy
+stderr 'feat-busy is in use by pid 1 \(claude/main\); stop it first \(or use --force\)'
+exec sprawl wt rm feat-busy --force --yes
+! exists .claude/worktrees/feat-busy
+
+# --force removes a modified worktree but keeps its unmerged branch; --force-branch deletes it.
+exitcode 2 sprawl wt rm feat-open --force-branch
 exec sprawl wt rm feat-open
 stdout 'removed worktree feat-open'
 stderr 'kept branch worktree-feat-open'
+stderr 'delete it with --force-branch'
+exec git branch -D worktree-feat-open
+exec git worktree add -q -b worktree-feat-gone .claude/worktrees/feat-gone
+exec git -C .claude/worktrees/feat-gone commit -q --allow-empty -m wip
+exec sprawl wt rm feat-gone --force-branch --yes
+stdout 'removed worktree feat-gone'
+exec git branch --list worktree-feat-gone
+! stdout .
 exitcode 1 sprawl wt rm nope
 exitcode 2 sprawl wt rm Bad_Name
 
@@ -69,3 +104,5 @@ cd repo
 exitcode 2 sprawl gc extra
 
 -- empty --
+-- inuse.json --
+{"pid":1,"account":"claude/main"}

@@ -28,6 +28,7 @@
 | `release` | signature and checksum verification, bounded extraction, installed layout, snapshots for rollback, version order | network (cli calls gh) |
 | `update` | when to check for releases, channel selection, the cached result | network, printing |
 | `doctor` | structured health checks, including all three guard layers | printing |
+| `inuse` | which sessions run in a directory (`<dir>/.sprawl-inuse/<pid>.json`, live by pid and start time), per-repository lock files | printing |
 | `usage` | per-account usage snapshots (limits, last limit hit), merge rules, states, ranking for a swap ([ADR 0009](adr/0009-usage-and-session-handoff.md)) | provider knowledge, printing |
 | `proc` | running programs under a deadline that kills the whole process group | — |
 | `fsx` | atomic writes, copies, directory swaps | — |
@@ -51,6 +52,12 @@ variable).
 (`@sprawl_repo`) in a single tmux invocation so concurrent `grid` runs join instead of
 duplicating; one pane per agent running `sprawl -a <provider/name> wt <name>`; panes carry
 `@sprawl_acct`/`@sprawl_name`, which `ps`, `wt ls`, re-runs and `swap` read back.
+
+**In use.** Before a session starts, `cli` records it with `inuse.Acquire` in the account's config
+dir and in the worktree it works in (in the main checkout, tagged with the worktree name, when
+`wt <name>` has not created it yet; `.sprawl-inuse/` is added to `info/exclude`). On Unix the
+recorded pid becomes the agent CLI, so the entry lives exactly as long as the session. `gc` keeps,
+and `wt rm`, `account rm` and `account rename` refuse (unless `--force`), what a live entry names.
 
 **Swap.** Claude Code stores conversations at `<config>/projects/<cwd key>/<session>.jsonl`.
 `swap` copies the newest one across accounts (with its subagent dir, mtime preserved) and resumes

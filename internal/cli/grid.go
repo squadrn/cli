@@ -10,12 +10,14 @@ import (
 	"runtime"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/grid"
+	"sprawling-agents/internal/inuse"
 	"sprawling-agents/internal/provider/claude"
 	"sprawling-agents/internal/worktree"
 )
@@ -100,16 +102,39 @@ func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool
 		agents[i].Account = acct.Label()
 	}
 
+	// One grid run at a time per repository: another one could start the same worktree between
+	// the check for running panes and the start.
+	common, err := repo.CommonDir(ctx)
+	if err != nil {
+		return err
+	}
+	unlock, err := inuse.Lock(filepath.Join(common, "sprawl-grid.lock"), 30*time.Second)
+	if err != nil {
+		return fmt.Errorf("another %s grid is starting agents in this repository: %w", a.cmd, err)
+	}
+	session, err := a.startGrid(ctx, repo, agents)
+	unlock()
+	if err != nil {
+		return err
+	}
+	if !a.interactive {
+		return nil
+	}
+	return grid.Tmux{}.Attach(session)
+}
+
+// startGrid starts the agents that are not running yet in repo's grid and returns its session.
+func (a *app) startGrid(ctx context.Context, repo worktree.Repo, agents []grid.Agent) (string, error) {
 	t := grid.Tmux{}
 	session, err := t.FindSession(ctx, repo.Root)
 	if err != nil {
-		return err
+		return "", err
 	}
 	running := map[string]bool{}
 	if session != "" {
 		panes, err := t.Panes(ctx, session)
 		if err != nil {
-			return err
+			return "", err
 		}
 		for _, p := range panes {
 			running[p.Name] = true
@@ -127,21 +152,18 @@ func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool
 		}
 		command := grid.ShellQuote(selfPath(), "-a", ag.Account, "wt", ag.Name)
 		if session, err = t.Start(ctx, a.cmd, repo.Root, repo.Root, cols, rows, ag, command); err != nil {
-			return err
+			return "", err
 		}
 		started++
 		a.out("  %-20s → %s\n", ag.Account, ag.Name)
 	}
 	if session == "" {
-		return errors.New("no agents were started")
+		return "", errors.New("no agents were started")
 	}
 	if started > 0 {
 		a.out("grid %s (%s grid attach)\n", session, a.cmd)
 	}
-	if !a.interactive {
-		return nil
-	}
-	return t.Attach(session)
+	return session, nil
 }
 
 // loggedIn returns the labels of accounts that are signed in, for --spread.

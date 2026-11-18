@@ -20,6 +20,7 @@ import (
 
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/githook"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/provider/claude"
@@ -108,6 +109,18 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 	}
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
+	}
+	// Accounts provisioned before account markers carry sprawl's plugin (or a previous name's).
+	store.HasPlugin = func(spec provider.Spec, dir string) bool {
+		if spec.ID != provider.Claude.ID {
+			return false
+		}
+		for _, id := range append([]string{account.PluginID}, account.LegacyPluginIDs()...) {
+			if claude.HasPlugin(dir, id) {
+				return true
+			}
+		}
+		return false
 	}
 	vt := enableVT()
 	noColor := os.Getenv("NO_COLOR") != "" || !vt
@@ -376,7 +389,12 @@ func (a *app) sessionEnv() []string {
 		return nil
 	}
 	dir := a.layout.GitHooks()
-	if !githook.Installed(dir, a.layout.Binary()) {
+	cfg, err := config.Path()
+	if err != nil || !fsx.IsFile(a.layout.Binary()) {
+		return nil
+	}
+	// Shims from an older release, or for another config path, are rewritten before use.
+	if !githook.Installed(dir, a.layout.Binary(), cfg) && githook.Install(dir, a.layout.Binary(), cfg) != nil {
 		return nil
 	}
 	return githook.Entries(os.Environ(), dir)
@@ -416,14 +434,25 @@ func (a *app) banner(acct account.Account) {
 // session starts an interactive agent session as acct: shared-file copies are refreshed first
 // (Windows without links) and executables left over from earlier updates are cleaned up.
 func (a *app) session(ag provider.Agent, acct account.Account, args []string) error {
-	for _, c := range a.store.RefreshShared(acct) {
+	return a.sessionIn(ag, acct, args, "")
+}
+
+// sessionIn is session for `wt <name>`: the session is recorded as using that worktree, which
+// the agent CLI may only create once it runs.
+func (a *app) sessionIn(ag provider.Agent, acct account.Account, args []string, wt string) error {
+	r := a.store.RefreshShared(acct)
+	for _, c := range r.Conflicts {
 		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+	}
+	for _, c := range r.Replaced {
+		a.warnf("%s was replaced in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
 	}
 	if a.cfgErr != nil && !a.cfgWarned {
 		a.cfgWarned = true
 		a.warnf("%v; the git push guard stays on, but fix the config (%s doctor)", a.cfgErr, a.cmd)
 	}
 	a.layout.CleanOld(append([]string{a.cmd}, a.cfg.Aliases...))
+	defer a.markInUse(acct, wt)()
 	return ag.Exec(acct.ConfigDir(), args)
 }
 

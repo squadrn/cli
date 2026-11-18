@@ -1,5 +1,5 @@
 [windows] skip 'Unix script: sh, symlinks or mode bits'
-mkdir home/.claude-personal elsewhere
+mkdir elsewhere
 
 # Globals right after the account are sprawl's, not the agent's.
 exec sprawl personal -C elsewhere --no-color -- here
@@ -56,3 +56,4 @@ esac
 env | grep '^GIT_CONFIG' | sort
 -- bad.toml --
 colour = "blue"
+-- home/.claude-personal/.sprawl-account --
