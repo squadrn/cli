@@ -42,7 +42,7 @@ gh release download -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String | 
 
 Everything above works the same, with these differences:
 - `grid`, `ps` and `swap` inside a pane need tmux and are not available; run each agent with
-  `sprawl wt <name>` in its own terminal tab.
+  `sprawl wt <name>` in its own terminal tab. `swap` outside a grid works.
 - Command names are copies of `sprawl.exe` in `%USERPROFILE%\.local\bin`, refreshed on update.
 - Shared settings use symbolic links with Developer Mode enabled; without it, directories become
   junctions and files hash-checked copies (an edit in a secondary account is reported, never
@@ -125,7 +125,7 @@ can see which account has room left before you swap.
 
 ```sh
 sprawl usage                        # every account: plan, org, 5h/7d used and reset times, state
-sprawl usage work                   # details, including the last limit hit
+sprawl usage work                   # details, including the last limit hit and handoff
 sprawl usage --json                 # stable JSON (below)
 sprawl usage --refresh              # also re-query login, plan and organization
 sprawl usage --watch                # redraw every 5 seconds
@@ -147,6 +147,34 @@ only as fresh as the last status line update. States: `ok`, `high` (5h ≥ 80% o
 `nodata`, `metered` (API billing), `loggedout`, `na` (provider does not report usage). The footer
 names the best account for the current repository: the same provider, not limited, then lowest 5h
 and 7d use. Records live in `~/.local/state/sprawl/usage/` (private).
+
+## Swap
+
+`swap` moves a conversation to another account and resumes it there, in the directory it was
+started in.
+
+```sh
+sprawl swap                          # the conversation that just hit its limit here; pick the target
+sprawl swap --to personal            # same, to claude/personal
+sprawl swap --session <id> --to work # any conversation, by session ID
+sprawl swap feat-a personal          # latest conversation of worktree feat-a (earlier form)
+```
+
+Without `--session`, the conversation is the one that last hit its limit in the current directory
+or below it, or a session running there (several: a picker; without a terminal, an error listing
+their `--session` values). Without `--to`, the target is picked from the accounts ranked like
+`sprawl usage` (without a terminal, `--to` is required). A logged-out target is refused, moving to
+another organization asks, and an Opus conversation moving to a Pro account warns.
+
+A session still running the conversation is stopped first, so it never has two writers: inside a
+grid its pane is restarted in place; elsewhere sprawl asks, interrupts it (ctrl-c) and, if it is
+still running after 10 seconds, asks again and terminates it (`-y` answers yes). On Windows a
+session in another terminal cannot be interrupted, so it is terminated after you agree.
+
+The transcript, its subagent and tool-result dir and its file checkpoints are copied (the copy is
+checked against the source). When the target already has the conversation and it went on there,
+the swap is refused unless `--force` overwrites that copy. Every handoff is appended to
+`~/.local/state/sprawl/handoffs.jsonl`.
 
 `--json` prints `{"accounts": [...], "from": "...", "best": "...", "next_reset": "..."}` (`from`:
 the account last limited or active in this directory; `next_reset`: when every account is limited,
@@ -180,14 +208,13 @@ sprawl grid ~/repo feat-1 feat-2 feat-3 --spread        # spread over logged-in 
 sprawl grid ~/repo personal:chore-c                     # add a pane to the running grid
 sprawl grid ls | attach [repo] | stop [repo]            # manage running grids
 sprawl ps [--json]                                      # which agent runs as which account
-sprawl swap fix-b personal                              # account hit its limit: move the conversation
+sprawl swap [--to personal]                             # account hit its limit: move the conversation
 sprawl deps feat-a                                      # install dependencies (exit status passes through)
 sprawl gc [--json]                                      # merged/empty worktrees; --yes removes them
 ```
 
 Worktree names are `<type>-<slug>` (`feat-otp-login`, `fix-cart-total`); Claude Code creates branch
-`worktree-<name>`. `swap` moves conversations between accounts of the same provider and asks first
-when the target account belongs to another organization.
+`worktree-<name>`. `swap` moves conversations between accounts of the same provider (see [Swap](#swap)).
 
 ## Git push guard
 
