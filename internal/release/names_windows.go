@@ -33,12 +33,15 @@ func (l Layout) readCommands() []string {
 	return names
 }
 
-func exe(dir, name string) string {
+// ExecutableName is the file name of command name in the bin dir.
+func ExecutableName(name string) string {
 	if strings.EqualFold(filepath.Ext(name), ".exe") {
-		return filepath.Join(dir, name)
+		return name
 	}
-	return filepath.Join(dir, name+".exe")
+	return name + ".exe"
 }
+
+func exe(dir, name string) string { return filepath.Join(dir, ExecutableName(name)) }
 
 // LinkCommands installs every name in names as a copy of the binary in BinDir (replacing older
 // copies even while they run) and removes the copies of names no longer wanted. A file that sprawl

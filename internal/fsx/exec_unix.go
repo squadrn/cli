@@ -2,7 +2,10 @@
 
 package fsx
 
-import "os"
+import (
+	"os"
+	"time"
+)
 
 // replaceExecutable copies src over dst atomically (a running binary keeps its old inode).
 func replaceExecutable(src, dst string) error {
@@ -13,4 +16,4 @@ func replaceExecutable(src, dst string) error {
 }
 
 // cleanOld has nothing to do: a replaced binary leaves no file behind on Unix.
-func cleanOld(string) {}
+func cleanOld(string, []string, time.Time) {}

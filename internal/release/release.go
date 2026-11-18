@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"sprawling-agents/internal/config"
 	"sprawling-agents/internal/fsx"
@@ -260,6 +261,26 @@ func Legacies(home string) []Legacy {
 }
 
 func (l Layout) Binary() string { return filepath.Join(l.DataDir, "bin", BinaryName) }
+
+// CleanOld removes executables earlier updates moved aside (Windows): the binary's and those of
+// the command names given, never other programs' files in the shared bin dir.
+func (l Layout) CleanOld(names []string) {
+	fsx.CleanOld(filepath.Dir(l.Binary()), []string{BinaryName})
+	files := make([]string, len(names))
+	for i, n := range names {
+		files[i] = ExecutableName(n)
+	}
+	fsx.CleanOld(l.BinDir, files)
+}
+
+// Leftovers are the moved-aside executables of names in the bin dir, any age (uninstall).
+func (l Layout) Leftovers(names []string) []string {
+	files := make([]string, len(names))
+	for i, n := range names {
+		files[i] = ExecutableName(n)
+	}
+	return fsx.Leftovers(l.BinDir, files, time.Now().Add(24*time.Hour))
+}
 
 // GitHooks is the directory of git-level guard shims.
 func (l Layout) GitHooks() string { return githook.Dir(l.DataDir) }

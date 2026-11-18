@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -180,17 +181,38 @@ func TestReplaceDirRecovery(t *testing.T) {
 
 func TestCleanOld(t *testing.T) {
 	dir := t.TempDir()
-	for _, n := range []string{"tool.old-1", "tool.new-2", "keep"} {
-		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o644); err != nil {
+	now := time.Now()
+	stale := now.Add(-time.Hour)
+	for n, mod := range map[string]time.Time{
+		"tool.exe.old-1": now, "tool.exe.new-2": stale, "keep": stale,
+		"other.exe.old-1": stale, "other.exe.new-1": stale, "tool.exe.new-3": now,
+	} {
+		p := filepath.Join(dir, n)
+		if err := os.WriteFile(p, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, mod, mod); err != nil {
 			t.Fatal(err)
 		}
 	}
-	CleanOld(dir)
-	CleanOld(filepath.Join(dir, "missing"))
-	if !IsFile(filepath.Join(dir, "keep")) {
-		t.Fatal("CleanOld removed an unrelated file")
+	got := Leftovers(dir, []string{"TOOL.exe"}, now)
+	want := []string{filepath.Join(dir, "tool.exe.new-2"), filepath.Join(dir, "tool.exe.old-1")}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Leftovers = %v, want %v", got, want)
 	}
-	if runtime.GOOS == "windows" && (IsFile(filepath.Join(dir, "tool.old-1")) || IsFile(filepath.Join(dir, "tool.new-2"))) {
+	if Leftovers(filepath.Join(dir, "missing"), []string{"tool.exe"}, now) != nil {
+		t.Fatal("leftovers in a missing dir")
+	}
+	if _, ok := leftoverKind("tool.exe.old-", []string{"tool.exe"}); ok {
+		t.Fatal("a name without a stamp counted as a leftover")
+	}
+	CleanOld(dir, []string{"tool.exe"})
+	for _, n := range []string{"keep", "other.exe.old-1", "other.exe.new-1", "tool.exe.new-3"} {
+		if !IsFile(filepath.Join(dir, n)) {
+			t.Fatalf("CleanOld removed %s, which sprawl does not own or is in flight", n)
+		}
+	}
+	if runtime.GOOS == "windows" && (IsFile(filepath.Join(dir, "tool.exe.old-1")) || IsFile(filepath.Join(dir, "tool.exe.new-2"))) {
 		t.Fatal("CleanOld left replaced executables")
 	}
 }

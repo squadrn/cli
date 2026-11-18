@@ -20,7 +20,6 @@ import (
 
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/githook"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/provider/claude"
@@ -390,8 +389,7 @@ func (a *app) session(ag provider.Agent, acct account.Account, args []string) er
 	for _, c := range a.store.RefreshShared(acct) {
 		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
 	}
-	fsx.CleanOld(filepath.Dir(a.layout.Binary()))
-	fsx.CleanOld(a.layout.BinDir)
+	a.layout.CleanOld(append([]string{a.cmd}, a.cfg.Aliases...))
 	return ag.Exec(acct.ConfigDir(), args)
 }
 
