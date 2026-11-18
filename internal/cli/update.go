@@ -47,6 +47,9 @@ func (a *app) selfUpdateCmd() *cobra.Command {
   %[1]s self-update --rollback    go back to the release installed before`, a.cmd),
 		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
+			if o.asJSON && !o.check {
+				return usagef("--json needs --check")
+			}
 			if o.rollback {
 				if o.check || o.tag != "" {
 					return usagef("--rollback cannot be combined with --check or --version")
@@ -61,13 +64,14 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.repo, "repo", "", "GitHub repository to update from (owner/name)")
 	cmd.Flags().BoolVar(&o.allowDowngrade, "allow-downgrade", false, "install a release older than the running one")
 	cmd.Flags().BoolVar(&o.rollback, "rollback", false, "reinstall the release that was installed before this one")
+	cmd.Flags().BoolVar(&o.asJSON, "json", false, "with --check: print JSON (current, latest, channel, available, notes)")
 	cmd.Flags().BoolVar(&o.background, "background", false, "refresh the update notice cache quietly")
 	_ = cmd.Flags().MarkHidden("background")
 	return cmd
 }
 
 type updateOptions struct {
-	check, allowDowngrade, rollback, background bool
+	check, allowDowngrade, rollback, background, asJSON bool
 	tag, repo                                   string
 }
 
@@ -101,6 +105,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 	if repo == "" {
 		repo = Repo
 	}
+	channel := a.cfg.Channel()
 	if repo == "" {
 		if o.background {
 			return nil
@@ -110,7 +115,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 	ghBin, err := exec.LookPath("gh")
 	if err != nil {
 		if o.background {
-			update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Err: "gh is not installed"})
+			update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel, Err: "gh is not installed"})
 			return nil
 		}
 		return fmt.Errorf("gh is required, logged in with access to %s", repo)
@@ -121,44 +126,49 @@ func (a *app) selfUpdate(o updateOptions) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	tag := o.tag
+	tag := normalizeTag(o.tag)
 	if tag == "" {
 		rels, err := releases(ctx, ghBin, repo)
 		if err != nil {
 			if o.background {
-				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Err: err.Error()})
+				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel, Err: err.Error()})
 				return nil
 			}
-			return fmt.Errorf("cannot list releases of %s (check gh auth status and your access): %w", repo, err)
+			return fmt.Errorf("cannot list releases of %s: %s", repo, ghFailure(err, repo, ""))
 		}
-		if tag = update.Newest(rels, a.cfg.Channel()); tag == "" {
+		if tag = update.Newest(rels, channel); tag == "" {
 			if o.background {
-				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now()})
+				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel})
 				return nil
 			}
-			return fmt.Errorf("%s has no %s release yet", repo, a.cfg.Channel())
+			return fmt.Errorf("%s has no %s release yet", repo, channel)
 		}
 		prev := update.Load(a.updateStatePath())
-		update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Latest: tag, NotifiedAt: prev.NotifiedAt})
+		update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Latest: tag, Channel: channel, NotifiedAt: prev.NotifiedAt})
+	} else if _, err := gh(ctx, ghBin, "release", "view", tag, "--repo", repo, "--json", "tagName"); err != nil {
+		return fmt.Errorf("cannot install %s: %s", tag, ghFailure(err, repo, tag))
 	}
 	if o.background {
 		return nil
 	}
+	if !o.asJSON {
+		a.warnOutsideLayout()
+	}
 	current := "v" + strings.TrimPrefix(Version, "v")
 	cmp, comparable := release.Compare(tag, current)
+	upToDate := tag == current || (comparable && cmp == 0)
+	repair := upToDate && a.needsRepair(tag)
+	if o.check {
+		return a.reportCheck(ctx, ghBin, repo, tag, current, channel, upToDate, repair, o.asJSON)
+	}
 	switch {
-	case tag == current || (comparable && cmp == 0):
-		a.out("sprawl %s is up to date (%s channel)\n", current, a.cfg.Channel())
+	case upToDate && !repair:
+		a.out("sprawl %s is up to date (%s channel)\n", current, channel)
 		return nil
+	case repair:
+		a.out("the installed copy of %s is incomplete (VERSION %q); reinstalling it\n", current, a.layout.Version())
 	case comparable && cmp < 0 && !o.allowDowngrade:
 		return usagef("%s is older than the installed %s; pass --allow-downgrade to install it", tag, current)
-	case o.check:
-		a.out("update available: %s → %s\n", current, tag)
-		if notes, err := gh(ctx, ghBin, "release", "view", tag, "--repo", repo, "--json", "body", "--jq", ".body"); err == nil && strings.TrimSpace(notes) != "" {
-			a.out("\n%s\n\n", releaseNotes(notes, 25))
-		}
-		a.out("install it with: %s self-update\n", a.cmd)
-		return nil
 	}
 	tmp, err := os.MkdirTemp("", "sprawl-update-")
 	if err != nil {
@@ -170,11 +180,17 @@ func (a *app) selfUpdate(o updateOptions) error {
 	// reason, before the archive is downloaded.
 	if a.signers != "" {
 		if _, err := gh(ctx, ghBin, "release", "download", tag, "--repo", repo, "--pattern", release.SignatureName, "--dir", tmp); err != nil {
-			return fmt.Errorf("release %s has no signature (%s); refusing to install it: %w", tag, release.SignatureName, err)
+			if missingAsset(err) {
+				return fmt.Errorf("release %s has no signature (%s); refusing to install it", tag, release.SignatureName)
+			}
+			return fmt.Errorf("download the signature of %s: %s", tag, ghFailure(err, repo, tag))
 		}
 	}
 	if _, err := gh(ctx, ghBin, "release", "download", tag, "--repo", repo, "--pattern", asset, "--pattern", release.ChecksumsName, "--dir", tmp); err != nil {
-		return fmt.Errorf("download %s: %w", tag, err)
+		if missingAsset(err) {
+			return fmt.Errorf("release %s has no %s or %s (no build for %s/%s?)", tag, asset, release.ChecksumsName, runtime.GOOS, runtime.GOARCH)
+		}
+		return fmt.Errorf("download %s: %s", tag, ghFailure(err, repo, tag))
 	}
 	if err := a.verifyRelease(ctx, ghBin, tmp, asset, repo); err != nil {
 		return err
@@ -184,6 +200,103 @@ func (a *app) selfUpdate(o updateOptions) error {
 		return err
 	}
 	return a.installRelease(src, tag, nameChoice{})
+}
+
+// reportCheck prints what self-update --check found.
+func (a *app) reportCheck(ctx context.Context, ghBin, repo, tag, current, channel string, upToDate, repair, asJSON bool) error {
+	available := !upToDate
+	if c, ok := release.Compare(tag, current); ok && c < 0 {
+		available = false
+	}
+	notes := ""
+	if available {
+		if n, err := gh(ctx, ghBin, "release", "view", tag, "--repo", repo, "--json", "body", "--jq", ".body"); err == nil {
+			notes = strings.TrimSpace(n)
+		}
+	}
+	if asJSON {
+		return a.printJSON(map[string]any{"current": current, "latest": tag, "channel": channel, "available": available, "repair": repair, "notes": notes})
+	}
+	switch {
+	case repair:
+		a.out("the installed copy of %s is incomplete; repair it with: %s self-update\n", current, a.cmd)
+	case !available:
+		a.out("sprawl %s is up to date (%s channel)\n", current, channel)
+	default:
+		a.out("update available: %s → %s\n", current, tag)
+		if notes != "" {
+			a.out("\n%s\n\n", releaseNotes(notes, 25))
+		}
+		a.out("install it with: %s self-update\n", a.cmd)
+	}
+	return nil
+}
+
+// needsRepair reports whether the installed release is not fully tag: an install that failed
+// half way leaves a new binary next to an old plugin and VERSION.
+func (a *app) needsRepair(tag string) bool {
+	if !fsx.IsFile(a.layout.Binary()) {
+		return false // not installed here (a development build); nothing to repair
+	}
+	return a.layout.Version() != strings.TrimPrefix(tag, "v") || a.layout.Marketplace() == "" ||
+		!fsx.IsDir(filepath.Join(a.layout.DataDir, "plugin"))
+}
+
+// warnOutsideLayout says when the running binary is not the installed one (a development build,
+// go install, a package manager): self-update replaces the installed copy, not this one.
+func (a *app) warnOutsideLayout() {
+	self, err := os.Executable()
+	if err != nil || !fsx.IsFile(a.layout.Binary()) || fsx.SameFile(self, a.layout.Binary()) || a.isCommandCopy(self) {
+		return
+	}
+	msg := fmt.Sprintf("this is %s (%s), not the installed copy %s (%s); self-update replaces the installed copy",
+		a.tilde(self), Version, a.tilde(a.layout.Binary()), a.layout.Version())
+	if p, err := exec.LookPath(a.cmd); err == nil {
+		msg += fmt.Sprintf("; %s on PATH is %s", a.cmd, a.tilde(p))
+	}
+	a.warnf("%s", msg)
+}
+
+// isCommandCopy reports whether path is one of the command copies in the bin dir (Windows).
+func (a *app) isCommandCopy(path string) bool {
+	return filepath.Clean(filepath.Dir(path)) == filepath.Clean(a.layout.BinDir)
+}
+
+// normalizeTag adds the v prefix release tags carry (1.2.0 → v1.2.0).
+func normalizeTag(tag string) string {
+	if tag == "" || strings.HasPrefix(tag, "v") {
+		return tag
+	}
+	if _, ok := release.Compare(tag, tag); ok {
+		return "v" + tag
+	}
+	return tag
+}
+
+// missingAsset reports gh's answer for a download pattern that matches no asset.
+func missingAsset(err error) bool {
+	return strings.Contains(err.Error(), "no assets match")
+}
+
+// ghFailure turns a gh error into what the user can act on: a missing release, a login or
+// access problem, or the network.
+func ghFailure(err error, repo, tag string) string {
+	msg := err.Error()
+	low := strings.ToLower(msg)
+	switch {
+	case tag != "" && (strings.Contains(low, "release not found") || strings.Contains(low, "http 404") || strings.Contains(low, "not found")):
+		return fmt.Sprintf("release %s not found in %s (see: gh release list -R %s)", tag, repo, repo)
+	case strings.Contains(low, "http 404") || strings.Contains(low, "could not resolve to a repository"):
+		return fmt.Sprintf("%s not found, or your GitHub account has no access to it", repo)
+	case strings.Contains(low, "http 401") || strings.Contains(low, "gh auth login") || strings.Contains(low, "authentication"):
+		return "gh is not logged in (run: gh auth login): " + msg
+	case strings.Contains(low, "http 403"):
+		return fmt.Sprintf("no access to %s (ask its owner for read access, or check gh auth status): %s", repo, msg)
+	case strings.Contains(low, "dial tcp") || strings.Contains(low, "no such host") || strings.Contains(low, "timeout") ||
+		strings.Contains(low, "connection") || strings.Contains(low, "network"):
+		return "network error, try again later: " + msg
+	}
+	return msg
 }
 
 // verifyRelease checks, in order: the signature of checksums.txt against the keys built into
@@ -309,6 +422,14 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	if err := a.nameCheck(accepted, nc.force).Check(cfg); err != nil {
 		return err
 	}
+	unlock, err := fsx.Lock(a.installLockPath())
+	var held fsx.LockedError
+	if errors.As(err, &held) {
+		return fmt.Errorf("another sprawl install or update is running (pid %d); try again when it has finished", held.PID)
+	} else if err != nil {
+		return err
+	}
+	defer unlock()
 	// Keep the installed release for --rollback. The snapshot is staged first because src may be
 	// the previous snapshot itself (a rollback).
 	staged := a.layout.Previous() + ".new"
@@ -320,8 +441,10 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		return err
 	}
 	if fsx.IsDir(staged) {
-		_ = os.RemoveAll(a.layout.Previous())
-		_ = os.Rename(staged, a.layout.Previous())
+		if err := fsx.MoveDir(staged, a.layout.Previous()); err != nil {
+			a.warnf("could not keep the previous release for --rollback (%v); a rollback may reinstall an older one", err)
+			_ = os.RemoveAll(staged)
+		}
 	}
 	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
@@ -352,6 +475,9 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	a.out("next: %s doctor\n", cfg.Command)
 	return nil
 }
+
+// installLockPath keeps two installs, updates or rollbacks from running at once.
+func (a *app) installLockPath() string { return filepath.Join(a.layout.DataDir, "install.lock") }
 
 func (a *app) nameCheck(accepted map[string]bool, force bool) install.NameCheck {
 	self, _ := os.Executable()

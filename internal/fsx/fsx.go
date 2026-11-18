@@ -123,6 +123,27 @@ func ReplaceDir(src, dst string, permMask fs.FileMode) error {
 	return os.RemoveAll(old)
 }
 
+// MoveDir replaces dst with the directory src by renaming it. Transient failures (a scanner
+// holding a file on Windows) are retried for about two seconds.
+func MoveDir(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		return err
+	}
+	var err error
+	for i := range 8 {
+		if i > 0 {
+			time.Sleep(time.Duration(50*i) * time.Millisecond)
+		}
+		if err = os.RemoveAll(dst); err != nil {
+			continue
+		}
+		if err = os.Rename(src, dst); err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
 // CleanStale removes leftovers of an interrupted ReplaceDir for dst.
 func CleanStale(dst string) {
 	_ = os.RemoveAll(dst + ".new")

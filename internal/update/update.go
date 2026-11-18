@@ -24,8 +24,10 @@ const (
 // State is the cached result of the last check.
 type State struct {
 	CheckedAt time.Time `json:"checked_at"`
-	Latest    string    `json:"latest,omitempty"` // newest release tag on the channel
-	Err       string    `json:"error,omitempty"`
+	Latest    string    `json:"latest,omitempty"` // newest release tag on Channel
+	// Channel is the channel Latest was looked up on; a result for another channel is stale.
+	Channel string `json:"channel,omitempty"`
+	Err     string `json:"error,omitempty"`
 	// NotifiedAt is when the notice was last shown, so it is not repeated on every command.
 	NotifiedAt time.Time `json:"notified_at,omitzero"`
 }
@@ -45,9 +47,10 @@ func Save(path string, s State) {
 	}
 }
 
-// Due reports whether a new background check should start.
-func Due(s State, now time.Time) bool {
-	return now.Sub(s.CheckedAt) >= Interval
+// Due reports whether a new background check should start for channel: never checked, the
+// interval has passed, or the cached result belongs to another channel.
+func Due(s State, now time.Time, channel string) bool {
+	return now.Sub(s.CheckedAt) >= Interval || (s.Latest != "" && s.Channel != channel)
 }
 
 // Release is one published release as the source lists it.
@@ -76,10 +79,11 @@ func validTag(tag string) bool {
 	return ok
 }
 
-// Available returns the newer release to mention for current, if any. Development builds
-// (unparsable versions) are never nagged.
-func Available(current string, s State) (string, bool) {
-	if s.Latest == "" {
+// Available returns the newer release on channel to mention for current, if any. A result
+// cached for another channel is ignored; development builds (unparsable versions) are never
+// nagged.
+func Available(current string, s State, channel string) (string, bool) {
+	if s.Latest == "" || s.Channel != channel {
 		return "", false
 	}
 	c, ok := release.Compare(s.Latest, "v"+strings.TrimPrefix(current, "v"))

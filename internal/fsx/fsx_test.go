@@ -229,3 +229,25 @@ func TestCopyFileErrors(t *testing.T) {
 		t.Fatal("copied a missing tree")
 	}
 }
+
+func TestMoveDir(t *testing.T) {
+	root := t.TempDir()
+	src, dst := filepath.Join(root, "src"), filepath.Join(root, "dst")
+	for _, f := range []string{filepath.Join(src, "new"), filepath.Join(dst, "old")} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := MoveDir(src, dst); err != nil {
+		t.Fatal(err)
+	}
+	if !IsFile(filepath.Join(dst, "new")) || IsFile(filepath.Join(dst, "old")) || IsDir(src) {
+		t.Fatal("MoveDir did not replace dst")
+	}
+	if err := MoveDir(filepath.Join(root, "missing"), dst); err == nil || !IsFile(filepath.Join(dst, "new")) {
+		t.Fatal("a missing source must fail and keep dst")
+	}
+}

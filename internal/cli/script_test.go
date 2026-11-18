@@ -28,6 +28,9 @@ func TestMain(m *testing.M) {
 		"sprawl": func() {
 			// Scripts sign their fake releases with their own key, never the real one.
 			buildSigners = func() string { return os.Getenv("SPRAWL_TEST_SIGNERS") }
+			if v := os.Getenv("SPRAWL_TEST_VERSION"); v != "" {
+				Version = v
+			}
 			os.Exit(Run(os.Args[1:]))
 		},
 	}
@@ -127,7 +130,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "USERPROFILE", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "USERPROFILE", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 
@@ -216,7 +219,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "TMUX"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "TMUX"} {
 				env.Setenv(k, "")
 			}
 			return nil

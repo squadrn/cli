@@ -27,13 +27,13 @@ func (a *app) updateNotice(r route) {
 	path := a.updateStatePath()
 	s := update.Load(path)
 	now := a.now()
-	if latest, ok := update.Available(Version, s); ok && now.Sub(s.NotifiedAt) >= noticeEvery {
+	if latest, ok := update.Available(Version, s, a.cfg.Channel()); ok && now.Sub(s.NotifiedAt) >= noticeEvery {
 		a.errf("%s\n", a.paint(true, "1;36", "✦ sprawl "+latest+" is available")+
 			a.paint(true, "2", " (you have v"+trimV(Version)+") · "+a.cmd+" self-update · what's new: "+a.cmd+" self-update --check"))
 		s.NotifiedAt = now
 		update.Save(path, s)
 	}
-	if Repo != "" && update.Due(s, now) {
+	if Repo != "" && update.Due(s, now, a.cfg.Channel()) {
 		s.CheckedAt = now // claim the slot so parallel invocations do not all start a check
 		update.Save(path, s)
 		if a.backgroundCheck != nil {

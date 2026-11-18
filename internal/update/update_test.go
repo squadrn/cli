@@ -12,16 +12,19 @@ func TestStateRoundTripAndDue(t *testing.T) {
 		t.Fatal("missing file should be empty")
 	}
 	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
-	if !Due(State{}, now) {
+	if !Due(State{}, now, Stable) {
 		t.Fatal("never checked: due")
 	}
-	Save(path, State{CheckedAt: now, Latest: "v1.1.0"})
+	Save(path, State{CheckedAt: now, Latest: "v1.1.0", Channel: Stable})
 	s := Load(path)
-	if s.Latest != "v1.1.0" || !s.CheckedAt.Equal(now) {
+	if s.Latest != "v1.1.0" || !s.CheckedAt.Equal(now) || s.Channel != Stable {
 		t.Fatalf("Load = %+v", s)
 	}
-	if Due(s, now.Add(time.Hour)) || !Due(s, now.Add(25*time.Hour)) {
+	if Due(s, now.Add(time.Hour), Stable) || !Due(s, now.Add(25*time.Hour), Stable) {
 		t.Fatal("Due interval")
+	}
+	if !Due(s, now.Add(time.Hour), Beta) {
+		t.Fatal("a result for another channel must be refreshed")
 	}
 }
 
@@ -49,9 +52,15 @@ func TestAvailable(t *testing.T) {
 		{"dev", "v1.1.0", false},
 		{"1.0.0", "", false},
 	} {
-		if _, got := Available(tt.current, State{Latest: tt.latest}); got != tt.want {
+		if _, got := Available(tt.current, State{Latest: tt.latest, Channel: Stable}, Stable); got != tt.want {
 			t.Errorf("Available(%s, %s) = %v", tt.current, tt.latest, got)
 		}
+	}
+	if _, got := Available("1.0.0", State{Latest: "v1.1.0-rc.1", Channel: Beta}, Stable); got {
+		t.Error("a beta result was offered on the stable channel")
+	}
+	if _, got := Available("1.0.0", State{Latest: "v1.1.0"}, Stable); got {
+		t.Error("a result without a channel was trusted")
 	}
 }
 

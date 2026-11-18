@@ -498,6 +498,7 @@ Flags:
       --allow-downgrade   install a release older than the running one
       --check             only report whether an update is available, with its release notes
   -h, --help              help for self-update
+      --json              with --check: print JSON (current, latest, channel, available, notes)
       --repo string       GitHub repository to update from (owner/name)
       --rollback          reinstall the release that was installed before this one
       --version string    install this release tag instead of the newest
