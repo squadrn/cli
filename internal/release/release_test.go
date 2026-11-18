@@ -2,11 +2,14 @@ package release
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -151,6 +154,107 @@ func TestAssetNamesStable(t *testing.T) {
 	} {
 		if got := AssetName("v1.2.3", tt.goos, tt.goarch); got != tt.want {
 			t.Errorf("AssetName(%s/%s) = %s, want %s", tt.goos, tt.goarch, got, tt.want)
+		}
+	}
+}
+
+func writeZip(t *testing.T, path string, files map[string]string, modes map[string]os.FileMode) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	names := make([]string, 0, len(files))
+	for n := range files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		h := &zip.FileHeader{Name: n, Method: zip.Deflate}
+		if m, ok := modes[n]; ok {
+			h.SetMode(m)
+		}
+		w, err := zw.CreateHeader(h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(files[n])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExtractZip(t *testing.T) {
+	dir := t.TempDir()
+	z := filepath.Join(dir, "r.zip")
+	writeZip(t, z, map[string]string{"sprawl.exe": "bin", "plugin/hooks/hooks.json": "{}", "plugin/": ""},
+		map[string]os.FileMode{"plugin/": os.ModeDir | 0o755})
+	dst := filepath.Join(dir, "out")
+	if err := Extract(z, dst); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dst, "plugin", "hooks", "hooks.json")); string(b) != "{}" {
+		t.Fatalf("hooks.json = %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dst, "sprawl.exe")); string(b) != "bin" {
+		t.Fatalf("sprawl.exe = %q", b)
+	}
+}
+
+func TestExtractZipRejectsUnsafeEntries(t *testing.T) {
+	for name, files := range map[string]map[string]string{
+		"traversal":    {"../escape": "x"},
+		"backslash":    {`a\..\..\x`: "x"},
+		"drive":        {"C:/x": "x"},
+		"stream":       {"a.txt:hidden": "x"},
+		"reserved":     {"CON": "x"},
+		"reserved-ext": {"plugin/nul.txt": "x"},
+		"trailing dot": {"a.": "x"},
+		"duplicate":    {"A.txt": "x", "a.txt": "y"},
+		"rooted":       {"/etc/x": "x"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			z := filepath.Join(dir, "r.zip")
+			writeZip(t, z, files, nil)
+			if err := Extract(z, filepath.Join(dir, "out")); err == nil {
+				t.Fatal("unsafe entry accepted")
+			}
+		})
+	}
+	dir := t.TempDir()
+	z := filepath.Join(dir, "link.zip")
+	writeZip(t, z, map[string]string{"link": "/etc/passwd"}, map[string]os.FileMode{"link": os.ModeSymlink | 0o777})
+	if err := Extract(z, filepath.Join(dir, "out")); err == nil {
+		t.Fatal("symlink accepted")
+	}
+	many := map[string]string{}
+	for i := range maxEntries + 1 {
+		many[fmt.Sprintf("f%04d", i)] = ""
+	}
+	z = filepath.Join(dir, "many.zip")
+	writeZip(t, z, many, nil)
+	if err := Extract(z, filepath.Join(dir, "out2")); err == nil {
+		t.Fatal("entry cap not enforced")
+	}
+}
+
+func TestSafeName(t *testing.T) {
+	for _, ok := range []string{"sprawl", "plugin/hooks/hooks.json", ".claude-plugin/marketplace.json", "./README.md", "dir/"} {
+		if _, err := safeName(ok); err != nil {
+			t.Errorf("safeName(%q) = %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "..", "a/../../b", "/x", `x\y`, "C:x", "COM1", "lpt9.txt", "aux", "x ", "x."} {
+		if _, err := safeName(bad); err == nil {
+			t.Errorf("safeName(%q) accepted", bad)
 		}
 	}
 }

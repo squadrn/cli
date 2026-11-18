@@ -11,6 +11,7 @@ package release
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"compress/gzip"
 	"crypto/sha256"
@@ -94,9 +95,73 @@ const (
 	maxEntries    = 1000
 )
 
-// Extract unpacks a .tar.gz into dst. Only regular files and directories are accepted, every
-// path must stay inside dst, sizes are capped, and modes are reduced to 0755/0644.
-func Extract(tarball, dst string) error {
+// Extract unpacks a release archive (.tar.gz, or .zip on Windows) into dst. Only regular files
+// and directories are accepted, every path must stay inside dst, sizes are capped, and modes are
+// reduced to 0755/0644.
+func Extract(archive, dst string) error {
+	if strings.HasSuffix(archive, ".zip") {
+		return extractZip(archive, dst)
+	}
+	return extractTarGz(archive, dst)
+}
+
+// extractZip unpacks a Windows release with the same rules as extractTarGz: safe names, regular
+// files and directories only, bounded sizes and entry count.
+func extractZip(archive, dst string) error {
+	zr, err := zip.OpenReader(archive)
+	if err != nil {
+		return fmt.Errorf("%s: %w", filepath.Base(archive), err)
+	}
+	defer func() { _ = zr.Close() }()
+	if len(zr.File) > maxEntries {
+		return fmt.Errorf("%s: more than %d entries", filepath.Base(archive), maxEntries)
+	}
+	var total uint64
+	seen := map[string]bool{}
+	for _, zf := range zr.File {
+		name, err := safeName(zf.Name)
+		if err != nil {
+			return err
+		}
+		key := strings.ToLower(name)
+		if seen[key] {
+			return fmt.Errorf("%s: duplicate entry %s", filepath.Base(archive), zf.Name)
+		}
+		seen[key] = true
+		target := filepath.Join(dst, name)
+		mode := zf.Mode()
+		switch {
+		case mode.IsDir():
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+			continue
+		case !mode.IsRegular():
+			return fmt.Errorf("unsupported entry in archive: %s", zf.Name)
+		}
+		total += zf.UncompressedSize64
+		if zf.UncompressedSize64 > maxEntryBytes || total > maxTotalBytes {
+			return fmt.Errorf("%s: %s is too large", filepath.Base(archive), zf.Name)
+		}
+		perm := os.FileMode(0o644)
+		if mode&0o111 != 0 || strings.EqualFold(filepath.Ext(name), ".exe") {
+			perm = 0o755
+		}
+		rc, err := zf.Open()
+		if err != nil {
+			return err
+		}
+		// LimitReader guards against a header that understates the data that follows.
+		err = fsx.WriteFile(target, io.LimitReader(rc, int64(zf.UncompressedSize64)), perm)
+		_ = rc.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func extractTarGz(tarball, dst string) error {
 	f, err := os.Open(tarball)
 	if err != nil {
 		return err
