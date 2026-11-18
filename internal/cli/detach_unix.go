@@ -7,7 +7,8 @@ import (
 	"syscall"
 )
 
-// detach runs cmd in a new session, without a controlling terminal.
-func detach(cmd *exec.Cmd) {
+// startDetached starts cmd in a new session, without a controlling terminal.
+func startDetached(cmd *exec.Cmd) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return cmd.Start()
 }

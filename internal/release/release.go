@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"sprawling-agents/internal/config"
 	"sprawling-agents/internal/fsx"
@@ -55,7 +55,8 @@ func VerifyChecksum(checksums, file string) error {
 	want := ""
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		if sum, n, ok := strings.Cut(sc.Text(), "  "); ok && n == name {
+		line := strings.TrimPrefix(sc.Text(), `\`) // GNU coreutils escaping marker
+		if sum, n, ok := strings.Cut(line, "  "); ok && strings.TrimPrefix(n, "*") == name {
 			want = sum
 		}
 	}
@@ -117,9 +118,9 @@ func Extract(tarball, dst string) error {
 		} else if err != nil {
 			return fmt.Errorf("%s: %w", filepath.Base(tarball), err)
 		}
-		name := filepath.Clean(hdr.Name)
-		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("unsafe path in archive: %s", hdr.Name)
+		name, err := safeName(hdr.Name)
+		if err != nil {
+			return err
 		}
 		target := filepath.Join(dst, name)
 		switch hdr.Typeflag {
@@ -144,6 +145,27 @@ func Extract(tarball, dst string) error {
 			return fmt.Errorf("unsupported entry in archive: %s", hdr.Name)
 		}
 	}
+}
+
+// safeName validates an archive member name the same way on every platform: relative, no "..",
+// no drive letters, colons (alternate data streams), backslashes or Windows reserved names.
+func safeName(raw string) (string, error) {
+	bad := func() (string, error) { return "", fmt.Errorf("unsafe path in archive: %s", raw) }
+	if raw == "" || strings.HasPrefix(raw, "/") || strings.ContainsAny(raw, `\:`) {
+		return bad()
+	}
+	for _, part := range strings.Split(strings.TrimSuffix(raw, "/"), "/") {
+		upper := strings.ToUpper(strings.TrimRight(part, ". "))
+		base, _, _ := strings.Cut(upper, ".")
+		switch {
+		case part == "..", part != "." && strings.TrimRight(part, ". ") != part:
+			return bad()
+		case base == "CON" || base == "PRN" || base == "AUX" || base == "NUL",
+			len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '0' && base[3] <= '9':
+			return bad()
+		}
+	}
+	return filepath.FromSlash(path.Clean(raw)), nil
 }
 
 type Layout struct {
@@ -255,95 +277,10 @@ func SnapshotVersion(dir string) string {
 	return strings.TrimSpace(string(b))
 }
 
-// Unlink removes the command links in BinDir that point at the binary and returns them.
-func (l Layout) Unlink() ([]string, error) {
-	entries, err := os.ReadDir(l.BinDir)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	var removed []string
-	for _, e := range entries {
-		link := filepath.Join(l.BinDir, e.Name())
-		if target, err := os.Readlink(link); err == nil && target == l.Binary() {
-			if err := os.Remove(link); err != nil {
-				return removed, err
-			}
-			removed = append(removed, link)
-		}
-	}
-	return removed, nil
-}
-
 type LinkResult struct {
 	Created  []string // links (re)pointed at the binary
 	Removed  []string // links for names no longer wanted
 	BackedUp []string // unrelated files moved aside as <name>.bak-<time>
-}
-
-// LinkCommands makes every name in names a link to the binary in BinDir and removes links of
-// ours (to the binary, or to any path in ours) whose name is no longer wanted. A file that is
-// not ours is moved aside instead of overwritten.
-func (l Layout) LinkCommands(names []string, ours []string, now time.Time) (LinkResult, error) {
-	var res LinkResult
-	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
-		return res, err
-	}
-	isOurs := func(target string) bool {
-		if target == l.Binary() {
-			return true
-		}
-		for _, o := range ours {
-			if target == o {
-				return true
-			}
-		}
-		return false
-	}
-	want := map[string]bool{}
-	for _, n := range names {
-		want[n] = true
-		link := filepath.Join(l.BinDir, n)
-		target, err := os.Readlink(link)
-		if err == nil && target == l.Binary() {
-			continue
-		}
-		if _, lerr := os.Lstat(link); lerr == nil {
-			if err == nil && isOurs(target) {
-				if err := os.Remove(link); err != nil {
-					return res, err
-				}
-			} else {
-				backup := link + ".bak-" + now.Format("20060102-150405")
-				if err := os.Rename(link, backup); err != nil {
-					return res, err
-				}
-				res.BackedUp = append(res.BackedUp, backup)
-			}
-		}
-		if err := os.Symlink(l.Binary(), link); err != nil {
-			return res, err
-		}
-		res.Created = append(res.Created, link)
-	}
-	entries, err := os.ReadDir(l.BinDir)
-	if err != nil {
-		return res, err
-	}
-	for _, e := range entries {
-		if want[e.Name()] || e.Type()&os.ModeSymlink == 0 {
-			continue
-		}
-		link := filepath.Join(l.BinDir, e.Name())
-		if target, err := os.Readlink(link); err == nil && isOurs(target) {
-			if err := os.Remove(link); err != nil {
-				return res, err
-			}
-			res.Removed = append(res.Removed, link)
-		}
-	}
-	return res, nil
 }
 
 func setPluginVersion(path, version string) error {

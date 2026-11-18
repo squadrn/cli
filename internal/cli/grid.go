@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 
@@ -20,6 +21,9 @@ import (
 )
 
 func requireTmux(what string) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("%s is not available on Windows: it runs agents in tmux panes; start each agent in its own terminal with: sprawl wt <name>", what)
+	}
 	if _, err := exec.LookPath("tmux"); err != nil {
 		return fmt.Errorf("tmux is required for %s", what)
 	}
@@ -400,7 +404,7 @@ func (a *app) swap(name, toInput string, yes bool) error {
 			return err
 		}
 		a.banner(to)
-		return ag.Exec(to.ConfigDir(), ag.ResumeArgs(s.ID))
+		return a.session(ag, to, ag.ResumeArgs(s.ID))
 	}
 	command := grid.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(s.ID)...)...)
 	if err := (grid.Tmux{}).Respawn(ctx, pane, dir, grid.Agent{Account: to.Label(), Name: name}, command); err != nil {

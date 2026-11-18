@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -265,7 +266,9 @@ func decideDirs(r repos) map[string]string {
 }
 
 // command fills the {main} placeholder with the repository on main.
-func (c decideCase) command(r repos) string { return strings.ReplaceAll(c.cmd, "{main}", r.main) }
+func (c decideCase) command(r repos) string {
+	return strings.ReplaceAll(c.cmd, "{main}", filepath.ToSlash(r.main))
+}
 
 func TestDecide(t *testing.T) {
 	r := newRepos(t)
@@ -495,11 +498,13 @@ func TestLogRecord(t *testing.T) {
 	if string(b) != want {
 		t.Fatalf("log = %q", b)
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
-		t.Errorf("log mode = %v", fi.Mode().Perm())
-	}
-	if fi, _ := os.Stat(filepath.Dir(path)); fi.Mode().Perm() != 0o700 {
-		t.Errorf("log dir mode = %v", fi.Mode().Perm())
+	if runtime.GOOS != "windows" {
+		if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+			t.Errorf("log mode = %v", fi.Mode().Perm())
+		}
+		if fi, _ := os.Stat(filepath.Dir(path)); fi.Mode().Perm() != 0o700 {
+			t.Errorf("log dir mode = %v", fi.Mode().Perm())
+		}
 	}
 	// A symlink planted at the log path is not followed.
 	target := filepath.Join(t.TempDir(), "target")
@@ -514,7 +519,7 @@ func TestLogRecord(t *testing.T) {
 	if b, _ := os.ReadFile(target); len(b) != 0 {
 		t.Error("log followed a symlink")
 	}
-	if got := DefaultLogPath("/h"); !strings.HasSuffix(got, "/sprawl/guard.log") {
+	if got := DefaultLogPath("/h"); !strings.HasSuffix(filepath.ToSlash(got), "/sprawl/guard.log") {
 		t.Errorf("DefaultLogPath = %q", got)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -92,6 +93,11 @@ func kindOf(m fs.FileMode) string {
 }
 
 func TestScript(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The scripts drive sh, tmux and a shell-script fake claude; Windows variants come with
+		// the Windows script suite (ADR 0008, P4).
+		t.Skip("script tests are Unix-only for now")
+	}
 	testscript.Run(t, testscript.Params{
 		Dir:           filepath.Join("..", "..", "testdata", "script"),
 		UpdateScripts: *updateScripts,

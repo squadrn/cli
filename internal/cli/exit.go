@@ -8,6 +8,7 @@ import (
 	"sprawling-agents/internal/config"
 	"sprawling-agents/internal/grid"
 	"sprawling-agents/internal/install"
+	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/ui"
 	"sprawling-agents/internal/worktree"
 )
@@ -42,11 +43,14 @@ func (e childExit) Error() string { return fmt.Sprintf("exit status %d", e.code)
 func exitCode(err error) int {
 	var ue usageError
 	var ce childExit
+	var es provider.ExitStatus
 	switch {
 	case err == nil:
 		return exitOK
 	case errors.As(err, &ce):
 		return ce.code
+	case errors.As(err, &es):
+		return es.Code
 	case errors.Is(err, ui.ErrCancelled):
 		return exitCancelled
 	case errors.As(err, &ue), errors.Is(err, account.ErrInvalidName), errors.Is(err, account.ErrReserved),
@@ -63,5 +67,6 @@ func exitCode(err error) int {
 // silent errors were already reported (or need no message).
 func silent(err error) bool {
 	var ce childExit
-	return errors.Is(err, errQuiet) || errors.Is(err, ui.ErrCancelled) || errors.As(err, &ce)
+	var es provider.ExitStatus
+	return errors.Is(err, errQuiet) || errors.Is(err, ui.ErrCancelled) || errors.As(err, &ce) || errors.As(err, &es)
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -168,7 +169,7 @@ func TestAccountChecks(t *testing.T) {
 	if c, _ := find(checks, "plugin disabled"); c.Status != Fail || c.Fix != "claude plugin enable sprawl@sprawl" {
 		t.Errorf("disabled plugin: %+v", c)
 	}
-	if c, _ := find(checks, "readable by other users"); c.Status != Warn || c.Fix != "chmod 700 ~/.claude-work" {
+	if c, _ := find(checks, "readable by other users"); runtime.GOOS != "windows" && (c.Status != Warn || c.Fix != "chmod 700 ~/.claude-work") {
 		t.Errorf("permissions: %+v", c)
 	}
 

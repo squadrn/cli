@@ -275,3 +275,18 @@ func listNames(ctx context.Context, c provider.Runner, configDir, field string, 
 	}
 	return set, nil
 }
+
+// RefreshShared brings copies of main's shared files up to date in account a. Copies exist only
+// where links are not available (Windows without Developer Mode); elsewhere this does nothing.
+// Copies edited in the account are left alone and returned.
+func (s Store) RefreshShared(a Account) []string {
+	if a.IsMain() {
+		return nil
+	}
+	main := s.MainDir(a.Spec)
+	sources := map[string]string{}
+	for _, item := range a.Spec.Shared {
+		sources[item] = filepath.Join(main, item)
+	}
+	return refreshCopies(a.Dir, sources)
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -245,7 +246,7 @@ func TestProvision(t *testing.T) {
 	if !r.PluginInstalled {
 		t.Error("plugin not installed")
 	}
-	if fi, err := os.Stat(a.Dir); err != nil || fi.Mode().Perm() != 0o700 {
+	if fi, err := os.Stat(a.Dir); runtime.GOOS != "windows" && (err != nil || fi.Mode().Perm() != 0o700) {
 		t.Errorf("account dir mode = %v, %v", fi.Mode().Perm(), err)
 	}
 }

@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -83,17 +84,21 @@ func TestRelocate(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(newDir, "plugins"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	body := `{"p":{"installPath":"` + oldDir + `/plugins/cache/x","other":"` + oldDir + `-suffix/y","ext":"/elsewhere/` + oldDir + `/z"}}`
+	j := func(v string) string { b, _ := json.Marshal(v); return string(b) }
+	doc := func(dir string) string {
+		return `{"p":{"installPath":` + j(dir+string(filepath.Separator)+filepath.Join("plugins", "cache", "x")) +
+			`,"slash":` + j(dir+"/plugins/y") + `,"other":` + j(oldDir+"-suffix/y") +
+			`,"ext":` + j("/elsewhere/"+oldDir+"/z") + `}}`
+	}
 	f := filepath.Join(newDir, "plugins", "installed_plugins.json")
-	if err := os.WriteFile(f, []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(f, []byte(doc(oldDir)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := (CLI{}).Relocate(oldDir, newDir); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(f)
-	want := `{"p":{"installPath":"` + newDir + `/plugins/cache/x","other":"` + oldDir + `-suffix/y","ext":"/elsewhere/` + oldDir + `/z"}}`
-	if string(b) != want {
+	if want := doc(newDir); string(b) != want {
 		t.Fatalf("relocated:\n%s\nwant\n%s", b, want)
 	}
 }

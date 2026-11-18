@@ -244,7 +244,7 @@ func (e Env) branchProtection(ctx context.Context) []Check {
 func (e Env) recommendedDeny() []string {
 	var rules []string
 	for _, dir := range []string{e.Layout.DataDir, config.DirsFor(e.Store.Home, config.Slug).Config} {
-		p := e.tilde(dir)
+		p := filepath.ToSlash(e.tilde(dir)) // Claude's permission rules use / on every platform
 		rules = append(rules, "Edit("+p+"/**)", "Write("+p+"/**)")
 	}
 	return rules
@@ -285,7 +285,7 @@ func (e Env) settings() []Check {
 					continue
 				}
 				seen[exe] = true
-				if fi, err := os.Stat(exe); err != nil || fi.Mode().Perm()&0o111 == 0 {
+				if fi, err := os.Stat(exe); err != nil || !executable(exe, fi) {
 					out = append(out, bad(g, Fail, "hook not executable: "+e.tilde(exe), "fix or remove it in "+e.tilde(path)))
 				}
 				if strings.HasSuffix(exe, "guard-git.sh") {
@@ -358,7 +358,7 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 		out = append(out, e.plugin(ctx, ag, a, g)...)
 	}
 	if !a.IsMain() {
-		if fi, err := os.Stat(a.Dir); err == nil && fi.Mode().Perm()&0o077 != 0 {
+		if fi, err := os.Stat(a.Dir); err == nil && !private(fi) {
 			out = append(out, bad(g, Warn, fmt.Sprintf("%s is readable by other users (%v)", e.tilde(a.Dir), fi.Mode().Perm()), "chmod 700 "+e.tilde(a.Dir)))
 		}
 		out = append(out, e.links(a, g)...)
@@ -428,21 +428,6 @@ func (e Env) expand(p string) string {
 }
 
 // onPath lists distinct executables named name across PATH.
-func onPath(name string) []string {
-	var out []string
-	seen := map[string]bool{}
-	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
-		p := filepath.Join(dir, name)
-		if fi, err := os.Stat(p); err != nil || fi.IsDir() || fi.Mode().Perm()&0o111 == 0 {
-			continue
-		}
-		if real := resolve(p); !seen[real] {
-			seen[real] = true
-			out = append(out, p)
-		}
-	}
-	return out
-}
 
 func resolve(p string) string {
 	if real, err := filepath.EvalSymlinks(p); err == nil {

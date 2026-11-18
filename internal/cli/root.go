@@ -20,6 +20,7 @@ import (
 
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/githook"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/provider/claude"
@@ -104,7 +105,7 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
 	}
-	noColor := os.Getenv("NO_COLOR") != ""
+	noColor := os.Getenv("NO_COLOR") != "" || !enableVT()
 	a := &app{
 		cmd:         cfg.CommandName(),
 		cfg:         cfg,
@@ -362,7 +363,7 @@ func (a *app) runAgent(accountInput string, args []string) error {
 		return err
 	}
 	a.banner(acct)
-	return ag.Exec(acct.ConfigDir(), args)
+	return a.session(ag, acct, args)
 }
 
 func (a *app) resolve(input string) (account.Account, error) {
@@ -381,6 +382,17 @@ func (a *app) banner(acct account.Account) {
 	if s, ok := a.cache.Cached(acct.Label()); ok && !s.LoggedIn {
 		a.warnf("%s is not logged in; run: %s account login %s", acct.Label(), a.cmd, acct.Label())
 	}
+}
+
+// session starts an interactive agent session as acct: shared-file copies are refreshed first
+// (Windows without links) and executables left over from earlier updates are cleaned up.
+func (a *app) session(ag provider.Agent, acct account.Account, args []string) error {
+	for _, c := range a.store.RefreshShared(acct) {
+		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+	}
+	fsx.CleanOld(filepath.Dir(a.layout.Binary()))
+	fsx.CleanOld(a.layout.BinDir)
+	return ag.Exec(acct.ConfigDir(), args)
 }
 
 func (a *app) tilde(path string) string {
@@ -470,13 +482,13 @@ func (a *app) pick() error {
 	if statuses[choice].Err == nil && !statuses[choice].Status.LoggedIn {
 		if err := a.confirm(false, "%s is not logged in. Log in now", acct.Label()); err == nil {
 			a.cache.Forget(acct.Label())
-			return ag.Exec(acct.ConfigDir(), ag.LoginArgs())
+			return a.session(ag, acct, ag.LoginArgs())
 		} else if !errors.Is(err, errAborted) {
 			return err
 		}
 	}
 	a.banner(acct)
-	return ag.Exec(acct.ConfigDir(), nil)
+	return a.session(ag, acct, nil)
 }
 
 func (a *app) addInteractively() error {
@@ -497,7 +509,7 @@ func (a *app) addInteractively() error {
 		return err
 	}
 	a.cache.Forget(acct.Label())
-	return ag.Exec(acct.ConfigDir(), ag.LoginArgs())
+	return a.session(ag, acct, ag.LoginArgs())
 }
 
 // marketplaceDir locates the local sprawl plugin marketplace: $SPRAWL_MARKETPLACE, else the

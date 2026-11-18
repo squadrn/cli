@@ -1,0 +1,32 @@
+//go:build !windows
+
+package doctor
+
+import (
+	"io/fs"
+	"os"
+	"path/filepath"
+)
+
+// executable: the execute bit is set.
+func executable(_ string, fi fs.FileInfo) bool { return fi.Mode().Perm()&0o111 != 0 }
+
+// private: no permissions for group or others.
+func private(fi fs.FileInfo) bool { return fi.Mode().Perm()&0o077 == 0 }
+
+// onPath lists distinct executables named name across PATH.
+func onPath(name string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		p := filepath.Join(dir, name)
+		if fi, err := os.Stat(p); err != nil || fi.IsDir() || !executable(p, fi) {
+			continue
+		}
+		if real := resolve(p); !seen[real] {
+			seen[real] = true
+			out = append(out, p)
+		}
+	}
+	return out
+}

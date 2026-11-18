@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -36,7 +37,7 @@ func TestInstall(t *testing.T) {
 	if err != nil || !strings.Contains(string(b), `exec '/opt/it'\''s/sprawl' hook git pre-push "$@"`) {
 		t.Fatalf("pre-push shim = %q, %v", b, err)
 	}
-	if fi, _ := os.Stat(filepath.Join(dir, "commit-msg")); fi.Mode().Perm() != 0o755 {
+	if fi, _ := os.Stat(filepath.Join(dir, "commit-msg")); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o755 {
 		t.Errorf("shim mode = %v", fi.Mode())
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
@@ -96,13 +97,14 @@ func TestRepoHook(t *testing.T) {
 	if err := os.WriteFile(def, []byte("#!/bin/sh\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); p != "" {
+	// Git for Windows has no execute bits: a #! script runs regardless.
+	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); runtime.GOOS != "windows" && p != "" {
 		t.Fatalf("non-executable hook returned: %q", p)
 	}
 	if err := os.Chmod(def, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if p, err := RepoHook(ctx, repo, ours, "pre-commit"); err != nil || !strings.HasSuffix(p, ".git/hooks/pre-commit") {
+	if p, err := RepoHook(ctx, repo, ours, "pre-commit"); err != nil || !strings.HasSuffix(filepath.ToSlash(p), ".git/hooks/pre-commit") {
 		t.Fatalf("default hooks dir: %q, %v", p, err)
 	}
 	husky := filepath.Join(repo, ".husky")
@@ -120,7 +122,7 @@ func TestRepoHook(t *testing.T) {
 		t.Fatalf("missing hook: %q", p)
 	}
 	git(t, repo, "config", "core.hooksPath", ours)
-	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); !strings.HasSuffix(p, ".git/hooks/pre-commit") {
+	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); !strings.HasSuffix(filepath.ToSlash(p), ".git/hooks/pre-commit") {
 		t.Fatalf("our own dir is never chained to: %q", p)
 	}
 	if _, err := RepoHook(ctx, t.TempDir(), ours, "pre-commit"); err == nil {
