@@ -1,0 +1,48 @@
+BIN     := bin/sprawl
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -s -w -X sprawling-agents/internal/cli.Version=$(VERSION)
+
+.PHONY: build test race cover cover-gates vuln lint fmt check validate clean
+
+build:
+	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/sprawl
+
+test:
+	go test ./...
+
+race:
+	go test -race ./...
+
+cover:
+	go test -coverprofile=coverage.out ./internal/...
+	go tool cover -func=coverage.out | tail -1
+
+# Minimum statement coverage per package: the guard is the security boundary.
+COVER_GATES := guard:95 githook:85 grid:70 doctor:70 install:80 release:80 update:95 ui:90 worktree:75
+
+cover-gates:
+	@for g in $(COVER_GATES); do \
+		pkg=$${g%%:*}; min=$${g#*:}; \
+		pct=$$(go test -cover ./internal/$$pkg/ | grep -o '[0-9.]*%' | tr -d %); \
+		echo "$$pkg coverage: $$pct% (min $$min%)"; \
+		awk -v p="$$pct" -v m="$$min" 'BEGIN { exit !(p >= m) }' || exit 1; \
+	done
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+lint:
+	golangci-lint run ./...
+	shellcheck -s sh plugin/bin/sprawl-hook scripts/*.sh
+	actionlint .github/workflows/*.yml
+
+fmt:
+	golangci-lint fmt ./...
+
+validate:
+	@if command -v claude >/dev/null; then claude plugin validate . && claude plugin validate plugin; else echo "claude not installed; skipping plugin validation"; fi
+
+check: lint race cover-gates validate
+
+clean:
+	rm -rf bin build dist coverage.out

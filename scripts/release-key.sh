@@ -1,0 +1,52 @@
+#!/bin/sh
+# Creates the release signing key (ed25519, SSH signature format). Run it once, yourself:
+#
+#   scripts/release-key.sh OWNER/sprawling-agents [--backup FILE]
+#
+# The private key never reaches the terminal: it is stored as the GitHub Actions secret
+# SPRAWL_SIGNING_KEY of the source repository, in pass (sprawl/release-signing-key) when pass is
+# installed, and in FILE when --backup is given; then the temporary copy is deleted. The public
+# key is appended to internal/release/signers.pub, which every build embeds.
+#
+# Keep a backup. Installed copies only trust the keys they were built with: losing the key means
+# everyone must reinstall with install.sh once.
+set -eu
+
+die() { printf 'release-key.sh: %s\n' "$*" >&2; exit 1; }
+
+repo=${1:-}
+[ -n "$repo" ] || die "usage: scripts/release-key.sh OWNER/REPO [--backup FILE]"
+shift
+backup=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --backup) [ $# -ge 2 ] || die "--backup needs a file"; backup=$2; shift 2 ;;
+    *) die "unknown option $1" ;;
+  esac
+done
+[ -f internal/release/signers.pub ] || die "run from the repository root"
+command -v ssh-keygen >/dev/null || die "ssh-keygen is required"
+command -v gh >/dev/null || die "gh is required (logged in with admin access to $repo)"
+if ! command -v pass >/dev/null && [ -z "$backup" ]; then
+  die "no backup: install pass or give --backup FILE (an encrypted volume)"
+fi
+
+umask 077
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT INT TERM
+ssh-keygen -q -t ed25519 -N '' -C "sprawl-release-$(date +%Y%m%d)" -f "$tmp/key"
+
+gh secret set SPRAWL_SIGNING_KEY --repo "$repo" <"$tmp/key"
+if command -v pass >/dev/null; then
+  pass insert -m -f sprawl/release-signing-key <"$tmp/key" >/dev/null
+  echo "private key stored in pass: sprawl/release-signing-key"
+fi
+if [ -n "$backup" ]; then
+  [ ! -e "$backup" ] || die "$backup exists; refusing to overwrite it"
+  cp "$tmp/key" "$backup"
+  echo "private key backed up to $backup"
+fi
+cat "$tmp/key.pub" >>internal/release/signers.pub
+echo "secret SPRAWL_SIGNING_KEY set on $repo"
+echo "public key added to internal/release/signers.pub:"
+cat "$tmp/key.pub"

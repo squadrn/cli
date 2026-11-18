@@ -1,0 +1,102 @@
+exec git init -q -b main repo
+exec git -C repo commit -q --allow-empty -m init
+mkdir home/.claude-personal home/.config/sprawl
+cp empty home/.claude/.loggedin
+cp empty home/.claude-personal/.loggedin
+
+# One pane per agent, each with its own account.
+exec sprawl grid repo feat-a personal:fix-b
+stdout 'claude/main +→ feat-a'
+stdout 'claude/personal +→ fix-b'
+exec tmux list-panes -s -t sprawl-repo -F '#{@sprawl_acct}:#{@sprawl_name}'
+stdout '^claude/main:feat-a$'
+stdout '^claude/personal:fix-b$'
+
+# Panes run `sprawl -a <account> wt <name>` from the repo root.
+waitfor home/calls.log 'cfg=<unset> pwd=.*/repo args=--worktree feat-a'
+waitfor home/calls.log 'cfg=.*/home/.claude-personal pwd=.*/repo args=--worktree fix-b'
+
+# Re-running adds new agents and skips running ones.
+exec sprawl grid repo feat-a main:chore-c
+stderr '"feat-a" is already running in sprawl-repo; skipped'
+stdout 'claude/main +→ chore-c'
+exec sh -c 'tmux list-panes -s -t sprawl-repo | wc -l'
+stdout '^ *3$'
+
+exec sprawl ps
+stdout '^SESSION +ACCOUNT +WORKTREE +PROCESS$'
+stdout '^sprawl-repo +claude/main +feat-a '
+stdout '^sprawl-repo +claude/personal +fix-b '
+stdout '^sprawl-repo +claude/main +chore-c '
+
+exec sprawl ps --json
+stdout '"Name": "fix-b"'
+exec sprawl grid ls
+stdout '^SESSION +REPO +PANES +ATTACHED$'
+stdout '^sprawl-repo +.*/repo +3 +false$'
+exec sprawl grid ls --json
+stdout '"Repo": ".*/repo"'
+exitcode 2 sprawl grid stop repo
+exec git -C repo worktree add -q -b worktree-feat-a .claude/worktrees/feat-a
+cd repo
+exec sprawl wt ls
+stdout '^feat-a +worktree-feat-a +clean +claude/main$'
+cd $WORK
+exitcode 1 sprawl account rename personal p2
+exec sprawl grid stop repo --yes
+stdout 'stopped sprawl-repo'
+exitcode 1 sprawl grid attach repo
+! exec sprawl grid attach repo
+stderr 'no grid is running for'
+exec sprawl grid ls
+stdout '^no running grids$'
+exec sprawl ps --json
+stdout '^\[\]$'
+
+# --spread round-robins over logged-in accounts only.
+mkdir home/.claude-idle
+exec sprawl grid repo feat-1 feat-2 feat-3 --spread
+stdout 'claude/main +→ feat-1'
+stdout 'claude/personal +→ feat-2'
+stdout 'claude/main +→ feat-3'
+! stdout idle
+
+# The default account comes from -a or from the account named before the subcommand.
+exec tmux kill-server
+exec sprawl personal grid repo feat-x
+stdout 'claude/personal +→ feat-x'
+exec sprawl grid repo feat-y -a claude/personal
+stdout 'claude/personal +→ feat-y'
+exec tmux kill-server
+
+exec sprawl ps
+stdout '^no running grids$'
+
+# Two repositories with the same directory name get separate grids; sessions are found by tag,
+# so renaming the command later never orphans a running grid.
+mkdir other
+exec git init -q -b main other/repo
+exec git -C other/repo commit -q --allow-empty -m init
+exec sprawl grid repo feat-a
+exec sprawl grid other/repo feat-b
+exec tmux list-sessions -F '#{session_name}'
+stdout '^sprawl-repo$'
+stdout '^sprawl-repo-2$'
+cp ai.toml home/.config/sprawl/config.toml
+exec sprawl grid repo feat-c
+stdout 'claude/main +→ feat-c'
+exec tmux list-panes -s -t sprawl-repo -F '#{@sprawl_name}'
+stdout '^feat-c$'
+! exec tmux has-session -t ai-repo
+exec tmux kill-server
+
+# Errors: duplicates and bad names are usage errors; unknown accounts and non-repos fail.
+exitcode 2 sprawl grid repo feat-z feat-z
+exitcode 2 sprawl grid repo
+exitcode 2 sprawl grid repo Bad_Name
+exitcode 1 sprawl grid repo ghost:feat-y
+exitcode 1 sprawl grid nowhere feat-a
+
+-- empty --
+-- ai.toml --
+command = "ai"

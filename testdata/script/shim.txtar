@@ -1,0 +1,43 @@
+# With sprawl on PATH, the plugin shim delegates to `sprawl hook`.
+stdin force.json
+exec $SHIM guard-git
+stdout '"permissionDecision":"deny"'
+stdout 'force push is not allowed'
+
+# The installed binary is found at its fixed path even when PATH lacks it (hooks often run with
+# a minimal PATH) and whatever command name the user chose.
+mkdir home/.local/share/sprawl/bin
+exec sh -c 'ln -s "$(command -v sprawl)" home/.local/share/sprawl/bin/sprawl'
+env PATH=/usr/bin:/bin
+stdin force.json
+exec $SHIM guard-git
+stdout 'force push is not allowed'
+
+# Without sprawl anywhere the shim denies pushes, asks about other git commands and stays out of
+# the way otherwise.
+rm home/.local/share/sprawl/bin/sprawl
+stdin force.json
+exec $SHIM guard-git
+stdout '"permissionDecision":"deny"'
+stdout 'sprawl is not installed, so git push is blocked'
+stdin obfuscated.json
+exec $SHIM guard-git
+stdout '"permissionDecision":"deny"'
+stdin status.json
+exec $SHIM guard-git
+stdout '"permissionDecision":"ask"'
+stdin ls.json
+exec $SHIM guard-git
+! stdout .
+stdin force.json
+exec $SHIM notify Test
+! stdout .
+
+-- force.json --
+{"cwd":".","tool_input":{"command":"git push -f origin feat-x"}}
+-- obfuscated.json --
+{"cwd":".","tool_input":{"command":"GIT pu''sh origin main"}}
+-- ls.json --
+{"cwd":".","tool_input":{"command":"ls -la"}}
+-- status.json --
+{"cwd":".","tool_input":{"command":"git status"}}

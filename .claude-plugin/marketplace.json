@@ -1,0 +1,14 @@
+{
+  "name": "sprawl",
+  "owner": {
+    "name": "Sprawling Agents"
+  },
+  "description": "Sprawling Agents: run many coding agents in parallel across accounts and worktrees, with git guardrails.",
+  "plugins": [
+    {
+      "name": "sprawl",
+      "source": "./plugin",
+      "description": "Guardrails and helpers for parallel coding agents."
+    }
+  ]
+}

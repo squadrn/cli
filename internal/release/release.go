@@ -1,0 +1,410 @@
+// Package release verifies, unpacks and installs sprawl release archives.
+//
+// Installed layout:
+//
+//	$XDG_DATA_HOME/sprawl/          (~/.local/share/sprawl) — also the local plugin marketplace
+//	├── bin/sprawl
+//	├── .claude-plugin/marketplace.json
+//	└── plugin/…
+//	~/.local/bin/<command>, ~/.local/bin/<alias>… → ~/.local/share/sprawl/bin/sprawl
+package release
+
+import (
+	"archive/tar"
+	"bufio"
+	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/fsx"
+	"sprawling-agents/internal/githook"
+)
+
+// AssetName is the archive goreleaser publishes for one platform.
+func AssetName(version, goos, goarch string) string {
+	return fmt.Sprintf("sprawl_%s_%s_%s.tar.gz", strings.TrimPrefix(version, "v"), goos, goarch)
+}
+
+// BinaryName is the executable inside a release and in the data dir; commands link to it.
+const BinaryName = "sprawl"
+
+const ChecksumsName = "checksums.txt"
+
+// VerifyChecksum checks file against its entry in a goreleaser checksums.txt.
+func VerifyChecksum(checksums, file string) error {
+	f, err := os.Open(checksums)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	name := filepath.Base(file)
+	want := ""
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		if sum, n, ok := strings.Cut(sc.Text(), "  "); ok && n == name {
+			want = sum
+		}
+	}
+	if want == "" {
+		return fmt.Errorf("%s has no checksum for %s", filepath.Base(checksums), name)
+	}
+	got, err := sha256File(file)
+	if err != nil {
+		return err
+	}
+	if got != want {
+		return fmt.Errorf("checksum mismatch for %s: got %s, want %s", name, got, want)
+	}
+	return nil
+}
+
+func sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// Limits for an unpacked release: generous for sprawl (a ~10 MB binary and a few small files),
+// small enough that a hostile archive cannot fill the disk.
+const (
+	maxEntryBytes = 256 << 20
+	maxTotalBytes = 512 << 20
+	maxEntries    = 1000
+)
+
+// Extract unpacks a .tar.gz into dst. Only regular files and directories are accepted, every
+// path must stay inside dst, sizes are capped, and modes are reduced to 0755/0644.
+func Extract(tarball, dst string) error {
+	f, err := os.Open(tarball)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("%s: %w", filepath.Base(tarball), err)
+	}
+	tr := tar.NewReader(gz)
+	var total int64
+	for n := 0; ; n++ {
+		if n >= maxEntries {
+			return fmt.Errorf("%s: more than %d entries", filepath.Base(tarball), maxEntries)
+		}
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("%s: %w", filepath.Base(tarball), err)
+		}
+		name := filepath.Clean(hdr.Name)
+		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("unsafe path in archive: %s", hdr.Name)
+		}
+		target := filepath.Join(dst, name)
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			total += hdr.Size
+			if hdr.Size > maxEntryBytes || total > maxTotalBytes {
+				return fmt.Errorf("%s: %s is too large", filepath.Base(tarball), hdr.Name)
+			}
+			mode := os.FileMode(0o644)
+			if hdr.Mode&0o111 != 0 {
+				mode = 0o755
+			}
+			// LimitReader guards against a header that understates the data that follows.
+			if err := fsx.WriteFile(target, io.LimitReader(tr, hdr.Size), mode); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported entry in archive: %s", hdr.Name)
+		}
+	}
+}
+
+type Layout struct {
+	DataDir string
+	BinDir  string
+}
+
+func DefaultLayout(home string) Layout {
+	return Layout{DataDir: config.DirsFor(home, config.Slug).Data, BinDir: filepath.Join(home, ".local", "bin")}
+}
+
+// Legacy is an install left behind by a previous product name.
+type Legacy struct {
+	Name    string
+	DataDir string
+	Binary  string
+}
+
+// Legacies lists where previous product names installed themselves, newest first.
+func Legacies(home string) []Legacy {
+	out := make([]Legacy, len(config.PreviousNames))
+	for i, n := range config.PreviousNames {
+		dir := config.DirsFor(home, n).Data
+		out[i] = Legacy{Name: n, DataDir: dir, Binary: filepath.Join(dir, "bin", n)}
+	}
+	return out
+}
+
+func (l Layout) Binary() string { return filepath.Join(l.DataDir, "bin", BinaryName) }
+
+// GitHooks is the directory of git-level guard shims.
+func (l Layout) GitHooks() string { return githook.Dir(l.DataDir) }
+
+// Marketplace is the local plugin marketplace dir, "" when not installed.
+func (l Layout) Marketplace() string {
+	if _, err := os.Stat(filepath.Join(l.DataDir, ".claude-plugin", "marketplace.json")); err != nil {
+		return ""
+	}
+	return l.DataDir
+}
+
+// Install places an unpacked release (src holds sprawl, plugin/ and .claude-plugin/) into the
+// data dir. The binary goes first: plugin hooks call it, so new plugin files never run against
+// an old binary. The plugin version is set to version so Claude Code's plugin cache picks it up.
+func (l Layout) Install(src, version string) error {
+	for _, p := range []string{BinaryName, filepath.Join("plugin", ".claude-plugin", "plugin.json"), filepath.Join(".claude-plugin", "marketplace.json")} {
+		if !fsx.IsFile(filepath.Join(src, p)) {
+			return fmt.Errorf("not a sprawl release: missing %s", p)
+		}
+	}
+	if err := fsx.CopyFile(filepath.Join(src, BinaryName), l.Binary(), 0o755, false); err != nil {
+		return err
+	}
+	if err := os.Chmod(l.Binary(), 0o755); err != nil {
+		return err
+	}
+	for _, dir := range []string{"plugin", ".claude-plugin"} {
+		dst := filepath.Join(l.DataDir, dir)
+		fsx.CleanStale(dst)
+		if err := fsx.ReplaceDir(filepath.Join(src, dir), dst, 0o755); err != nil {
+			return err
+		}
+	}
+	if err := setPluginVersion(filepath.Join(l.DataDir, "plugin", ".claude-plugin", "plugin.json"), version); err != nil {
+		return err
+	}
+	if err := fsx.WriteBytes(filepath.Join(l.DataDir, versionFile), []byte(strings.TrimPrefix(version, "v")+"\n"), 0o644); err != nil {
+		return err
+	}
+	return githook.Install(l.GitHooks(), l.Binary())
+}
+
+// versionFile records the installed version next to the binary.
+const versionFile = "VERSION"
+
+// Version is the installed release, "" when unknown.
+func (l Layout) Version() string {
+	b, err := os.ReadFile(filepath.Join(l.DataDir, versionFile))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// Previous holds the release that was installed before the current one (for rollback).
+func (l Layout) Previous() string { return filepath.Join(l.DataDir, "previous") }
+
+// Snapshot copies the installed release into dst in the layout Install reads, so dst can be
+// installed again later. It does nothing when no release is installed.
+func (l Layout) Snapshot(dst string) error {
+	if !fsx.IsFile(l.Binary()) {
+		return nil
+	}
+	_ = os.RemoveAll(dst)
+	if err := fsx.CopyFile(l.Binary(), filepath.Join(dst, BinaryName), 0o755, false); err != nil {
+		return err
+	}
+	for _, dir := range []string{"plugin", ".claude-plugin"} {
+		if err := fsx.CopyTree(filepath.Join(l.DataDir, dir), filepath.Join(dst, dir), 0o755, false); err != nil {
+			return err
+		}
+	}
+	return fsx.WriteBytes(filepath.Join(dst, versionFile), []byte(l.Version()+"\n"), 0o644)
+}
+
+// SnapshotVersion is the version recorded in a snapshot dir.
+func SnapshotVersion(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, versionFile))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// Unlink removes the command links in BinDir that point at the binary and returns them.
+func (l Layout) Unlink() ([]string, error) {
+	entries, err := os.ReadDir(l.BinDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for _, e := range entries {
+		link := filepath.Join(l.BinDir, e.Name())
+		if target, err := os.Readlink(link); err == nil && target == l.Binary() {
+			if err := os.Remove(link); err != nil {
+				return removed, err
+			}
+			removed = append(removed, link)
+		}
+	}
+	return removed, nil
+}
+
+type LinkResult struct {
+	Created  []string // links (re)pointed at the binary
+	Removed  []string // links for names no longer wanted
+	BackedUp []string // unrelated files moved aside as <name>.bak-<time>
+}
+
+// LinkCommands makes every name in names a link to the binary in BinDir and removes links of
+// ours (to the binary, or to any path in ours) whose name is no longer wanted. A file that is
+// not ours is moved aside instead of overwritten.
+func (l Layout) LinkCommands(names []string, ours []string, now time.Time) (LinkResult, error) {
+	var res LinkResult
+	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
+		return res, err
+	}
+	isOurs := func(target string) bool {
+		if target == l.Binary() {
+			return true
+		}
+		for _, o := range ours {
+			if target == o {
+				return true
+			}
+		}
+		return false
+	}
+	want := map[string]bool{}
+	for _, n := range names {
+		want[n] = true
+		link := filepath.Join(l.BinDir, n)
+		target, err := os.Readlink(link)
+		if err == nil && target == l.Binary() {
+			continue
+		}
+		if _, lerr := os.Lstat(link); lerr == nil {
+			if err == nil && isOurs(target) {
+				if err := os.Remove(link); err != nil {
+					return res, err
+				}
+			} else {
+				backup := link + ".bak-" + now.Format("20060102-150405")
+				if err := os.Rename(link, backup); err != nil {
+					return res, err
+				}
+				res.BackedUp = append(res.BackedUp, backup)
+			}
+		}
+		if err := os.Symlink(l.Binary(), link); err != nil {
+			return res, err
+		}
+		res.Created = append(res.Created, link)
+	}
+	entries, err := os.ReadDir(l.BinDir)
+	if err != nil {
+		return res, err
+	}
+	for _, e := range entries {
+		if want[e.Name()] || e.Type()&os.ModeSymlink == 0 {
+			continue
+		}
+		link := filepath.Join(l.BinDir, e.Name())
+		if target, err := os.Readlink(link); err == nil && isOurs(target) {
+			if err := os.Remove(link); err != nil {
+				return res, err
+			}
+			res.Removed = append(res.Removed, link)
+		}
+	}
+	return res, nil
+}
+
+func setPluginVersion(path, version string) error {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(b, &manifest); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	manifest["version"] = strings.TrimPrefix(version, "v")
+	out, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return fsx.WriteBytes(path, append(out, '\n'), 0o644)
+}
+
+// Compare orders release versions (v1.2.3, 1.2.3-rc.1): -1, 0 or 1. A pre-release sorts before
+// its release. ok is false when either is not a version (e.g. "dev").
+func Compare(a, b string) (cmp int, ok bool) {
+	pa, prea, oka := parseVersion(a)
+	pb, preb, okb := parseVersion(b)
+	if !oka || !okb {
+		return 0, false
+	}
+	for i := range 3 {
+		if pa[i] != pb[i] {
+			if pa[i] < pb[i] {
+				return -1, true
+			}
+			return 1, true
+		}
+	}
+	switch {
+	case prea == preb:
+		return 0, true
+	case prea == "":
+		return 1, true
+	case preb == "":
+		return -1, true
+	case prea < preb:
+		return -1, true
+	}
+	return 1, true
+}
+
+func parseVersion(v string) ([3]int, string, bool) {
+	var out [3]int
+	v = strings.TrimPrefix(v, "v")
+	v, pre, _ := strings.Cut(v, "-")
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return out, "", false
+	}
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 {
+			return out, "", false
+		}
+		out[i] = n
+	}
+	return out, pre, true
+}

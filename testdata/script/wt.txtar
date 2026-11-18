@@ -1,0 +1,19 @@
+exec git init -q -b main repo
+exec git -C repo commit -q --allow-empty -m init
+mkdir home/.claude-personal repo/sub
+
+# wt runs claude --worktree from the repo root, whatever subdirectory it is called from.
+cd repo/sub
+exec sprawl wt feat-a
+stdout '^cfg=<unset> args=--worktree feat-a$'
+grep 'pwd=.*/repo args=--worktree feat-a' ../../home/calls.log
+exec sprawl personal wt feat-b
+stdout '^cfg=.*/home/.claude-personal args=--worktree feat-b$'
+exec sprawl wt feat-c -a claude/personal
+stdout '^cfg=.*/home/.claude-personal args=--worktree feat-c$'
+
+exitcode 2 sprawl wt Bad_Name
+exitcode 2 sprawl wt
+exitcode 1 sprawl wt feat-d -a ghost
+cd $WORK
+exitcode 1 sprawl wt feat-a

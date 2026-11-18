@@ -1,0 +1,182 @@
+# An unpacked release: this binary plus the repository's plugin and marketplace files.
+mkdir rel home/.claude-personal home/.local/bin
+exec sh -c 'cp "$(command -v sprawl)" rel/sprawl && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+
+# First install with a chosen command name and alias.
+exec sprawl self-install rel --command ai --alias sx
+stdout 'installed sprawl dev → ~/.local/share/sprawl/bin/sprawl'
+stdout 'linked ~/.local/bin/ai'
+stdout 'linked ~/.local/bin/sx'
+stdout 'claude/main: plugin installed'
+stdout 'claude/personal: plugin installed'
+stdout 'next: ai doctor'
+! stdout 'migrated'
+exists home/.local/share/sprawl/plugin/bin/sprawl-hook
+grep '"version": "dev"' home/.local/share/sprawl/plugin/.claude-plugin/plugin.json
+grep '^command = "ai"' home/.config/sprawl/config.toml
+grep '^aliases = \["sx"\]' home/.config/sprawl/config.toml
+exec sh -c 'readlink home/.local/bin/ai && readlink home/.local/bin/sx'
+stdout -count=2 'home/.local/share/sprawl/bin/sprawl$'
+
+# Messages use the chosen name.
+exitcode 1 sprawl -a ghost
+! exec sprawl -a ghost
+stderr '^ai: account not found: claude/ghost \(run: ai account add claude/ghost\)$'
+
+# Upgrades keep the names and refresh the plugin.
+exec sprawl self-install rel
+stdout 'claude/main: plugin updated'
+! stdout 'linked'
+grep '^command = "ai"' home/.config/sprawl/config.toml
+
+# Rename the command, then drop the alias: links follow, nothing else changes.
+exec sprawl config set command dev2
+stdout 'linked ~/.local/bin/dev2'
+stdout 'removed ~/.local/bin/ai'
+! exists home/.local/bin/ai
+exists home/.local/bin/sx
+exec sprawl config
+stdout '^command +dev2$'
+stdout '^aliases +sx$'
+exec sprawl config get aliases
+stdout '^sx$'
+exec sprawl config --json
+stdout '"command": "dev2"'
+exec sprawl config set protected_branches main,production
+stdout '^protected_branches = main,production$'
+exec sprawl config get protected_branches
+stdout '^main,production$'
+exec sprawl config set git_hooks false
+exec sprawl config get git_hooks
+stdout '^false$'
+exitcode 2 sprawl config set git_hooks maybe
+exitcode 2 sprawl config set default_provider nope
+exitcode 2 sprawl config get colour
+exec sprawl config set git_hooks true
+exec sprawl config set aliases ''
+stdout 'removed ~/.local/bin/sx'
+! exists home/.local/bin/sx
+
+# Unusable or clashing names are refused; --force accepts a name another program has.
+exitcode 2 sprawl config set command cd
+exitcode 2 sprawl config set command claude
+exitcode 2 sprawl config set command Bad
+exitcode 2 sprawl config set colour blue
+cp fakeprog bin/taken
+chmod 755 bin/taken
+exitcode 2 sprawl config set command taken
+exec sprawl config set command taken --force
+stdout 'linked ~/.local/bin/taken'
+exitcode 2 sprawl self-install rel --command dev2 --alias dev2
+
+# self-update needs a repository, given by flag only (an environment variable is ignored).
+env SPRAWL_REPO=me/sprawl
+exitcode 2 sprawl self-update
+! exec sprawl self-update
+stderr 'no release repository configured; pass --repo owner/name'
+
+# A published release, served by a fake gh: archive for this platform plus checksums.
+env SPRAWL_REPO=me/sprawl
+env COPYFILE_DISABLE=1
+exec sh -c 'os=$(uname -s | tr A-Z a-z); case $(uname -m) in x86_64|amd64) arch=amd64;; *) arch=arm64;; esac; mkdir -p pub && tar -czf "pub/sprawl_9.9.9_${os}_${arch}.tar.gz" -C rel . && cd pub && (sha256sum * 2>/dev/null || shasum -a 256 *) > checksums.txt'
+cp fakegh bin/gh
+chmod 755 bin/gh
+
+# The build trusts a key, and the release is signed with it.
+exec ssh-keygen -q -t ed25519 -N '' -C test -f relkey
+envfile SPRAWL_TEST_SIGNERS relkey.pub
+exec ssh-keygen -Y sign -q -f relkey -n sprawl-release pub/checksums.txt
+
+exec sprawl self-update --repo me/sprawl --check
+stdout '^update available: vdev → v9.9.9$'
+stdout '^  - faster grids$'
+stdout 'install it with: taken self-update'
+exists home/.cache/sprawl/update.json
+grep '"latest":"v9.9.9"' home/.cache/sprawl/update.json
+
+# The beta channel also sees pre-releases.
+exec sprawl config set update_channel beta
+exec sprawl self-update --repo me/sprawl --check
+stdout '^update available: vdev → v10.0.0-rc.1$'
+exec sprawl config set update_channel stable
+exitcode 2 sprawl config set update_channel nightly
+exitcode 2 sprawl self-update --rollback --check
+
+exec sprawl self-update --repo me/sprawl
+stdout 'verified release signature'
+! stderr 'attestation'
+stdout 'installed sprawl v9.9.9 → ~/.local/share/sprawl/bin/sprawl'
+stdout 'claude/main: plugin updated'
+stdout 'claude/personal: plugin updated'
+grep '"version": "9.9.9"' home/.local/share/sprawl/plugin/.claude-plugin/plugin.json
+grep '^command = "taken"' home/.config/sprawl/config.toml
+grep '^9.9.9$' home/.local/share/sprawl/VERSION
+grep '^dev$' home/.local/share/sprawl/previous/VERSION
+
+# --rollback reinstalls the release from before; doing it again goes forward again.
+exec sprawl self-update --rollback
+stdout 'rolling back v9.9.9 → vdev'
+grep '^dev$' home/.local/share/sprawl/VERSION
+exec sprawl self-update --rollback
+stdout 'rolling back vdev → v9.9.9'
+grep '^9.9.9$' home/.local/share/sprawl/VERSION
+
+# Tampered checksums break the signature; an unsigned release is refused outright.
+cp pub/checksums.txt good-checksums.txt
+exec sh -c 'cd pub && sed "s/^[0-9a-f]\{8\}/00000000/" checksums.txt > c && mv c checksums.txt'
+exitcode 1 sprawl self-update --repo me/sprawl
+! exec sprawl self-update --repo me/sprawl
+stderr 'release signature is not valid; refusing to install it'
+rm pub/checksums.txt.sig
+! exec sprawl self-update --repo me/sprawl
+stderr 'release v9.9.9 has no signature \(checksums.txt.sig\); refusing to install it'
+
+# A build without signing keys falls back to the checksum, says so, and still catches tampering.
+env SPRAWL_TEST_SIGNERS=
+! exec sprawl self-update --repo me/sprawl
+stderr 'this build has no release signing key'
+stderr 'checksum mismatch'
+cp good-checksums.txt pub/checksums.txt
+exec sprawl self-update --repo me/sprawl
+stderr 'verified by checksum only'
+stdout 'installed sprawl v9.9.9'
+
+exitcode 2 sprawl self-install
+exitcode 1 sprawl self-install nowhere
+
+# self-uninstall removes the plugin everywhere, the links and installed files; --purge also the
+# config, logs and caches. Accounts stay.
+exitcode 2 sprawl self-uninstall
+exec sprawl self-uninstall --yes --purge
+stdout 'claude/main: plugin removed'
+stdout 'claude/personal: plugin removed'
+stdout 'removed ~/.local/bin/taken'
+stdout 'sprawl is uninstalled'
+! exists home/.local/share/sprawl
+! exists home/.local/bin/taken
+! exists home/.config/sprawl
+! exists home/.cache/sprawl
+exists home/.claude-personal
+grep 'args=plugin uninstall sprawl@sprawl' home/calls.log
+
+-- fakeprog --
+#!/bin/sh
+-- fakegh --
+#!/bin/sh
+case "$1 $2" in
+  "release list") echo '[{"tagName":"v10.0.0-rc.1","isPrerelease":true,"isDraft":false},{"tagName":"v9.9.9","isPrerelease":false,"isDraft":false},{"tagName":"v8.0.0","isPrerelease":false,"isDraft":false}]' ;;
+  "release view") printf '## 9.9.9\n- faster grids\n' ;;
+  "release download")
+    shift 3
+    pats=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --pattern) pats="$pats $2"; shift 2 ;;
+        --dir) dest=$2; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    for p in $pats; do cp "$WORK/pub/$p" "$dest/" || exit 1; done ;;
+  "attestation verify") echo "Error: no attestations found for subject" >&2; exit 1 ;;
+  *) echo "unexpected gh $*" >&2; exit 1 ;;
+esac

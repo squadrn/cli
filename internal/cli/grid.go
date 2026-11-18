@@ -1,0 +1,480 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/charmbracelet/x/term"
+	"github.com/spf13/cobra"
+
+	"sprawling-agents/internal/account"
+	"sprawling-agents/internal/grid"
+	"sprawling-agents/internal/provider/claude"
+	"sprawling-agents/internal/worktree"
+)
+
+func requireTmux(what string) error {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		return fmt.Errorf("tmux is required for %s", what)
+	}
+	return nil
+}
+
+func (a *app) gridCmd() *cobra.Command {
+	var spread bool
+	cmd := &cobra.Command{
+		Use:   "grid <repo> [<account>:]<name>...",
+		Short: "tmux grid for <repo>, one agent per pane in its own worktree; re-running adds panes",
+		Example: fmt.Sprintf(`  %[1]s grid ~/repo feat-a personal:fix-b          per-agent account (default: main or -a)
+  %[1]s grid ~/repo feat-a claude/personal:fix-b   account as provider/name
+  %[1]s grid ~/repo feat-1 feat-2 --spread         round-robin over logged-in accounts
+  %[1]s grid ls | attach [repo] | stop [repo]`, a.cmd),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 2 {
+				return usagef("usage: %s", cmd.UseLine())
+			}
+			return nil
+		},
+		RunE: func(_ *cobra.Command, args []string) error {
+			return a.grid(args[0], args[1:], a.account, spread)
+		},
+	}
+	cmd.Flags().BoolVar(&spread, "spread", false, "spread unprefixed names over logged-in accounts")
+	cmd.AddCommand(a.gridLsCmd(), a.gridAttachCmd(), a.gridStopCmd())
+	return cmd
+}
+
+func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool) error {
+	if err := requireTmux("grid"); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	var pool []string
+	def := account.Main
+	if spread {
+		var err error
+		if pool, err = a.loggedIn(); err != nil {
+			return err
+		}
+	} else {
+		acct, err := a.resolve(acctInput)
+		if err != nil {
+			return err
+		}
+		def = acct.Label()
+	}
+	agents, err := grid.Assign(specs, def, pool)
+	if err != nil {
+		return err
+	}
+	var repo worktree.Repo
+	for i, ag := range agents {
+		acct, err := a.store.Get(ag.Account)
+		if err != nil {
+			return err
+		}
+		if _, err := a.agent(acct.Spec); err != nil {
+			return err
+		}
+		if !acct.Spec.Caps.Worktree {
+			return fmt.Errorf("%s: %s cannot create worktrees", acct.Label(), acct.Spec.Name)
+		}
+		if repo.Root == "" {
+			if repo, err = worktree.Open(ctx, repoArg, acct.Spec.WorktreeDir); err != nil {
+				return err
+			}
+		}
+		agents[i].Account = acct.Label()
+	}
+
+	t := grid.Tmux{}
+	session, err := t.FindSession(ctx, repo.Root)
+	if err != nil {
+		return err
+	}
+	running := map[string]bool{}
+	if session != "" {
+		panes, err := t.Panes(ctx, session)
+		if err != nil {
+			return err
+		}
+		for _, p := range panes {
+			running[p.Name] = true
+		}
+	}
+	cols, rows := 200, 50
+	if w, h, err := term.GetSize(os.Stdout.Fd()); err == nil {
+		cols, rows = w, h
+	}
+	started := 0
+	for _, ag := range agents {
+		if running[ag.Name] {
+			a.warnf("%q is already running in %s; skipped", ag.Name, session)
+			continue
+		}
+		command := grid.ShellQuote(selfPath(), "-a", ag.Account, "wt", ag.Name)
+		if session, err = t.Start(ctx, a.cmd, repo.Root, repo.Root, cols, rows, ag, command); err != nil {
+			return err
+		}
+		started++
+		a.out("  %-20s → %s\n", ag.Account, ag.Name)
+	}
+	if session == "" {
+		return errors.New("no agents were started")
+	}
+	if started > 0 {
+		a.out("grid %s (%s grid attach)\n", session, a.cmd)
+	}
+	if !a.interactive {
+		return nil
+	}
+	return t.Attach(session)
+}
+
+// loggedIn returns the labels of accounts that are signed in, for --spread.
+func (a *app) loggedIn() ([]string, error) {
+	accts, err := a.store.List()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for i, res := range a.statuses(accts, false) {
+		if res.Err == nil && res.Status.LoggedIn {
+			names = append(names, accts[i].Label())
+		}
+	}
+	if len(names) == 0 {
+		return nil, fmt.Errorf("--spread: no logged-in accounts (see: %s account ls)", a.cmd)
+	}
+	return names, nil
+}
+
+// gridSession finds the grid of the repository at dir ("" = the working directory).
+func (a *app) gridSession(ctx context.Context, dir string) (string, error) {
+	if dir == "" {
+		dir = "."
+	}
+	repo, err := worktree.Open(ctx, dir, a.defaultSpec().WorktreeDir)
+	if err != nil {
+		return "", err
+	}
+	session, err := grid.Tmux{}.FindSession(ctx, repo.Root)
+	if err != nil {
+		return "", err
+	}
+	if session == "" {
+		return "", fmt.Errorf("no grid is running for %s", a.tilde(repo.Root))
+	}
+	return session, nil
+}
+
+func optionalRepo(cmd *cobra.Command, args []string) error {
+	if len(args) > 1 {
+		return usagef("usage: %s", cmd.UseLine())
+	}
+	return nil
+}
+
+func firstOr(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	return ""
+}
+
+func (a *app) gridAttachCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "attach [repo]",
+		Short: "Attach to the grid of a repository (default: this one)",
+		Args:  optionalRepo,
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := requireTmux("grid attach"); err != nil {
+				return err
+			}
+			session, err := a.gridSession(context.Background(), firstOr(args))
+			if err != nil {
+				return err
+			}
+			return grid.Tmux{}.Attach(session)
+		},
+	}
+}
+
+func (a *app) gridStopCmd() *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "stop [repo]",
+		Short: "Stop the grid of a repository and every agent in it (worktrees are kept)",
+		Args:  optionalRepo,
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := requireTmux("grid stop"); err != nil {
+				return err
+			}
+			ctx := context.Background()
+			session, err := a.gridSession(ctx, firstOr(args))
+			if err != nil {
+				return err
+			}
+			panes, _ := grid.Tmux{}.Panes(ctx, session)
+			if err := a.confirm(yes, "Stop grid %s and its %d agent(s)", session, len(panes)); err != nil {
+				return err
+			}
+			if err := (grid.Tmux{}).Kill(ctx, session); err != nil {
+				return err
+			}
+			a.out("stopped %s\n", session)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	return cmd
+}
+
+func (a *app) gridLsCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "ls",
+		Short: "List running grids",
+		Args:  noArgs,
+		RunE: func(*cobra.Command, []string) error {
+			if err := requireTmux("grid ls"); err != nil {
+				return err
+			}
+			sessions, err := grid.Tmux{}.Sessions(context.Background())
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				if sessions == nil {
+					sessions = []grid.Session{}
+				}
+				return a.printJSON(sessions)
+			}
+			if len(sessions) == 0 {
+				a.out("no running grids\n")
+				return nil
+			}
+			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
+			_, _ = fmt.Fprintln(w, "SESSION\tREPO\tPANES\tATTACHED")
+			for _, s := range sessions {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%v\n", s.Name, a.tilde(s.Repo), s.Panes, s.Attached)
+			}
+			return w.Flush()
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	return cmd
+}
+
+func (a *app) psCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "ps",
+		Short: "List running agents: session, account, worktree",
+		Args:  noArgs,
+		RunE: func(*cobra.Command, []string) error {
+			if err := requireTmux("ps"); err != nil {
+				return err
+			}
+			panes, err := grid.Tmux{}.Panes(context.Background(), "")
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				if panes == nil {
+					panes = []grid.Pane{}
+				}
+				return a.printJSON(panes)
+			}
+			if len(panes) == 0 {
+				a.out("no running grids\n")
+				return nil
+			}
+			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
+			_, _ = fmt.Fprintln(w, "SESSION\tACCOUNT\tWORKTREE\tPROCESS")
+			for _, p := range panes {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Session, p.Account, p.Name, p.Command)
+			}
+			return w.Flush()
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	return cmd
+}
+
+func (a *app) swapCmd() *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "swap <name> <account>",
+		Short: "Move a worktree's latest conversation to <account> and resume it there",
+		Long: `Move the latest conversation of worktree <name> to <account> and resume it, e.g. when an
+account hits its usage limit. Inside a grid the pane is restarted in place (asks first). Moving a
+conversation to an account of another organization asks first too.`,
+		Args:              exactArgs(2),
+		ValidArgsFunction: a.completeWorktrees,
+		RunE:              func(_ *cobra.Command, args []string) error { return a.swap(args[0], args[1], yes) },
+	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	return cmd
+}
+
+func (a *app) swap(name, toInput string, yes bool) error {
+	if err := worktree.ValidateName(name); err != nil {
+		return err
+	}
+	to, err := a.store.Get(toInput)
+	if err != nil {
+		return err
+	}
+	if !to.Spec.Caps.SessionTransfer {
+		return fmt.Errorf("%s: %s cannot transfer conversations", to.Label(), to.Spec.Name)
+	}
+	ctx := context.Background()
+	repo, err := a.repoHere(ctx, to.Spec)
+	if err != nil {
+		return err
+	}
+	dir := repo.Dir(name)
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("worktree not found: %s", a.tilde(dir))
+	}
+	key, err := claude.ProjectKey(dir)
+	if err != nil {
+		return err
+	}
+	all, err := a.store.List()
+	if err != nil {
+		return err
+	}
+	// Conversations only move between accounts of the same provider: formats differ across CLIs.
+	var accts []account.Account
+	for _, acct := range all {
+		if acct.Provider == to.Provider {
+			accts = append(accts, acct)
+		}
+	}
+	dirs := make([]string, len(accts))
+	for i, acct := range accts {
+		dirs[i] = acct.Dir
+	}
+	s, err := claude.LatestSession(dirs, key)
+	if errors.Is(err, claude.ErrNoSession) {
+		return fmt.Errorf("no conversation found for worktree %q in any account", name)
+	} else if err != nil {
+		return err
+	}
+	from := accts[s.Owner]
+	if from.Label() != to.Label() {
+		st := a.statuses([]account.Account{from, to}, true)
+		fromOrg, toOrg := st[0].Status.OrgName, st[1].Status.OrgName
+		if st[0].Err == nil && st[1].Err == nil && fromOrg != toOrg {
+			if err := a.confirm(yes, "Move the conversation from %s (%s) to %s (%s), another organization", from.Label(), orgOr(fromOrg), to.Label(), orgOr(toOrg)); err != nil {
+				return err
+			}
+		}
+	}
+	pane := a.paneOf(name)
+	if pane != "" {
+		if err := a.confirm(yes, "Restart pane %s (%q) as %s; its current process is stopped", pane, name, to.Label()); err != nil {
+			return err
+		}
+	}
+	if from.Label() != to.Label() {
+		if err := claude.CopySession(s, to.Dir, key); err != nil {
+			return err
+		}
+	}
+	a.out("swap %s: %s → %s (session %s)\n", name, from.Label(), to.Label(), s.ID)
+	ag, err := a.agent(to.Spec)
+	if err != nil {
+		return err
+	}
+	if pane == "" {
+		if err := os.Chdir(dir); err != nil {
+			return err
+		}
+		a.banner(to)
+		return ag.Exec(to.ConfigDir(), ag.ResumeArgs(s.ID))
+	}
+	command := grid.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(s.ID)...)...)
+	if err := (grid.Tmux{}).Respawn(ctx, pane, dir, grid.Agent{Account: to.Label(), Name: name}, command); err != nil {
+		return err
+	}
+	a.out("pane %s now runs %s as %s\n", pane, name, to.Label())
+	return nil
+}
+
+func orgOr(org string) string {
+	if org == "" {
+		return "personal"
+	}
+	return org
+}
+
+// panes lists agent panes of root's grid; none when tmux is missing or no grid runs.
+func (a *app) panes(root string) []grid.Pane {
+	if exec.Command("tmux", "-V").Run() != nil {
+		return nil
+	}
+	ctx := context.Background()
+	t := grid.Tmux{}
+	session, err := t.FindSession(ctx, root)
+	if err != nil || session == "" {
+		return nil
+	}
+	panes, _ := t.Panes(ctx, session)
+	return panes
+}
+
+// paneOf returns the pane running worktree (or account label) key in this repository's grid.
+func (a *app) paneOf(key string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	repo, err := worktree.Open(context.Background(), cwd, a.defaultSpec().WorktreeDir)
+	if err != nil {
+		return ""
+	}
+	for _, p := range a.panes(repo.Root) {
+		if p.Name == key || p.Account == key {
+			return p.ID
+		}
+	}
+	return ""
+}
+
+// anyPane returns a pane of any grid running as account label.
+func (a *app) anyPane(label string) string {
+	if exec.Command("tmux", "-V").Run() != nil {
+		return ""
+	}
+	panes, _ := grid.Tmux{}.Panes(context.Background(), "")
+	for _, p := range panes {
+		if p.Account == label {
+			return p.ID
+		}
+	}
+	return ""
+}
+
+// selfPath is how panes re-invoke sprawl. It keeps the invoked name (not the symlink target),
+// so an ~/.local/bin link keeps working after the binary it points to is replaced.
+func selfPath() string {
+	p := os.Args[0]
+	if !strings.ContainsRune(p, filepath.Separator) {
+		if found, err := exec.LookPath(p); err == nil {
+			p = found
+		}
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
+}

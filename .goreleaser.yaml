@@ -1,0 +1,75 @@
+version: 2
+project_name: sprawl
+
+# Releases are published to a separate repository holding binaries only (ADR 0007):
+# SPRAWL_RELEASES_OWNER/SPRAWL_RELEASES_NAME. Users get read access to it, never to the source.
+before:
+  hooks:
+    - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+
+builds:
+  - main: ./cmd/sprawl
+    binary: sprawl
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    # Reproducible: file times come from the commit, not the build machine.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X sprawling-agents/internal/cli.Version={{ .Version }} -X sprawling-agents/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    builds_info:
+      owner: root
+      group: root
+      mtime: "{{ .CommitDate }}"
+    files:
+      - src: plugin/**/*
+        info: &fileinfo
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+      - src: plugin/.claude-plugin/*
+        info: *fileinfo
+      - src: .claude-plugin/*
+        info: *fileinfo
+      - src: README.md
+        info: *fileinfo
+      - src: LICENSE
+        info: *fileinfo
+      # Same basename as the root README; without an explicit dst it is dropped.
+      - src: plugin/README.md
+        dst: plugin/README.md
+        info: *fileinfo
+
+sboms:
+  - artifacts: archive
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+# checksums.txt.sig: SSH signature (namespace sprawl-release) that self-update and install.sh
+# verify against the keys in internal/release/signers.pub.
+signs:
+  - id: release
+    artifacts: checksum
+    signature: "${artifact}.sig"
+    cmd: sh
+    args: ["scripts/sign.sh", "${artifact}", "${signature}"]
+
+release:
+  github:
+    owner: "{{ .Env.SPRAWL_RELEASES_OWNER }}"
+    name: "{{ .Env.SPRAWL_RELEASES_NAME }}"
+  # Tags with a pre-release suffix (v1.2.0-rc.1) reach the beta channel only.
+  prerelease: auto
+  extra_files:
+    - glob: build/install.sh
+
+# Release notes come from CHANGELOG.md (--release-notes), never from commit messages.
+changelog:
+  disable: true

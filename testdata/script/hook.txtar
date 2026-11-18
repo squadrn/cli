@@ -1,0 +1,140 @@
+# Repositories: one on a feature branch, one with its own protected list.
+env GIT_CONFIG_GLOBAL=/dev/null
+env GIT_CONFIG_NOSYSTEM=1
+exec git init -q -b feat-x feat
+exec git init -q -b feat-x prod
+exec git -C prod config sprawl.protectedBranches production
+mkdir home/.config/sprawl
+
+# Allowed commands produce no output and exit 0.
+stdin allow.json
+exec sprawl hook guard-git
+! stdout .
+
+# Denials follow Claude Code's PreToolUse protocol.
+stdin force.json
+exec sprawl hook guard-git
+stdout '"hookEventName":"PreToolUse"'
+stdout '"permissionDecision":"deny"'
+stdout '"permissionDecisionReason":"sprawl guard: force push is not allowed \(-f\)"'
+
+# Denials and asks are logged with credentials masked.
+stdin token.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+exists home/.local/state/sprawl/guard.log
+grep 'deny\tpre-tool\tfeat\tdirect push to protected branch "main"' home/.local/state/sprawl/guard.log
+grep 'https://\*\*\*@github.com' home/.local/state/sprawl/guard.log
+! grep 's3cr3t' home/.local/state/sprawl/guard.log
+
+# Runtime-only targets ask instead of guessing.
+stdin dynamic.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"ask"'
+
+# A repo's own list only adds to the user's: main stays protected, production is too.
+stdin prod-main.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+stdin prod-disable.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+stdin prod-production.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+
+# The config file changes the default list for every repo.
+stdin feat-staging.json
+exec sprawl hook guard-git
+! stdout .
+cp staging.toml home/.config/sprawl/config.toml
+stdin feat-staging.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+
+# Broken input never fails open.
+stdin garbage.txt
+exec sprawl hook guard-git
+stdout '"permissionDecision":"ask"'
+
+# A broken config file falls back to the default list instead of disabling the guard.
+cp broken.toml home/.config/sprawl/config.toml
+stdin force.json
+exec sprawl hook guard-git
+stdout '"permissionDecision":"deny"'
+
+exitcode 2 sprawl hook notify
+exitcode 2 sprawl hook guard-git extra
+exitcode 2 sprawl hook
+exitcode 2 sprawl hook bogus
+exitcode 2 sprawl hook git
+
+# Layer 2: git's pre-push hook judges the exact refs, whatever command started the push.
+rm home/.config/sprawl/config.toml
+exec git init -q --bare remote.git
+exec git -C feat commit -q --allow-empty -m one
+exec git -C feat remote add origin ../remote.git
+exec git -C feat push -q origin feat-x
+exec sh -c 'git -C feat rev-parse HEAD > head.txt'
+exec sh -c 'printf "refs/heads/feat-x %s refs/heads/main %s\n" "$(cat head.txt)" 0000000000000000000000000000000000000000 > pp-main.txt'
+exec sh -c 'printf "refs/heads/feat-x %s refs/heads/feat-x %s\n" "$(cat head.txt)" "$(cat head.txt)" > pp-feat.txt'
+cd feat
+stdin ../pp-main.txt
+! exec sprawl hook git pre-push origin ../remote.git
+stderr 'sprawl guard: direct push to protected branch "main"'
+stdin ../pp-feat.txt
+exec sprawl hook git pre-push origin ../remote.git
+cd $WORK
+grep 'deny\tpre-push\t.*feat\tdirect push to protected branch "main"' home/.local/state/sprawl/guard.log
+
+# The repository's own hook still runs after the check, with the same input.
+cp repo-hook feat/.git/hooks/pre-push
+chmod 755 feat/.git/hooks/pre-push
+cd feat
+stdin ../pp-feat.txt
+! exec sprawl hook git pre-push origin ../remote.git
+stderr 'repo hook saw refs/heads/feat-x'
+cd $WORK
+rm feat/.git/hooks/pre-push
+
+# Other hooks only chain to the repository's own.
+cd feat
+exec sprawl hook git post-commit
+cd $WORK
+
+# Through git itself, with core.hooksPath pointing at the installed shims.
+mkdir rel
+exec sh -c 'cp "$(command -v sprawl)" rel/sprawl && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+exec sprawl self-install rel
+exists home/.local/share/sprawl/git-hooks/pre-push
+! exec git -C feat -c core.hooksPath=$HOME/.local/share/sprawl/git-hooks push origin feat-x:main
+stderr 'sprawl guard: direct push to protected branch "main"'
+exec git -C feat -c core.hooksPath=$HOME/.local/share/sprawl/git-hooks push -q origin feat-x:feat-y
+
+-- allow.json --
+{"cwd":"feat","tool_input":{"command":"npm test && git push -u origin feat-x"}}
+-- force.json --
+{"cwd":"feat","tool_input":{"command":"git push -f origin feat-x"}}
+-- token.json --
+{"cwd":"feat","tool_input":{"command":"git push https://u:s3cr3t@github.com/o/r main"}}
+-- dynamic.json --
+{"cwd":"feat","tool_input":{"command":"git push origin \"$(git branch --show-current)\""}}
+-- prod-main.json --
+{"cwd":"prod","tool_input":{"command":"git push origin main"}}
+-- prod-disable.json --
+{"cwd":"prod","tool_input":{"command":"git config sprawl.protectedBranches none && git push origin main"}}
+-- repo-hook --
+#!/bin/sh
+read l _ _ _
+echo "repo hook saw $l" >&2
+exit 1
+-- prod-production.json --
+{"cwd":"prod","tool_input":{"command":"git push origin production"}}
+-- feat-staging.json --
+{"cwd":"feat","tool_input":{"command":"git push origin staging"}}
+-- staging.toml --
+protected_branches = ["main", "staging"]
+-- broken.toml --
+protected_branches = [
+-- garbage.txt --
+not json

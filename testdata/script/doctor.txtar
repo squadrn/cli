@@ -1,0 +1,50 @@
+# main: logged in with the plugin; personal: logged out, no plugin, a broken shared link.
+mkdir home/.claude-personal home/.claude/agents
+cp empty home/.claude/.loggedin
+cp plugins.json home/.claude/.plugins
+cp settings.json home/.claude/settings.json
+exec sh -c 'ln -s /elsewhere home/.claude-personal/agents && ln -s /gone home/.claude-personal/hooks'
+
+! exec sprawl doctor
+stdout '^install$'
+stdout '✓ git'
+stdout '! claude at .* is not the native build'
+stdout '! sprawl plugin files not installed'
+stdout '^settings & hooks$'
+stdout '✓ settings.json valid'
+stdout '✗ hook not executable: .*/missing-hook.sh'
+stdout '! legacy guard-git.sh hook in settings.json'
+stdout '! Stop runs "notify" 2 times'
+stdout '^push guard$'
+stdout '✓ layer 1 \(pre-tool hook\) denies force pushes'
+stdout '! layer 2 \(git pre-push hook\) is not installed'
+stdout '! agents can edit sprawl.s own files  → add to permissions.deny in ~/.claude/settings.json: \["Edit\(~/.local/share/sprawl/\*\*\)"'
+stdout '! ~/.claude-personal is readable by other users'
+stdout '^account claude/main$'
+stdout '✓ logged in as me@.claude'
+stdout '✓ sprawl plugin enabled'
+stdout '! old plugin squad@squad still installed \(guard runs twice\)'
+stdout '✓ sprawl on PATH'
+stdout '^account claude/personal$'
+stdout '✗ not logged in  → sprawl account login claude/personal'
+stdout '✗ sprawl plugin not installed \(no git push guard\)  → sprawl account add claude/personal'
+stdout '✗ agents is not linked to main  → sprawl account add claude/personal'
+stdout '! dangling link hooks  → sprawl account add claude/personal'
+stdout '[0-9]+ problem\(s\), [0-9]+ warning\(s\)$'
+exitcode 1 sprawl doctor
+exitcode 2 sprawl doctor extra
+! exec sprawl doctor --json
+stdout '"status": "fail"'
+stdout '"group": "push guard"'
+exec sh -c 'chmod 700 home/.claude-personal'
+! exec sprawl doctor
+! stdout 'readable by other users'
+
+
+-- empty --
+-- plugins.json --
+[{"id":"sprawl@sprawl","enabled":true},{"id":"squad@squad","enabled":true}]
+-- settings.json --
+{"hooks":{
+  "PreToolUse":[{"hooks":[{"type":"command","command":"$HOME/missing-hook.sh"},{"type":"command","command":"$HOME/.claude/hooks/guard-git.sh"}]}],
+  "Stop":[{"hooks":[{"type":"command","command":"notify"},{"type":"command","command":"notify"}]}]}}

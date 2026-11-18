@@ -1,0 +1,15 @@
+{
+  "name": "sprawl",
+  "version": "0.0.0",
+  "description": "Sprawling Agents guardrails for parallel coding agents: blocks force pushes and pushes to protected branches, desktop notifications, read-only locator and reviewer agents.",
+  "author": {
+    "name": "Sprawling Agents"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "multi-agent",
+    "worktree",
+    "guardrails",
+    "git"
+  ]
+}

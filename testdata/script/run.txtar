@@ -1,0 +1,46 @@
+# Bare sprawl without a terminal runs claude as main, with CLAUDE_CONFIG_DIR removed
+# even when the caller's environment sets it.
+env CLAUDE_CONFIG_DIR=/should/be/removed
+exec sprawl
+stdout '^cfg=<unset> args=$'
+env CLAUDE_CONFIG_DIR=
+
+mkdir home/.claude-personal
+
+# Account selection: name, provider/name, -a, --account=
+exec sprawl personal
+stdout '^cfg=.*/home/.claude-personal args=$'
+exec sprawl claude/personal -p hi
+stdout '^cfg=.*/home/.claude-personal args=-p hi$'
+exec sprawl -a personal --resume abc
+stdout '^cfg=.*/home/.claude-personal args=--resume abc$'
+exec sprawl --account=personal
+stdout '^cfg=.*/home/.claude-personal args=$'
+exec sprawl main
+stdout '^cfg=<unset> args=$'
+
+# Prompts go after --; agent subcommands and flags pass through; unknown words are errors.
+exec sprawl -- fix the bug
+stdout '^cfg=<unset> args=fix the bug$'
+exec sprawl personal -- doctor
+stdout '^cfg=.*/home/.claude-personal args=doctor$'
+exec sprawl 'fix the bug'
+stdout '^cfg=<unset> args=fix the bug$'
+exec sprawl mcp list
+stdout '^cfg=<unset> args=mcp list$'
+exec sprawl personal --version
+stdout '^cfg=.*/home/.claude-personal args=--version$'
+exitcode 2 sprawl fix the bug
+
+# -C runs as if started elsewhere.
+mkdir elsewhere
+exec sprawl -C elsewhere -- here
+grep 'pwd=.*/elsewhere args=here' home/calls.log
+exitcode 2 sprawl -C missing-dir
+
+# Exit codes: 2 usage, 1 runtime.
+exitcode 2 sprawl -a
+exitcode 2 sprawl -a Bad_Name
+exitcode 1 sprawl -a ghost
+! exec sprawl -a ghost
+stderr 'account not found: claude/ghost \(run: sprawl account add claude/ghost\)'

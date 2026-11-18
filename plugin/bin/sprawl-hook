@@ -1,0 +1,21 @@
+#!/bin/sh
+# Plugin hook entrypoint: hands off to `sprawl hook`. The binary is found at its fixed install
+# path first, so it works whatever command name the user chose. Fails closed: when sprawl is
+# missing, git pushes are denied and other git commands are asked about, rather than run unguarded.
+for c in "${XDG_DATA_HOME:-$HOME/.local/share}/sprawl/bin/sprawl" "$(command -v sprawl 2>/dev/null)"; do
+  if [ -n "$c" ] && [ -x "$c" ]; then exec "$c" hook "$@"; fi
+done
+if [ "$1" != guard-git ]; then
+  cat >/dev/null
+  exit 0
+fi
+decide() {
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"sprawl guard: sprawl is not installed, so %s. Install sprawl or remove the sprawl plugin."}}\n' "$1" "$2"
+}
+# Lower-cased, with quotes and backslashes removed, so pu''sh and P\USH still match.
+input=$(tr '[:upper:]' '[:lower:]' | tr -d "\"'\\\\")
+case "$input" in
+  *push*) decide deny "git push is blocked" ;;
+  *git*) decide ask "git commands cannot be checked" ;;
+esac
+exit 0

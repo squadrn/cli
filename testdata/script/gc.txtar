@@ -1,0 +1,61 @@
+exec git init -q -b main repo
+exec git -C repo commit -q --allow-empty -m init
+mkdir repo/.claude
+exec git -C repo worktree add -q -b worktree-feat-merged .claude/worktrees/feat-merged
+exec git -C repo worktree add -q -b worktree-feat-open .claude/worktrees/feat-open
+exec git -C repo/.claude/worktrees/feat-open commit -q --allow-empty -m wip
+exec git -C repo worktree add -q -b worktree-fix-dirty .claude/worktrees/fix-dirty
+cp empty repo/.claude/worktrees/fix-dirty/x
+exec git -C repo worktree add -q -b other ../outside
+
+# Dry run classifies and removes nothing; worktrees outside .claude/worktrees are ignored.
+cd repo
+exec sprawl gc
+stdout '^base: main$'
+stdout 'remove +feat-merged +merged or no commits'
+stdout 'keep +feat-open +unmerged commits'
+stdout 'keep +fix-dirty +uncommitted changes'
+! stdout outside
+stdout 'dry run; re-run with --yes to remove'
+exists .claude/worktrees/feat-merged
+
+exec sprawl gc --yes
+stdout 'removed 1 worktree\(s\)'
+! exists .claude/worktrees/feat-merged
+exists .claude/worktrees/feat-open
+exists .claude/worktrees/fix-dirty
+exec git branch --list worktree-feat-merged
+! stdout .
+
+# From inside a worktree, gc still works on the main checkout.
+cd .claude/worktrees/feat-open
+exec sprawl gc
+stdout 'keep +feat-open'
+
+exec sprawl gc --json
+stdout '"action": "keep"'
+stdout '"name": "feat-open"'
+
+# wt ls and wt rm.
+cd $WORK/repo
+exec sprawl wt ls
+stdout '^feat-open +worktree-feat-open +clean +-$'
+stdout '^fix-dirty +worktree-fix-dirty +modified +-$'
+exec sprawl wt ls --json
+stdout '"dirty": true'
+! exec sprawl wt rm fix-dirty
+exists .claude/worktrees/fix-dirty
+exec sprawl wt rm fix-dirty --force --yes
+! exists .claude/worktrees/fix-dirty
+exec sprawl wt rm feat-open
+stdout 'removed worktree feat-open'
+stderr 'kept branch worktree-feat-open'
+exitcode 1 sprawl wt rm nope
+exitcode 2 sprawl wt rm Bad_Name
+
+cd $WORK
+exitcode 1 sprawl gc
+cd repo
+exitcode 2 sprawl gc extra
+
+-- empty --

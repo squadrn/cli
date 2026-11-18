@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" guard-git", "timeout": 5 }]
+      }
+    ],
+    "Notification": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Cần input'", "async": true }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Xong việc'", "async": true }] }
+    ]
+  }
+}
