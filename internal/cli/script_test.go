@@ -3,6 +3,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -28,6 +29,14 @@ func TestMain(m *testing.M) {
 		"sprawl": func() {
 			// Scripts sign their fake releases with their own key, never the real one.
 			buildSigners = func() string { return os.Getenv("SPRAWL_TEST_SIGNERS") }
+			// SPRAWL_TEST_TTY stands in for the controlling terminal: answers come from that file.
+			openTTY = func() (io.Reader, io.Writer, func(), bool) {
+				f, err := os.Open(os.Getenv("SPRAWL_TEST_TTY"))
+				if err != nil {
+					return nil, nil, nil, false
+				}
+				return f, os.Stderr, func() { _ = f.Close() }, true
+			}
 			if v := os.Getenv("SPRAWL_TEST_VERSION"); v != "" {
 				Version = v
 			}
@@ -130,7 +139,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "USERPROFILE", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "USERPROFILE", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 
@@ -219,7 +228,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "TMUX"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "TMUX"} {
 				env.Setenv(k, "")
 			}
 			return nil

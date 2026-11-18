@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 
 	"golang.org/x/sys/windows"
@@ -26,4 +27,18 @@ func enableVT() bool {
 		}
 	}
 	return ok
+}
+
+// openTerminal opens the console when stdin or stdout are not it (a script block fed by gh).
+func openTerminal() (io.Reader, io.Writer, func(), bool) {
+	in, err := os.OpenFile("CONIN$", os.O_RDWR, 0)
+	if err != nil {
+		return nil, nil, nil, false
+	}
+	out, err := os.OpenFile("CONOUT$", os.O_RDWR, 0)
+	if err != nil {
+		_ = in.Close()
+		return nil, nil, nil, false
+	}
+	return in, out, func() { _ = in.Close(); _ = out.Close() }, true
 }

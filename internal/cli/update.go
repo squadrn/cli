@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,7 +74,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 
 type updateOptions struct {
 	check, allowDowngrade, rollback, background, asJSON bool
-	tag, repo                                   string
+	tag, repo                                           string
 }
 
 func (a *app) updateStatePath() string {
@@ -373,6 +375,20 @@ type nameChoice struct {
 	force    bool
 	// selfInstall: the installers run this release (not self-update or rollback).
 	selfInstall bool
+	// interactive: ask for the names on the terminal (installers without name flags).
+	interactive bool
+}
+
+// openTTY opens a terminal for prompts when stdin or stdout are redirected; tests replace it.
+var openTTY = openTerminal
+
+// terminalIO is where install prompts go: stdin/stdout when both are a terminal, else the
+// controlling terminal. ok is false when there is none (CI, ssh -T): nothing is asked then.
+func (a *app) terminalIO() (io.Reader, io.Writer, func(), bool) {
+	if a.interactive {
+		return a.stdin, a.stdout, func() {}, true
+	}
+	return openTTY()
 }
 
 func (a *app) selfInstallCmd() *cobra.Command {
@@ -391,6 +407,7 @@ func (a *app) selfInstallCmd() *cobra.Command {
 	cmd.Flags().StringVar(&nc.command, "command", "", "command name to install under (default: configured, else sprawl)")
 	cmd.Flags().StringSliceVar(&nc.aliases, "alias", nil, "extra command names, comma separated")
 	cmd.Flags().BoolVar(&nc.force, "force", false, "install even if a name is another program on PATH")
+	cmd.Flags().BoolVar(&nc.interactive, "interactive", false, "ask for the command name and aliases on the terminal")
 	return cmd
 }
 
@@ -413,6 +430,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		return err
 	}
 	accepted := install.Names(cfg)
+	oldCmd, oldAliases := cfg.Command, cfg.Aliases
 	if nc.command != "" {
 		cfg.Command = nc.command
 	}
@@ -424,6 +442,17 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		cfg.Aliases = nc.aliases
 	case fresh:
 		cfg.Aliases = config.DefaultAliases()
+	}
+	if nc.interactive && nc.command == "" && !nc.aliasSet {
+		if in, out, done, ok := a.terminalIO(); ok {
+			p := namePrompt{in: bufio.NewReader(in), out: out, check: a.nameCheck(accepted, nc.force)}
+			var forced map[string]bool
+			cfg.Command, cfg.Aliases, forced = p.run(cfg.Command, cfg.Aliases)
+			done()
+			for n := range forced {
+				accepted[n] = true
+			}
+		}
 	}
 	if err := a.nameCheck(accepted, nc.force).Check(cfg); err != nil {
 		return err
@@ -469,6 +498,11 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	if err := a.linkNames(cfg); err != nil {
 		return err
+	}
+	if !fresh && oldCmd != "" {
+		if msg := renameSummary(oldCmd, oldAliases, cfg.Command, cfg.Aliases); msg != "" {
+			a.out("%s\n", msg)
+		}
 	}
 	moved, errs := install.MigrateLegacy(a.store.Home, a.now())
 	for _, m := range moved {
@@ -723,6 +757,7 @@ func (a *app) configCmd() *cobra.Command {
 				cfg.Command = config.DefaultCommand
 			}
 			accepted := install.Names(cfg)
+			old := cfg
 			if err := cfg.Set(args[0], args[1]); err != nil {
 				return err
 			}
@@ -744,7 +779,13 @@ func (a *app) configCmd() *cobra.Command {
 				return nil
 			}
 			a.cmd = cfg.Command
-			return a.linkNames(cfg)
+			if err := a.linkNames(cfg); err != nil {
+				return err
+			}
+			if msg := renameSummary(old.Command, old.Aliases, cfg.Command, cfg.Aliases); msg != "" {
+				a.out("%s\n", msg)
+			}
+			return nil
 		},
 	}
 	set.Flags().BoolVar(&force, "force", false, "use a command name even if another program on PATH has it")
