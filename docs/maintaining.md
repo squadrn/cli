@@ -27,6 +27,25 @@ matches `signers.pub`. GitHub also emails 7 days before a personal access token 
 4. The `release` workflow runs the full CI matrix, then builds, signs and publishes to the
    releases repository. Users get a notice within a day.
 
+Pre-releases (`vX.Y.Z-rc.N`) need their own `## X.Y.Z-rc.N` CHANGELOG section; installs of a
+pre-release follow the beta channel.
+
+### Windows check (releases that touch Windows code)
+
+CI installs, updates over a running command, rolls back and uninstalls on `windows-latest`. Before
+announcing a release that changes Windows behaviour, also check by hand on Windows 10 and 11, as a
+standard (non-admin) user with Defender on:
+
+- `install.ps1` in Windows PowerShell 5.1 and PowerShell 7; a tampered `checksums.txt` is refused
+- a new terminal finds `sprawl`; `sprawl doctor` is green
+- `sprawl account add`/`login`, run as an account, ctrl-c in a session returns to the prompt
+- `sprawl wt`, `sprawl gc`
+- push to `main` from the Bash tool, the PowerShell tool and the plain terminal of a session:
+  denied or asked each time
+- `sprawl self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
+- colours and the account picker in Windows Terminal and the classic console
+- `scripts/windows-spike.ps1` once per Claude Code major version (hook and tool behaviour)
+
 If the release workflow fails before publishing, fix it, push `main`, then move the tag:
 `git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`, tag again and push it.
 

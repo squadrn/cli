@@ -42,3 +42,25 @@ sprawl_VERSION_linux_arm64.tar.gz
   plugin/bin/sprawl-hook
   plugin/hooks/hooks.json
   sprawl
+sprawl_VERSION_windows_amd64.zip
+  .claude-plugin/marketplace.json
+  LICENSE
+  README.md
+  plugin/.claude-plugin/plugin.json
+  plugin/README.md
+  plugin/agents/locator.md
+  plugin/agents/reviewer.md
+  plugin/bin/sprawl-hook
+  plugin/hooks/hooks.json
+  sprawl.exe
+sprawl_VERSION_windows_arm64.zip
+  .claude-plugin/marketplace.json
+  LICENSE
+  README.md
+  plugin/.claude-plugin/plugin.json
+  plugin/README.md
+  plugin/agents/locator.md
+  plugin/agents/reviewer.md
+  plugin/bin/sprawl-hook
+  plugin/hooks/hooks.json
+  sprawl.exe

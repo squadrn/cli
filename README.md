@@ -6,7 +6,8 @@ Run many coding agents in parallel on one machine — across several accounts an
 worktrees — with a guard that stops agents from force-pushing or pushing to protected branches.
 
 Providers: Claude Code today; the account model (`provider/name`) is ready for Codex and Gemini.
-Platforms: macOS and Linux (amd64, arm64). Windows is not supported.
+Platforms: macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in beta, without
+`grid` (ADR 0008).
 
 ## Install
 
@@ -28,6 +29,26 @@ gh release download -R OWNER/sprawl-releases -p install.sh -O - | sh -s -- --nam
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
 `~/.local/share/sprawl/bin/sprawl`, links your command name(s) from `~/.local/bin`, and installs
 the sprawl plugin into every Claude account.
+
+### Windows (beta)
+
+Requires [Git for Windows](https://git-scm.com/download/win) 2.31+ and `gh`. In PowerShell:
+
+```powershell
+gh release download -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String | Invoke-Expression
+# with options:
+& ([scriptblock]::Create((gh release download -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String))) -Name ai -Alias ''
+```
+
+Everything above works the same, with these differences:
+- `grid`, `ps` and `swap` inside a pane need tmux and are not available; run each agent with
+  `sprawl wt <name>` in its own terminal tab.
+- Command names are copies of `sprawl.exe` in `%USERPROFILE%\.local\bin`, refreshed on update.
+- Shared settings use symbolic links with Developer Mode enabled; without it, directories become
+  junctions and files hash-checked copies (an edit in a secondary account is reported, never
+  overwritten).
+- The push guard covers both the Bash (Git Bash) and PowerShell tools of Claude Code.
+- Until releases are code-signed, SmartScreen may warn on first run.
 
 ### Updates
 
