@@ -1,10 +1,14 @@
 package cli
 
 import (
+	"flag"
+	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -72,9 +76,25 @@ func pathWithoutHome(path string) string {
 	return strings.Join(keep, string(os.PathListSeparator))
 }
 
+// -update rewrites the expected files embedded in scripts (cmp with an archive file), e.g. the
+// golden help, completion and install-layout outputs in golden.txtar.
+var updateScripts = flag.Bool("update", false, "update golden files embedded in scripts")
+
+func kindOf(m fs.FileMode) string {
+	switch {
+	case m.IsDir():
+		return "dir"
+	case m&fs.ModeSymlink != 0:
+		return "link"
+	default:
+		return "file"
+	}
+}
+
 func TestScript(t *testing.T) {
 	testscript.Run(t, testscript.Params{
-		Dir: filepath.Join("..", "..", "testdata", "script"),
+		Dir:           filepath.Join("..", "..", "testdata", "script"),
+		UpdateScripts: *updateScripts,
 		Setup: func(env *testscript.Env) error {
 			home := filepath.Join(env.WorkDir, "home")
 			bin := filepath.Join(env.WorkDir, "bin")
@@ -143,6 +163,37 @@ func TestScript(t *testing.T) {
 					}
 					time.Sleep(50 * time.Millisecond)
 				}
+			},
+			// tree DIR prints every entry under DIR, sorted: relative path, type, permission bits
+			// and, for links, the target with $WORK replaced. The install-layout golden uses it.
+			"tree": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) != 1 {
+					ts.Fatalf("usage: tree dir")
+				}
+				root := ts.MkAbs(args[0])
+				work := ts.Getenv("WORK")
+				var lines []string
+				err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+					if err != nil || p == root {
+						return err
+					}
+					rel, _ := filepath.Rel(root, p)
+					info, err := os.Lstat(p)
+					if err != nil {
+						return err
+					}
+					line := fmt.Sprintf("%s %s %v", filepath.ToSlash(rel), kindOf(info.Mode()), info.Mode().Perm())
+					if info.Mode()&fs.ModeSymlink != 0 {
+						// A link's own permission bits differ between Linux and macOS: print the target only.
+						target, _ := os.Readlink(p)
+						line = filepath.ToSlash(rel) + " link -> " + strings.ReplaceAll(filepath.ToSlash(target), filepath.ToSlash(work), "$WORK")
+					}
+					lines = append(lines, line)
+					return nil
+				})
+				ts.Check(err)
+				sort.Strings(lines)
+				_, _ = fmt.Fprintln(ts.Stdout(), strings.Join(lines, "\n"))
 			},
 			// envfile NAME FILE sets NAME to the contents of FILE.
 			"envfile": func(ts *testscript.TestScript, neg bool, args []string) {

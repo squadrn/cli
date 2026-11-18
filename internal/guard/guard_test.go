@@ -3,6 +3,8 @@ package guard
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -77,190 +79,202 @@ func decide(g Guard, cmd, dir string) Decision {
 	return g.Decide(ctx, cmd, dir)
 }
 
-func TestDecide(t *testing.T) {
-	r := newRepos(t)
-	g := newGuard(r)
-	dirs := map[string]string{
+// decideCase is one row of the push-guard decision table. The table doubles as the golden corpus
+// (testdata/decisions.golden): a verdict or reason change on any row is visible in review.
+type decideCase struct {
+	want Verdict
+	dir  string
+	cmd  string
+}
+
+var decideCases = []decideCase{
+	// Force pushes in every spelling, including git's unique-prefix long options.
+	{Deny, "feat", `git push --force`},
+	{Deny, "feat", `git push -f origin feat-x`},
+	{Deny, "feat", `git push -uf origin feat-x`},
+	{Deny, "feat", `git push origin feat-x --force-with-lease`},
+	{Deny, "feat", `git push --force-with-lease=feat-x:abc origin feat-x`},
+	{Deny, "feat", `git push --force-if-includes origin feat-x`},
+	{Deny, "feat", `git push --forc origin feat-x`},
+	{Deny, "feat", `git push --for origin feat-x`},
+	{Deny, "feat", `git push origin +feat-x`},
+	{Deny, "feat", `git push --force origin $BRANCH`},
+	// Protected destinations, normalised the way git resolves them.
+	{Deny, "feat", `git push origin main`},
+	{Deny, "feat", `git push origin Main`},
+	{Deny, "feat", `git push origin HEAD:main`},
+	{Deny, "feat", `git push origin feat-x:refs/heads/develop`},
+	{Deny, "feat", `git push origin feat-x:heads/main`},
+	{Deny, "feat", `git push upstream refs/heads/main`},
+	{Deny, "feat", `git push origin release/1.2`},
+	{Deny, "feat", `git push origin release/1.2/hotfix`},
+	{Deny, "feat", `git push origin feat-x main`},
+	{Deny, "feat", `git push origin 'main'`},
+	{Deny, "feat", `git push origin ma\in`},
+	{Deny, "feat", `git push --repo=origin main`},
+	// Deleting, wildcards, matching and everything-at-once pushes.
+	{Deny, "feat", `git push origin --delete main`},
+	{Deny, "feat", `git push origin --del main`},
+	{Deny, "feat", `git push origin -d master`},
+	{Deny, "feat", `git push origin :master`},
+	{Deny, "feat", `git push origin :`},
+	{Deny, "feat", `git push origin 'refs/heads/*:refs/heads/*'`},
+	{Deny, "feat", `git push --all origin`},
+	{Deny, "feat", `git push --al origin`},
+	{Deny, "feat", `git push --mirror origin`},
+	{Deny, "feat", `git push --mirr origin`},
+	{Deny, "feat", `git push --prune origin`},
+	{Deny, "feat", `git push --pru origin`},
+	{Deny, "feat", `git send-pack origin main`},
+	// Bare pushes resolve their real target from configuration.
+	{Deny, "main", `git push`},
+	{Deny, "main", `git push origin`},
+	{Deny, "main", `git push origin HEAD`},
+	{Deny, "main", `git push -u origin @`},
+	{Deny, "remote-push", `git push`},
+	{Deny, "matching", `git push`},
+	{Deny, "upstream", `git push`},
+	{Deny, "feat", `git -c remote.origin.push=HEAD:main push`},
+	{Deny, "feat", `git -c push.default=matching push`},
+	// Word obfuscation is undone before judging.
+	{Deny, "feat", `git pu''sh origin feat-x:main`},
+	{Deny, "feat", `git pu""sh origin main`},
+	{Deny, "feat", `git p\ush origin main`},
+	{Deny, "feat", `git $'\x70ush' origin main`},
+	{Deny, "feat", `Git push origin feat-x:main`},
+	{Deny, "feat", `GIT PUSH origin main`},
+	{Deny, "feat", `/usr/libexec/git-core/git-push origin feat-x:main`},
+	{Ask, "feat", `git $(printf pu)sh origin main`},
+	// Aliases: command-line, configured, and shell aliases.
+	{Deny, "feat", `git -c alias.p=push p origin feat-x:main`},
+	{Deny, "alias", `git p origin main`},
+	{Deny, "alias", `git sh`},
+	{Allow, "alias", `git st`},
+	{Ask, "feat", `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0=push git p origin main`},
+	{Ask, "feat", `export GIT_CONFIG_COUNT=0; git push origin feat-x`},
+	{Ask, "feat", `unset GIT_CONFIG_COUNT; git push origin feat-x`},
+	{Ask, "feat", `env -u GIT_CONFIG_COUNT git push origin feat-x`},
+	{Ask, "feat", `git --exec-path=/tmp/x push origin feat-x`},
+	// The git-level guard cannot be switched off from the command line.
+	{Deny, "feat", `git push --no-verify origin feat-x`},
+	{Deny, "feat", `git push --no-v origin feat-x`},
+	{Deny, "feat", `git -c core.hooksPath=/dev/null push origin feat-x`},
+	// Directory changes: -C, cd and pushd are followed.
+	{Deny, "feat", `git -C . push origin "main"`},
+	{Deny, "feat", `git -C {main} push`},
+	{Deny, "feat", `cd {main} && git push`},
+	{Deny, "feat", `pushd {main} && git push`},
+	{Deny, "main", `git -C ../feat push origin develop`},
+	{Ask, "feat", `git -C "$D" push origin feat-x`},
+	// Compound commands, substitutions, functions, control flow.
+	{Deny, "feat", `npm test && git push origin main`},
+	{Deny, "feat", `cd x; git -c push.default=current push origin develop`},
+	{Deny, "feat", `(cd sub && git push origin main)`},
+	{Deny, "feat", `echo $(git push -f)`},
+	{Deny, "feat", "echo `git push origin main`"},
+	{Deny, "feat", `f() { git push -f; }; f`},
+	{Deny, "feat", `if true; then git push origin main; fi`},
+	{Deny, "feat", `for b in a; do git push origin main; done`},
+	// Nested shells, eval, here-documents, here-strings and stdin.
+	{Deny, "feat", `bash -c "git push -f"`},
+	{Deny, "feat", `sh -lc 'git push origin main'`},
+	{Deny, "feat", `bash -o pipefail -c "git push --force"`},
+	{Deny, "feat", `bash -O extglob -c 'git push origin main'`},
+	{Deny, "feat", `eval "git push origin main"`},
+	{Deny, "feat", `bash -c "bash -c 'git push -f'"`},
+	{Deny, "feat", "bash <<'EOF'\ngit status\ngit push -f\nEOF"},
+	{Deny, "feat", `bash <<< 'git push origin main'`},
+	{Ask, "feat", `echo 'git push origin main' | bash`},
+	{Ask, "feat", `bash <(echo git push origin main)`},
+	{Ask, "feat", `bash -c "$CMD"`},
+	{Ask, "feat", `eval "$push_cmd"`},
+	// Wrappers and runners.
+	{Deny, "feat", `sudo git push -f`},
+	{Deny, "feat", `sudo -u bot git push origin main`},
+	{Deny, "feat", `env GIT_TRACE=1 git push origin main`},
+	{Deny, "feat", `GIT_TRACE=1 git push origin main`},
+	{Deny, "feat", `env -S 'git push origin main'`},
+	{Deny, "feat", `nohup git push -f &`},
+	{Deny, "feat", `timeout -s KILL 30 git push origin main`},
+	{Deny, "feat", `xcrun git push origin main`},
+	{Deny, "feat", `script -q /dev/null git push origin main`},
+	{Deny, "feat", `script -c 'git push origin main' /dev/null`},
+	{Deny, "feat", `watch -n1 git push origin main`},
+	{Deny, "feat", `find . -exec git push origin main \;`},
+	{Deny, "feat", `git submodule foreach git push origin main`},
+	{Deny, "feat", `git rebase --exec 'git push origin main' HEAD~1`},
+	{Deny, "feat", `git bisect run git push origin main`},
+	{Ask, "feat", `echo main | xargs git push origin`},
+	{Ask, "feat", `python3 -c 'import subprocess; subprocess.run(["git","push","origin","main"])'`},
+	{Ask, "feat", `node -e "require('child_process').execSync('git push origin main')"`},
+	{Ask, "feat", "python3 - <<'PY'\nimport os; os.system('git push origin main')\nPY"},
+	{Ask, "feat", `$GIT push origin main`},
+	// Runtime-only targets and unparsable input ask.
+	{Ask, "feat", `git push origin $BRANCH`},
+	{Ask, "feat", `git push origin "$(git branch --show-current)"`},
+	{Ask, "feat", `git push $REMOTE feat-x`},
+	{Ask, "feat", `git push origin ma{i,}n`},
+	{Ask, "feat", `git push origin release/*`},
+	{Ask, "feat", `git push origin HEAD~1`},
+	{Ask, "feat", `git push --frobnicate origin feat-x`},
+	{Ask, "feat", `git push -z origin feat-x`},
+	{Ask, "feat", `git push --receive-pack=evil origin feat-x`},
+	{Ask, "feat", `git push origin main "`},
+	// Repository policy can only add protected branches.
+	{Deny, "prod", `git push origin production`},
+	{Deny, "prod", `git push origin staging`},
+	{Deny, "prod", `git push origin main`},
+	{Deny, "squad", `git push origin staging`},
+	{Deny, "feat", `git config sprawl.protectedBranches none && git push origin main`},
+
+	// Allowed: feature branches, tags, review refs and commands that only mention push.
+	{Allow, "feat", `git push`},
+	{Allow, "feat", `git push -u origin feat-x`},
+	{Allow, "feat", `git push origin HEAD`},
+	{Allow, "feat", `git push origin HEAD~1:feat-y`},
+	{Allow, "feat", `git push origin --delete feat-old`},
+	{Allow, "feat", `git push --follow-tags origin feat-x`},
+	{Allow, "feat", `git push --dry-run origin feat-x`},
+	{Allow, "feat", `git push -o ci.skip origin feat-x`},
+	{Allow, "feat", `git push -uo ci.skip origin feat-x`},
+	{Allow, "feat", `git push --repo origin feat-x`},
+	{Allow, "feat", `git push origin tag v1.0`},
+	{Allow, "feat", `git push origin refs/tags/main`},
+	{Allow, "feat", `git push origin HEAD:refs/for/main`},
+	{Allow, "feat", `git push origin release-notes`},
+	{Allow, "feat", `git push origin feat-x:feat-y`},
+	{Allow, "feat", `git status && git log --oneline`},
+	{Allow, "feat", `git stash push -m wip`},
+	{Allow, "feat", `git log --grep=push`},
+	{Allow, "feat", `echo "pushing to main is bad"`},
+	{Allow, "feat", `echo "git push -f"`},
+	{Allow, "feat", `printf 'git push origin main'`},
+	{Allow, "feat", `grep -r "git push --force" docs/`},
+	{Allow, "feat", "cat > notes.md <<'EOF'\ngit push --force origin main\nEOF"},
+	{Allow, "feat", `bash deploy.sh`},
+	{Allow, "feat", `npm run deploy`},
+	{Allow, "feat", `ls ~/push`},
+	{Allow, "feat", `echo x | xargs echo push`},
+}
+
+func decideDirs(r repos) map[string]string {
+	return map[string]string{
 		"feat": r.feat, "main": r.main, "prod": r.prod, "squad": r.squad, "remote-push": r.remotePush,
 		"matching": r.matching, "upstream": r.upstream, "alias": r.alias,
 	}
+}
 
-	tests := []struct {
-		want Verdict
-		dir  string
-		cmd  string
-	}{
-		// Force pushes in every spelling, including git's unique-prefix long options.
-		{Deny, "feat", `git push --force`},
-		{Deny, "feat", `git push -f origin feat-x`},
-		{Deny, "feat", `git push -uf origin feat-x`},
-		{Deny, "feat", `git push origin feat-x --force-with-lease`},
-		{Deny, "feat", `git push --force-with-lease=feat-x:abc origin feat-x`},
-		{Deny, "feat", `git push --force-if-includes origin feat-x`},
-		{Deny, "feat", `git push --forc origin feat-x`},
-		{Deny, "feat", `git push --for origin feat-x`},
-		{Deny, "feat", `git push origin +feat-x`},
-		{Deny, "feat", `git push --force origin $BRANCH`},
-		// Protected destinations, normalised the way git resolves them.
-		{Deny, "feat", `git push origin main`},
-		{Deny, "feat", `git push origin Main`},
-		{Deny, "feat", `git push origin HEAD:main`},
-		{Deny, "feat", `git push origin feat-x:refs/heads/develop`},
-		{Deny, "feat", `git push origin feat-x:heads/main`},
-		{Deny, "feat", `git push upstream refs/heads/main`},
-		{Deny, "feat", `git push origin release/1.2`},
-		{Deny, "feat", `git push origin release/1.2/hotfix`},
-		{Deny, "feat", `git push origin feat-x main`},
-		{Deny, "feat", `git push origin 'main'`},
-		{Deny, "feat", `git push origin ma\in`},
-		{Deny, "feat", `git push --repo=origin main`},
-		// Deleting, wildcards, matching and everything-at-once pushes.
-		{Deny, "feat", `git push origin --delete main`},
-		{Deny, "feat", `git push origin --del main`},
-		{Deny, "feat", `git push origin -d master`},
-		{Deny, "feat", `git push origin :master`},
-		{Deny, "feat", `git push origin :`},
-		{Deny, "feat", `git push origin 'refs/heads/*:refs/heads/*'`},
-		{Deny, "feat", `git push --all origin`},
-		{Deny, "feat", `git push --al origin`},
-		{Deny, "feat", `git push --mirror origin`},
-		{Deny, "feat", `git push --mirr origin`},
-		{Deny, "feat", `git push --prune origin`},
-		{Deny, "feat", `git push --pru origin`},
-		{Deny, "feat", `git send-pack origin main`},
-		// Bare pushes resolve their real target from configuration.
-		{Deny, "main", `git push`},
-		{Deny, "main", `git push origin`},
-		{Deny, "main", `git push origin HEAD`},
-		{Deny, "main", `git push -u origin @`},
-		{Deny, "remote-push", `git push`},
-		{Deny, "matching", `git push`},
-		{Deny, "upstream", `git push`},
-		{Deny, "feat", `git -c remote.origin.push=HEAD:main push`},
-		{Deny, "feat", `git -c push.default=matching push`},
-		// Word obfuscation is undone before judging.
-		{Deny, "feat", `git pu''sh origin feat-x:main`},
-		{Deny, "feat", `git pu""sh origin main`},
-		{Deny, "feat", `git p\ush origin main`},
-		{Deny, "feat", `git $'\x70ush' origin main`},
-		{Deny, "feat", `Git push origin feat-x:main`},
-		{Deny, "feat", `GIT PUSH origin main`},
-		{Deny, "feat", `/usr/libexec/git-core/git-push origin feat-x:main`},
-		{Ask, "feat", `git $(printf pu)sh origin main`},
-		// Aliases: command-line, configured, and shell aliases.
-		{Deny, "feat", `git -c alias.p=push p origin feat-x:main`},
-		{Deny, "alias", `git p origin main`},
-		{Deny, "alias", `git sh`},
-		{Allow, "alias", `git st`},
-		{Ask, "feat", `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0=push git p origin main`},
-		{Ask, "feat", `export GIT_CONFIG_COUNT=0; git push origin feat-x`},
-		{Ask, "feat", `unset GIT_CONFIG_COUNT; git push origin feat-x`},
-		{Ask, "feat", `env -u GIT_CONFIG_COUNT git push origin feat-x`},
-		{Ask, "feat", `git --exec-path=/tmp/x push origin feat-x`},
-		// The git-level guard cannot be switched off from the command line.
-		{Deny, "feat", `git push --no-verify origin feat-x`},
-		{Deny, "feat", `git push --no-v origin feat-x`},
-		{Deny, "feat", `git -c core.hooksPath=/dev/null push origin feat-x`},
-		// Directory changes: -C, cd and pushd are followed.
-		{Deny, "feat", `git -C . push origin "main"`},
-		{Deny, "feat", `git -C ` + r.main + ` push`},
-		{Deny, "feat", `cd ` + r.main + ` && git push`},
-		{Deny, "feat", `pushd ` + r.main + ` && git push`},
-		{Deny, "main", `git -C ../feat push origin develop`},
-		{Ask, "feat", `git -C "$D" push origin feat-x`},
-		// Compound commands, substitutions, functions, control flow.
-		{Deny, "feat", `npm test && git push origin main`},
-		{Deny, "feat", `cd x; git -c push.default=current push origin develop`},
-		{Deny, "feat", `(cd sub && git push origin main)`},
-		{Deny, "feat", `echo $(git push -f)`},
-		{Deny, "feat", "echo `git push origin main`"},
-		{Deny, "feat", `f() { git push -f; }; f`},
-		{Deny, "feat", `if true; then git push origin main; fi`},
-		{Deny, "feat", `for b in a; do git push origin main; done`},
-		// Nested shells, eval, here-documents, here-strings and stdin.
-		{Deny, "feat", `bash -c "git push -f"`},
-		{Deny, "feat", `sh -lc 'git push origin main'`},
-		{Deny, "feat", `bash -o pipefail -c "git push --force"`},
-		{Deny, "feat", `bash -O extglob -c 'git push origin main'`},
-		{Deny, "feat", `eval "git push origin main"`},
-		{Deny, "feat", `bash -c "bash -c 'git push -f'"`},
-		{Deny, "feat", "bash <<'EOF'\ngit status\ngit push -f\nEOF"},
-		{Deny, "feat", `bash <<< 'git push origin main'`},
-		{Ask, "feat", `echo 'git push origin main' | bash`},
-		{Ask, "feat", `bash <(echo git push origin main)`},
-		{Ask, "feat", `bash -c "$CMD"`},
-		{Ask, "feat", `eval "$push_cmd"`},
-		// Wrappers and runners.
-		{Deny, "feat", `sudo git push -f`},
-		{Deny, "feat", `sudo -u bot git push origin main`},
-		{Deny, "feat", `env GIT_TRACE=1 git push origin main`},
-		{Deny, "feat", `GIT_TRACE=1 git push origin main`},
-		{Deny, "feat", `env -S 'git push origin main'`},
-		{Deny, "feat", `nohup git push -f &`},
-		{Deny, "feat", `timeout -s KILL 30 git push origin main`},
-		{Deny, "feat", `xcrun git push origin main`},
-		{Deny, "feat", `script -q /dev/null git push origin main`},
-		{Deny, "feat", `script -c 'git push origin main' /dev/null`},
-		{Deny, "feat", `watch -n1 git push origin main`},
-		{Deny, "feat", `find . -exec git push origin main \;`},
-		{Deny, "feat", `git submodule foreach git push origin main`},
-		{Deny, "feat", `git rebase --exec 'git push origin main' HEAD~1`},
-		{Deny, "feat", `git bisect run git push origin main`},
-		{Ask, "feat", `echo main | xargs git push origin`},
-		{Ask, "feat", `python3 -c 'import subprocess; subprocess.run(["git","push","origin","main"])'`},
-		{Ask, "feat", `node -e "require('child_process').execSync('git push origin main')"`},
-		{Ask, "feat", "python3 - <<'PY'\nimport os; os.system('git push origin main')\nPY"},
-		{Ask, "feat", `$GIT push origin main`},
-		// Runtime-only targets and unparsable input ask.
-		{Ask, "feat", `git push origin $BRANCH`},
-		{Ask, "feat", `git push origin "$(git branch --show-current)"`},
-		{Ask, "feat", `git push $REMOTE feat-x`},
-		{Ask, "feat", `git push origin ma{i,}n`},
-		{Ask, "feat", `git push origin release/*`},
-		{Ask, "feat", `git push origin HEAD~1`},
-		{Ask, "feat", `git push --frobnicate origin feat-x`},
-		{Ask, "feat", `git push -z origin feat-x`},
-		{Ask, "feat", `git push --receive-pack=evil origin feat-x`},
-		{Ask, "feat", `git push origin main "`},
-		// Repository policy can only add protected branches.
-		{Deny, "prod", `git push origin production`},
-		{Deny, "prod", `git push origin staging`},
-		{Deny, "prod", `git push origin main`},
-		{Deny, "squad", `git push origin staging`},
-		{Deny, "feat", `git config sprawl.protectedBranches none && git push origin main`},
+// command fills the {main} placeholder with the repository on main.
+func (c decideCase) command(r repos) string { return strings.ReplaceAll(c.cmd, "{main}", r.main) }
 
-		// Allowed: feature branches, tags, review refs and commands that only mention push.
-		{Allow, "feat", `git push`},
-		{Allow, "feat", `git push -u origin feat-x`},
-		{Allow, "feat", `git push origin HEAD`},
-		{Allow, "feat", `git push origin HEAD~1:feat-y`},
-		{Allow, "feat", `git push origin --delete feat-old`},
-		{Allow, "feat", `git push --follow-tags origin feat-x`},
-		{Allow, "feat", `git push --dry-run origin feat-x`},
-		{Allow, "feat", `git push -o ci.skip origin feat-x`},
-		{Allow, "feat", `git push -uo ci.skip origin feat-x`},
-		{Allow, "feat", `git push --repo origin feat-x`},
-		{Allow, "feat", `git push origin tag v1.0`},
-		{Allow, "feat", `git push origin refs/tags/main`},
-		{Allow, "feat", `git push origin HEAD:refs/for/main`},
-		{Allow, "feat", `git push origin release-notes`},
-		{Allow, "feat", `git push origin feat-x:feat-y`},
-		{Allow, "feat", `git status && git log --oneline`},
-		{Allow, "feat", `git stash push -m wip`},
-		{Allow, "feat", `git log --grep=push`},
-		{Allow, "feat", `echo "pushing to main is bad"`},
-		{Allow, "feat", `echo "git push -f"`},
-		{Allow, "feat", `printf 'git push origin main'`},
-		{Allow, "feat", `grep -r "git push --force" docs/`},
-		{Allow, "feat", "cat > notes.md <<'EOF'\ngit push --force origin main\nEOF"},
-		{Allow, "feat", `bash deploy.sh`},
-		{Allow, "feat", `npm run deploy`},
-		{Allow, "feat", `ls ~/push`},
-		{Allow, "feat", `echo x | xargs echo push`},
-	}
+func TestDecide(t *testing.T) {
+	r := newRepos(t)
+	g := newGuard(r)
+	dirs := decideDirs(r)
+	tests := decideCases
 	for _, tt := range tests {
 		t.Run(tt.dir+": "+tt.cmd, func(t *testing.T) {
-			d := decide(g, tt.cmd, dirs[tt.dir])
+			d := decide(g, tt.command(r), dirs[tt.dir])
 			if d.Verdict != tt.want {
 				t.Fatalf("got %s (%s), want %s", d.Verdict, d.Reason, tt.want)
 			}
@@ -657,5 +671,42 @@ func TestLogRecordUnwritable(t *testing.T) {
 	Log{Path: filepath.Join(file, "guard.log")}.Record(time.Now(), "pretool", Decision{}, "/", "x")
 	if Ask.String() != "ask" {
 		t.Fatal("Ask.String")
+	}
+}
+
+var updateGolden = flag.Bool("update", false, "rewrite golden files")
+
+// TestDecideGolden pins verdict and reason of every decision-table row. Run with -update after an
+// intended change and review the diff of testdata/decisions.golden.
+func TestDecideGolden(t *testing.T) {
+	r := newRepos(t)
+	g := newGuard(r)
+	dirs := decideDirs(r)
+	var b strings.Builder
+	for _, c := range decideCases {
+		d := decide(g, c.command(r), dirs[c.dir])
+		fmt.Fprintf(&b, "%s\t%s\t%s\t%q\n", d.Verdict, c.dir, d.Reason, c.cmd)
+	}
+	path := filepath.Join("testdata", "decisions.golden")
+	if *updateGolden {
+		if err := os.MkdirAll("testdata", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%v (run: go test ./internal/guard -run TestDecideGolden -update)", err)
+	}
+	if got := b.String(); got != string(want) {
+		gl, wl := strings.Split(got, "\n"), strings.Split(string(want), "\n")
+		for i := range min(len(gl), len(wl)) {
+			if gl[i] != wl[i] {
+				t.Fatalf("decision changed at line %d:\n got  %s\n want %s\n(intended? rerun with -update and review)", i+1, gl[i], wl[i])
+			}
+		}
+		t.Fatalf("decision corpus length changed: %d lines, want %d", len(gl), len(wl))
 	}
 }
