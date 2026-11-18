@@ -13,8 +13,20 @@ stdout '^cfg=.*/home/.claude-personal args=--worktree feat-b$'
 exec sprawl wt feat-c -a claude/personal
 stdout '^cfg=.*/home/.claude-personal args=--worktree feat-c$'
 
+# The session is recorded for gc and wt rm: in the repo root while the worktree does not exist
+# yet (git never sees the registry), and in the account dir.
+exec sh -c 'cat ../.sprawl-inuse/*.json'
+stdout '"worktree":"feat-c"'
+stdout '"account":"claude/personal"'
+exec sh -c 'cat ../../home/.claude-personal/.sprawl-inuse/*.json'
+stdout '"account":"claude/personal"'
+grep '^\.sprawl-inuse/$' ../.git/info/exclude
+exec git -C .. status --porcelain
+! stdout .
+
 exitcode 2 sprawl wt Bad_Name
 exitcode 2 sprawl wt
 exitcode 1 sprawl wt feat-d -a ghost
 cd $WORK
 exitcode 1 sprawl wt feat-a
+-- home/.claude-personal/.sprawl-account --
