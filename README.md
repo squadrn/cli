@@ -193,26 +193,10 @@ moves its guard log to `~/.local/state/sprawl/legacy-logs/` and backs its files 
 ## Releasing (maintainer)
 
 Source and releases live in two repositories (ADR 0007): this one (private, source) and
-`hoangthaininh/sprawl-releases` (private, binaries only, users are invited there as read
-collaborators). One-time setup:
-
-1. Create `hoangthaininh/sprawl-releases` (private) with a README and the LICENSE, and invite
-   users there — never to the source.
-2. In this repository, set the variable `SPRAWL_RELEASES_REPO=hoangthaininh/sprawl-releases` and the secret
-   `SPRAWL_RELEASES_TOKEN`: a fine-grained token with *Contents: read and write* on the releases
-   repository only.
-3. Create the signing key, then commit `internal/release/signers.pub`:
-   `scripts/release-key.sh hoangthaininh/sprawling-agents` (stores the private key as the secret
-   `SPRAWL_SIGNING_KEY` and in `pass`; it is never printed). Keep the backup: installed copies
-   only trust the keys they were built with.
-
-Release: add a `## X.Y.Z` section to the CHANGELOG (it becomes the release notes), push tag
-`vX.Y.Z` (`vX.Y.Z-rc.N` for the beta channel). The full CI matrix runs first; GoReleaser then
-publishes reproducible, signed archives with an SBOM to the releases repository. To revoke
-someone, remove them from the releases repository: their copy keeps working but gets no updates.
-
-To rotate the key, add the new key to `signers.pub` and release once signed with the old key, then
-switch the secret to the new key.
+`hoangthaininh/sprawl-releases` (private, binaries only; users are invited there with read
+access). Release steps, the secrets they depend on, renewing the token and handling the signing
+key: [docs/maintaining.md](docs/maintaining.md). A monthly `maintenance` workflow checks those
+secrets and fails (GitHub emails you) before anything expires.
 
 ## Development
 

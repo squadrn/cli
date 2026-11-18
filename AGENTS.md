@@ -32,6 +32,7 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
   New push forms go into `TestDecide`.
 - Linux and macOS only; no Windows code paths.
 - Never read or print the release signing key; `scripts/release-key.sh` and CI handle it.
+  Releases, secrets and key handling: `docs/maintaining.md`.
 - Previous product names live in `config.PreviousNames`; every legacy identifier derives from it.
 
 ## Commits
