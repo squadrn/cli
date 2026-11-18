@@ -181,3 +181,4 @@ case "$1 $2" in
   "attestation verify") echo "Error: no attestations found for subject" >&2; exit 1 ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
+-- home/.claude-personal/.sprawl-account --

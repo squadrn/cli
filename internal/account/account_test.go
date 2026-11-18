@@ -19,9 +19,16 @@ func newStore(t *testing.T, accounts ...string) Store {
 	home := t.TempDir()
 	must(t, os.MkdirAll(filepath.Join(home, ".claude"), 0o755))
 	for _, a := range accounts {
-		must(t, os.MkdirAll(filepath.Join(home, ".claude-"+a), 0o755))
+		mkAccount(t, filepath.Join(home, ".claude-"+a))
 	}
 	return Store{Home: home}
+}
+
+// mkAccount creates an account dir as sprawl provisions it (with Marker).
+func mkAccount(t *testing.T, dir string) {
+	t.Helper()
+	must(t, os.MkdirAll(dir, 0o755))
+	must(t, os.WriteFile(filepath.Join(dir, Marker), nil, 0o600))
 }
 
 func must(t *testing.T, err error) {
@@ -92,8 +99,8 @@ func TestGet(t *testing.T) {
 
 func TestGetAcrossProviders(t *testing.T) {
 	s := twoProviders(newStore(t, "personal", "work"))
-	must(t, os.MkdirAll(filepath.Join(s.Home, ".codex-work"), 0o755))
-	must(t, os.MkdirAll(filepath.Join(s.Home, ".codex-ops"), 0o755))
+	mkAccount(t, filepath.Join(s.Home, ".codex-work"))
+	mkAccount(t, filepath.Join(s.Home, ".codex-ops"))
 
 	if a, err := s.Get("ops"); err != nil || a.Label() != "codex/ops" || a.Spec.ConfigEnv != "CODEX_HOME" {
 		t.Errorf("unique name on another provider: %+v, %v", a, err)
@@ -142,7 +149,7 @@ func TestListGroupsByProviderMainFirst(t *testing.T) {
 	s := twoProviders(newStore(t, "zeta", "alpha", "Bad", "mcp"))
 	must(t, os.WriteFile(filepath.Join(s.Home, ".claude-file"), nil, 0o600))
 	must(t, os.MkdirAll(filepath.Join(s.Home, ".codex"), 0o755))
-	must(t, os.MkdirAll(filepath.Join(s.Home, ".codex-b2"), 0o755))
+	mkAccount(t, filepath.Join(s.Home, ".codex-b2"))
 	got, err := s.List()
 	must(t, err)
 	var labels []string
@@ -162,6 +169,11 @@ func TestMoveToTrash(t *testing.T) {
 	must(t, err)
 	if want := filepath.Join(s.Home, "data", "Trash", "files", ".claude-old-20260102-030405"); dst != want {
 		t.Errorf("dst = %q", dst)
+	}
+	info, err := os.ReadFile(filepath.Join(s.Home, "data", "Trash", "info", ".claude-old-20260102-030405.trashinfo"))
+	must(t, err)
+	if want := "[Trash Info]\nPath=" + filepath.ToSlash(a.Dir) + "\nDeletionDate=2026-01-02T03:04:05\n"; runtime.GOOS != "windows" && string(info) != want {
+		t.Errorf("trashinfo = %q, want %q", info, want)
 	}
 	if s.Exists("old") {
 		t.Error("account still exists after removal")
@@ -365,5 +377,80 @@ func TestRemoveLegacyPlugins(t *testing.T) {
 	}
 	if !slices.Equal(LegacyPluginIDs(), []string{"squad@squad"}) {
 		t.Errorf("LegacyPluginIDs = %v", LegacyPluginIDs())
+	}
+}
+
+func TestMarkerAdoptAndMigration(t *testing.T) {
+	s := newStore(t, "mine")
+	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-squad"), 0o755)) // another tool's dir
+	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-legacy"), 0o755))
+	if s.Exists("squad") || s.Exists("legacy") {
+		t.Fatal("a dir without the marker is an account")
+	}
+	un, err := s.Unmanaged()
+	must(t, err)
+	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "squad" {
+		t.Fatalf("Unmanaged = %+v", un)
+	}
+	// Dirs provisioned before markers carry the sprawl plugin: adopted on sight.
+	s.HasPlugin = func(_ provider.Spec, dir string) bool { return filepath.Base(dir) == ".claude-legacy" }
+	got, err := s.List()
+	must(t, err)
+	if len(got) != 3 || got[1].Name != "legacy" || !isFile(filepath.Join(s.Home, ".claude-legacy", Marker)) {
+		t.Fatalf("List = %+v", got)
+	}
+	a, err := s.Adopt("squad")
+	must(t, err)
+	if !s.Managed(a) {
+		t.Fatal("adopted dir is not an account")
+	}
+	if _, err := s.Adopt("ghost"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Adopt(ghost) = %v", err)
+	}
+	if _, err := s.Adopt("main"); !errors.Is(err, ErrReserved) {
+		t.Fatalf("Adopt(main) = %v", err)
+	}
+	m, _ := s.Get("main")
+	if Mark(m) != nil || isFile(filepath.Join(m.Dir, Marker)) {
+		t.Fatal("main got a marker")
+	}
+}
+
+func TestRefreshSharedReconcilesEntriesAndReportsReplaced(t *testing.T) {
+	s, a, _, p := provisionFixture(t)
+	_, err := p.Provision(context.Background(), a)
+	must(t, err)
+	if !isFile(filepath.Join(a.Dir, Marker)) {
+		t.Fatal("Provision did not mark the account")
+	}
+	main := s.MainDir(provider.Claude)
+	must(t, os.MkdirAll(filepath.Join(main, "skills", "new-skill"), 0o755))
+	must(t, os.RemoveAll(filepath.Join(main, "skills", "find-skills")))
+	own := filepath.Join(a.Dir, "skills", "own")
+	must(t, os.MkdirAll(own, 0o755))
+
+	r := s.RefreshShared(a)
+	if _, err := os.Lstat(filepath.Join(a.Dir, "skills", "new-skill")); err != nil {
+		t.Error("new skill in main not linked")
+	}
+	if _, err := os.Lstat(filepath.Join(a.Dir, "skills", "find-skills")); err == nil {
+		t.Error("link to a deleted skill kept")
+	}
+	if !isDir(own) {
+		t.Error("the account's own skill was touched")
+	}
+	if len(r.Conflicts)+len(r.Replaced) != 0 {
+		t.Errorf("Refresh = %+v", r)
+	}
+	settings := filepath.Join(a.Dir, "settings.json")
+	must(t, os.Remove(settings))
+	must(t, os.WriteFile(settings, []byte(`{"own":true}`), 0o600))
+	// Unix: a file replaced the link. Windows (copies): the copy was edited.
+	if r := s.RefreshShared(a); !slices.Equal(append(r.Conflicts, r.Replaced...), []string{settings}) {
+		t.Errorf("Refresh = %+v", r)
+	}
+	m, _ := s.Get("main")
+	if r := s.RefreshShared(m); len(r.Replaced) != 0 {
+		t.Error("main refreshed")
 	}
 }

@@ -78,7 +78,7 @@ func TestGCWithOriginAndSquashMergedPR(t *testing.T) {
 		t.Fatalf("actions = %v", actions)
 	}
 
-	removed, errs := repo.RemoveAll(ctx, cands)
+	removed, errs := repo.RemoveAll(ctx, cands, false)
 	if removed != 1 || len(errs) != 0 {
 		t.Fatalf("Apply = %d, %v", removed, errs)
 	}
@@ -124,16 +124,16 @@ func TestRemoveOneAndAgents(t *testing.T) {
 	if dirty, _ := Dirty(ctx, repo.Dir("feat-a")); !dirty {
 		t.Fatal("Dirty = false")
 	}
-	if err := repo.RemoveOne(ctx, "feat-a", false); err == nil {
+	if err := repo.RemoveOne(ctx, "feat-a", false, false); err == nil {
 		t.Fatal("removed a dirty worktree without force")
 	}
-	if err := repo.RemoveOne(ctx, "feat-a", true); err != nil {
+	if err := repo.RemoveOne(ctx, "feat-a", true, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RemoveOne(ctx, "feat-b", false); !errors.Is(err, ErrUnmerged) {
+	if err := repo.RemoveOne(ctx, "feat-b", false, false); !errors.Is(err, ErrUnmerged) {
 		t.Fatalf("unmerged branch: %v", err)
 	}
-	if err := repo.RemoveOne(ctx, "nope", false); err == nil {
+	if err := repo.RemoveOne(ctx, "nope", false, false); err == nil {
 		t.Fatal("missing worktree: no error")
 	}
 	if _, err := Open(ctx, t.TempDir(), ""); err == nil {

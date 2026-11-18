@@ -2,7 +2,18 @@
 
 package claude
 
-import "syscall"
+import (
+	"os/exec"
+	"syscall"
+)
+
+func lookPath() (string, error) {
+	bin, err := exec.LookPath("claude")
+	if err != nil {
+		return "", errNotInstalled
+	}
+	return bin, nil
+}
 
 // run replaces the current process with bin: claude inherits the terminal, signals and exit
 // status directly.

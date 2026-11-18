@@ -31,6 +31,9 @@ func (f fakeAgent) Output(_ context.Context, _ string, args ...string) ([]byte, 
 		}
 		return []byte(f.plugins), nil
 	}
+	if len(args) == 1 && args[0] == "--version" && f.loggedIn {
+		return []byte("2.1.0 (Claude Code)\n"), nil
+	}
 	return nil, nil
 }
 
@@ -162,6 +165,9 @@ func TestAccountChecks(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, account.Marker), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -242,6 +248,25 @@ func TestPathFixNamesTheDirectory(t *testing.T) {
 	}
 	if fix != want {
 		t.Fatalf("PathFix = %s, want %s", fix, want)
+	}
+}
+
+func TestVersions(t *testing.T) {
+	e := env(t, fakeAgent{loggedIn: true}, nil)
+	if len(e.versions(context.Background())) != 0 {
+		t.Fatal("version of a CLI that is not on PATH")
+	}
+	e.LookPath = func(string) (string, error) { return "/bin/claude", nil }
+	if c, _ := find(e.versions(context.Background()), "claude 2.1.0 (Claude Code)"); c.Status != OK || c.Group != "install" {
+		t.Errorf("version: %+v", c)
+	}
+	e.Agent = func(provider.Spec) (provider.Agent, error) { return fakeAgent{}, nil }
+	if c, _ := find(e.versions(context.Background()), "--version failed"); c.Status != Warn {
+		t.Errorf("no version: %+v", c)
+	}
+	e.Agent = func(provider.Spec) (provider.Agent, error) { return nil, errors.New("x") }
+	if len(e.versions(context.Background())) != 0 {
+		t.Error("agent error reported twice")
 	}
 }
 

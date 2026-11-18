@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"sprawling-agents/internal/inuse"
 	"sprawling-agents/internal/proc"
 )
 
@@ -22,6 +23,37 @@ type Candidate struct {
 	Worktree
 	Action Action
 	Reason string
+	// Ignored counts ignored paths (build output, node_modules) that removal deletes.
+	Ignored int
+}
+
+// BranchPrefix starts the branch of every agent worktree (Claude Code: worktree-<name>). sprawl
+// only ever deletes branches named BranchPrefix+<worktree name>.
+const BranchPrefix = "worktree-"
+
+// InUse returns the sessions running in an agent worktree: those recorded in the worktree and
+// those recorded in the main checkout for it before it existed (wt <name>).
+func (r Repo) InUse(w Worktree) []inuse.Entry {
+	out := inuse.Active(w.Path)
+	name, ok := r.Name(w)
+	if !ok {
+		return out
+	}
+	for _, e := range inuse.Active(r.Root) {
+		if e.Worktree == name {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func describe(entries []inuse.Entry) string {
+	e := entries[0]
+	s := fmt.Sprintf("in use (pid %d", e.PID)
+	if e.Account != "" {
+		s += ", " + e.Account
+	}
+	return s + ")"
 }
 
 // SquashMerged reports whether branch was merged through a PR (squash or rebase merges leave
@@ -38,6 +70,11 @@ func (r Repo) Classify(ctx context.Context, base string, squashed SquashMerged) 
 	out := make([]Candidate, 0, len(agents))
 	for _, wt := range agents {
 		c := Candidate{Worktree: wt, Action: Keep}
+		if used := r.InUse(wt); len(used) > 0 {
+			c.Reason = describe(used)
+			out = append(out, c)
+			continue
+		}
 		switch dirty, err := Dirty(ctx, wt.Path); {
 		case err != nil:
 			c.Reason = "status unavailable"
@@ -58,18 +95,27 @@ func (r Repo) Classify(ctx context.Context, base string, squashed SquashMerged) 
 				c.Reason = "unmerged commits"
 			}
 		}
+		if c.Action != Keep {
+			c.Ignored, _ = Ignored(ctx, wt.Path)
+		}
 		out = append(out, c)
 	}
 	return out, nil
 }
 
 // RemoveAll removes the classified worktrees and their branches, then prunes stale metadata.
-func (r Repo) RemoveAll(ctx context.Context, cands []Candidate) (removed int, errs []error) {
+// force lets git remove worktrees it otherwise refuses (those containing submodules); gc only
+// marks clean worktrees, so nothing uncommitted is lost.
+func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (removed int, errs []error) {
 	for _, c := range cands {
 		if c.Action == Keep {
 			continue
 		}
-		if err := r.remove(ctx, c.Worktree, c.Action == RemoveSquashed, false); err != nil {
+		if used := r.InUse(c.Worktree); len(used) > 0 {
+			errs = append(errs, fmt.Errorf("%s: %w: %s", c.Path, ErrInUse, describe(used)))
+			continue
+		}
+		if err := r.remove(ctx, c.Worktree, force, c.Action == RemoveSquashed); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -81,34 +127,52 @@ func (r Repo) RemoveAll(ctx context.Context, cands []Candidate) (removed int, er
 	return removed, errs
 }
 
-// ErrUnmerged means a branch was kept because it has commits outside its upstream/HEAD.
-var ErrUnmerged = errors.New("branch not fully merged")
+var (
+	// ErrUnmerged means a branch was kept because it has commits outside its upstream/HEAD.
+	ErrUnmerged = errors.New("branch not fully merged")
+	// ErrInUse means a session sprawl started still runs in the worktree.
+	ErrInUse = errors.New("worktree in use")
+)
 
-// RemoveOne removes the agent worktree name. Without force, git refuses a dirty worktree and the
-// branch is only deleted when merged (it is kept otherwise, reported as ErrUnmerged).
-func (r Repo) RemoveOne(ctx context.Context, name string, force bool) error {
+// Find returns the agent worktree name.
+func (r Repo) Find(ctx context.Context, name string) (Worktree, error) {
 	agents, err := r.Agents(ctx)
 	if err != nil {
-		return err
+		return Worktree{}, err
 	}
 	for _, w := range agents {
 		if n, _ := r.Name(w); n == name {
-			return r.remove(ctx, w, force, force)
+			return w, nil
 		}
 	}
-	return fmt.Errorf("worktree not found: %s", r.Dir(name))
+	return Worktree{}, fmt.Errorf("worktree not found: %s", r.Dir(name))
 }
 
-func (r Repo) remove(ctx context.Context, w Worktree, forceBranch, forceTree bool) error {
+// RemoveOne removes the agent worktree name. Without forceTree git refuses a dirty worktree;
+// without forceBranch the branch is only deleted when merged (it is kept otherwise, reported as
+// ErrUnmerged).
+func (r Repo) RemoveOne(ctx context.Context, name string, forceTree, forceBranch bool) error {
+	w, err := r.Find(ctx, name)
+	if err != nil {
+		return err
+	}
+	return r.remove(ctx, w, forceTree, forceBranch)
+}
+
+func (r Repo) remove(ctx context.Context, w Worktree, forceTree, forceBranch bool) error {
 	args := []string{"worktree", "remove", w.Path}
 	if forceTree {
 		args = []string{"worktree", "remove", "--force", w.Path}
+	} else if dirty, err := Dirty(ctx, w.Path); err != nil || dirty {
+		// git's own check honours status.showUntrackedFiles=no and would delete untracked files.
+		return fmt.Errorf("%s has uncommitted changes or untracked files (or its status is unavailable)", w.Path)
 	}
 	if _, err := git(ctx, r.Root, args...); err != nil {
 		return err
 	}
-	if w.Branch == "" {
-		return nil
+	name, _ := r.Name(w)
+	if w.Branch == "" || w.Branch != BranchPrefix+name {
+		return nil // not a branch the agent CLI made for this worktree: never delete it
 	}
 	flag := "-d"
 	if forceBranch {
@@ -147,9 +211,33 @@ func (r Repo) GitHubSquashMerged(ctx context.Context) SquashMerged {
 	if err != nil {
 		return nil
 	}
+	return r.mergedPR(gh)
+}
+
+// mergedPR reports a branch as merged only when a merged PR's head was the branch's current
+// tip or contains it: a branch name reused after its PR merged carries new commits the PR
+// never had, and deleting it would lose them.
+func (r Repo) mergedPR(gh string) SquashMerged {
 	return func(ctx context.Context, branch string) bool {
-		out, err := proc.Output(ctx, proc.Options{Dir: r.Root}, gh, "pr", "list", "--head", branch, "--state", "merged", "--json", "number", "--jq", "length")
-		n := strings.TrimSpace(string(out))
-		return err == nil && n != "" && n != "0"
+		tip, err := git(ctx, r.Root, "rev-parse", "-q", "--verify", "refs/heads/"+branch+"^{commit}")
+		if err != nil || tip == "" {
+			return false
+		}
+		out, err := proc.Output(ctx, proc.Options{Dir: r.Root}, gh, "pr", "list", "--head", branch, "--state", "merged", "--json", "number,headRefOid", "--jq", ".[].headRefOid")
+		if err != nil {
+			return false
+		}
+		for _, oid := range strings.Fields(string(out)) {
+			if oid == tip {
+				return true
+			}
+			if _, err := git(ctx, r.Root, "cat-file", "-e", oid+"^{commit}"); err != nil {
+				continue // the PR head is not here, so containment cannot be proven
+			}
+			if _, err := git(ctx, r.Root, "merge-base", "--is-ancestor", tip, oid); err == nil {
+				return true
+			}
+		}
+		return false
 	}
 }

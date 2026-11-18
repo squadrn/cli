@@ -13,6 +13,12 @@ func linksTo(dst, src string) bool {
 	return err == nil && target == src
 }
 
+// linkTarget is where the symbolic link dst points.
+func linkTarget(dst string) (string, bool) {
+	t, err := os.Readlink(dst)
+	return t, err == nil
+}
+
 // LinksTo reports whether dst in an account shares src from the main account.
 func LinksTo(dst, src string) bool { return linksTo(dst, src) }
 
