@@ -1,5 +1,66 @@
 # Changelog
 
+## 1.2.0-rc.3
+
+New:
+- `sprawl usage`: usage limits of every account (5-hour and weekly %, reset times, state, the best
+  account for this repo), `--json`, `--watch`. Data comes from Claude Code's status line, which sprawl
+  wraps without replacing yours (`usage --setup`, asked once at `account add`; `--undo`). Hitting a
+  limit is recorded and notified (StopFailure hook). ADR 0009.
+- `sprawl swap` moves a conversation by session ID: with no arguments it takes the session that just
+  hit its limit (or one running) in this directory and offers the accounts ranked by usage;
+  `--session`, `--to`. It stops the old session first, copies the `/rewind` checkpoints too, refuses
+  copies that diverged, and records each handoff. Works on Windows outside a grid. The old
+  `swap <worktree> <account>` form still works.
+- `account adopt` for existing account directories; directories of other tools (`~/.claude-squad`,
+  `~/.claude-code-router`, …) are no longer taken for accounts.
+- `--json` for `--version`, `config get` and `self-update --check`.
+
+Push guard (security audit):
+- Layer 1 now asks or denies for aliases defined on the fly, command-valued git config
+  (`core.fsmonitor`, `core.sshCommand`, `credential.helper`, …) and the matching environment
+  variables, policy changes by agents (`config set protected_branches|git_hooks`, writes to the
+  config or hook files), opaque executors (`xargs`, `trap`, `busybox`, `ssh`, `tmux`, …), switching
+  layer 2 off (`GIT_CONFIG_*`, `env -i`), `gh` writes to branches (`repo sync --force`,
+  `pr merge --admin`, `gh api` ref updates), remote helpers, mirror remotes, `remote.<r>.push`
+  mappings and `--git-dir`/`GIT_DIR`.
+- Layer 2 takes the policy from a path fixed at install, not from the pushing process.
+- An invalid config keeps the guard on and is reported by `doctor`; `doctor` reads branch protection
+  and rulesets, and tests the installed hook itself.
+
+Data safety:
+- `gc` never deletes unmerged commits of a reused branch name, untracked files hidden by
+  `status.showUntrackedFiles=no`, or worktrees a session is using (new in-use registry, also checked
+  by `wt rm`, `account rm` and `account rename`).
+- `wt rm --force` no longer deletes an unmerged branch: that needs `--force-branch`. Only
+  `worktree-<name>` branches are ever deleted. `gc --force` removes clean worktrees with submodules.
+- Correct repository root for submodules, bare repositories and `--separate-git-dir`.
+- `grid` starts each worktree once when run twice at the same time and handles repo paths with `#`
+  or `|`.
+- `account rename` logs the old login out first; `account rm` writes trash info on Linux; skills
+  added to the main account later are linked into every account.
+
+Install and update:
+- Installers install the release they come from (Windows works without `-Version`); they ask for the
+  command name and alias on every interactive install, with the current names as defaults; Windows
+  device names and PowerShell aliases are refused as new names. Pre-release installs follow the beta
+  channel on every platform.
+- `install.ps1` no longer closes the PowerShell window on failure, works when Windows PowerShell has no
+  profile path, and puts the PATH entry in place before installing (no more Unix `export PATH` hint).
+  The completion line survives uninstall and `self-uninstall` removes it.
+- Pre-releases are ordered by semver (rc.10 after rc.9).
+- `self-update` repairs an install left half way, explains download failures, accepts `1.2.0` for
+  `v1.2.0`, and warns when run from a binary other than the installed one. Windows restores the old
+  binary if replacing it fails, and only cleans up its own leftovers.
+- The installers are covered by the signed checksums; releases are published only after the upgrade
+  test passed.
+
+Fixes:
+- Global flags after the account name (`sprawl work -C ~/repo`) belong to sprawl; commands that do not
+  use an account refuse one.
+- `NO_COLOR` keeps the account banner and update notices (without colors).
+- `gc --json --yes` prints JSON.
+
 ## 1.2.0-rc.2
 
 - `install.ps1` no longer fails when the PowerShell profile cannot be written (Documents redirected
