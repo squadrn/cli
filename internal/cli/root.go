@@ -61,10 +61,15 @@ type app struct {
 	stdout      io.Writer
 	stderr      io.Writer
 	interactive bool
+	// ttyErr: stderr is a terminal that understands ANSI cursor sequences, so banners, notices,
+	// spinners and the picker can be shown. NO_COLOR and --no-color do not change it.
+	ttyErr bool
 	// colorOut and colorErr: the stream is a terminal and colors are not disabled.
 	colorOut, colorErr bool
-	cache              provider.AuthCache
-	now                func() time.Time
+	// cfgWarned: the invalid-config warning was shown in this run.
+	cfgWarned bool
+	cache     provider.AuthCache
+	now       func() time.Time
 	// agents overrides how provider CLIs are found (tests); nil uses the real ones.
 	agents func(provider.Spec) (provider.Agent, error)
 	// signers are the release signing keys updates must be signed with; "" when the build has none.
@@ -102,7 +107,8 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 	if err != nil {
 		return err
 	}
-	noColor := os.Getenv("NO_COLOR") != "" || !enableVT()
+	vt := enableVT()
+	noColor := os.Getenv("NO_COLOR") != "" || !vt
 	a := &app{
 		cmd:         cfg.CommandName(),
 		cfg:         cfg,
@@ -115,6 +121,7 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 		interactive: isTerminal(os.Stdin) && isTerminal(os.Stdout),
 		colorOut:    !noColor && isTerminal(os.Stdout),
 		colorErr:    !noColor && isTerminal(os.Stderr),
+		ttyErr:      vt && isTerminal(os.Stderr),
 		cache: provider.AuthCache{
 			Path:   filepath.Join(config.DirsFor(store.Home, config.Slug).Cache, "auth.json"),
 			TTL:    authTTL,
@@ -241,12 +248,18 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 	root.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colors (also: NO_COLOR=1)")
 	root.PersistentFlags().StringVarP(&acct, "account", "a", "", "account to run as (provider/name or name)")
 	root.PersistentFlags().StringVarP(&dir, "dir", "C", "", "run as if started in this directory")
-	root.PersistentPreRunE = func(*cobra.Command, []string) error {
+	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if noColor {
 			a.colorOut, a.colorErr = false, false
 		}
 		if acct != "" {
+			if a.account != "" && a.account != acct {
+				return usagef("the account is given twice (%s and -a %s)", a.account, acct)
+			}
 			a.account = acct
+		}
+		if a.account != "" && !takesAccount(cmd) {
+			return usagef("%s does not take an account", strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" "))
 		}
 		if dir != "" {
 			if err := os.Chdir(dir); err != nil {
@@ -276,6 +289,22 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 	root.InitDefaultCompletionCmd()
 	a.root = root
 	return root
+}
+
+// takesAccount reports whether cmd runs as an account: starting an agent (the root command),
+// wt <name> and grid. Help and completion ignore it.
+func takesAccount(cmd *cobra.Command) bool {
+	path := strings.Fields(cmd.CommandPath())[1:]
+	if len(path) == 0 {
+		return true
+	}
+	switch path[0] {
+	case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+		return true
+	case "wt", "grid":
+		return len(path) == 1
+	}
+	return false
 }
 
 // out and errf print user-facing messages; a failed write to the terminal is not actionable.
@@ -322,7 +351,7 @@ func (a *app) confirm(yes bool, format string, args ...any) error {
 
 // spin shows a spinner on stderr while work runs, when stderr is a terminal.
 func (a *app) spin(msg string) func() {
-	if !a.colorErr {
+	if !a.ttyErr {
 		return func() {}
 	}
 	return ui.Spin(a.stderr, msg)
@@ -362,9 +391,10 @@ func (a *app) agent(spec provider.Spec) (provider.Agent, error) {
 	return cl, nil
 }
 
-// sessionEnv points core.hooksPath at the git-level guard for sessions sprawl starts.
+// sessionEnv points core.hooksPath at the git-level guard for sessions sprawl starts. An invalid
+// config keeps it on: the guard fails closed (as the hooks do).
 func (a *app) sessionEnv() []string {
-	if a.cfgErr != nil || !a.cfg.GitHooksEnabled() {
+	if a.cfgErr == nil && !a.cfg.GitHooksEnabled() {
 		return nil
 	}
 	dir := a.layout.GitHooks()
@@ -401,10 +431,10 @@ func (a *app) resolve(input string) (account.Account, error) {
 
 // banner names the account a session runs as and warns when it is known to be logged out.
 func (a *app) banner(acct account.Account) {
-	if !a.colorErr {
+	if !a.ttyErr {
 		return
 	}
-	a.errf("%s: account \033[1m%s\033[0m (%s)\n", a.cmd, acct.Label(), a.tilde(acct.Dir))
+	a.errf("%s: account %s (%s)\n", a.cmd, a.paint(a.colorErr, "1", acct.Label()), a.tilde(acct.Dir))
 	if s, ok := a.cache.Cached(acct.Label()); ok && !s.LoggedIn {
 		a.warnf("%s is not logged in; run: %s account login %s", acct.Label(), a.cmd, acct.Label())
 	}
@@ -426,8 +456,11 @@ func (a *app) sessionIn(ag provider.Agent, acct account.Account, args []string, 
 	for _, c := range r.Replaced {
 		a.warnf("%s was replaced in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
 	}
-	fsx.CleanOld(filepath.Dir(a.layout.Binary()))
-	fsx.CleanOld(a.layout.BinDir)
+	if a.cfgErr != nil && !a.cfgWarned {
+		a.cfgWarned = true
+		a.warnf("%v; the git push guard stays on, but fix the config (%s doctor)", a.cfgErr, a.cmd)
+	}
+	a.layout.CleanOld(append([]string{a.cmd}, a.cfg.Aliases...))
 	defer a.markInUse(acct, wt)()
 	return ag.Exec(acct.ConfigDir(), args)
 }
@@ -487,6 +520,10 @@ func (a *app) pick() error {
 	accts, err := a.store.List()
 	if err != nil {
 		return err
+	}
+	if !a.ttyErr {
+		// The picker draws on stderr with cursor sequences; without them, list and explain.
+		return usagef("the account picker needs a terminal; name an account: %s <account>\n  accounts: %s", a.cmd, strings.Join(a.accountNames(), ", "))
 	}
 	stop := a.spin("checking accounts…")
 	statuses := a.statuses(accts, false)

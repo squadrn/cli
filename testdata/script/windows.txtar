@@ -45,6 +45,12 @@ exec sprawl config set aliases ''
 exec sprawl self-uninstall --yes
 ! exists home/.local/bin/sprawl.exe
 
+# cmd.exe would misread a data dir with % ^ & or !.
+env XDG_DATA_HOME=$WORK${/}R&D
+exitcode 2 sprawl self-install rel
+! exec sprawl self-install rel
+stderr 'which cmd.exe would misread'
+
 -- empty --
 -- ps-force.json --
 {"cwd":".","tool_name":"PowerShell","tool_input":{"command":"& git push -f origin x"}}

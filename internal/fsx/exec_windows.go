@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -22,18 +20,29 @@ func replaceExecutable(src, dst string) error {
 	if err := CopyFile(src, tmp, 0o755, false); err != nil {
 		return err
 	}
+	old := ""
 	if _, err := os.Lstat(dst); err == nil {
-		if err := retry(func() error { return os.Rename(dst, dst+".old-"+stamp()) }); err != nil {
+		old = dst + ".old-" + stamp()
+		if err := retry(func() error { return rename(dst, old) }); err != nil {
 			_ = os.Remove(tmp)
 			return fmt.Errorf("move %s aside: %w", dst, err)
 		}
 	}
-	if err := retry(func() error { return os.Rename(tmp, dst) }); err != nil {
+	if err := retry(func() error { return rename(tmp, dst) }); err != nil {
 		_ = os.Remove(tmp)
+		if old != "" {
+			// Put the previous executable back, or the command would be gone.
+			if rerr := retry(func() error { return rename(old, dst) }); rerr != nil {
+				return fmt.Errorf("install %s: %w (and restoring it from %s failed: %w)", dst, err, old, rerr)
+			}
+		}
 		return fmt.Errorf("install %s: %w", dst, err)
 	}
 	return nil
 }
+
+// rename is os.Rename; tests replace it to inject failures.
+var rename = os.Rename
 
 func stamp() string { return time.Now().Format("20060102-150405.000000000") }
 
@@ -55,14 +64,8 @@ func busy(err error) bool {
 }
 
 // cleanOld deletes executables moved aside by earlier updates; ones still running stay.
-func cleanOld(dir string) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if strings.Contains(e.Name(), ".old-") || strings.Contains(e.Name(), ".new-") {
-			_ = os.Remove(filepath.Join(dir, e.Name()))
-		}
+func cleanOld(dir string, names []string, now time.Time) {
+	for _, p := range Leftovers(dir, names, now) {
+		_ = os.Remove(p)
 	}
 }

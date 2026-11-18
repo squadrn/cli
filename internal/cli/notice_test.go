@@ -22,7 +22,7 @@ func TestUpdateNotice(t *testing.T) {
 	started := 0
 	a := &app{
 		cmd: "sprawl", store: account.Store{Home: t.TempDir()}, stderr: &stderr,
-		interactive: true, colorErr: true, now: func() time.Time { return now },
+		interactive: true, colorErr: true, ttyErr: true, now: func() time.Time { return now },
 		backgroundCheck: func() { started++ },
 	}
 	// Nothing known yet: no notice, one background check, not repeated within the interval.
@@ -31,7 +31,7 @@ func TestUpdateNotice(t *testing.T) {
 	if stderr.Len() != 0 || started != 1 {
 		t.Fatalf("first run: %q, %d checks", stderr.String(), started)
 	}
-	update.Save(a.updateStatePath(), update.State{CheckedAt: now, Latest: "v1.1.0"})
+	update.Save(a.updateStatePath(), update.State{CheckedAt: now, Latest: "v1.1.0", Channel: update.Stable})
 	a.updateNotice(route{})
 	if !strings.Contains(stderr.String(), "sprawl v1.1.0 is available") || !strings.Contains(stderr.String(), "you have v1.0.0") {
 		t.Fatalf("notice: %q", stderr.String())

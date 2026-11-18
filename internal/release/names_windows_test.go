@@ -81,3 +81,11 @@ func TestReplaceRunningCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCheckInstallDir(t *testing.T) {
+	for dir, ok := range map[string]bool{`C:\Users\me\.local\share\sprawl`: true, `C:\a%b\sprawl`: false, `C:\R&D\sprawl`: false, `C:\x^y`: false, `C:\hi!`: false} {
+		if err := CheckInstallDir(dir); (err == nil) != ok {
+			t.Errorf("CheckInstallDir(%s) = %v", dir, err)
+		}
+	}
+}

@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"sprawling-agents/internal/config"
 	"sprawling-agents/internal/fsx"
@@ -44,6 +45,9 @@ func AssetName(version, goos, goarch string) string {
 // data dir; commands link to it.
 
 const ChecksumsName = "checksums.txt"
+
+// ErrUnsafeInstallDir: the install path cannot be used on this platform (CheckInstallDir).
+var ErrUnsafeInstallDir = errors.New("unsafe install directory")
 
 // VerifyChecksum checks file against its entry in a goreleaser checksums.txt.
 func VerifyChecksum(checksums, file string) error {
@@ -261,6 +265,26 @@ func Legacies(home string) []Legacy {
 
 func (l Layout) Binary() string { return filepath.Join(l.DataDir, "bin", BinaryName) }
 
+// CleanOld removes executables earlier updates moved aside (Windows): the binary's and those of
+// the command names given, never other programs' files in the shared bin dir.
+func (l Layout) CleanOld(names []string) {
+	fsx.CleanOld(filepath.Dir(l.Binary()), []string{BinaryName})
+	files := make([]string, len(names))
+	for i, n := range names {
+		files[i] = ExecutableName(n)
+	}
+	fsx.CleanOld(l.BinDir, files)
+}
+
+// Leftovers are the moved-aside executables of names in the bin dir, any age (uninstall).
+func (l Layout) Leftovers(names []string) []string {
+	files := make([]string, len(names))
+	for i, n := range names {
+		files[i] = ExecutableName(n)
+	}
+	return fsx.Leftovers(l.BinDir, files, time.Now().Add(24*time.Hour))
+}
+
 // GitHooks is the directory of git-level guard shims.
 func (l Layout) GitHooks() string { return githook.Dir(l.DataDir) }
 
@@ -375,8 +399,10 @@ func setPluginVersion(path, version string) error {
 	return fsx.WriteBytes(path, append(out, '\n'), 0o644)
 }
 
-// Compare orders release versions (v1.2.3, 1.2.3-rc.1): -1, 0 or 1. A pre-release sorts before
-// its release. ok is false when either is not a version (e.g. "dev").
+// Compare orders release versions (v1.2.3, 1.2.3-rc.1) by semver 2.0 precedence: -1, 0 or 1.
+// A pre-release sorts before its release; pre-release identifiers compare numerically when both
+// are numbers (rc.9 < rc.10), numbers before words, and a shorter list first when the rest is
+// equal. Build metadata (+…) is ignored. ok is false when either is not a version (e.g. "dev").
 func Compare(a, b string) (cmp int, ok bool) {
 	pa, prea, oka := parseVersion(a)
 	pb, preb, okb := parseVersion(b)
@@ -384,40 +410,80 @@ func Compare(a, b string) (cmp int, ok bool) {
 		return 0, false
 	}
 	for i := range 3 {
-		if pa[i] != pb[i] {
-			if pa[i] < pb[i] {
-				return -1, true
-			}
-			return 1, true
+		if c := compareInt(pa[i], pb[i]); c != 0 {
+			return c, true
 		}
 	}
 	switch {
-	case prea == preb:
+	case len(prea) == 0 && len(preb) == 0:
 		return 0, true
-	case prea == "":
+	case len(prea) == 0:
 		return 1, true
-	case preb == "":
-		return -1, true
-	case prea < preb:
+	case len(preb) == 0:
 		return -1, true
 	}
-	return 1, true
+	for i := 0; i < len(prea) && i < len(preb); i++ {
+		if c := comparePre(prea[i], preb[i]); c != 0 {
+			return c, true
+		}
+	}
+	return compareInt(len(prea), len(preb)), true
 }
 
-func parseVersion(v string) ([3]int, string, bool) {
+// Prerelease reports whether v has a pre-release part (v1.2.0-rc.1).
+func Prerelease(v string) bool {
+	_, pre, ok := parseVersion(v)
+	return ok && len(pre) > 0
+}
+
+func compareInt(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+func comparePre(a, b string) int {
+	na, errA := strconv.Atoi(a)
+	nb, errB := strconv.Atoi(b)
+	switch {
+	case errA == nil && errB == nil:
+		return compareInt(na, nb)
+	case errA == nil:
+		return -1
+	case errB == nil:
+		return 1
+	}
+	return strings.Compare(a, b)
+}
+
+func parseVersion(v string) ([3]int, []string, bool) {
 	var out [3]int
 	v = strings.TrimPrefix(v, "v")
-	v, pre, _ := strings.Cut(v, "-")
+	v, _, _ = strings.Cut(v, "+")
+	v, pre, hasPre := strings.Cut(v, "-")
 	parts := strings.Split(v, ".")
 	if len(parts) != 3 {
-		return out, "", false
+		return out, nil, false
 	}
 	for i, p := range parts {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 0 {
-			return out, "", false
+			return out, nil, false
 		}
 		out[i] = n
 	}
-	return out, pre, true
+	if !hasPre {
+		return out, nil, true
+	}
+	ids := strings.Split(pre, ".")
+	for _, id := range ids {
+		if id == "" {
+			return out, nil, false
+		}
+	}
+	return out, ids, true
 }

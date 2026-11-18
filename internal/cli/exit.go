@@ -9,6 +9,7 @@ import (
 	"sprawling-agents/internal/grid"
 	"sprawling-agents/internal/install"
 	"sprawling-agents/internal/provider"
+	"sprawling-agents/internal/release"
 	"sprawling-agents/internal/ui"
 	"sprawling-agents/internal/worktree"
 )
@@ -56,7 +57,7 @@ func exitCode(err error) int {
 	case errors.As(err, &ue), errors.Is(err, account.ErrInvalidName), errors.Is(err, account.ErrReserved),
 		errors.Is(err, account.ErrAmbiguous), errors.Is(err, account.ErrUnknownProvider),
 		errors.Is(err, config.ErrInvalidCommand), errors.Is(err, config.ErrUnknownKey), errors.Is(err, config.ErrInvalidValue),
-		errors.Is(err, install.ErrNameTaken), errors.Is(err, install.ErrDuplicateName),
+		errors.Is(err, install.ErrNameTaken), errors.Is(err, install.ErrDuplicateName), errors.Is(err, release.ErrUnsafeInstallDir),
 		errors.Is(err, worktree.ErrInvalidName), errors.Is(err, grid.ErrInvalidSpec):
 		return exitUsage
 	default:
