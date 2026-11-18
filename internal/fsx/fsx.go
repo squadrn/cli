@@ -157,3 +157,7 @@ func SameFile(a, b string) bool {
 // ReplaceExecutable installs src at dst as an executable, replacing dst even while it runs
 // (platform: replaceExecutable).
 func ReplaceExecutable(src, dst string) error { return replaceExecutable(src, dst) }
+
+// CleanOld removes executables that ReplaceExecutable moved aside in dir once they no longer
+// run (Windows); a no-op elsewhere.
+func CleanOld(dir string) { cleanOld(dir) }
