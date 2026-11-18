@@ -54,6 +54,12 @@ func (g Guard) Decide(ctx context.Context, cmd, cwd string) Decision {
 	if err := e.script(cmd, cwd, 0); err != nil {
 		return ask("the command could not be parsed, so a git push in it cannot be checked")
 	}
+	return g.verdict(ctx, e)
+}
+
+// verdict combines what the analysis found: the most severe finding or push decision wins, and
+// an expired deadline asks.
+func (g Guard) verdict(ctx context.Context, e *extractor) Decision {
 	worst := allow()
 	for _, f := range e.findings {
 		if f.verdict > worst.Verdict {
