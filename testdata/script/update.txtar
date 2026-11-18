@@ -201,6 +201,17 @@ stdout 'sprawl is uninstalled'
 exists home/.claude-personal
 grep 'args=plugin uninstall sprawl@sprawl' home/calls.log
 
+# Installing a pre-release follows the beta channel unless a channel was chosen.
+env SPRAWL_TEST_VERSION=1.2.0-rc.3
+exec sprawl self-install rel
+stdout 'pre-release: following the beta channel \(back to stable: sprawl config set update_channel stable\)'
+grep '^update_channel = "beta"$' home/.config/sprawl/config.toml
+exec sprawl config set update_channel stable
+exec sprawl self-install rel
+! stdout 'beta channel'
+grep '^update_channel = "stable"$' home/.config/sprawl/config.toml
+env SPRAWL_TEST_VERSION=
+
 -- fakeprog --
 #!/bin/sh
 -- fakegh --

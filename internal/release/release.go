@@ -46,6 +46,9 @@ func AssetName(version, goos, goarch string) string {
 
 const ChecksumsName = "checksums.txt"
 
+// ErrUnsafeInstallDir: the install path cannot be used on this platform (CheckInstallDir).
+var ErrUnsafeInstallDir = errors.New("unsafe install directory")
+
 // VerifyChecksum checks file against its entry in a goreleaser checksums.txt.
 func VerifyChecksum(checksums, file string) error {
 	f, err := os.Open(checksums)

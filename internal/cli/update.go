@@ -371,6 +371,8 @@ type nameChoice struct {
 	aliases  []string
 	aliasSet bool
 	force    bool
+	// selfInstall: the installers run this release (not self-update or rollback).
+	selfInstall bool
 }
 
 func (a *app) selfInstallCmd() *cobra.Command {
@@ -382,6 +384,7 @@ func (a *app) selfInstallCmd() *cobra.Command {
 		Args:   oneArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			nc.aliasSet = cmd.Flags().Changed("alias")
+			nc.selfInstall = true
 			return a.installRelease(args[0], Version, nc)
 		},
 	}
@@ -404,6 +407,9 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	cfg, migratedFrom, fresh, err := install.LoadConfig(cfgPath, legacy)
 	if err != nil {
+		return err
+	}
+	if err := release.CheckInstallDir(a.layout.DataDir); err != nil {
 		return err
 	}
 	accepted := install.Names(cfg)
@@ -446,6 +452,10 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 			_ = os.RemoveAll(staged)
 		}
 	}
+	beta := nc.selfInstall && cfg.UpdateChannel == "" && release.Prerelease(version)
+	if beta {
+		cfg.UpdateChannel = update.Beta
+	}
 	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}
@@ -453,6 +463,9 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	a.out("installed sprawl %s → %s\n", version, a.tilde(a.layout.Binary()))
 	if migratedFrom != "" {
 		a.out("  settings migrated from %s\n", a.tilde(migratedFrom))
+	}
+	if beta {
+		a.out("  pre-release: following the beta channel (back to stable: %s config set update_channel stable)\n", cfg.Command)
 	}
 	if err := a.linkNames(cfg); err != nil {
 		return err

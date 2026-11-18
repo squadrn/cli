@@ -99,3 +99,6 @@ func (l Layout) Unlink() ([]string, error) {
 	}
 	return removed, nil
 }
+
+// CheckInstallDir: shell-form hooks quote the path, so any directory works.
+func CheckInstallDir(string) error { return nil }

@@ -5,6 +5,7 @@ package release
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -110,4 +111,13 @@ func removeRunning(path string) error {
 		return nil
 	}
 	return os.Rename(path, path+".old-"+time.Now().Format("20060102-150405.000000000"))
+}
+
+// CheckInstallDir refuses a data dir whose path cmd.exe would expand or split: the plugin hooks
+// run "<dir>\\bin\\sprawl.exe" through cmd.exe (ADR 0008, component 3).
+func CheckInstallDir(dir string) error {
+	if i := strings.IndexAny(dir, "%^&!"); i >= 0 {
+		return fmt.Errorf("%w: %s contains %q, which cmd.exe would misread in the plugin hooks; set XDG_DATA_HOME to a path without %%, ^, & or ! in it", ErrUnsafeInstallDir, dir, dir[i])
+	}
+	return nil
 }

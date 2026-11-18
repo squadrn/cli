@@ -81,6 +81,7 @@ func (a *app) uninstall(purge bool) error {
 		names = append(names, strings.TrimSuffix(filepath.Base(l), ".exe"))
 		a.removeCompletions(strings.TrimSuffix(filepath.Base(l), ".exe"))
 	}
+	a.removeProfileLines()
 	// Executables still running (this one, a session, a hook) cannot be deleted on Windows; they
 	// are removed once sprawl has exited.
 	var later []string
