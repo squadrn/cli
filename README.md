@@ -123,13 +123,17 @@ sprawl account add work             # create or repair claude/work
 sprawl account login work
 sprawl account ls [--json]
 sprawl account logout work
-sprawl account rename work job      # usually needs a new login
+sprawl account adopt squad          # make an existing ~/.claude-squad an account (asks; --yes)
+sprawl account rename work job      # logs work out first; log in again as job
 sprawl account rm work              # logs out and moves the dir to the trash
 ```
 
 A word that is neither a sprawl command, an account nor an agent subcommand is a usage error with
 a suggestion (`sprawl acount` → *did you mean account?*), so a typo never becomes a prompt.
 Global options before the command: `-a <account>`, `-C <dir>`, `--no-color` (also `NO_COLOR=1`).
+
+A dir named like an account but not made by sprawl (no `.sprawl-account` marker) is not an
+account: `account ls` lists it as unmanaged and `account adopt` makes it one.
 
 Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `comacpro-2`. Names that are sprawl or
 provider subcommands (`mcp`, `wt`, …) are rejected. Account dirs are created private (`0700`).
@@ -191,6 +195,7 @@ not an error: the command exits 0.
 sprawl wt feat-login                                    # agent in .claude/worktrees/feat-login
 sprawl wt ls [--json]                                   # worktrees, modified or not, running as whom
 sprawl wt rm feat-login [--force]                       # remove one (branch only if merged)
+sprawl wt rm feat-login --force-branch                  # also delete an unmerged branch (asks; -y)
 sprawl grid ~/repo feat-a personal:fix-b                # tmux grid, one agent per pane
 sprawl grid ~/repo feat-a claude/personal:fix-b         # account as provider/name
 sprawl grid ~/repo feat-1 feat-2 feat-3 --spread        # spread over logged-in accounts
@@ -200,7 +205,11 @@ sprawl ps [--json]                                      # which agent runs as wh
 sprawl swap fix-b personal                              # account hit its limit: move the conversation
 sprawl deps feat-a                                      # install dependencies (exit status passes through)
 sprawl gc [--json]                                      # merged/empty worktrees; --yes removes them
+sprawl gc --yes --force                                 # also those git refuses (submodules)
 ```
+
+`wt rm` refuses a worktree a running session uses (`--force` removes it anyway) and keeps an
+unmerged branch unless `--force-branch` is given.
 
 Worktree names are `<type>-<slug>` (`feat-otp-login`, `fix-cart-total`); Claude Code creates branch
 `worktree-<name>`. `swap` moves conversations between accounts of the same provider and asks first
