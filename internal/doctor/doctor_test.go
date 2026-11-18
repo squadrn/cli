@@ -244,3 +244,44 @@ func TestPathFixNamesTheDirectory(t *testing.T) {
 		t.Fatalf("PathFix = %s, want %s", fix, want)
 	}
 }
+
+func TestConfigAndInstalledRelease(t *testing.T) {
+	e := env(t, fakeAgent{}, nil)
+	e.ConfigErr = errors.New("config x: unknown key")
+	if c, _ := find(e.install(), "config invalid: config x: unknown key"); c.Status != Fail || !strings.Contains(c.Fix, "sprawl doctor") {
+		t.Fatalf("config check: %+v", c)
+	}
+	e.ConfigErr = nil
+	if _, found := find(e.install(), "installed release"); found {
+		t.Fatal("no install: nothing to compare")
+	}
+	bin := e.Layout.Binary()
+	for p, body := range map[string]string{
+		bin: "bin",
+		filepath.Join(e.Layout.DataDir, "VERSION"):                            "1.1.0\n",
+		filepath.Join(e.Layout.DataDir, ".claude-plugin", "marketplace.json"): "{}",
+	} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.Self, e.Version = bin, "1.2.0"
+	if c, _ := find(e.install(), "installed release is incomplete"); c.Status != Fail || c.Fix != "sprawl self-update" {
+		t.Fatalf("mismatch: %+v", c)
+	}
+	e.Version = "v1.1.0"
+	if c, _ := find(e.install(), "installed release 1.1.0"); c.Status != OK {
+		t.Fatalf("match: %+v", c)
+	}
+	e.Version = "dev"
+	if _, found := find(e.install(), "installed release"); found {
+		t.Fatal("a development build is not compared")
+	}
+	e.Version, e.Self = "1.2.0", filepath.Join(t.TempDir(), "other")
+	if _, found := find(e.install(), "installed release"); found {
+		t.Fatal("another binary is not compared")
+	}
+}

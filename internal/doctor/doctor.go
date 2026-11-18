@@ -79,6 +79,8 @@ type Env struct {
 	Git func(context.Context) (gitver.Version, error)
 	// GitHint is the command that upgrades Git on this system.
 	GitHint string
+	// ConfigErr is why the config file could not be loaded (nil when it is fine).
+	ConfigErr error
 }
 
 // Run performs every check. Account checks run concurrently.
@@ -124,6 +126,12 @@ func (e Env) gitCheck(ctx context.Context) Check {
 func (e Env) install() []Check {
 	const g = "install"
 	var out []Check
+	if e.ConfigErr != nil {
+		out = append(out, bad(g, Fail, "config invalid: "+e.ConfigErr.Error(), "fix the file, then run: "+e.Command+" doctor"))
+	}
+	if c, ok := e.installedRelease(); ok {
+		out = append(out, c)
+	}
 	for _, spec := range provider.All() {
 		bin, err := e.LookPath(spec.Binary)
 		switch {
@@ -183,6 +191,28 @@ func (e Env) install() []Check {
 		out = append(out, ok(g, "plugin marketplace"))
 	}
 	return out
+}
+
+// installedRelease compares the installed release with the running binary when that binary is
+// the installed one: an install that stopped half way leaves a new binary with an old VERSION
+// and plugin.
+func (e Env) installedRelease() (Check, bool) {
+	const g = "install"
+	bin := e.Layout.Binary()
+	if !fsx.IsFile(bin) || e.Self == "" {
+		return Check{}, false
+	}
+	if !fsx.SameFile(e.Self, bin) && filepath.Clean(filepath.Dir(e.Self)) != filepath.Clean(e.Layout.BinDir) {
+		return Check{}, false // a development build or another copy; self-update warns about it
+	}
+	running := strings.TrimPrefix(e.Version, "v")
+	if _, ok := release.Compare(running, running); !ok {
+		return Check{}, false
+	}
+	if v := e.Layout.Version(); v != running || e.Layout.Marketplace() == "" {
+		return bad(g, Fail, fmt.Sprintf("installed release is incomplete (VERSION %q, running %s)", v, running), e.Command+" self-update"), true
+	}
+	return ok(g, "installed release "+running), true
 }
 
 // guard checks the three push-guard layers.

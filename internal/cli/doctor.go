@@ -25,21 +25,22 @@ func (a *app) doctorCmd() *cobra.Command {
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
 			env := doctor.Env{
-				Store:    a.store,
-				Agent:    a.agent,
-				Layout:   a.layout,
-				Config:   a.cfg,
-				LookPath: exec.LookPath,
-				Self:     selfPath(),
-				Names:    append([]string{a.cmd}, a.cfg.Aliases...),
-				Command:  a.cmd,
-				Timeout:  10 * time.Second,
-				Version:  Version,
-				Signed:   a.signers != "",
-				Git:      gitver.Detect,
-				GitHint:  gitver.Hint(runtime.GOOS),
+				Store:     a.store,
+				Agent:     a.agent,
+				Layout:    a.layout,
+				Config:    a.cfg,
+				LookPath:  exec.LookPath,
+				Self:      selfPath(),
+				Names:     append([]string{a.cmd}, a.cfg.Aliases...),
+				Command:   a.cmd,
+				Timeout:   10 * time.Second,
+				Version:   Version,
+				Signed:    a.signers != "",
+				Git:       gitver.Detect,
+				GitHint:   gitver.Hint(runtime.GOOS),
+				ConfigErr: a.cfgErr,
 			}
-			if latest, ok := update.Available(Version, update.Load(a.updateStatePath())); ok {
+			if latest, ok := update.Available(Version, update.Load(a.updateStatePath()), a.cfg.Channel()); ok {
 				env.Latest = latest
 			}
 			if cwd, err := os.Getwd(); err == nil {
