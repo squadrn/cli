@@ -2,6 +2,8 @@
 exec git init -q -b main repo
 exec git -C repo commit -q --allow-empty -m init
 mkdir repo/.claude home/.claude-personal
+cp empty home/.claude/.loggedin
+cp empty home/.claude-personal/.loggedin
 exec git -C repo worktree add -q -b worktree-feat-s .claude/worktrees/feat-s
 exec git -C repo worktree add -q -b worktree-feat-empty .claude/worktrees/feat-empty
 
@@ -25,8 +27,6 @@ stdout '^cfg=<unset> args=--resume sid-2$'
 # Moving a conversation into another organization's account asks first.
 cp $WORK/org-a $WORK/home/.claude/.org
 cp $WORK/org-b $WORK/home/.claude-personal/.org
-cp $WORK/empty $WORK/home/.claude/.loggedin
-cp $WORK/empty $WORK/home/.claude-personal/.loggedin
 exec sh -c 'touch "$HOME/.claude/projects/$(cat ../key.txt)/sid-2.jsonl"'
 exitcode 2 sprawl swap feat-s personal
 ! exec sprawl swap feat-s personal
@@ -35,7 +35,12 @@ exec sprawl swap feat-s personal --yes
 stdout 'swap feat-s: claude/main → claude/personal'
 rm $WORK/home/.claude/.org $WORK/home/.claude-personal/.org
 
-# Errors.
+# Errors. A logged-out target is refused.
+rm $WORK/home/.claude-personal/.loggedin
+exitcode 1 sprawl swap feat-s personal
+! exec sprawl swap feat-s personal
+stderr 'claude/personal is not logged in; run: sprawl account login personal'
+cp $WORK/empty $WORK/home/.claude-personal/.loggedin
 exitcode 1 sprawl swap feat-nope personal
 exitcode 1 sprawl swap feat-empty personal
 exitcode 2 sprawl swap feat-s

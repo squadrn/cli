@@ -285,6 +285,9 @@ func (a *app) usageDetails(r usageRow, rep usageReport) {
 			a.out("          in %s (session %s)\n", a.tilde(l.Cwd), dash(l.Session))
 		}
 	}
+	if h, ok, _ := a.ledger().Last(r.Account); ok {
+		a.out("handoff   %s: %s → %s (session %s)\n", ago(h.At, now), h.From, h.To, shortID(h.Session))
+	}
 	tracking := "on"
 	if !r.Tracking {
 		tracking = "off (run: " + a.cmd + " usage --setup " + r.Account + ")"

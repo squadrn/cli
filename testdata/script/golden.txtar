@@ -104,7 +104,7 @@ Agents:
   gc             Remove clean worktrees that are merged or empty (dry run without --yes)
   grid           tmux grid for <repo>, one agent per pane in its own worktree; re-running adds panes
   ps             List running agents: session, account, worktree
-  swap           Move a worktree's latest conversation to <account> and resume it there
+  swap           Move a conversation to another account and resume it there
   wt             Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
 
 Accounts:
@@ -411,16 +411,32 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-swap.txt --
-Move the latest conversation of worktree <name> to <account> and resume it, e.g. when an
-account hits its usage limit. Inside a grid the pane is restarted in place (asks first). Moving a
-conversation to an account of another organization asks first too.
+Move a conversation to another account and resume it there, e.g. when an account hits its
+usage limit. Without arguments the conversation is the one that last hit its limit in this
+directory (or below it), or one running here; several candidates are offered in a picker. The
+target account is --to, else picked from the accounts ranked by their usage.
+
+A running session is stopped first (asks; in a grid its pane is restarted in place). Moving a
+conversation to an account of another organization asks first too. When the target account
+already holds the conversation and it went on there, the swap is refused unless --force.
+
+The legacy form <worktree> <account> moves the latest conversation of that worktree.
 
 Usage:
-  sprawl swap <name> <account> [flags]
+  sprawl swap [<worktree> <account>] [flags]
+
+Examples:
+  sprawl swap                            the conversation that just hit its limit here
+  sprawl swap --to personal              the same, to claude/personal
+  sprawl swap feat-a personal            latest conversation of worktree feat-a
+  sprawl swap --session <id> --to work
 
 Flags:
-  -h, --help   help for swap
-  -y, --yes    do not ask for confirmation
+      --force            overwrite the target's copy when it differs
+  -h, --help             help for swap
+      --session string   session ID of the conversation to move
+      --to string        account to move it to
+  -y, --yes              do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)

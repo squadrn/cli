@@ -18,7 +18,6 @@ import (
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/grid"
 	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/provider/claude"
 	"sprawling-agents/internal/worktree"
 )
 
@@ -334,115 +333,6 @@ func (a *app) psCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) swapCmd() *cobra.Command {
-	var yes bool
-	cmd := &cobra.Command{
-		Use:   "swap <name> <account>",
-		Short: "Move a worktree's latest conversation to <account> and resume it there",
-		Long: `Move the latest conversation of worktree <name> to <account> and resume it, e.g. when an
-account hits its usage limit. Inside a grid the pane is restarted in place (asks first). Moving a
-conversation to an account of another organization asks first too.`,
-		Args:              exactArgs(2),
-		ValidArgsFunction: a.completeWorktrees,
-		RunE:              func(_ *cobra.Command, args []string) error { return a.swap(args[0], args[1], yes) },
-	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
-	return cmd
-}
-
-func (a *app) swap(name, toInput string, yes bool) error {
-	if err := worktree.ValidateName(name); err != nil {
-		return err
-	}
-	to, err := a.store.Get(toInput)
-	if err != nil {
-		return err
-	}
-	if !to.Spec.Caps.SessionTransfer {
-		return fmt.Errorf("%s: %s cannot transfer conversations", to.Label(), to.Spec.Name)
-	}
-	ctx := context.Background()
-	repo, err := a.repoHere(ctx, to.Spec)
-	if err != nil {
-		return err
-	}
-	dir := repo.Dir(name)
-	if _, err := os.Stat(dir); err != nil {
-		return fmt.Errorf("worktree not found: %s", a.tilde(dir))
-	}
-	key, err := claude.ProjectKey(dir)
-	if err != nil {
-		return err
-	}
-	all, err := a.store.List()
-	if err != nil {
-		return err
-	}
-	// Conversations only move between accounts of the same provider: formats differ across CLIs.
-	var accts []account.Account
-	for _, acct := range all {
-		if acct.Provider == to.Provider {
-			accts = append(accts, acct)
-		}
-	}
-	dirs := make([]string, len(accts))
-	for i, acct := range accts {
-		dirs[i] = acct.Dir
-	}
-	s, err := claude.LatestSession(dirs, key)
-	if errors.Is(err, claude.ErrNoSession) {
-		return fmt.Errorf("no conversation found for worktree %q in any account", name)
-	} else if err != nil {
-		return err
-	}
-	from := accts[s.Owner]
-	if from.Label() != to.Label() {
-		st := a.statuses([]account.Account{from, to}, true)
-		fromOrg, toOrg := st[0].Status.OrgName, st[1].Status.OrgName
-		if st[0].Err == nil && st[1].Err == nil && fromOrg != toOrg {
-			if err := a.confirm(yes, "Move the conversation from %s (%s) to %s (%s), another organization", from.Label(), orgOr(fromOrg), to.Label(), orgOr(toOrg)); err != nil {
-				return err
-			}
-		}
-	}
-	pane := a.paneOf(name)
-	if pane != "" {
-		if err := a.confirm(yes, "Restart pane %s (%q) as %s; its current process is stopped", pane, name, to.Label()); err != nil {
-			return err
-		}
-	}
-	if from.Label() != to.Label() {
-		if err := claude.CopySession(s, to.Dir, key); err != nil {
-			return err
-		}
-	}
-	a.out("swap %s: %s → %s (session %s)\n", name, from.Label(), to.Label(), s.ID)
-	ag, err := a.agent(to.Spec)
-	if err != nil {
-		return err
-	}
-	if pane == "" {
-		if err := os.Chdir(dir); err != nil {
-			return err
-		}
-		a.banner(to)
-		return a.session(ag, to, ag.ResumeArgs(s.ID))
-	}
-	command := grid.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(s.ID)...)...)
-	if err := (grid.Tmux{}).Respawn(ctx, pane, dir, grid.Agent{Account: to.Label(), Name: name}, command); err != nil {
-		return err
-	}
-	a.out("pane %s now runs %s as %s\n", pane, name, to.Label())
-	return nil
-}
-
-func orgOr(org string) string {
-	if org == "" {
-		return "personal"
-	}
-	return org
-}
-
 // panes lists agent panes of root's grid; none when tmux is missing or no grid runs.
 func (a *app) panes(root string) []grid.Pane {
 	if exec.Command("tmux", "-V").Run() != nil {
@@ -458,13 +348,9 @@ func (a *app) panes(root string) []grid.Pane {
 	return panes
 }
 
-// paneOf returns the pane running worktree (or account label) key in this repository's grid.
-func (a *app) paneOf(key string) string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	repo, err := worktree.Open(context.Background(), cwd, a.defaultSpec().WorktreeDir)
+// paneIn returns the pane running worktree (or account label) key in the grid of dir's repository.
+func (a *app) paneIn(dir, key string) string {
+	repo, err := worktree.Open(context.Background(), dir, a.defaultSpec().WorktreeDir)
 	if err != nil {
 		return ""
 	}
