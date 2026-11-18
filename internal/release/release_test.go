@@ -116,12 +116,31 @@ func TestCompare(t *testing.T) {
 		{"v2.0.0", "v2.0.0-rc.1", 1, true},
 		{"v2.0.0-rc.1", "v2.0.0-rc.2", -1, true},
 		{"v2.0.0-rc.2", "v2.0.0-rc.1", 1, true},
+		{"v1.2.0-rc.9", "v1.2.0-rc.10", -1, true},
+		{"v1.2.0-rc.10", "v1.2.0-rc.9", 1, true},
+		{"v1.2.0-alpha", "v1.2.0-beta", -1, true},
+		{"v1.2.0-beta.2", "v1.2.0-rc.1", -1, true},
+		{"v1.2.0-rc.1", "v1.2.0", -1, true},
+		{"v1.2.0-alpha", "v1.2.0-alpha.1", -1, true},
+		{"v1.2.0-alpha.1", "v1.2.0-alpha.beta", -1, true},
+		{"v1.2.0-1", "v1.2.0-alpha", -1, true},
+		{"v1.2.0-rc.1+build.5", "v1.2.0-rc.1", 0, true},
+		{"v1.2.0-rc..1", "v1.2.0", 0, false},
+		{"v1.2.0-", "v1.2.0", 0, false},
 		{"dev", "v1.0.0", 0, false},
 		{"v1.0", "v1.0.0", 0, false},
 		{"v1.x.0", "v1.0.0", 0, false},
 	} {
 		if got, ok := Compare(tt.a, tt.b); got != tt.want || ok != tt.ok {
 			t.Errorf("Compare(%s, %s) = %d, %v", tt.a, tt.b, got, ok)
+		}
+	}
+}
+
+func TestPrerelease(t *testing.T) {
+	for v, want := range map[string]bool{"v1.2.0-rc.1": true, "1.2.0": false, "dev": false, "v1.2.0+b": false} {
+		if got := Prerelease(v); got != want {
+			t.Errorf("Prerelease(%s) = %v", v, got)
 		}
 	}
 }
