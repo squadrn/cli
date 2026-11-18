@@ -132,3 +132,78 @@ func TestSameFileAndReplaceExecutable(t *testing.T) {
 		t.Fatalf("not executable: %v", fi.Mode())
 	}
 }
+
+func TestReplaceDirRecovery(t *testing.T) {
+	base := t.TempDir()
+	src, dst := filepath.Join(base, "src"), filepath.Join(base, "dst")
+	if err := os.MkdirAll(filepath.Join(src, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "sub", "a"), []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "stale"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ReplaceDir(src, dst, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dst, "sub", "a")); string(b) != "new" || IsFile(filepath.Join(dst, "stale")) {
+		t.Fatalf("ReplaceDir result: %q", b)
+	}
+	if IsDir(dst+".new") || IsDir(dst+".old") || !IsDir(dst) || IsDir(filepath.Join(dst, "sub", "a")) {
+		t.Fatal("leftovers or wrong kinds")
+	}
+	// A swap that died between the renames: dst is missing and .old holds it.
+	if err := os.Rename(dst, dst+".old"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dst+".new", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	CleanStale(dst)
+	if !IsDir(dst) || IsDir(dst+".old") || IsDir(dst+".new") {
+		t.Fatal("CleanStale did not restore the previous tree")
+	}
+	if err := ReplaceDir(filepath.Join(base, "missing"), dst, 0o755); err == nil || !IsDir(dst) {
+		t.Fatalf("a failed copy must keep dst: %v", err)
+	}
+	// A new tree into a destination that does not exist yet.
+	fresh := filepath.Join(base, "fresh")
+	if err := ReplaceDir(src, fresh, 0o755); err != nil || !IsFile(filepath.Join(fresh, "sub", "a")) {
+		t.Fatalf("fresh ReplaceDir: %v", err)
+	}
+}
+
+func TestCleanOld(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"tool.old-1", "tool.new-2", "keep"} {
+		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	CleanOld(dir)
+	CleanOld(filepath.Join(dir, "missing"))
+	if !IsFile(filepath.Join(dir, "keep")) {
+		t.Fatal("CleanOld removed an unrelated file")
+	}
+	if runtime.GOOS == "windows" && (IsFile(filepath.Join(dir, "tool.old-1")) || IsFile(filepath.Join(dir, "tool.new-2"))) {
+		t.Fatal("CleanOld left replaced executables")
+	}
+}
+
+func TestCopyFileErrors(t *testing.T) {
+	dir := t.TempDir()
+	if err := CopyFile(filepath.Join(dir, "missing"), filepath.Join(dir, "x"), 0o644, false); err == nil {
+		t.Fatal("copied a missing file")
+	}
+	if err := CopyFile(dir, filepath.Join(dir, "x"), 0o644, false); err == nil {
+		t.Fatal("copied a directory")
+	}
+	if err := CopyTree(filepath.Join(dir, "missing"), filepath.Join(dir, "y"), 0o755, false); err == nil {
+		t.Fatal("copied a missing tree")
+	}
+}
