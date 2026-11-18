@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  # The full CI matrix (Linux amd64/arm64, macOS) must pass before anything is published.
+  # The full CI matrix (Linux amd64/arm64, macOS, Windows) must pass before anything is published.
   ci:
     uses: ./.github/workflows/ci.yml
 
@@ -63,4 +63,5 @@ jobs:
         with:
           subject-path: |
             dist/*.tar.gz
+            dist/*.zip
             dist/checksums.txt
