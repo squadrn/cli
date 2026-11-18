@@ -39,18 +39,19 @@ jobs:
             echo "SPRAWL_RELEASES_OWNER=${RELEASES_REPO%%/*}"
             echo "SPRAWL_RELEASES_NAME=${RELEASES_REPO#*/}"
           } >>"$GITHUB_ENV"
+      # Outside the checkout: GoReleaser refuses to release from a dirty tree.
       - name: Release notes from CHANGELOG.md
         run: |
           version=${GITHUB_REF_NAME#v}
           awk -v v="$version" '
             /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
             found { print }
-          ' CHANGELOG.md >release-notes.md
-          [ -s release-notes.md ] || { echo "CHANGELOG.md has no section for $version"; exit 1; }
+          ' CHANGELOG.md >"$RUNNER_TEMP/release-notes.md"
+          [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "CHANGELOG.md has no section for $version"; exit 1; }
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
           version: "~> v2"
-          args: release --clean --release-notes release-notes.md
+          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
         env:
           # Fine-grained token with contents:write on the releases repository only.
           GITHUB_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
