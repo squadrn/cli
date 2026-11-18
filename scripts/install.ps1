@@ -124,11 +124,18 @@ try {
             $AddToProfile = ($answer -eq "" -or $answer -match "^[Yy]")
         }
         if ($AddToProfile) {
-            New-Item -ItemType Directory -Force -Path (Split-Path $profilePath) | Out-Null
-            Add-Content -Path $profilePath -Value $line
-            Write-Host "tab completion added to $profilePath"
-            if ((Get-ExecutionPolicy) -eq "Restricted") {
-                Write-Host "note: profiles do not load under the Restricted policy; run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned" -ForegroundColor Yellow
+            # Documents can be redirected (OneDrive) or guarded (Controlled Folder Access); sprawl
+            # is installed by now, so a profile that cannot be written only costs completion.
+            try {
+                New-Item -ItemType Directory -Force -Path (Split-Path $profilePath) | Out-Null
+                Add-Content -Path $profilePath -Value $line
+                Write-Host "tab completion added to $profilePath"
+                if ((Get-ExecutionPolicy) -eq "Restricted") {
+                    Write-Host "note: profiles do not load under the Restricted policy; run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned" -ForegroundColor Yellow
+                }
+            } catch {
+                Write-Host "warning: cannot write $profilePath ($($_.Exception.Message))" -ForegroundColor Yellow
+                Write-Host "sprawl is installed; for tab completion add this line to your profile yourself:  $line"
             }
         } else {
             Write-Host "tab completion: add this line to $profilePath :  $line"
