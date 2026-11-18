@@ -104,7 +104,7 @@ func TestRepoHook(t *testing.T) {
 	if err := os.Chmod(def, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if p, err := RepoHook(ctx, repo, ours, "pre-commit"); err != nil || !strings.HasSuffix(p, ".git/hooks/pre-commit") {
+	if p, err := RepoHook(ctx, repo, ours, "pre-commit"); err != nil || !strings.HasSuffix(filepath.ToSlash(p), ".git/hooks/pre-commit") {
 		t.Fatalf("default hooks dir: %q, %v", p, err)
 	}
 	husky := filepath.Join(repo, ".husky")
@@ -122,7 +122,7 @@ func TestRepoHook(t *testing.T) {
 		t.Fatalf("missing hook: %q", p)
 	}
 	git(t, repo, "config", "core.hooksPath", ours)
-	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); !strings.HasSuffix(p, ".git/hooks/pre-commit") {
+	if p, _ := RepoHook(ctx, repo, ours, "pre-commit"); !strings.HasSuffix(filepath.ToSlash(p), ".git/hooks/pre-commit") {
 		t.Fatalf("our own dir is never chained to: %q", p)
 	}
 	if _, err := RepoHook(ctx, t.TempDir(), ours, "pre-commit"); err == nil {
