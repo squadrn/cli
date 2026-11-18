@@ -139,7 +139,7 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 	case base == "pwsh" || base == "powershell":
 		words := make([]psWord, len(argv)-1)
 		for i, a := range argv[1:] {
-			words[i] = psWord{val: a.val, dynamic: a.dynamic}
+			words[i] = psWord(a)
 		}
 		e.psNested(words, *dir, depth)
 	case base == "wsl" || base == "winpty":

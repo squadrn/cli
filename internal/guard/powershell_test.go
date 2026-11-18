@@ -81,6 +81,27 @@ func TestDecidePowerShell(t *testing.T) {
 		{Allow, "feat", `git commit -m 'push the button'`},
 		{Allow, "feat", `Remove-Item -Recurse .\dist`},
 		{Allow, "feat", `bash -c 'npm test'`},
+		{Deny, "feat", `git-push.exe origin main`},
+		{Deny, "feat", `$out += git push origin main`},
+		{Deny, "feat", `git push origin 'it''s' main`},
+		{Deny, "feat", `git push origin "ma""in" main`},
+		{Deny, "feat", `Get-Date || git push -f`},
+		{Deny, "feat", `Push-Location -LiteralPath {main}; git push`},
+		{Deny, "feat", "git push origin main # done"},
+		{Ask, "feat", "$doc = @\"\n$name\n\"@; git push origin $doc"},
+		{Ask, "feat", `pwsh -c`},
+		{Ask, "feat", `bash -c 'git push "'`},
+		{Ask, "feat", `Remove-Item Env:*`},
+		{Ask, "feat", `Clear-Item Env:GIT_CONFIG_COUNT`},
+		{Ask, "feat", `ForEach-Object { git push }`},
+		{Ask, "feat", `Write-Output $(git push origin main)`},
+		{Allow, "feat", `Write-Output push`},
+		{Allow, "feat", `Select-String -Pattern push *.md`},
+		{Allow, "feat", `Get-Date --% -x`},
+		{Allow, "feat", `Write-Output @'inline'@`},
+		{Allow, "feat", `$x = 1; $x -= 1`},
+		{Allow, "feat", `cd`},
+		{Allow, "feat", `&`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.dir+": "+tt.cmd, func(t *testing.T) {
@@ -92,6 +113,19 @@ func TestDecidePowerShell(t *testing.T) {
 				t.Fatal("non-allow decision without a reason")
 			}
 		})
+	}
+}
+
+func TestPowerShellNesting(t *testing.T) {
+	g := Guard{Protected: []string{"main"}, Git: fakeGit{facts: Facts{Branch: "feat"}}}
+	deep := strings.Repeat("pwsh -c ", 1) + "'" + strings.Repeat("pwsh -c ", 0) + "git status'"
+	if d := decidePS(g, deep, "/r"); d.Verdict != Allow {
+		t.Fatalf("one level: %+v", d)
+	}
+	e := &extractor{ctx: t.Context(), facts: newFactsCache(g.Git)}
+	e.powershell("git status", "/r", maxDepth+1)
+	if len(e.findings) != 1 || e.findings[0].verdict != Ask {
+		t.Fatalf("too deep: %+v", e.findings)
 	}
 }
 
@@ -129,13 +163,4 @@ func FuzzPowerShellNeverAllowsUnparsedPush(f *testing.F) {
 			t.Fatalf("allowed %q although git may run in a way the analyser cannot follow", cmd)
 		}
 	})
-}
-
-func containsAll(s string, subs ...string) bool {
-	for _, sub := range subs {
-		if !containsFold(s, sub) {
-			return false
-		}
-	}
-	return true
 }

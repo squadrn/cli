@@ -17,9 +17,7 @@ import (
 // DecidePowerShell judges a PowerShell command run from cwd, like Decide does for shell commands.
 func (g Guard) DecidePowerShell(ctx context.Context, cmd, cwd string) Decision {
 	e := &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git)}
-	if err := e.powershell(cmd, cwd, 0); err != nil {
-		return ask("the PowerShell command could not be analysed, so a git push in it cannot be checked")
-	}
+	e.powershell(cmd, cwd, 0)
 	return g.verdict(ctx, e)
 }
 
@@ -52,23 +50,22 @@ func psName(v string) string {
 	return strings.ToLower(path.Base(strings.ReplaceAll(v, `\`, "/")))
 }
 
-func (e *extractor) powershell(src, cwd string, depth int) error {
+func (e *extractor) powershell(src, cwd string, depth int) {
 	if depth > maxDepth {
 		e.flag(Ask, "commands nest too deeply to check")
-		return nil
+		return
 	}
 	src = normalizePS(src)
 	if strings.Contains(src, "--%") {
 		if containsFold(src, "git") || containsFold(src, "push") {
 			e.flag(Ask, "--% stops PowerShell parsing, so the arguments cannot be checked")
 		}
-		return nil
+		return
 	}
 	dir := cwd
 	for _, st := range splitPS(src) {
 		e.psStatement(st, &dir, depth)
 	}
-	return nil
 }
 
 // normalizePS maps the Unicode quotes and dashes PowerShell accepts to their ASCII forms.
@@ -169,8 +166,10 @@ func psInert(name string) bool {
 	case "echo", "write", "cat", "type", "gc", "sls", "findstr", "grep", "ls", "dir", "gci", "more", "sort":
 		return true
 	}
-	for _, verb := range []string{"get-", "write-", "out-", "select-", "sort-", "format-", "measure-", "test-",
-		"convertto-", "convertfrom-", "compare-", "group-", "set-content", "add-content"} {
+	for _, verb := range []string{
+		"get-", "write-", "out-", "select-", "sort-", "format-", "measure-", "test-",
+		"convertto-", "convertfrom-", "compare-", "group-", "set-content", "add-content",
+	} {
 		if strings.HasPrefix(name, verb) {
 			return true
 		}
@@ -229,7 +228,7 @@ func (e *extractor) psNested(args []psWord, dir string, depth int) {
 	prefix := func(opt, full string, min int) bool { return len(opt) >= min && strings.HasPrefix(full, opt) }
 	for i, w := range args {
 		v := strings.ToLower(w.val)
-		if w.dynamic || !(strings.HasPrefix(v, "-") || strings.HasPrefix(v, "/")) {
+		if w.dynamic || !strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "/") {
 			continue
 		}
 		switch opt := strings.TrimLeft(v, "-/"); {
@@ -241,7 +240,7 @@ func (e *extractor) psNested(args []psWord, dir string, depth int) {
 				e.flag(Ask, "PowerShell runs a command known only at runtime")
 				return
 			}
-			_ = e.powershell(args[i+1].val, dir, depth+1)
+			e.powershell(args[i+1].val, dir, depth+1)
 			return
 		case opt == "f" || prefix(opt, "file", 2):
 			return
@@ -324,7 +323,7 @@ func splitPS(src string) [][]psWord {
 			body := string(rs[i+2:])[:end]
 			inWord = true
 			w.WriteString(body)
-			if q == '"' && (strings.ContainsAny(body, "$`")) {
+			if q == '"' && strings.ContainsAny(body, "$`") {
 				dyn = true
 			}
 			i += 2 + len([]rune(body)) + 2
