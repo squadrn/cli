@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+Groundwork for native Windows support (ADR 0008); no behaviour change on macOS or Linux.
+
+- sprawl needs Git 2.31 or newer, as it already did in practice; an older Git now gets a clear
+  message with the upgrade command for your system instead of a raw git error. `doctor` reports
+  it, `install.sh` refuses older Git, and `self-update` only warns.
+- Platform-specific code moved behind small seams (`_unix.go` files); golden tests pin the help,
+  completion, guard decisions, install layout and release archives on macOS and Linux.
+- Line endings are LF on every platform (`.gitattributes`).
+
 ## 1.0.0 — Sprawling Agents
 
 First published release (ADR 0005). Earlier versions below were internal under the names squad and ccx.

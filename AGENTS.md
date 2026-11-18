@@ -20,8 +20,8 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 - Provider differences are data in `provider.Spec`; behaviour is behind `provider.Agent`. Only
   `internal/provider/claude` knows Claude Code internals (env vars, transcript layout, plugin
   registry). New providers get their own package there.
-- External programs run through `internal/proc` (deadline kills the process group); files are
-  written through `internal/fsx` (atomic).
+- External programs run through `internal/proc` (a deadline kills the whole process tree); files
+  are written through `internal/fsx` (atomic).
 - The guard fails closed: layer 1 asks, layer 2 denies, when anything is uncertain (ADR 0006).
 - Fixed identifiers never follow the user's command name: config/data/state dirs, `SPRAWL_*`,
   plugin `sprawl@sprawl`, git key `sprawl.protectedBranches`, tmux options `@sprawl_*`. User-facing
@@ -30,7 +30,11 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
   Scripts run with a fake `claude`, a throwaway HOME and a private tmux server — never real accounts.
 - Coverage gates (`make cover-gates`, CI): `guard` ≥ 95% and the others listed in the Makefile.
   New push forms go into `TestDecide`.
-- Linux and macOS only; no Windows code paths.
+- Platform code lives only in `_unix.go` / `_windows.go` pairs next to the code that needs it
+  (ADR 0008); domain logic never branches on `runtime.GOOS`. macOS and Linux behaviour is pinned
+  by golden files (`-update` rewrites them; review the diff). Windows is in progress and not yet
+  supported for users.
+- Git 2.31 or newer (`internal/gitver`).
 - Never read or print the release signing key; `scripts/release-key.sh` and CI handle it.
   Releases, secrets and key handling: `docs/maintaining.md`.
 - Previous product names live in `config.PreviousNames`; every legacy identifier derives from it.
