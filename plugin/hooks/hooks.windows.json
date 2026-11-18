@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\sprawl.exe\" hook guard-git || exit /b 2"], "timeout": 5 }]
+      }
+    ],
+    "Notification": [
+      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\sprawl.exe\" hook notify \"Cần input\""], "async": true }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\sprawl.exe\" hook notify \"Xong việc\""], "async": true }] }
+    ]
+  }
+}

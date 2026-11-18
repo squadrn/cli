@@ -25,7 +25,9 @@ const hookDeadline = 3 * time.Second
 
 // hookInput is the part of Claude Code's hook payload sprawl reads.
 type hookInput struct {
-	Cwd       string `json:"cwd"`
+	Cwd string `json:"cwd"`
+	// ToolName is Bash or PowerShell (Windows); missing means Bash (older Claude Code).
+	ToolName  string `json:"tool_name"`
 	ToolInput struct {
 		Command string `json:"command"`
 	} `json:"tool_input"`
@@ -140,7 +142,14 @@ func (h hookEnv) guardGit() {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "guard could not locate the home directory"}
 		return
 	}
-	d = g.Decide(ctx, cmd, cwd)
+	switch in.ToolName {
+	case "", "Bash":
+		d = g.Decide(ctx, cmd, cwd)
+	case "PowerShell":
+		d = g.DecidePowerShell(ctx, cmd, cwd)
+	default:
+		d = guard.Decision{Verdict: guard.Ask, Reason: "the guard does not know the " + in.ToolName + " tool; confirm this command manually"}
+	}
 	if cfgErr != nil && d.Verdict == guard.Allow && strings.Contains(strings.ToLower(cmd), "push") {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "sprawl config is invalid (" + cfgErr.Error() + "), so protected branches are uncertain"}
 	}
