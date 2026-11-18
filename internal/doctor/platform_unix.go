@@ -40,5 +40,13 @@ func onPath(name string) []string {
 // platform has no extra checks on Unix.
 func (Env) platform(context.Context) []Check { return nil }
 
+// probeTool is the agent tool the layer-1 probe pretends to be.
+const probeTool = "Bash"
+
+const reinstallHint = "re-run install.sh"
+
+// shellForm runs a shell-form hook command the way Claude Code does on Unix.
+func shellForm(command string) (string, []string) { return "sh", []string{"-c", command} }
+
 // powerShellOnly: Unix agents always use the shell tool.
 func powerShellOnly() bool { return false }

@@ -199,16 +199,23 @@ Three layers keep agents from force-pushing or pushing to protected branches:
    quoting tricks (`pu''sh`), case (`GIT PUSH`), git's option prefixes (`--forc`), `-c alias.*` and
    repository aliases — and resolves a bare `git push` the way git does (`push.default`,
    `remote.*.push`, upstream). It **denies** force pushes, `--all`/`--mirror`/`--prune`,
-   `--no-verify`, and pushes or deletions targeting a protected branch; **asks** when the target is
-   only known at runtime (`$BRANCH`, `xargs`, `python -c …`, a shell reading stdin); **allows** the
+   `--no-verify`, pushes or deletions targeting a protected branch, `gh api` writes to branch refs
+   or protection, `gh pr merge --admin`, and agents changing the guard's own policy
+   (`sprawl config set protected_branches|git_hooks`, writes to its config file or git hooks);
+   **asks** when the target is only known at runtime (`$BRANCH`, `xargs`, `python -c …`, a shell
+   reading stdin), for git aliases or subcommands it cannot see, settings or `GIT_*` variables that
+   make git run a program or use another repository, and other GitHub writes; **allows** the
    rest. Any failure or timeout asks, never allows.
 2. **git pre-push hook.** Sessions sprawl starts (`sprawl`, `wt`, `grid`, `swap`) get
    `core.hooksPath` pointed at `~/.local/share/sprawl/git-hooks` through `GIT_CONFIG_*`. Git's
    pre-push hook sees the exact refs, so pushes layer 1 cannot see (scripts, interpreters) are
    checked too, including non-fast-forward updates. The repository's own hooks (husky, lefthook,
-   pre-commit) still run after the check. Turn it off with `sprawl config set git_hooks false`.
+   pre-commit) still run after the check. The hook reads the protected list from the config file
+   fixed at install, not from the pushing process's environment. Turn it off with
+   `sprawl config set git_hooks false` (in your own terminal: agents are not allowed to).
 3. **The server.** Only branch protection on the remote stops pushes made outside sprawl.
-   `sprawl doctor` checks it for the current GitHub repository.
+   `sprawl doctor` checks it for the current GitHub repository (classic protection or a ruleset
+   that blocks force pushes and deletion).
 
 Protected branches default to `main master develop release/*`; set your own list with
 `sprawl config set protected_branches …`. A repository can add branches — never remove them:

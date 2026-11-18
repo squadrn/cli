@@ -10,6 +10,8 @@ package guard
 import (
 	"context"
 	"fmt"
+
+	"sprawling-agents/internal/config"
 )
 
 type Verdict int
@@ -45,16 +47,34 @@ type Guard struct {
 	// GitHooks is set when the git-level guard is active; overriding core.hooksPath for a push
 	// would switch it off, so that is denied.
 	GitHooks bool
+	// Names are the command names sprawl is installed under besides the defaults (configured
+	// command and aliases); agents may not change the guard's policy through them.
+	Names []string
+	// Dirs are sprawl's own directories; zero means derived from Home. Writes to the config file
+	// or the git hooks are denied, other writes into them ask.
+	Dirs config.Dirs
 }
 
 // Decide judges a full command line run from cwd. The most severe verdict wins. ctx bounds all
 // git queries; when it expires, or anything else fails, the answer is Ask, never Allow.
 func (g Guard) Decide(ctx context.Context, cmd, cwd string) Decision {
-	e := &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git)}
+	e := g.newExtractor(ctx)
 	if err := e.script(cmd, cwd, 0); err != nil {
 		return ask("the command could not be parsed, so a git push in it cannot be checked")
 	}
 	return g.verdict(ctx, e)
+}
+
+func (g Guard) newExtractor(ctx context.Context) *extractor {
+	dirs := g.Dirs
+	if dirs.Config == "" && g.Home != "" {
+		dirs = config.DirsFor(g.Home, config.Slug)
+	}
+	names := map[string]bool{config.DefaultCommand: true, config.Slug + "-hook": true}
+	for _, n := range append(config.DefaultAliases(), g.Names...) {
+		names[cmdBase(n)] = true
+	}
+	return &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git), dirs: dirs, names: names}
 }
 
 // verdict combines what the analysis found: the most severe finding or push decision wins, and

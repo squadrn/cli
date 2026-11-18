@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"sprawling-agents/internal/config"
 )
 
 type repos struct {
@@ -71,7 +73,15 @@ func gitRun(t testing.TB, dir string, args ...string) string {
 }
 
 func newGuard(r repos) Guard {
-	return Guard{Protected: []string{"main", "master", "develop", "release/*"}, Git: GitCLI{}, Home: r.root, GitHooks: true}
+	return Guard{
+		Protected: []string{"main", "master", "develop", "release/*"}, Git: GitCLI{}, Home: r.root, GitHooks: true,
+		Names: []string{"ai"},
+		Dirs: config.Dirs{
+			Config: filepath.Join(r.root, ".config", "sprawl"),
+			Data:   filepath.Join(r.root, ".local", "share", "sprawl"),
+			State:  filepath.Join(r.root, ".local", "state", "sprawl"),
+		},
+	}
 }
 
 func decidePS(g Guard, cmd, dir string) Decision {
@@ -218,11 +228,9 @@ var decideCases = []decideCase{
 	{Ask, "feat", `$GIT push origin main`},
 	// Runtime-only targets and unparsable input ask.
 	{Ask, "feat", `git push origin $BRANCH`},
-	{Ask, "feat", `git push origin "$(git branch --show-current)"`},
 	{Ask, "feat", `git push $REMOTE feat-x`},
 	{Ask, "feat", `git push origin ma{i,}n`},
 	{Ask, "feat", `git push origin release/*`},
-	{Ask, "feat", `git push origin HEAD~1`},
 	{Ask, "feat", `git push --frobnicate origin feat-x`},
 	{Ask, "feat", `git push -z origin feat-x`},
 	{Ask, "feat", `git push --receive-pack=evil origin feat-x`},
@@ -261,7 +269,165 @@ var decideCases = []decideCase{
 	{Allow, "feat", `bash deploy.sh`},
 	{Allow, "feat", `npm run deploy`},
 	{Allow, "feat", `ls ~/push`},
-	{Allow, "feat", `echo x | xargs echo push`},
+	{Ask, "feat", `echo x | xargs echo push`},
+
+	// G1: git subcommands that are neither built-ins nor visible aliases; alias definitions.
+	{Ask, "feat", `git config alias.pp 'push --no-verify -f origin HEAD:main' && git pp`},
+	{Ask, "feat", `git pp origin feat-x`},
+	{Ask, "feat", `git config --global alias.pp push`},
+	{Ask, "feat", `git config --file .git/config alias.pp push`},
+	{Ask, "feat", `git config set --system alias.pp push`},
+	{Ask, "feat", `git config --add Alias.pp push`},
+	{Allow, "feat", `git config --get alias.st`},
+	{Allow, "feat", `git config user.name bot`},
+	{Allow, "feat", `git config --unset alias.pp`},
+	// G2: settings and variables that make git run a program.
+	{Ask, "feat", `git -c core.sshCommand='ssh -i k' fetch`},
+	{Ask, "feat", `git -c core.fsmonitor=./x status`},
+	{Ask, "feat", `git -c alias.p=push p origin feat-x`},
+	{Ask, "feat", `git config --global credential.helper store`},
+	{Ask, "feat", `git config credential.https://github.com.helper x`},
+	{Ask, "feat", `git config diff.x.textconv ./run`},
+	{Ask, "feat", `git config filter.lfs.clean x`},
+	{Ask, "feat", `git config INCLUDE.PATH /tmp/x`},
+	{Ask, "feat", `git config includeIf.gitdir:~/.path /tmp/x`},
+	{Ask, "feat", `git config remote.origin.uploadpack x`},
+	{Ask, "feat", `git config protocol.ext.allow always`},
+	{Ask, "feat", `git config core.hooksPath /dev/null`},
+	{Ask, "feat", `GIT_SSH_COMMAND='ssh -o ProxyCommand=x' git fetch`},
+	{Ask, "feat", `GIT_EDITOR=vim git commit`},
+	{Ask, "feat", `export GIT_PAGER=x`},
+	{Ask, "feat", `GIT_CONFIG_PARAMETERS="'alias.x=push'" git status`},
+	{Allow, "feat", `git config --list`},
+	{Allow, "feat", `git config core.pager`},
+	{Allow, "feat", `git config get core.editor`},
+	{Allow, "feat", `GIT_TRACE=1 git status`},
+	// G3: agents cannot lower the guard's policy.
+	{Deny, "feat", `sprawl config set protected_branches none`},
+	{Deny, "feat", `sra config set git_hooks false`},
+	{Deny, "feat", `~/.local/bin/ai config set protected_branches x`},
+	{Deny, "feat", `env FOO=1 sprawl config set --force protected_branches x`},
+	{Ask, "feat", `sprawl config "$OP" protected_branches x`},
+	{Allow, "feat", `sprawl config get protected_branches`},
+	{Allow, "feat", `sprawl config set update_channel beta`},
+	{Deny, "feat", `echo 'protected_branches = ["x"]' > ~/.config/sprawl/config.toml`},
+	{Deny, "feat", `echo x >> "$HOME/.config/sprawl/config.toml"`},
+	{Deny, "feat", `tee -a ~/.config/sprawl/config.toml <<< x`},
+	{Deny, "feat", `sed -i '' 's/main//' ~/.config/sprawl/config.toml`},
+	{Deny, "feat", `cp /tmp/c.toml ~/.config/sprawl/config.toml`},
+	{Deny, "feat", `mv ~/.config/sprawl /tmp/x`},
+	{Deny, "feat", `cd ~/.config/sprawl && printf x > config.toml`},
+	{Ask, "feat", `echo x > ~/.local/state/sprawl/guard.log`},
+	{Ask, "feat", `cp x ~/.local/share/sprawl/plugin/hooks/hooks.json`},
+	{Allow, "feat", `cp ~/.config/sprawl/config.toml /tmp/backup.toml`},
+	// G4: programs that run other commands.
+	{Deny, "feat", `trap 'git push -f' EXIT`},
+	{Allow, "feat", `trap - EXIT`},
+	{Deny, "feat", `busybox sh -c 'git push -f'`},
+	{Deny, "feat", `git-bash -c 'git push origin main'`},
+	{Deny, "feat", `bash.exe -c 'git push origin main'`},
+	{Ask, "feat", `git-cmd.exe /c git push origin main`},
+	{Ask, "feat", `ssh host 'git push origin main'`},
+	{Ask, "feat", `tmux send-keys 'git push origin main' Enter`},
+	{Allow, "feat", `tmux ls`},
+	{Ask, "feat", `parallel git push ::: a`},
+	{Ask, "feat", `expect -c 'spawn git push'`},
+	{Ask, "feat", `source ./deploy.sh`},
+	{Ask, "feat", `. ./env.sh`},
+	{Allow, "feat", `source ~/.zshrc`},
+	{Ask, "feat", `awk 'BEGIN{system("git push origin main")}'`},
+	{Allow, "feat", `awk '/git/ {print $1}' log.txt`},
+	{Ask, "feat", `sed 's/x/git push/e' f`},
+	{Allow, "feat", `sed 's/github/gitlab/' f`},
+	{Ask, "feat", `vim -c '!git push origin main'`},
+	{Ask, "feat", `ruby -e 'system("git", "push")'`},
+	// G5: the environment that points git elsewhere or disables layer 2.
+	{Ask, "feat", `GIT_DIR=/tmp/x make`},
+	{Ask, "feat", `export GIT_WORK_TREE=/tmp`},
+	{Ask, "feat", `unset GIT_EXEC_PATH`},
+	{Ask, "feat", `env -i make`},
+	{Ask, "feat", `env -u GIT_DIR make`},
+	{Ask, "feat", `GIT_TEMPLATE_DIR=/x git init`},
+	{Ask, "feat", `GIT_CONFIG_NOSYSTEM=1 npm test`},
+	{Deny, "feat", `chmod -x ~/.local/share/sprawl/git-hooks/pre-push`},
+	{Deny, "feat", `rm -rf ~/.local/share/sprawl/git-hooks`},
+	{Deny, "feat", `rm -rf ~/.local/share/sprawl`},
+	{Deny, "feat", `truncate -s0 ~/.local/share/sprawl/git-hooks/pre-push`},
+	// G6: GitHub CLI writes to branches.
+	{Deny, "feat", `gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=abc -F force=true`},
+	{Deny, "feat", `gh api repos/o/r/git/refs -f ref=refs/heads/main -f sha=x`},
+	{Deny, "feat", `gh api --method DELETE repos/o/r/git/refs/heads/main`},
+	{Deny, "feat", `gh api -XPOST repos/o/r/merges -f base=main -f head=x`},
+	{Deny, "feat", `gh api -X POST repos/o/r/branches/main/rename -f new_name=x`},
+	{Deny, "feat", `gh api -X DELETE repos/o/r/branches/main/protection`},
+	{Ask, "feat", `gh api -X POST repos/o/r/issues -f title=x`},
+	{Ask, "feat", `gh api graphql -f query='mutation{x}'`},
+	{Ask, "feat", `gh api -X DELETE "$URL"`},
+	{Allow, "feat", `gh api repos/o/r/pulls`},
+	{Allow, "feat", `gh api -X GET repos/o/r/git/refs -f per_page=100`},
+	{Deny, "feat", `gh repo sync --force`},
+	{Ask, "feat", `gh repo sync`},
+	{Deny, "feat", `gh pr merge 12 --admin --squash`},
+	{Allow, "feat", `gh pr merge 12 --squash`},
+	{Ask, "feat", `gh repo delete o/r --yes`},
+	{Ask, "feat", `gh repo edit --default-branch dev`},
+	{Ask, "feat", `gh alias set pm 'api -X DELETE x'`},
+	{Ask, "feat", `gh pm`},
+	{Allow, "feat", `gh pr create --fill`},
+	{Allow, "feat", `gh -R o/r pr view 3`},
+	{Allow, "feat", `gh run list && gh pr checks`},
+	{Allow, "feat", `gh ruleset list`},
+	// G7: transports and bridges that push without git push.
+	{Deny, "feat", `git remote-https origin https://github.com/o/r`},
+	{Deny, "feat", `git remote-ext origin 'ext::sh -c x'`},
+	{Deny, "feat", `git http-push https://x/r main`},
+	{Deny, "feat", `git-remote-https origin url`},
+	{Deny, "feat", `git subtree push --prefix=docs origin main`},
+	{Deny, "feat", `git subtree push -P docs origin refs/heads/develop`},
+	{Allow, "feat", `git subtree push --prefix=docs origin docs-branch`},
+	{Allow, "feat", `git subtree split --prefix=docs`},
+	{Ask, "feat", `git p4 submit`},
+	{Ask, "feat", `git svn dcommit`},
+	{Allow, "feat", `git svn fetch`},
+	// G8: a refspec without a colon goes where remote.<r>.push or the upstream maps it.
+	{Deny, "feat", `git -c remote.origin.push=refs/heads/feat-x:refs/heads/main push origin feat-x`},
+	{Deny, "feat", `git -c 'remote.origin.push=refs/heads/*:refs/heads/release/*' push origin feat-x`},
+	{Deny, "feat", `git -c remote.origin.push=+refs/heads/feat-x:refs/heads/feat-x push origin feat-x`},
+	{Deny, "upstream", `git push origin feat-x`},
+	{Allow, "upstream", `git push other feat-x`},
+	{Allow, "feat", `git -c remote.origin.push=refs/heads/feat-x:refs/heads/feat-y push origin feat-x`},
+	// G9: mirror remotes.
+	{Deny, "feat", `git -c remote.origin.mirror=true push origin feat-x`},
+	{Deny, "feat", `git -c remote.origin.mirror push`},
+	{Allow, "feat", `git -c remote.origin.mirror=false push origin feat-x`},
+	// G10: push configuration written earlier on the same line.
+	{Ask, "feat", `git config remote.origin.push refs/heads/feat-x:refs/heads/main && git push origin feat-x`},
+	{Ask, "feat", `git config push.default upstream; git push`},
+	{Ask, "feat", `git branch -u origin/main && git push`},
+	{Ask, "feat", `git remote add --mirror=push m url; git push m`},
+	{Allow, "feat", `git push origin feat-x && git config push.default simple`},
+	// G11: --git-dir and GIT_DIR name the repository.
+	{Deny, "feat", `git --git-dir={main}/.git push`},
+	{Deny, "feat", `git --git-dir {main}/.git --work-tree {main} push`},
+	{Deny, "feat", `GIT_DIR={main}/.git git push`},
+	{Ask, "feat", `git --git-dir=nowhere push origin feat-x`},
+	{Ask, "feat", `git --git-dir="$D" push origin feat-x`},
+	{Allow, "feat", `git --git-dir=.git push origin feat-x`},
+	// G13: shell aliases for git push.
+	{Ask, "feat", `gp`},
+	{Ask, "feat", `gpf!`},
+	{Ask, "feat", `ggpush`},
+	{Ask, "feat", `gpsup`},
+	{Allow, "feat", `gpg --verify x.sig`},
+	{Allow, "feat", `gprof a.out`},
+	// G15: fewer prompts for forms git resolves safely.
+	{Allow, "feat", `git push origin "$(git branch --show-current)"`},
+	{Allow, "feat", `git push -u origin $(git rev-parse --abbrev-ref HEAD)`},
+	{Deny, "main", `git push origin "$(git symbolic-ref --short -q HEAD)"`},
+	{Ask, "feat", `git push origin "$(git branch --show-current)-x"`},
+	{Allow, "feat", `git push origin HEAD~1`},
+	{Ask, "feat", `git push origin @{-1}`},
+	{Allow, "feat", `node -e 'console.log("push")'`},
 }
 
 func decideDirs(r repos) map[string]string {
@@ -326,11 +492,11 @@ func TestDecideOutsideRepository(t *testing.T) {
 	}
 }
 
-func TestGitHooksOffAllowsHooksPathOverride(t *testing.T) {
+func TestGitHooksOffAsksForHooksPathOverride(t *testing.T) {
 	r := newRepos(t)
 	g := newGuard(r)
 	g.GitHooks = false
-	if d := decide(g, `git -c core.hooksPath=/x push origin feat-x`, r.feat); d.Verdict != Allow {
+	if d := decide(g, `git -c core.hooksPath=/x push origin feat-x`, r.feat); d.Verdict != Ask {
 		t.Fatalf("got %s", d.Verdict)
 	}
 }
@@ -569,7 +735,7 @@ func TestDecideEdgeForms(t *testing.T) {
 		{Allow, `echo $'\xzz é \n'`},
 		{Deny, `git rebase --exec='git push origin main' HEAD~1`},
 		{Deny, `git rebase -x 'git push origin main' HEAD~1`},
-		{Allow, `git frobnicate`},
+		{Ask, `git frobnicate`},
 		{Ask, `git -c alias.a=b -c alias.b=a a`},
 		{Deny, `git -c alias.a=b -c alias.b=push a origin main`},
 		{Deny, `git -c alias.a='-c alias.b=push b' a origin main`},
@@ -622,6 +788,76 @@ func TestDecideEdgeForms(t *testing.T) {
 		{Ask, `pwsh -EncodedCommand ZwBpAHQA`},
 		{Allow, `pwsh -File ./build.ps1`},
 		{Ask, `git_config_count=1 git push origin feat-x`},
+		// git config forms.
+		{Allow, `git config`},
+		{Allow, `git config set`},
+		{Ask, `git config -e`},
+		{Ask, `git config edit --global`},
+		{Ask, `git config --rename-section x alias`},
+		{Allow, `git config --remove-section alias`},
+		{Ask, `git config --unset remote.origin.push && git push origin feat-x`},
+		{Ask, `git config "$K" x`},
+		{Ask, `git config --$O alias.x y`},
+		{Ask, `git config -- alias.x y`},
+		{Ask, `git config --type bool -f x alias.x true`},
+		{Ask, `git config --replace-all core.editor x`},
+		{Ask, `git config sequence.editor x`},
+		{Ask, `git config pager.log x`},
+		{Allow, `git config core.editor`},
+		// gh forms.
+		{Allow, `gh`},
+		{Allow, `gh -R o/r`},
+		{Ask, `gh $X`},
+		{Deny, `gh api --method=PUT repos/o/r/git/refs/heads/x`},
+		{Ask, `gh api -X POST`},
+		{Ask, `gh api -X "$M" repos/o/r`},
+		{Ask, `gh api --$X y`},
+		{Ask, `gh api --field=a=b repos/o/r/issues`},
+		{Ask, `gh api -Ffoo=bar repos/o/r/issues`},
+		{Ask, `gh api --input body.json repos/o/r/issues`},
+		{Allow, `gh api -H 'Accept: x' -q .x repos/o/r`},
+		{Allow, `gh api -X`},
+		{Allow, `gh ruleset view 1`},
+		{Ask, `gh ruleset delete 1`},
+		{Allow, `gh repo edit --description x`},
+		{Allow, `gh alias list`},
+		{Allow, `gh --help`},
+		{Allow, `gh repo view`},
+		// subtree, trap, editors, sourcing.
+		{Ask, `git subtree push`},
+		{Ask, `git subtree push --$X origin main`},
+		{Deny, `git subtree push origin +main`},
+		{Allow, `git subtree push -m msg -b x origin y`},
+		{Allow, `git subtree`},
+		{Deny, `trap -- 'git push -f' EXIT`},
+		{Allow, `trap -p`},
+		{Ask, `trap "$X" EXIT`},
+		{Allow, `awk "$P" f`},
+		{Ask, `nvim +'!git push' x`},
+		{Ask, `emacs --eval '(shell-command "git push")'`},
+		{Ask, `source "$F"`},
+		{Ask, `source`},
+		{Allow, `busybox`},
+		{Ask, `git-cmd`},
+		// Writes to sprawl's files.
+		{Deny, `dd if=x of=~/.config/sprawl/config.toml`},
+		{Deny, `install -t ~/.local/share/sprawl/git-hooks x`},
+		{Deny, `cp --target-directory=~/.config/sprawl x`},
+		{Deny, `ln -sf /tmp/x ~/.config/sprawl/config.toml`},
+		{Allow, `sed 's/a/b/' ~/.config/sprawl/config.toml`},
+		{Deny, `rm "$D/sprawl/git-hooks/pre-push"`},
+		{Ask, `rm "$D/.local/share/sprawl/x"`},
+		{Allow, `rm "$D/x"`},
+		{Allow, `sprawl protected_branches`},
+		// --git-dir, --work-tree, GIT_DIR and refspec mapping.
+		{Allow, `git --git-dir`},
+		{Ask, `git --work-tree "$W" push`},
+		{Allow, `git --work-tree=. push origin feat-x`},
+		{Ask, `GIT_DIR="$X" git push`},
+		{Ask, `env GIT_DIR=nowhere git push origin feat-x`},
+		{Allow, `git -c 'remote.origin.push=refs/heads/x*:refs/heads/main' push origin feat-x`},
+		{Allow, `git -c remote.origin.push=refs/heads/feat-x push origin feat-x`},
+		{Allow, `git push origin refs/heads/feat-x`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.cmd, func(t *testing.T) {
@@ -629,6 +865,34 @@ func TestDecideEdgeForms(t *testing.T) {
 				t.Fatalf("got %s (%s), want %s", d.Verdict, d.Reason, tt.want)
 			}
 		})
+	}
+}
+
+func TestConfigKeys(t *testing.T) {
+	for k, want := range map[string]bool{
+		"alias.x": true, "filter.lfs.clean": true, "pager.log": true, "includeif.onbranch:x.path": true,
+		"core.fsmonitor": true, "core.sshcommand": true, "core.bare": false, "sequence.editor": true,
+		"include.path": true, "credential.helper": true, "credential.https://h.helper": true, "credential.username": false,
+		"diff.external": true, "diff.x.command": true, "diff.x.textconv": true, "diff.x.external": false, "diff.renames": false,
+		"merge.x.driver": true, "gpg.program": true, "gpg.ssh.program": true, "gpg.ssh.defaultkeycommand": true, "gpg.format": false,
+		"protocol.ext.allow": true, "remote.o.uploadpack": true, "remote.o.receivepack": true, "remote.o.vcs": true, "remote.o.url": false,
+		"uploadpack.packobjectshook": true, "difftool.x.cmd": true, "mergetool.x.cmd": true, "browser.x.path": true,
+		"man.x.cmd": true, "sendemail.tocmd": true, "sendemail.smtpuser": false, "interactive.difffilter": true,
+		"user.name": false, "x": false,
+	} {
+		if got := commandKey(k); got != want {
+			t.Errorf("commandKey(%q) = %v", k, got)
+		}
+	}
+	for k, want := range map[string]bool{
+		"push.default": true, "push.autosetupremote": false, "remote.o.push": true, "remote.o.mirror": true,
+		"remote.pushdefault": true, "remote.o.url": false, "branch.x.merge": true, "branch.x.remote": true,
+		"branch.x.pushremote": true, "branch.x.rebase": false, "url.x.pushinsteadof": true, "url.x.insteadof": true,
+		"user.name": false,
+	} {
+		if got := pushKey(k); got != want {
+			t.Errorf("pushKey(%q) = %v", k, got)
+		}
 	}
 }
 

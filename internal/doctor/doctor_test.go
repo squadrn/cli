@@ -72,20 +72,52 @@ func env(t *testing.T, ag provider.Agent, agentErr error) Env {
 	}
 }
 
+// fakeInstall puts the real plugin hooks.json and a stand-in hook entry point that prints
+// decision into the layout, as install.sh would.
+func fakeInstall(t *testing.T, e Env, decision string) {
+	t.Helper()
+	root := filepath.Join(e.Layout.DataDir, "plugin")
+	for _, d := range []string{filepath.Join(root, "hooks"), filepath.Join(root, "bin"), filepath.Dir(e.Layout.Binary())} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hooks, err := os.ReadFile(filepath.Join("..", "..", "plugin", "hooks", "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\ncat >/dev/null\n[ \"$1\" = guard-git ] && printf '{\"hookSpecificOutput\":{\"permissionDecision\":\"%s\"}}\\n' " + decision + "\n"
+	for p, b := range map[string][]byte{
+		filepath.Join(root, "hooks", "hooks.json"): hooks,
+		filepath.Join(root, "bin", "sprawl-hook"):  []byte(script),
+		e.Layout.Binary():                          []byte("bin"),
+	} {
+		if err := os.WriteFile(p, b, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestGuardLayers(t *testing.T) {
 	e := env(t, fakeAgent{}, nil)
 	checks := e.guard(context.Background())
-	if c, _ := find(checks, "layer 1"); c.Status != OK {
-		t.Errorf("layer 1: %+v", c)
+	if c, _ := find(checks, "layer 1"); c.Status != Fail || !strings.Contains(c.Name, "not installed") {
+		t.Errorf("layer 1 without an install: %+v", c)
 	}
-	if c, _ := find(checks, "layer 2"); c.Status != Warn || c.Fix != "re-run install.sh" {
+	if c, _ := find(checks, "layer 2"); c.Status != Warn || c.Fix != reinstallHint {
 		t.Errorf("layer 2 missing: %+v", c)
 	}
-	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary()); err != nil {
+	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary(), e.configFile()); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ := find(e.guard(context.Background()), "layer 2"); c.Status != OK {
 		t.Errorf("layer 2 installed: %+v", c)
+	}
+	if err := githook.Install(e.Layout.GitHooks(), e.Layout.Binary(), "/elsewhere/config.toml"); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := find(e.guard(context.Background()), "layer 2"); c.Status != Warn {
+		t.Errorf("layer 2 for another config file: %+v", c)
 	}
 	off := false
 	e.Config = config.Config{GitHooks: &off}
@@ -94,38 +126,92 @@ func TestGuardLayers(t *testing.T) {
 	}
 }
 
+func TestHookProbe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the Windows hooks.json runs sprawl.exe through cmd.exe; covered by the windows e2e script")
+	}
+	e := env(t, fakeAgent{}, nil)
+	fakeInstall(t, e, "deny")
+	if c := e.hookProbe(context.Background()); c.Status != OK {
+		t.Errorf("deny: %+v", c)
+	}
+	fakeInstall(t, e, "allow")
+	if c := e.hookProbe(context.Background()); c.Status != Fail || !strings.Contains(c.Name, "did not deny") {
+		t.Errorf("allow: %+v", c)
+	}
+	hooks := filepath.Join(e.Layout.DataDir, "plugin", "hooks", "hooks.json")
+	for body, want := range map[string]string{
+		`{`:                           "invalid",
+		`{"hooks":{"PreToolUse":[]}}`: "no guard-git",
+		`{"hooks":{"PreToolUse":[{"hooks":[{"command":"sh","args":["-c","${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook guard-git"]}]}]}}`: "",
+	} {
+		if err := os.WriteFile(hooks, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		c := e.hookProbe(context.Background())
+		if want == "" && c.Status != Fail || want != "" && !strings.Contains(c.Name, want) {
+			t.Errorf("%s: %+v", body, c)
+		}
+	}
+	_ = os.Remove(hooks)
+	if c := e.hookProbe(context.Background()); !strings.Contains(c.Name, "plugin hooks not installed") {
+		t.Errorf("missing hooks.json: %+v", c)
+	}
+}
+
 func TestBranchProtection(t *testing.T) {
 	e := env(t, fakeAgent{}, nil)
 	e.Repo = "/r"
-	reply := func(view string, protErr error) GH {
+	type reply struct {
+		body string
+		err  error
+	}
+	gh := func(view string, rules, prot reply) GH {
 		return func(_ context.Context, args ...string) ([]byte, error) {
-			if args[0] == "repo" {
+			switch {
+			case args[0] == "repo":
 				return []byte(view), nil
+			case strings.Contains(args[1], "/rules/branches/"):
+				return []byte(rules.body), rules.err
 			}
-			return nil, protErr
+			return []byte(prot.body), prot.err
 		}
 	}
+	none := reply{"[]", nil}
+	strict := reply{`{"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false},"enforce_admins":{"enabled":true}}`, nil}
 	for name, tt := range map[string]struct {
 		gh     GH
 		status Status
 		want   string
 	}{
-		"protected":   {reply("me/app main\n", nil), OK, "layer 3 (server) protects main on me/app"},
-		"unprotected": {reply("me/app main", errors.New("gh: Branch not protected (HTTP 404)")), Warn, "main on me/app is not protected"},
-		"forbidden":   {reply("me/app main", errors.New("HTTP 403")), Warn, "needs admin"},
-		"other":       {reply("me/app main", errors.New("network down")), Warn, "unknown: network down"},
+		"protected":   {gh("me/app main\n", none, strict), OK, "layer 3 (server) protects main on me/app"},
+		"ruleset":     {gh("me/app main", reply{`[{"type":"deletion"},{"type":"non_fast_forward"}]`, nil}, reply{"", errors.New("HTTP 404")}), OK, "(ruleset)"},
+		"weak rules":  {gh("me/app main", reply{`[{"type":"deletion"}]`, nil}, reply{"", errors.New("gh: Branch not protected (HTTP 404)")}), Warn, "main on me/app is not protected"},
+		"bad rules":   {gh("me/app main", reply{`x`, nil}, strict), OK, "protects main"},
+		"no rules":    {gh("me/app main", reply{"", errors.New("HTTP 404")}, strict), OK, "protects main"},
+		"force":       {gh("me/app main", none, reply{`{"allow_force_pushes":{"enabled":true}}`, nil}), Warn, "allows force pushes"},
+		"deletions":   {gh("me/app main", none, reply{`{"allow_deletions":{"enabled":true}}`, nil}), Warn, "can be deleted"},
+		"unreadable":  {gh("me/app main", none, reply{`x`, nil}), Warn, "unreadable"},
+		"unprotected": {gh("me/app main", none, reply{"", errors.New("gh: Branch not protected (HTTP 404)")}), Warn, "main on me/app is not protected"},
+		"plan":        {gh("me/app main", none, reply{"", errors.New("Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)")}), Warn, "needs GitHub Pro"},
+		"forbidden":   {gh("me/app main", none, reply{"", errors.New("HTTP 403")}), Warn, "needs admin"},
+		"other":       {gh("me/app main", none, reply{"", errors.New("network down")}), Warn, "unknown: network down"},
 	} {
 		e.GH = tt.gh
 		checks := e.branchProtection(context.Background())
-		if len(checks) != 1 || checks[0].Status != tt.status || !strings.Contains(checks[0].Name, tt.want) {
+		if len(checks) == 0 || checks[0].Status != tt.status || !strings.Contains(checks[0].Name, tt.want) {
 			t.Errorf("%s: %+v", name, checks)
 		}
+	}
+	e.GH = gh("me/app main", none, reply{`{"enforce_admins":{"enabled":false}}`, nil})
+	if c, _ := find(e.branchProtection(context.Background()), "admins can bypass"); c.Status != Warn {
+		t.Errorf("enforce_admins off: %+v", c)
 	}
 	e.GH = func(context.Context, ...string) ([]byte, error) { return nil, errors.New("not github") }
 	if checks := e.branchProtection(context.Background()); checks != nil {
 		t.Errorf("not GitHub: %+v", checks)
 	}
-	e.GH = reply("garbage", nil)
+	e.GH = gh("garbage", none, strict)
 	if checks := e.branchProtection(context.Background()); checks != nil {
 		t.Errorf("garbage: %+v", checks)
 	}

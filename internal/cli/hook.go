@@ -49,7 +49,7 @@ type hookEnv struct {
 	now            func() time.Time
 }
 
-const hookUsage = "usage: sprawl hook guard-git | notify <title> | git <hook-name> [args...] | statusline [--then <command>] | limit"
+const hookUsage = "usage: sprawl hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit"
 
 // runHook handles `sprawl hook …` and returns the exit code.
 func runHook(args []string, h hookEnv) int {
@@ -74,11 +74,15 @@ func runHook(args []string, h hookEnv) int {
 		h.notify(args[1])
 		return exitOK
 	case "git":
+		cfgFile := ""
+		if len(args) > 2 && args[1] == githook.ConfigFlag {
+			cfgFile, args = args[2], args[2:]
+		}
 		if len(args) < 2 {
 			_, _ = fmt.Fprintln(h.stderr, hookUsage)
 			return exitUsage
 		}
-		return h.git(args[1], args[2:])
+		return h.git(cfgFile, args[1], args[2:])
 	case "statusline":
 		return h.statusline(args[1:])
 	case "limit":
@@ -95,19 +99,31 @@ func runHook(args []string, h hookEnv) int {
 	return exitUsage
 }
 
-// hookGuard builds the guard from the config. A broken config still yields the defaults, and
-// cfgErr is reported so callers can refuse to allow.
-func hookGuard() (guard.Guard, error) {
+// hookGuard builds the guard from the config: cfgFile when the git hook shim names it (baked in
+// at install, so the pushing process's environment cannot point it elsewhere), else the usual
+// location. A broken config still yields the defaults, and cfgErr is reported so callers can
+// refuse to allow.
+func hookGuard(cfgFile string) (guard.Guard, error) {
 	home, err := config.Home()
 	if err != nil {
 		return guard.Guard{}, err
 	}
-	cfg, cfgErr := config.Load()
+	var cfg config.Config
+	var cfgErr error
+	if cfgFile != "" {
+		cfg, cfgErr = config.Read(cfgFile)
+	} else {
+		cfg, cfgErr = config.Load()
+	}
 	protected := config.DefaultProtectedBranches()
 	if cfgErr == nil && len(cfg.ProtectedBranches) > 0 {
 		protected = cfg.ProtectedBranches
 	}
-	g := guard.Guard{Protected: protected, Git: guard.GitCLI{}, Home: home, GitHooks: cfgErr != nil || cfg.GitHooksEnabled()}
+	g := guard.Guard{
+		Protected: protected, Git: guard.GitCLI{}, Home: home, GitHooks: cfgErr != nil || cfg.GitHooksEnabled(),
+		Names: append([]string{cfg.CommandName()}, cfg.Aliases...),
+		Dirs:  config.DirsFor(home, config.Slug),
+	}
 	return g, cfgErr
 }
 
@@ -145,7 +161,7 @@ func (h hookEnv) guardGit() {
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
-	g, cfgErr := hookGuard()
+	g, cfgErr := hookGuard("")
 	if g.Git == nil {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "guard could not locate the home directory"}
 		return
@@ -173,7 +189,7 @@ func (h hookEnv) writeDecision(d guard.Decision) {
 
 // git runs as git hook <name> (layer 2): pre-push is judged first, then the repository's own
 // hook of that name runs with the same arguments and input. pre-push fails closed.
-func (h hookEnv) git(name string, args []string) int {
+func (h hookEnv) git(cfgFile, name string, args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), hookDeadline*10)
 	defer cancel()
 	dir, _ := os.Getwd()
@@ -187,7 +203,7 @@ func (h hookEnv) git(name string, args []string) int {
 		if input, err = io.ReadAll(h.stdin); err != nil {
 			return h.gitFail(name, err)
 		}
-		if code := h.prePush(ctx, dir, home, args, input); code != 0 {
+		if code := h.prePush(ctx, cfgFile, dir, home, args, input); code != 0 {
 			return code
 		}
 	}
@@ -215,7 +231,7 @@ func (h hookEnv) git(name string, args []string) int {
 }
 
 // prePush judges the exact ref updates. args are <remote name> <remote url>.
-func (h hookEnv) prePush(ctx context.Context, dir, home string, args []string, input []byte) int {
+func (h hookEnv) prePush(ctx context.Context, cfgFile, dir, home string, args []string, input []byte) int {
 	var d guard.Decision
 	func() {
 		defer func() {
@@ -228,7 +244,7 @@ func (h hookEnv) prePush(ctx context.Context, dir, home string, args []string, i
 			d = guard.Decision{Verdict: guard.Deny, Reason: err.Error()}
 			return
 		}
-		g, cfgErr := hookGuard()
+		g, cfgErr := hookGuard(cfgFile)
 		if cfgErr != nil {
 			d = guard.Decision{Verdict: guard.Deny, Reason: "sprawl config is invalid: " + cfgErr.Error()}
 			return

@@ -2,7 +2,6 @@ package guard
 
 import (
 	"context"
-	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,7 +15,7 @@ import (
 
 // DecidePowerShell judges a PowerShell command run from cwd, like Decide does for shell commands.
 func (g Guard) DecidePowerShell(ctx context.Context, cmd, cwd string) Decision {
-	e := &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git)}
+	e := g.newExtractor(ctx)
 	e.powershell(cmd, cwd, 0)
 	return g.verdict(ctx, e)
 }
@@ -43,12 +42,7 @@ var psExecutors = map[string]string{
 	"invoke-cimmethod": "CIM", "invoke-wmimethod": "WMI", "start-scheduledtask": "a scheduled task",
 }
 
-var gitBase = regexp.MustCompile(`^git(-[a-z-]+)?(\.exe)?$`)
-
-// psName normalises a command word: lower case, last path element, Windows separators.
-func psName(v string) string {
-	return strings.ToLower(path.Base(strings.ReplaceAll(v, `\`, "/")))
-}
+var gitBase = regexp.MustCompile(`^git(-[a-z-]+)?$`)
 
 func (e *extractor) powershell(src, cwd string, depth int) {
 	if depth > maxDepth {
@@ -86,11 +80,11 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 	text := joinPS(words)
 	first := words[0]
 
-	// Assignment: $x = <pipeline>. The right side runs like any statement; $env:GIT_* changes
-	// git's configuration for later commands.
+	// Assignment: $x = <pipeline>. The right side runs like any statement; $env:GIT_DIR and the
+	// like change what git does for later commands.
 	if psVariable.MatchString(first.val) && len(words) > 1 && isAssign(words[1].val) {
-		if strings.HasPrefix(strings.ToLower(first.val), "$env:git_") {
-			e.flag(Ask, "setting "+first.val+" changes git's configuration and can disable the git-level guard")
+		if name, ok := psEnvName(first.val); ok && riskyEnv(name) {
+			e.flag(Ask, "setting "+first.val+" redirects git or the programs it runs, and can disable the git-level guard")
 		}
 		e.psStatement(words[2:], dir, depth)
 		return
@@ -110,26 +104,28 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 		}
 		return
 	}
+	e.psRedirects(words, *dir)
 
-	// & <command>, . <script>: the call operators.
+	// & <command>, . <script>: the call operators run the command like a statement.
 	if first.val == "&" || first.val == "." {
 		if len(words) < 2 {
 			return
 		}
-		callee := words[1]
-		if callee.dynamic {
+		if words[1].dynamic {
 			e.flag(Ask, "the call operator runs a command known only at runtime")
 			return
 		}
-		if gitBase.MatchString(psName(callee.val)) {
-			e.psGit(callee, words[2:], *dir, depth)
-		}
-		// A script run by path is outside this guard's view; the git-level guard covers it.
+		e.psStatement(words[1:], dir, depth)
 		return
 	}
 
-	name := psName(first.val)
+	name := cmdBase(first.val)
+	args := psArgs(words[1:])
 	switch {
+	case name == "git-bash" || name == "bash" || name == "sh":
+		e.psShell(name, words[1:], *dir, depth)
+	case name == "git-cmd":
+		e.flag(Ask, "git-cmd runs cmd.exe, whose git commands cannot be checked")
 	case gitBase.MatchString(name):
 		e.psGit(first, words[1:], *dir, depth)
 	case name == "cd" || name == "chdir" || name == "sl" || name == "set-location" ||
@@ -137,12 +133,16 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 		if t := psOperand(words[1:], "-path", "-literalpath"); t != nil && !t.dynamic {
 			*dir = e.resolve(*dir, t.val)
 		}
-	case name == "bash" || name == "sh" || name == "bash.exe" || name == "sh.exe":
-		e.psShell(name, words[1:], *dir, depth)
-	case name == "pwsh" || name == "powershell" || name == "pwsh.exe" || name == "powershell.exe":
+	case name == "pwsh" || name == "powershell":
 		e.psNested(words[1:], *dir, depth)
+	case name == "gh":
+		e.gh(args)
+	case e.names[name]:
+		e.sprawl(args)
 	case psEnvWrite(name, words[1:]):
 		e.flag(Ask, "changing GIT_* environment variables can disable the git-level guard")
+	case psFileWriter(name):
+		e.psFileWrite(name, words[1:], *dir)
 	default:
 		if what, ok := psExecutors[name]; ok {
 			e.flag(Ask, what+" can run git in a way that cannot be checked")
@@ -152,10 +152,31 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 			e.flag(Ask, "changing GIT_* environment variables can disable the git-level guard")
 			return
 		}
+		if gitPushAlias.MatchString(name) {
+			e.flag(Ask, name+" looks like an alias for git push, which cannot be checked")
+			return
+		}
 		if !psInert(name) && slices.ContainsFunc(words[1:], func(w psWord) bool { return containsFold(w.val, "push") }) {
 			e.flag(Ask, "an unrecognised command with push in its arguments (an alias for git?)")
 		}
 	}
+}
+
+func psArgs(words []psWord) []arg {
+	out := make([]arg, len(words))
+	for i, w := range words {
+		out[i] = arg(w)
+	}
+	return out
+}
+
+// psEnvName returns the variable name of $env:X, env:X, env:\X or env:/X (any case).
+func psEnvName(v string) (string, bool) {
+	l := strings.ToLower(strings.TrimPrefix(v, "$"))
+	if !strings.HasPrefix(l, "env:") {
+		return "", false
+	}
+	return strings.TrimLeft(v[len(v)-len(l)+4:], `\/`), true
 }
 
 var psVariable = regexp.MustCompile(`^\$[A-Za-z_][\w:]*$`)
@@ -195,12 +216,12 @@ func (e *extractor) psGit(callee psWord, args []psWord, dir string, depth int) {
 		}
 		argv = append(argv, arg{val: w.val})
 	}
-	name := strings.TrimSuffix(psName(callee.val), ".exe")
+	name := cmdBase(callee.val)
 	if strings.HasPrefix(name, "git-") {
-		_ = e.gitSub(strings.TrimPrefix(name, "git-"), argv, dir, nil, false, depth)
+		_ = e.gitSub(strings.TrimPrefix(name, "git-"), argv, dir, nil, false, depth, false)
 		return
 	}
-	_ = e.git(argv, dir, false, depth, nil)
+	_ = e.git(argv, dir, false, depth, nil, false)
 }
 
 // psShell follows bash/sh -c '<script>' with the shell parser; anything else asks if git may run.
@@ -256,8 +277,7 @@ func psEnvWrite(name string, args []psWord) bool {
 		return false
 	}
 	for _, w := range args {
-		v := strings.ToLower(w.val)
-		if strings.HasPrefix(v, "env:") && (strings.HasPrefix(v, "env:git") || strings.Contains(v, "*")) {
+		if n, ok := psEnvName(w.val); ok && (strings.HasPrefix(strings.ToUpper(n), "GIT") || strings.Contains(n, "*")) {
 			return true
 		}
 	}

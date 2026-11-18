@@ -130,7 +130,6 @@ func (e Env) platform(ctx context.Context) []Check {
 			out = append(out, bad(g, Warn, "claude on PATH is a "+ext+" shim ("+e.tilde(p)+"): ctrl-c prompts \"Terminate batch job\"", "irm https://claude.ai/install.ps1 | iex, and put %USERPROFILE%\\.local\\bin first in PATH"))
 		}
 	}
-	out = append(out, e.hookProbe(ctx, g))
 	out = append(out, e.commandCopies(g)...)
 	if v, err := proc.Output(ctx, proc.Options{}, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-ExecutionPolicy"); err == nil {
 		if strings.EqualFold(strings.TrimSpace(string(v)), "Restricted") {
@@ -158,19 +157,18 @@ func (e Env) opensshCheck(g, version string) Check {
 	return bad(g, Warn, "the built-in OpenSSH cannot verify release signatures (needs 8.1)", "install Git for Windows")
 }
 
-// hookProbe runs the installed plugin hook the way Claude Code does (exec form through cmd.exe)
-// with a force-push payload: it must deny, or the guard is not active.
-func (e Env) hookProbe(ctx context.Context, g string) Check {
-	bin := e.Layout.Binary()
-	if !fsx.IsFile(bin) {
-		return bad(g, Fail, "sprawl.exe is not installed in "+e.tilde(bin)+": plugin hooks block every command", "re-run install.ps1")
+// probeTool is the agent tool the layer-1 probe pretends to be: without Git Bash it is the only
+// one, and its analyser is the weaker of the two.
+const probeTool = "PowerShell"
+
+const reinstallHint = "re-run install.ps1"
+
+// shellForm runs a shell-form hook command through Git Bash, as Claude Code does when it has it.
+func shellForm(command string) (string, []string) {
+	if sh := firstFile(filepath.Join(gitRoot(), "bin", "bash.exe")); sh != "" {
+		return sh, []string{"-c", command}
 	}
-	payload := `{"cwd":"` + strings.ReplaceAll(os.TempDir(), `\`, `/`) + `","tool_name":"PowerShell","tool_input":{"command":"git push --force origin main"}}`
-	out, err := proc.Output(ctx, proc.Options{Stdin: strings.NewReader(payload)}, "cmd.exe", "/d", "/c", `"`+bin+`" hook guard-git || exit /b 2`)
-	if err != nil || !strings.Contains(string(out), `"permissionDecision":"deny"`) {
-		return bad(g, Fail, "the guard hook did not deny a force push when run like Claude Code runs it", "re-run install.ps1; then sprawl doctor")
-	}
-	return ok(g, "guard hook runs through cmd.exe and denies a force push")
+	return "bash", []string{"-c", command}
 }
 
 // commandCopies reports command names whose copy differs from the installed binary: an update
