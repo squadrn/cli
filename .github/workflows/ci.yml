@@ -27,9 +27,31 @@ jobs:
         with:
           version: v2.15
       - name: shellcheck
-        run: sudo apt-get install -y -qq shellcheck && shellcheck -s sh plugin/bin/sprawl-hook scripts/*.sh
+        run: sudo apt-get install -y -qq shellcheck && shellcheck -s sh plugin/bin/sprawl-hook scripts/*.sh .githooks/*
       - name: go mod tidy
         run: go mod tidy -diff
+
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Commit messages (Conventional Commits, no AI attribution)
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD_SHA"
+          elif [ -n "$BEFORE" ] && ! printf '%s' "$BEFORE" | grep -q '^0*$' && git cat-file -e "$BEFORE" 2>/dev/null; then
+            range="$BEFORE..$HEAD_SHA"
+          else
+            range="$HEAD_SHA" # first push or force push: the whole history
+          fi
+          scripts/commitlint.sh --range "$range"
 
   vuln:
     runs-on: ubuntu-latest
