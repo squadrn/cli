@@ -1,3 +1,4 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # A Git older than the supported minimum gets a clear message with the upgrade command, not a raw
 # git error. Everything but `git version` still reaches the real git.
 exec git init -q -b main repo

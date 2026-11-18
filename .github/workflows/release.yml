@@ -65,3 +65,51 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/checksums.txt
+
+  # The real upgrade path: install the previous release with the published installer, then
+  # self-update to this one. Skipped for the first release.
+  upgrade:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
+      RELEASES_REPO: ${{ vars.SPRAWL_RELEASES_REPO }}
+      TAG: ${{ github.ref_name }}
+      SPRAWL_NO_UPDATE_CHECK: "1"
+    steps:
+      - name: Previous release
+        id: prev
+        shell: bash
+        run: |
+          prev=$(gh release list --repo "$RELEASES_REPO" --limit 20 --json tagName,isPrerelease \
+            --jq "[.[] | select(.tagName != \"$TAG\")][0].tagName // empty")
+          # The first Windows release has no Windows predecessor to update from.
+          if [ -n "$prev" ] && [ "$RUNNER_OS" = Windows ]; then
+            zips=$(gh release view "$prev" --repo "$RELEASES_REPO" --json assets --jq '[.assets[].name | select(endswith(".zip"))] | length')
+            [ "$zips" -gt 0 ] || prev=""
+          fi
+          echo "tag=$prev" >>"$GITHUB_OUTPUT"
+          echo "previous release: ${prev:-none}"
+      - name: Install the previous release and update (Linux)
+        if: steps.prev.outputs.tag != '' && runner.os == 'Linux'
+        run: |
+          gh release download "$TAG" -R "$RELEASES_REPO" -p install.sh -O install.sh
+          sh install.sh --version "${{ steps.prev.outputs.tag }}" --name sprawl --alias ''
+          export PATH="$HOME/.local/bin:$PATH"
+          sprawl version
+          sprawl self-update --version "$TAG"
+          test "$(sprawl version)" = "sprawl ${TAG#v}"
+      - name: Install the previous release and update (Windows)
+        if: steps.prev.outputs.tag != '' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          gh release download $env:TAG -R $env:RELEASES_REPO -p install.ps1 -O install.ps1
+          ./install.ps1 -Version "${{ steps.prev.outputs.tag }}" -Name sprawl -Alias ''
+          $sprawl = Join-Path $env:USERPROFILE ".local\bin\sprawl.exe"
+          & $sprawl version
+          & $sprawl self-update --version $env:TAG
+          if ((& $sprawl version) -ne "sprawl $($env:TAG.TrimStart('v'))") { throw "self-update did not reach $env:TAG" }

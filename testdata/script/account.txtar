@@ -1,3 +1,4 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # Fixture: main has shared files, a per-account synced skills dir and user MCP servers.
 mkdir home/.claude/agents home/.claude/skills/find-skills home/.claude/skills/synced
 cp settings.json home/.claude/settings.json

@@ -49,6 +49,9 @@ func (l Layout) LinkCommands(names []string, _ []string, now time.Time) (LinkRes
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		return res, err
 	}
+	if err := fsx.ProtectDir(l.BinDir); err != nil {
+		return res, err
+	}
 	prev := l.readCommands()
 	for _, n := range names {
 		dst := exe(l.BinDir, n)

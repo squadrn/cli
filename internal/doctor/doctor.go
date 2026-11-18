@@ -88,6 +88,7 @@ func Run(ctx context.Context, e Env) []Check {
 	checks = append(checks, e.guard(ctx)...)
 	checks = append(checks, e.settings()...)
 	checks = append(checks, e.accounts(ctx)...)
+	checks = append(checks, e.platform(ctx)...)
 	return checks
 }
 
@@ -230,7 +231,11 @@ func (e Env) branchProtection(ctx context.Context) []Check {
 		msg := err.Error()
 		switch {
 		case strings.Contains(msg, "404") || strings.Contains(msg, "Branch not protected"):
-			return []Check{bad(g, Warn, fmt.Sprintf("layer 3 (server): %s on %s is not protected", branch, repo),
+			status := Warn
+			if powerShellOnly() {
+				status = Fail // the weaker PowerShell analyser is the only layer 1 here
+			}
+			return []Check{bad(g, status, fmt.Sprintf("layer 3 (server): %s on %s is not protected", branch, repo),
 				fmt.Sprintf("protect it: https://github.com/%s/settings/branches", repo))}
 		case strings.Contains(msg, "403"):
 			return []Check{bad(g, Warn, "layer 3 (server): cannot read branch protection of "+repo+" (needs admin)", "ask a repository admin to protect "+branch)}

@@ -1,6 +1,29 @@
 # Changelog
 
-## 1.1.0
+## 1.2.0-rc.1
+
+Native Windows support, beta (ADR 0008). macOS and Linux behave as in 1.1.0 (golden tests).
+
+- Windows 10 21H2+/11, amd64 and arm64, with Git for Windows 2.31+: install with `install.ps1`
+  (signature and checksum verified), sessions as accounts, account management, worktrees, `gc`,
+  `deps`, `doctor`, updates, rollback and uninstall. `grid`, `ps` and `swap` inside a pane need
+  tmux and are not available on Windows.
+- Push guard on Windows: Claude Code's PowerShell tool is judged by an allow-list analyser that
+  asks whenever git may run in a way it cannot follow; the shell parser understands `git.exe`,
+  Windows paths, `wsl`, `winpty`, `cmd /c`, `start` and `pwsh -Command`; hooks run through
+  `cmd.exe` so a binary that cannot start blocks the call; layer 2 chains to repository hooks
+  through Git for Windows' `sh.exe`.
+- Windows specifics: command names are copies of `sprawl.exe` refreshed on update (replacing a
+  running binary is supported); shared settings use symbolic links, or junctions and hash-checked
+  copies without Developer Mode; directories outside the profile get a protected ACL; PowerShell
+  tab completion (`install.ps1 -AddToProfile`).
+- `doctor` on Windows checks Git for Windows, Git Bash, the signature tool, the guard hook as Claude
+  Code runs it, stale command copies, the execution policy and long paths.
+- Fixes found while porting, on every platform: archive member names are validated the same way
+  everywhere; `account rename` rewrites plugin paths written with backslashes; recommended
+  `permissions.deny` rules use `/`.
+- Install a release candidate on Windows with `-Version v1.2.0-rc.1`; it follows the beta channel.
+
 
 Groundwork for native Windows support (ADR 0008); no behaviour change on macOS or Linux.
 

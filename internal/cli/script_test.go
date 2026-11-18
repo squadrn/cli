@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,16 +17,86 @@ import (
 	"time"
 
 	"github.com/rogpeppe/go-internal/testscript"
+
+	"sprawling-agents/internal/release"
+
+	"sprawling-agents/internal/fsx"
 )
 
 func TestMain(m *testing.M) {
-	testscript.Main(m, map[string]func(){
+	cmds := map[string]func(){
 		"sprawl": func() {
 			// Scripts sign their fake releases with their own key, never the real one.
 			buildSigners = func() string { return os.Getenv("SPRAWL_TEST_SIGNERS") }
 			os.Exit(Run(os.Args[1:]))
 		},
-	})
+	}
+	if runtime.GOOS == "windows" {
+		// Windows cannot run the shell-script fake; claude.exe is this test binary instead.
+		cmds["claude"] = func() { os.Exit(fakeClaudeMain(os.Args[1:])) }
+	}
+	testscript.Main(m, cmds)
+}
+
+// fakeClaudeMain behaves exactly like the fakeClaude shell script, for Windows.
+func fakeClaudeMain(args []string) int {
+	cfg := os.Getenv("CLAUDE_CONFIG_DIR")
+	dir := cfg
+	if cfg == "" {
+		cfg, dir = "<unset>", filepath.Join(os.Getenv("HOME"), ".claude")
+	}
+	cmd := strings.Join(args, " ")
+	exists := func(name string) bool { _, err := os.Stat(filepath.Join(dir, name)); return err == nil }
+	cat := func(name, fallback string) {
+		if b, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
+			fmt.Print(string(b))
+		} else {
+			fmt.Println(fallback)
+		}
+	}
+	switch {
+	case cmd == "auth status":
+		org, _ := os.ReadFile(filepath.Join(dir, ".org"))
+		if exists(".loggedin") {
+			fmt.Printf(`{"loggedIn":true,"email":"me@%s","orgName":"%s"}`+"\n", filepath.Base(dir), strings.TrimSpace(string(org)))
+			return 0
+		}
+		fmt.Println(`{"loggedIn":false}`)
+		return 1
+	case cmd == "auth logout":
+		_ = os.Remove(filepath.Join(dir, ".loggedin"))
+	case strings.HasPrefix(cmd, "mcp get "):
+		b, _ := os.ReadFile(filepath.Join(dir, ".mcp"))
+		if !slices.Contains(strings.Split(strings.ReplaceAll(string(b), "\r", ""), "\n"), args[2]) {
+			return 1
+		}
+	case strings.HasPrefix(cmd, "mcp add-json -s user ") && len(args) > 4:
+		f, err := os.OpenFile(filepath.Join(dir, ".mcp"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err == nil {
+			_, _ = fmt.Fprintln(f, args[4])
+			_ = f.Close()
+		}
+	case cmd == "plugin marketplace list --json":
+		cat(".markets", "[]")
+	case strings.HasPrefix(cmd, "plugin marketplace add "):
+		_ = os.WriteFile(filepath.Join(dir, ".markets"), []byte(`[{"name":"sprawl"}]`+"\n"), 0o644)
+	case cmd == "plugin list --json":
+		cat(".plugins", "[]")
+	case strings.HasPrefix(cmd, "plugin install "):
+		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"sprawl@sprawl"}]`+"\n"), 0o644)
+	default:
+		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)
+		wd, _ := os.Getwd()
+		if real, err := filepath.EvalSymlinks(wd); err == nil {
+			wd = real
+		}
+		f, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), "calls.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err == nil {
+			_, _ = fmt.Fprintf(f, "cfg=%s pwd=%s args=%s\n", cfg, wd, cmd)
+			_ = f.Close()
+		}
+	}
+	return 0
 }
 
 // fakeClaude answers the queries sprawl makes and records every other invocation in
@@ -56,7 +127,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "USERPROFILE", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 
@@ -93,11 +164,6 @@ func kindOf(m fs.FileMode) string {
 }
 
 func TestScript(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// The scripts drive sh, tmux and a shell-script fake claude; Windows variants come with
-		// the Windows script suite (ADR 0008, P4).
-		t.Skip("script tests are Unix-only for now")
-	}
 	testscript.Run(t, testscript.Params{
 		Dir:           filepath.Join("..", "..", "testdata", "script"),
 		UpdateScripts: *updateScripts,
@@ -117,8 +183,12 @@ func TestScript(t *testing.T) {
 				return err
 			}
 			// A private tmux server per script. The socket path must stay under ~104 bytes,
-			// which the default temp dir on macOS exceeds.
-			sock, err := os.MkdirTemp("/tmp", "sqdt")
+			// which the default temp dir on macOS exceeds. (No tmux on Windows.)
+			tmpRoot := "/tmp"
+			if runtime.GOOS == "windows" {
+				tmpRoot = ""
+			}
+			sock, err := os.MkdirTemp(tmpRoot, "sqdt")
 			if err != nil {
 				return err
 			}
@@ -131,6 +201,7 @@ func TestScript(t *testing.T) {
 			env.Setenv("SHIM", shim)
 			env.Setenv("REPO_ROOT", filepath.Dir(filepath.Dir(filepath.Dir(shim))))
 			env.Setenv("HOME", home)
+			env.Setenv("USERPROFILE", home) // os.UserHomeDir on Windows
 			env.Setenv("PATH", bin+string(os.PathListSeparator)+pathWithoutHome(env.Getenv("PATH")))
 			env.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 			env.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
@@ -200,6 +271,23 @@ func TestScript(t *testing.T) {
 				ts.Check(err)
 				sort.Strings(lines)
 				_, _ = fmt.Fprintln(ts.Stdout(), strings.Join(lines, "\n"))
+			},
+			// release DIR lays out an unpacked release in DIR without a shell: this test binary as
+			// sprawl(.exe), the plugin and the marketplace; on Windows the Windows hooks.json.
+			"release": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) != 1 {
+					ts.Fatalf("usage: release dir")
+				}
+				dst := ts.MkAbs(args[0])
+				root := ts.Getenv("REPO_ROOT")
+				self, err := os.Executable()
+				ts.Check(err)
+				ts.Check(fsx.CopyFile(self, filepath.Join(dst, release.BinaryName), 0o755, false))
+				ts.Check(fsx.CopyTree(filepath.Join(root, "plugin"), filepath.Join(dst, "plugin"), 0o755, false))
+				ts.Check(fsx.CopyTree(filepath.Join(root, ".claude-plugin"), filepath.Join(dst, ".claude-plugin"), 0o755, false))
+				if runtime.GOOS == "windows" {
+					ts.Check(fsx.CopyFile(filepath.Join(root, "scripts", "hooks.windows.json"), filepath.Join(dst, "plugin", "hooks", "hooks.json"), 0o644, false))
+				}
 			},
 			// envfile NAME FILE sets NAME to the contents of FILE.
 			"envfile": func(ts *testscript.TestScript, neg bool, args []string) {

@@ -281,6 +281,12 @@ func (l Layout) Install(src, version string) error {
 			return fmt.Errorf("not a sprawl release: missing %s", p)
 		}
 	}
+	if err := os.MkdirAll(l.DataDir, 0o700); err != nil { // as fsx.WriteFile created it before
+		return err
+	}
+	if err := fsx.ProtectDir(l.DataDir); err != nil {
+		return err
+	}
 	if err := fsx.ReplaceExecutable(filepath.Join(src, BinaryName), l.Binary()); err != nil {
 		return err
 	}
