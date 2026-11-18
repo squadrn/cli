@@ -138,8 +138,8 @@ func TestStartJoinsSessionCreatedConcurrently(t *testing.T) {
 		t.Fatalf("Start = %q, %v (calls %v)", s, err, f.calls)
 	}
 	last := strings.Join(f.calls[len(f.calls)-1], " ")
-	if !strings.Contains(last, "set -p -t %7 @sprawl_name feat-b") || !strings.Contains(last, "select-layout") {
-		t.Fatalf("pane not tagged: %q", last)
+	if !strings.HasPrefix(last, "split-window") || !strings.Contains(last, "; set -p @sprawl_name feat-b") || !strings.Contains(last, "select-layout") {
+		t.Fatalf("pane not created and tagged in one batch: %q", last)
 	}
 }
 
@@ -165,10 +165,10 @@ func TestSessionsAndPanes(t *testing.T) {
 	f := &fakeTmux{replies: func(args []string) (string, error) {
 		switch args[0] {
 		case "list-sessions":
-			return "plain||0\nsra-app|/r/app|1", nil
+			return "plain||0\nsra-app|/r/app|1\nodd\\|name|/r/a\\|b\\ c|0", nil
 		case "list-panes":
 			if args[1] == "-a" {
-				return "plain\nsra-app\nsra-app\nsra-app", nil
+				return "plain\nsra-app\nsra-app\nsra-app\nodd\\|name", nil
 			}
 			return "%1|sra-app|claude/main|feat-a|claude\n%2|sra-app|||zsh", nil
 		}
@@ -176,7 +176,8 @@ func TestSessionsAndPanes(t *testing.T) {
 	}}
 	tm := Tmux{Run: f.run}
 	ss, err := tm.Sessions(context.Background())
-	if err != nil || len(ss) != 1 || ss[0] != (Session{Name: "sra-app", Repo: "/r/app", Panes: 3, Attached: true}) {
+	if err != nil || len(ss) != 2 || ss[0] != (Session{Name: "sra-app", Repo: "/r/app", Panes: 3, Attached: true}) ||
+		ss[1] != (Session{Name: "odd|name", Repo: "/r/a|b c", Panes: 1}) {
 		t.Fatalf("Sessions = %+v, %v", ss, err)
 	}
 	ps, err := tm.Panes(context.Background(), "sra-app")
