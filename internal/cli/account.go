@@ -137,7 +137,7 @@ func (a *app) accountLogin(input string) error {
 	}
 	a.cache.Forget(acct.Label())
 	a.banner(acct)
-	return ag.Exec(acct.ConfigDir(), ag.LoginArgs())
+	return a.session(ag, acct, ag.LoginArgs())
 }
 
 func (a *app) accountLogout(input string) error {

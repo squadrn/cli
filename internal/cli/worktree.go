@@ -78,7 +78,7 @@ func (a *app) wtCmd() *cobra.Command {
 				return err
 			}
 			a.banner(acct)
-			return ag.Exec(acct.ConfigDir(), ag.WorktreeArgs(args[0]))
+			return a.session(ag, acct, ag.WorktreeArgs(args[0]))
 		},
 	}
 	cmd.AddCommand(a.wtLsCmd(), a.wtRmCmd())

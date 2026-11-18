@@ -60,8 +60,7 @@ func startBackgroundCheck() {
 	}
 	cmd := exec.Command(self, "self-update", "--background")
 	cmd.Env = append(os.Environ(), "SPRAWL_NO_UPDATE_CHECK=1")
-	detach(cmd)
-	if cmd.Start() == nil {
+	if startDetached(cmd) == nil {
 		_ = cmd.Process.Release()
 	}
 }
