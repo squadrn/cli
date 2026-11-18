@@ -1,3 +1,4 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # Bare sprawl without a terminal runs claude as main, with CLAUDE_CONFIG_DIR removed
 # even when the caller's environment sets it.
 env CLAUDE_CONFIG_DIR=/should/be/removed

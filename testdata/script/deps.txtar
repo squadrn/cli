@@ -1,3 +1,4 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 exec git init -q -b main repo
 exec git -C repo commit -q --allow-empty -m init
 mkdir repo/.claude/worktrees/feat-a repo/.claude/worktrees/feat-b

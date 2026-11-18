@@ -1,3 +1,4 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # main: logged in with the plugin; personal: logged out, no plugin, a broken shared link.
 mkdir home/.claude-personal home/.claude/agents
 cp empty home/.claude/.loggedin

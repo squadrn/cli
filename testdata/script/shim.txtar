@@ -1,3 +1,4 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # With sprawl on PATH, the plugin shim delegates to `sprawl hook`.
 stdin force.json
 exec $SHIM guard-git
