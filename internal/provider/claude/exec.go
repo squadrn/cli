@@ -94,6 +94,10 @@ func (CLI) ResumeArgs(session string) []string { return []string{"--resume", ses
 func (c CLI) Exec(configDir string, args []string) error {
 	argv := append([]string{"claude"}, args...)
 	if err := run(c.Bin, argv, c.env(configDir)); err != nil {
+		var es provider.ExitStatus
+		if errors.As(err, &es) {
+			return es
+		}
 		return fmt.Errorf("exec %s: %w", c.Bin, err)
 	}
 	return nil

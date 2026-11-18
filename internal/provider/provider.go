@@ -52,6 +52,34 @@ type AuthStatus struct {
 	OrgName  string `json:"orgName"`
 }
 
+// ExitStatus is returned by Agent.Exec on platforms where the session runs as a child process
+// (Windows): the agent CLI exited with Code, which sprawl passes on as its own exit status.
+type ExitStatus struct{ Code int }
+
+func (e ExitStatus) Error() string { return "exit status " + itoa(e.Code) }
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var b [20]byte
+	i := len(b)
+	for n > 0 {
+		i--
+		b[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		b[i] = '-'
+	}
+	return string(b[i:])
+}
+
 // Runner runs the CLI non-interactively. configDir "" selects the main account. A non-zero exit
 // returns whatever stdout was produced together with the error.
 type Runner interface {
@@ -61,7 +89,8 @@ type Runner interface {
 // Agent drives one provider's CLI.
 type Agent interface {
 	Runner
-	// Exec replaces the current process with an interactive session.
+	// Exec runs an interactive session in place of sprawl: on Unix it replaces the process; on
+	// Windows it runs as a child and returns ExitStatus when the session ends.
 	Exec(configDir string, args []string) error
 	Auth(ctx context.Context, configDir string) (AuthStatus, error)
 	// LoginArgs, WorktreeArgs and ResumeArgs are the CLI arguments for those sessions.
