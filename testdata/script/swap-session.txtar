@@ -1,0 +1,128 @@
+# swap by session ID (ADR 0009, S1). Portable: no shell, runs on Windows too.
+mkdir repo repo/sub
+cp empty home/.claude/.loggedin
+cp empty home/.claude-work/.loggedin
+cp empty home/.claude-personal/.loggedin
+cp pro home/.claude-personal/.plan
+
+# work holds the conversation (with its subagent dir and file checkpoints) and hits its limit.
+jsonexpand s1.jsonl home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+mkdir home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111/subagents
+cp empty home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111/subagents/a.jsonl
+mkdir home/.claude-work/file-history/11111111-1111-4111-8111-111111111111
+cp empty home/.claude-work/file-history/11111111-1111-4111-8111-111111111111/f@v1
+chtime home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl -1h
+jsonexpand limit1.json limit.json
+env CLAUDE_CONFIG_DIR=$WORK${/}home${/}.claude-work
+stdin limit.json
+exec sprawl hook limit
+env CLAUDE_CONFIG_DIR=
+
+# Not below the directory of the limit: nothing to swap.
+cd repo/sub
+exitcode 1 sprawl swap --to personal
+cd $WORK
+
+# Without --to and without a terminal: name the best account to pass.
+exitcode 2 sprawl swap
+! exec sprawl swap
+stderr 'pass the account to move the conversation to with --to \(best: claude/main\)'
+
+# No arguments: the conversation that hit its limit here (or below) moves and resumes where it
+# was started; an Opus conversation moving to a Pro account warns.
+exec sprawl swap --to personal
+stdout '^swap: claude/work → claude/personal \(session 11111111-1111-4111-8111-111111111111\)$'
+stderr 'warning: the conversation uses claude-opus-4-7; claude/personal is on the Pro plan'
+stdout '^cfg=.*personal args=--resume 11111111-1111-4111-8111-111111111111$'
+waitfor $WORK/home/calls.log 'pwd=.*repo args=--resume 11111111-1111-4111-8111-111111111111$'
+cmp home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+exists home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111/subagents/a.jsonl
+exists home/.claude-personal/file-history/11111111-1111-4111-8111-111111111111/f@v1
+
+# The handoff is recorded and shown with the account.
+exec sprawl usage work
+stdout '^handoff +just now: claude/work → claude/personal \(session 11111111\)$'
+exec sprawl usage personal
+stdout '^handoff +just now: claude/work → claude/personal'
+
+# Moved already: nothing left to swap here.
+cd repo
+exitcode 1 sprawl swap --to main
+! exec sprawl swap --to main
+stderr 'no conversation hit its limit or runs in .*repo; pass --session <id>'
+
+# The conversation went on in both accounts: refused, unless --force.
+jsonexpand $WORK/s1-personal.jsonl $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+chtime $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl -30m
+jsonexpand $WORK/s1-work.jsonl $WORK/home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+exitcode 1 sprawl swap --session 11111111-1111-4111-8111-111111111111 --to personal
+! exec sprawl swap --session 11111111-1111-4111-8111-111111111111 --to personal
+stderr 'the conversation went on in claude/personal after it was copied there.*--force'
+jsonexpand $WORK/s1-personal.jsonl $WORK/expected.jsonl
+cmp $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl $WORK/expected.jsonl
+exec sprawl swap --session 11111111-1111-4111-8111-111111111111 --to personal --force
+stdout '^swap: claude/work → claude/personal'
+cmp $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl $WORK/home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+
+# Grown on top of the target's copy (append only): fine.
+jsonexpand $WORK/s1-work-more.jsonl $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+chtime $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl 1m
+exec sprawl swap --session 11111111-1111-4111-8111-111111111111 --to work
+stdout '^swap: claude/personal → claude/work'
+! stderr 'Pro plan'
+cmp $WORK/home/.claude-work/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
+
+# Errors.
+exitcode 2 sprawl swap --session nope --to work
+exitcode 1 sprawl swap --session 99999999-9999-4999-8999-999999999999 --to work
+exitcode 2 sprawl swap feat-a personal --to work
+exitcode 2 sprawl swap feat-a
+exitcode 1 sprawl swap --session 11111111-1111-4111-8111-111111111111 --to ghost
+
+# Several candidates without a terminal: a newer limit here, then a session running here.
+jsonexpand $WORK/s3.jsonl $WORK/home/.claude-work/projects/-repo/33333333-3333-4333-8333-333333333333.jsonl
+jsonexpand $WORK/limit3.json $WORK/limit3.json
+env CLAUDE_CONFIG_DIR=$WORK${/}home${/}.claude-work
+stdin $WORK/limit3.json
+exec sprawl hook limit
+env CLAUDE_CONFIG_DIR=
+jsonexpand $WORK/s2.jsonl $WORK/home/.claude/projects/-repo/22222222-2222-4222-8222-222222222222.jsonl
+livesession $WORK/home/.claude 22222222-2222-4222-8222-222222222222 $WORK/repo
+livesession $WORK/home/.claude-personal 44444444-4444-4444-8444-444444444444 $WORK/elsewhere
+exitcode 2 sprawl swap --to personal
+! exec sprawl swap --to personal
+stderr 'several conversations could be moved; pass one with --session:'
+stderr '(?s)--session 33333333-3333-4333-8333-333333333333  claude/work .*repo · just now · limited.*--session 22222222-2222-4222-8222-222222222222  claude/main .*repo · .* · running'
+! stderr '44444444'
+rm $WORK/home/.claude/sessions
+rm $WORK/home/.claude-personal/sessions
+
+-- empty --
+-- pro --
+pro
+-- home/.claude-work/.sprawl-account --
+-- home/.claude-personal/.sprawl-account --
+-- s1.jsonl --
+{"type":"user","cwd":"$WORK/repo","sessionId":"11111111-1111-4111-8111-111111111111"}
+{"type":"assistant","message":{"model":"claude-opus-4-7"}}
+-- s1-personal.jsonl --
+{"type":"user","cwd":"$WORK/repo","sessionId":"11111111-1111-4111-8111-111111111111"}
+{"type":"assistant","message":{"model":"claude-opus-4-7"}}
+{"type":"user","message":"went on in personal"}
+-- s1-work.jsonl --
+{"type":"user","cwd":"$WORK/repo","sessionId":"11111111-1111-4111-8111-111111111111"}
+{"type":"assistant","message":{"model":"claude-opus-4-7"}}
+{"type":"user","message":"went on in work"}
+-- s1-work-more.jsonl --
+{"type":"user","cwd":"$WORK/repo","sessionId":"11111111-1111-4111-8111-111111111111"}
+{"type":"assistant","message":{"model":"claude-opus-4-7"}}
+{"type":"user","message":"went on in work"}
+{"type":"assistant","message":{"model":"claude-sonnet-4-6"}}
+-- s2.jsonl --
+{"type":"user","cwd":"$WORK/repo"}
+-- s3.jsonl --
+{"type":"user","cwd":"$WORK/repo"}
+-- limit1.json --
+{"session_id":"11111111-1111-4111-8111-111111111111","cwd":"$WORK/repo","error":"rate_limit","last_assistant_message":"You've hit your session limit"}
+-- limit3.json --
+{"session_id":"33333333-3333-4333-8333-333333333333","cwd":"$WORK/repo","error":"rate_limit","last_assistant_message":"You've hit your session limit"}

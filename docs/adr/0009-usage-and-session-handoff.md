@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. U1 ships with this ADR; S1 is approved and not built; S2 is later.
+Accepted. U1 ships with this ADR; S1 implemented; S2 is later.
 
 ## Context
 
@@ -65,7 +65,7 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
   the account most recently limited or active in this directory. PLAN/ORG come from the auth
   cache. The JSON schema is documented in the README.
 
-### S1 — swap by session (approved, not built)
+### S1 — swap by session (implemented)
 
 - Find a conversation by session ID with a glob `<config>/projects/*/<id>.jsonl` instead of
   computing the project key (whose encoding is internal and differs on Windows), and copy
@@ -78,6 +78,20 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
 - Every handoff is appended to `~/.local/state/sprawl/handoffs.jsonl` (time, session, from, to,
   cwd).
 - Moving to an account of another organisation always asks.
+- As built: the transcript moves under the source's project folder name (Claude Code shortens long
+  keys with a hash, so the key is never computed for a session ID; the legacy worktree form
+  computes it and falls back to the transcripts whose first records name the worktree as `cwd`).
+  `<session>/` and `file-history/<session>/` are replaced through a staged copy; the transcript is
+  staged, checked (size, SHA-256) and renamed last. A target copy that is not a prefix of the
+  source (it went on there) is refused unless `--force`. Candidates without `--session`: the latest
+  limit in or below the working directory not moved since (ledger), then registry sessions running
+  there; several → picker, none at a terminal → an error listing `--session` values. Targets are
+  ranked with `usage.Rank`; logged-out targets are refused; an Opus conversation moving to a Pro
+  account warns. Holders: registry entries for the session, and sessions sprawl started as the
+  source account in its directory (in-use records in both) unless the registry shows another
+  session. Unix sends SIGINT, then — asked again after 10 s — SIGTERM; Windows cannot interrupt a
+  process on another console (`GenerateConsoleCtrlEvent` only reaches the caller's console), so it
+  uses `TerminateProcess` after confirmation. A holder still alive refuses the swap.
 
 ### S2 — supervisor (later)
 

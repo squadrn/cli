@@ -230,6 +230,21 @@ func TestCopyFileErrors(t *testing.T) {
 	}
 }
 
+func TestAppendLine(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "d", "log.jsonl")
+	for _, l := range []string{"a", "b"} {
+		if err := AppendLine(p, []byte(l), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if b, _ := os.ReadFile(p); string(b) != "a\nb\n" {
+		t.Fatalf("content = %q", b)
+	}
+	if err := AppendLine(filepath.Join(p, "x"), []byte("c"), 0o600); err == nil {
+		t.Fatal("append under a file succeeded")
+	}
+}
+
 func TestMoveDir(t *testing.T) {
 	root := t.TempDir()
 	src, dst := filepath.Join(root, "src"), filepath.Join(root, "dst")

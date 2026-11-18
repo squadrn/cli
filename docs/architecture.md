@@ -29,7 +29,7 @@
 | `update` | when to check for releases, channel selection, the cached result | network, printing |
 | `doctor` | structured health checks, including all three guard layers | printing |
 | `inuse` | which sessions run in a directory (`<dir>/.sprawl-inuse/<pid>.json`, live by pid and start time), per-repository lock files | printing |
-| `usage` | per-account usage snapshots (limits, last limit hit), merge rules, states, ranking for a swap ([ADR 0009](adr/0009-usage-and-session-handoff.md)) | provider knowledge, printing |
+| `usage` | per-account usage snapshots (limits, last limit hit), merge rules, states, ranking for a swap, the handoff ledger ([ADR 0009](adr/0009-usage-and-session-handoff.md)) | provider knowledge, printing |
 | `proc` | running programs under a deadline that kills the whole process group | — |
 | `fsx` | atomic writes, copies, directory swaps | — |
 
@@ -59,9 +59,20 @@ dir and in the worktree it works in (in the main checkout, tagged with the workt
 recorded pid becomes the agent CLI, so the entry lives exactly as long as the session. `gc` keeps,
 and `wt rm`, `account rm` and `account rename` refuse (unless `--force`), what a live entry names.
 
-**Swap.** Claude Code stores conversations at `<config>/projects/<cwd key>/<session>.jsonl`.
-`swap` copies the newest one across accounts (with its subagent dir, mtime preserved) and resumes
-it — in place via `respawn-pane` inside a grid. Only `provider/claude/transcript.go` knows this layout.
+**Swap.** Claude Code stores conversations at `<config>/projects/<folder>/<session>.jsonl` (the
+folder encodes the working directory; long ones are shortened by an undocumented rule), with a
+`<session>/` dir (subagents, tool results) and checkpoints in `<config>/file-history/<session>/`.
+`swap` finds a conversation by session ID with a glob over every account of the provider
+(`claude.FindSession`), or — the legacy `<worktree> <account>` form — the newest one of a worktree.
+Without `--session` the candidates come from the usage store (the last limit hit in or below the
+working directory, unless the ledger shows it moved since) and from Claude Code's session registry
+`<config>/sessions/<pid>.json` (read as a hint). Before copying, every live holder is stopped
+(a grid pane is respawned; otherwise the registry and the in-use records name the process, which
+gets an interrupt, then — asked again — termination, through the `cli/stop_unix.go` /
+`stop_windows.go` pair). `claude.TransferSession` copies under the same folder name, refuses a
+target copy that is not a prefix of the source (`--force` overrides), verifies size and SHA-256
+and renames the transcript into place last. The handoff is appended to the state dir's
+`handoffs.jsonl` (`usage.Ledger`). Only `provider/claude` knows the layout.
 
 **Guard.** See [ADR 0006](adr/0006-layered-push-guard.md). Layer 1: `guard.Decide` parses with
 `mvdan.cc/sh`, normalises words, follows wrappers, nested shells and aliases, and judges each push

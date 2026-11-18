@@ -96,7 +96,7 @@ func (h hookEnv) recordStatus(raw []byte) (name string, snap usage.Snapshot) {
 		return "", usage.Snapshot{}
 	}
 	snap = obs
-	store, err := account.NewStore()
+	store, err := newStore(config.Load())
 	if err != nil {
 		return "", snap
 	}
@@ -151,11 +151,11 @@ func (h hookEnv) recordLimit(raw []byte) (msg string) {
 	if err != nil || !f.Limited {
 		return ""
 	}
-	store, err := account.NewStore()
+	cfg, cfgErr := config.Load()
+	store, err := newStore(cfg, cfgErr)
 	if err != nil {
 		return ""
 	}
-	cfg, _ := config.Load()
 	label := "this account"
 	snap := f.Observation
 	if acct, ok := hookAccount(store, provider.Claude); ok {

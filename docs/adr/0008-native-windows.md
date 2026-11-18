@@ -40,7 +40,7 @@ overrides `GIT_CONFIG_COUNT`.
 | Push guard layer 1 (Bash and PowerShell tools) and layer 2 (git pre-push) | Yes |
 | `doctor`, `config`, update notices, `self-update`, `--rollback`, `self-uninstall` | Yes |
 | `install.ps1`, signed releases, PowerShell completion | Yes |
-| `swap` outside a grid | Yes, after spike S3 |
+| `swap` outside a grid | Yes (ADR 0009 S1: found by session ID; a running session is terminated after confirmation) |
 | `grid`, `ps`, `grid ls/attach/stop`, `swap` in a pane | No (tmux). Refused by one check in `cli` with a clear message |
 | Desktop notifications | No-op (already the case for unknown platforms) |
 | Requirements | Windows 10 21H2+/11, **Git for Windows** (provides git, Git Bash, `sh.exe`, `ssh-keygen`) |

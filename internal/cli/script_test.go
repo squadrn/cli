@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -108,12 +109,25 @@ func fakeClaudeMain(args []string) int {
 			_, _ = fmt.Fprintf(f, "cfg=%s pwd=%s args=%s\n", cfg, wd, cmd)
 			_ = f.Close()
 		}
+		if id := os.Getenv("FAKE_HOLD"); id != "" {
+			// A running session listed in Claude Code's registry until it is terminated.
+			pid := os.Getpid()
+			entry, _ := json.Marshal(map[string]any{"pid": pid, "sessionId": id, "cwd": wd, "status": "busy", "kind": "interactive"})
+			if os.Getenv("FAKE_NOREG") == "" {
+				_ = os.MkdirAll(filepath.Join(dir, "sessions"), 0o755)
+				_ = os.WriteFile(filepath.Join(dir, "sessions", strconv.Itoa(pid)+".json"), entry, 0o644)
+			}
+			_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), "held.txt"), []byte(strconv.Itoa(pid)+"\n"), 0o644)
+			time.Sleep(60 * time.Second)
+		}
 	}
 	return 0
 }
 
 // fakeClaude answers the queries sprawl makes and records every other invocation in
-// $HOME/calls.log. Inside a tmux pane it stays alive like an interactive session.
+// $HOME/calls.log. Inside a tmux pane it stays alive like an interactive session. With
+// FAKE_HOLD=<session> it lists itself in the account's session registry (not with FAKE_NOREG
+// set), writes its pid to $HOME/held.txt and runs until interrupted.
 // `auth status` reports logged in when <config dir>/.loggedin exists, with .org and .plan.
 const fakeClaude = `#!/bin/sh
 cfg=${CLAUDE_CONFIG_DIR:-<unset>}
@@ -134,6 +148,14 @@ case "$*" in
   *)
     echo "cfg=$cfg args=$*"
     echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"
+    if [ -n "$FAKE_HOLD" ]; then
+      [ -n "$FAKE_NOREG" ] || mkdir -p "$dir/sessions"
+      [ -n "$FAKE_NOREG" ] || printf '{"pid":%s,"sessionId":"%s","cwd":"%s","status":"busy","kind":"interactive"}\n' $$ "$FAKE_HOLD" "$(pwd -P)" >"$dir/sessions/$$.json"
+      trap 'rm -f "$dir/sessions/$$.json"; echo "stopped $$" >>"$HOME/calls.log"; kill $! 2>/dev/null; exit 0' INT TERM
+      echo $$ >"$HOME/held.txt"
+      sleep 60 &
+      wait
+    fi
     if [ -n "$TMUX_PANE" ]; then sleep 60; fi ;;
 esac
 `
@@ -141,7 +163,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "USERPROFILE", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 
@@ -230,7 +252,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "TMUX"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
 				env.Setenv(k, "")
 			}
 			return nil
@@ -302,6 +324,42 @@ func TestScript(t *testing.T) {
 				if runtime.GOOS == "windows" {
 					ts.Check(fsx.CopyFile(filepath.Join(root, "scripts", "hooks.windows.json"), filepath.Join(dst, "plugin", "hooks", "hooks.json"), 0o644, false))
 				}
+			},
+			// jsonexpand SRC DST copies SRC to DST (creating its dir), replacing $VAR with the
+			// variable's value escaped for a JSON string (Windows paths have backslashes).
+			"jsonexpand": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) != 2 {
+					ts.Fatalf("usage: jsonexpand src dst")
+				}
+				out := os.Expand(ts.ReadFile(args[0]), func(k string) string {
+					b, _ := json.Marshal(ts.Getenv(k))
+					return string(b[1 : len(b)-1])
+				})
+				dst := ts.MkAbs(args[1])
+				ts.Check(os.MkdirAll(filepath.Dir(dst), 0o755))
+				ts.Check(os.WriteFile(dst, []byte(out), 0o600))
+			},
+			// chtime FILE DURATION sets FILE's modification time to now plus DURATION (e.g. -1h).
+			"chtime": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) != 2 {
+					ts.Fatalf("usage: chtime file duration")
+				}
+				d, err := time.ParseDuration(args[1])
+				ts.Check(err)
+				t := time.Now().Add(d)
+				ts.Check(os.Chtimes(ts.MkAbs(args[0]), t, t))
+			},
+			// livesession CONFIGDIR SESSION CWD lists a running session in CONFIGDIR's Claude Code
+			// registry, with the pid of this (live) test process.
+			"livesession": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) != 3 {
+					ts.Fatalf("usage: livesession configdir session cwd")
+				}
+				dir := filepath.Join(ts.MkAbs(args[0]), "sessions")
+				b, err := json.Marshal(map[string]any{"pid": os.Getpid(), "sessionId": args[1], "cwd": ts.MkAbs(args[2])})
+				ts.Check(err)
+				ts.Check(os.MkdirAll(dir, 0o755))
+				ts.Check(os.WriteFile(filepath.Join(dir, strconv.Itoa(os.Getpid())+".json"), b, 0o600))
 			},
 			// envfile NAME FILE sets NAME to the contents of FILE.
 			"envfile": func(ts *testscript.TestScript, neg bool, args []string) {

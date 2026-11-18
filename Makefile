@@ -18,9 +18,9 @@ cover:
 	go tool cover -func=coverage.out | tail -1
 
 # Minimum statement coverage per package: the guard is the security boundary.
-COVER_GATES := guard:95 githook:85 grid:70 doctor:70 install:80 release:80 update:95 ui:90 worktree:75 proc:85 fsx:75 usage:90
+COVER_GATES := guard:95 githook:85 grid:70 doctor:70 install:80 release:80 update:95 ui:90 worktree:75 proc:85 fsx:75 usage:90 inuse:85
 # On Windows some Unix-only tests are skipped; the security-critical gates stay high.
-COVER_GATES_WINDOWS := guard:93 githook:70 install:75 release:65 update:95 ui:90 proc:70 fsx:65 usage:90
+COVER_GATES_WINDOWS := guard:93 githook:70 install:75 release:65 update:95 ui:90 proc:70 fsx:65 usage:90 inuse:65
 
 cover-gates:
 	@scripts/cover-gates.sh $(COVER_GATES)
