@@ -185,6 +185,7 @@ func within(dir, base string) bool {
 	if err1 == nil && err2 == nil {
 		dir, base = rd, rb
 	}
+	base = filepath.Clean(base)
 	rel, err := filepath.Rel(base, dir)
 	return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) && filepath.Dir(base) != base
 }
