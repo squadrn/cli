@@ -104,6 +104,8 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 		}
 		return
 	}
+	e.psRedirects(words, *dir)
+
 	// & <command>, . <script>: the call operators run the command like a statement.
 	if first.val == "&" || first.val == "." {
 		if len(words) < 2 {
@@ -118,6 +120,7 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 	}
 
 	name := cmdBase(first.val)
+	args := psArgs(words[1:])
 	switch {
 	case name == "git-bash" || name == "bash" || name == "sh":
 		e.psShell(name, words[1:], *dir, depth)
@@ -132,8 +135,12 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 		}
 	case name == "pwsh" || name == "powershell":
 		e.psNested(words[1:], *dir, depth)
+	case e.names[name]:
+		e.sprawl(args)
 	case psEnvWrite(name, words[1:]):
 		e.flag(Ask, "changing GIT_* environment variables can disable the git-level guard")
+	case psFileWriter(name):
+		e.psFileWrite(name, words[1:], *dir)
 	default:
 		if what, ok := psExecutors[name]; ok {
 			e.flag(Ask, what+" can run git in a way that cannot be checked")
@@ -151,6 +158,14 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 			e.flag(Ask, "an unrecognised command with push in its arguments (an alias for git?)")
 		}
 	}
+}
+
+func psArgs(words []psWord) []arg {
+	out := make([]arg, len(words))
+	for i, w := range words {
+		out[i] = arg(w)
+	}
+	return out
 }
 
 // psEnvName returns the variable name of $env:X, env:X, env:\X or env:/X (any case).

@@ -99,6 +99,7 @@ func (e *extractor) script(src, cwd string, depth int) error {
 				}
 			}
 		case *syntax.Stmt:
+			e.redirects(node.Redirs, dir)
 			call, ok := node.Cmd.(*syntax.CallExpr)
 			if !ok {
 				return true
@@ -188,6 +189,8 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 		}
 	case base == "source" || base == ".":
 		e.source(argv[1:], *dir)
+	case e.names[base]:
+		e.sprawl(argv[1:])
 	case base == "pwsh" || base == "powershell":
 		words := make([]psWord, len(argv)-1)
 		for i, a := range argv[1:] {
@@ -217,6 +220,9 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 		e.interpreter(argv, redirs)
 	case isEditorLike(base):
 		e.editorLike(base, argv)
+		if isFileWriter(base) {
+			e.fileWrite(base, argv[1:], *dir)
+		}
 	case base == "xargs" || base == "parallel":
 		if anyContainsFold(argv[1:], "git") || anyContainsFold(argv[1:], "push") {
 			e.flag(Ask, base+" supplies arguments at runtime, so the git command it runs cannot be checked")
@@ -230,6 +236,8 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 	case base == "watch":
 		rest := skipOptions(argv[1:], map[string]bool{"-n": true, "-d": false, "--interval": true, "-q": true})
 		return e.nested(rest, *dir, depth, "watch")
+	case isFileWriter(base):
+		e.fileWrite(base, argv[1:], *dir)
 	case gitPushAlias.MatchString(base):
 		e.flag(Ask, base+" looks like a shell alias for git push, which cannot be checked")
 	}
