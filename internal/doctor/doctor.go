@@ -17,7 +17,9 @@ import (
 
 	"sprawling-agents/internal/account"
 	"sprawling-agents/internal/config"
+	"sprawling-agents/internal/fsx"
 	"sprawling-agents/internal/githook"
+	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/guard"
 	"sprawling-agents/internal/provider"
 	"sprawling-agents/internal/release"
@@ -73,6 +75,10 @@ type Env struct {
 	// none); Signed reports whether this build verifies release signatures.
 	Version, Latest string
 	Signed          bool
+	// Git returns the installed Git version; nil skips the version check.
+	Git func(context.Context) (gitver.Version, error)
+	// GitHint is the command that upgrades Git on this system.
+	GitHint string
 }
 
 // Run performs every check. Account checks run concurrently.
@@ -96,6 +102,22 @@ func (e Env) tilde(p string) string {
 		return filepath.Join("~", rel)
 	}
 	return p
+}
+
+// gitCheck reports Git against the supported minimum (gitver.Min).
+func (e Env) gitCheck(ctx context.Context) Check {
+	const g = "install"
+	if e.Git == nil {
+		return ok(g, "git")
+	}
+	v, err := e.Git(ctx)
+	switch {
+	case err != nil:
+		return bad(g, Fail, err.Error(), e.GitHint)
+	case !v.AtLeast(gitver.Min):
+		return bad(g, Fail, fmt.Sprintf("git %s is too old (sprawl needs %d.%d or newer)", v, gitver.Min.Major, gitver.Min.Minor), e.GitHint)
+	}
+	return ok(g, "git "+v.String())
 }
 
 func (e Env) install() []Check {
@@ -126,7 +148,7 @@ func (e Env) install() []Check {
 	for _, n := range e.Names {
 		if p, err := e.LookPath(n); err != nil {
 			out = append(out, bad(g, Warn, n+" not on PATH", fmt.Sprintf("export PATH=\"%s:$PATH\"", e.tilde(e.Layout.BinDir))))
-		} else if real, _ := filepath.EvalSymlinks(p); real != resolve(e.Self) {
+		} else if !fsx.SameFile(p, e.Self) {
 			out = append(out, bad(g, Warn, n+" on PATH ("+e.tilde(p)+") is a different program than this sprawl", e.Command+" config set command <name>"))
 		} else {
 			out = append(out, ok(g, n+" on PATH"))
@@ -137,9 +159,12 @@ func (e Env) install() []Check {
 		status Status
 		why    string
 	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", Warn, "needed by self-update, gc PR detection and the branch protection check"}} {
-		if _, err := e.LookPath(t.name); err != nil {
+		switch _, err := e.LookPath(t.name); {
+		case err != nil:
 			out = append(out, bad(g, t.status, t.name+" missing ("+t.why+")", "install "+t.name))
-		} else {
+		case t.name == "git":
+			out = append(out, e.gitCheck(context.Background()))
+		default:
 			out = append(out, ok(g, t.name))
 		}
 	}
@@ -386,7 +411,7 @@ func (e Env) links(a account.Account, g string) []Check {
 		if _, err := os.Stat(src); err != nil {
 			continue
 		}
-		if target, err := os.Readlink(filepath.Join(a.Dir, item)); err != nil || target != src {
+		if !account.LinksTo(filepath.Join(a.Dir, item), src) {
 			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account add "+a.Label()))
 		}
 	}

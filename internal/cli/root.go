@@ -70,6 +70,8 @@ type app struct {
 	signers string
 	// backgroundCheck overrides how the update check is started (tests).
 	backgroundCheck func()
+	// gitChecked: the Git version was checked in this run (openRepo).
+	gitChecked bool
 }
 
 // Run executes sprawl with args (program name excluded) and returns the process exit code.

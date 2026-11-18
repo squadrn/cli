@@ -64,7 +64,7 @@ Completions for zsh (`~/.zsh/completions`), bash (`~/.local/share/bash-completio
 and fish (`~/.config/fish/completions`) are written when those directories exist; otherwise
 `sprawl completion zsh|bash|fish` prints them.
 
-Requirements: `claude` (native build), `git`; `tmux` for `grid`/`ps`/`swap`; `gh` for installing
+Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`/`swap`; `gh` for installing
 and updating. Examples below use `sprawl`; `sra` works the same.
 
 ## Accounts

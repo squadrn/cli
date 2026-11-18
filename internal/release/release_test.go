@@ -347,3 +347,18 @@ func TestSnapshotRollbackAndUnlink(t *testing.T) {
 		t.Errorf("missing bin dir: %v, %v", removed, err)
 	}
 }
+
+// TestAssetNamesStable pins the archive names existing installs and install.sh look for.
+func TestAssetNamesStable(t *testing.T) {
+	for _, tt := range []struct{ goos, goarch, want string }{
+		{"linux", "amd64", "sprawl_1.2.3_linux_amd64.tar.gz"},
+		{"linux", "arm64", "sprawl_1.2.3_linux_arm64.tar.gz"},
+		{"darwin", "amd64", "sprawl_1.2.3_darwin_amd64.tar.gz"},
+		{"darwin", "arm64", "sprawl_1.2.3_darwin_arm64.tar.gz"},
+		{"windows", "amd64", "sprawl_1.2.3_windows_amd64.zip"},
+	} {
+		if got := AssetName("v1.2.3", tt.goos, tt.goarch); got != tt.want {
+			t.Errorf("AssetName(%s/%s) = %s, want %s", tt.goos, tt.goarch, got, tt.want)
+		}
+	}
+}

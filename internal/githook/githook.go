@@ -146,14 +146,17 @@ func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {
 		return "", nil
 	case err != nil:
 		return "", err
-	case fi.IsDir() || fi.Mode().Perm()&0o111 == 0:
-		return "", nil // git skips non-executable hooks too
+	case !isRunnable(p, fi):
+		return "", nil // git skips hooks it would not run either
 	}
 	if samePath(filepath.Dir(p), ours) {
 		return "", nil
 	}
 	return p, nil
 }
+
+// HookCommand is how git would start the hook at path with args.
+func HookCommand(path string, args []string) (string, []string) { return hookCommand(path, args) }
 
 func expandHome(p string) string {
 	if rest, ok := strings.CutPrefix(p, "~/"); ok {

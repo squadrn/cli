@@ -86,7 +86,7 @@ func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool
 			return fmt.Errorf("%s: %s cannot create worktrees", acct.Label(), acct.Spec.Name)
 		}
 		if repo.Root == "" {
-			if repo, err = worktree.Open(ctx, repoArg, acct.Spec.WorktreeDir); err != nil {
+			if repo, err = a.openRepo(ctx, repoArg, acct.Spec.WorktreeDir); err != nil {
 				return err
 			}
 		}
@@ -160,7 +160,7 @@ func (a *app) gridSession(ctx context.Context, dir string) (string, error) {
 	if dir == "" {
 		dir = "."
 	}
-	repo, err := worktree.Open(ctx, dir, a.defaultSpec().WorktreeDir)
+	repo, err := a.openRepo(ctx, dir, a.defaultSpec().WorktreeDir)
 	if err != nil {
 		return "", err
 	}

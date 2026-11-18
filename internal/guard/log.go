@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"sprawling-agents/internal/config"
@@ -54,8 +53,7 @@ func (l Log) Record(now time.Time, layer string, d Decision, cwd, cmd string) {
 		return
 	}
 	_ = os.Chmod(dir, 0o700)
-	// O_NOFOLLOW: a symlink planted at the log path cannot redirect writes elsewhere.
-	f, err := os.OpenFile(l.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY|syscall.O_NOFOLLOW, 0o600)
+	f, err := openLog(l.Path)
 	if err != nil {
 		return
 	}

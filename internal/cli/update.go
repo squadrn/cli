@@ -17,6 +17,7 @@ import (
 
 	"sprawling-agents/internal/config"
 	"sprawling-agents/internal/fsx"
+	"sprawling-agents/internal/gitver"
 	"sprawling-agents/internal/install"
 	"sprawling-agents/internal/proc"
 	"sprawling-agents/internal/release"
@@ -340,6 +341,10 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		a.warnf("%v", e)
 	}
 	a.installPlugins()
+	// An update must never be blocked by Git (that would strand users on old releases); say it.
+	if err := gitver.Require(context.Background(), runtime.GOOS); err != nil {
+		a.warnf("%v", err)
+	}
 	if !onPATH(a.layout.BinDir) {
 		a.out("add to your shell rc: export PATH=\"%s:$PATH\"\n", a.layout.BinDir)
 	}

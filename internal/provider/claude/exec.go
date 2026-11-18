@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	"sprawling-agents/internal/proc"
 	"sprawling-agents/internal/provider"
@@ -91,10 +90,10 @@ func (CLI) WorktreeArgs(name string) []string { return []string{"--worktree", na
 
 func (CLI) ResumeArgs(session string) []string { return []string{"--resume", session} }
 
-// Exec replaces the current process with an interactive claude session.
+// Exec runs an interactive claude session in place of sprawl (platform: run).
 func (c CLI) Exec(configDir string, args []string) error {
 	argv := append([]string{"claude"}, args...)
-	if err := syscall.Exec(c.Bin, argv, c.env(configDir)); err != nil {
+	if err := run(c.Bin, argv, c.env(configDir)); err != nil {
 		return fmt.Errorf("exec %s: %w", c.Bin, err)
 	}
 	return nil

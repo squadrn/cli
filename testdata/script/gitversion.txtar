@@ -1,0 +1,10 @@
+# A Git older than the supported minimum gets a clear message with the upgrade command, not a raw
+# git error. Everything but `git version` still reaches the real git.
+exec git init -q -b main repo
+exec sh -c 'real=$(command -v git); printf "#!/bin/sh\nif [ \"\$1\" = version ]; then echo \"git version 2.30.2\"; exit 0; fi\nexec \"%s\" \"\$@\"\n" "$real" > bin/git && chmod 755 bin/git'
+cd repo
+! exec sprawl wt ls
+stderr 'git 2.30.2 is too old; sprawl needs git 2.31 or newer \(upgrade: '
+exitcode 1 sprawl gc
+! exec sprawl doctor
+stdout '✗ git 2.30.2 is too old \(sprawl needs 2.31 or newer\)  → '

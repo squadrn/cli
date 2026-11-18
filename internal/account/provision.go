@@ -101,7 +101,7 @@ func (p Provisioner) linkShared(a Account, r *Report) error {
 func linkOne(src, dst string, r *Report) error {
 	if _, err := os.Stat(src); errors.Is(err, fs.ErrNotExist) {
 		// main no longer has the item: drop the link we made to it rather than leave it dangling.
-		if target, err := os.Readlink(dst); err == nil && target == src {
+		if linksTo(dst, src) {
 			if err := os.Remove(dst); err != nil {
 				return err
 			}
@@ -111,14 +111,14 @@ func linkOne(src, dst string, r *Report) error {
 	} else if err != nil {
 		return err
 	}
-	if target, err := os.Readlink(dst); err == nil && target == src {
+	if linksTo(dst, src) {
 		return nil
 	}
 	if _, err := os.Lstat(dst); err == nil {
 		r.Conflicts = append(r.Conflicts, dst)
 		return nil
 	}
-	if err := os.Symlink(src, dst); err != nil {
+	if err := link(src, dst); err != nil {
 		return fmt.Errorf("link %s: %w", dst, err)
 	}
 	r.Linked = append(r.Linked, dst)

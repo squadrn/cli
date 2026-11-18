@@ -1,0 +1,44 @@
+sprawl_VERSION_darwin_amd64.tar.gz
+  .claude-plugin/marketplace.json
+  LICENSE
+  README.md
+  plugin/.claude-plugin/plugin.json
+  plugin/README.md
+  plugin/agents/locator.md
+  plugin/agents/reviewer.md
+  plugin/bin/sprawl-hook
+  plugin/hooks/hooks.json
+  sprawl
+sprawl_VERSION_darwin_arm64.tar.gz
+  .claude-plugin/marketplace.json
+  LICENSE
+  README.md
+  plugin/.claude-plugin/plugin.json
+  plugin/README.md
+  plugin/agents/locator.md
+  plugin/agents/reviewer.md
+  plugin/bin/sprawl-hook
+  plugin/hooks/hooks.json
+  sprawl
+sprawl_VERSION_linux_amd64.tar.gz
+  .claude-plugin/marketplace.json
+  LICENSE
+  README.md
+  plugin/.claude-plugin/plugin.json
+  plugin/README.md
+  plugin/agents/locator.md
+  plugin/agents/reviewer.md
+  plugin/bin/sprawl-hook
+  plugin/hooks/hooks.json
+  sprawl
+sprawl_VERSION_linux_arm64.tar.gz
+  .claude-plugin/marketplace.json
+  LICENSE
+  README.md
+  plugin/.claude-plugin/plugin.json
+  plugin/README.md
+  plugin/agents/locator.md
+  plugin/agents/reviewer.md
+  plugin/bin/sprawl-hook
+  plugin/hooks/hooks.json
+  sprawl
