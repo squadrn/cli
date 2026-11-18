@@ -134,7 +134,7 @@ exec git -C feat -c core.hooksPath=$HOME/.local/share/sprawl/git-hooks push -q o
 -- token.json --
 {"cwd":"feat","tool_input":{"command":"git push https://u:s3cr3t@github.com/o/r main"}}
 -- dynamic.json --
-{"cwd":"feat","tool_input":{"command":"git push origin \"$(git branch --show-current)\""}}
+{"cwd":"feat","tool_input":{"command":"git push origin \"$BRANCH\""}}
 -- prod-main.json --
 {"cwd":"prod","tool_input":{"command":"git push origin main"}}
 -- prod-disable.json --
