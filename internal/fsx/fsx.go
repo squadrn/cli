@@ -47,6 +47,21 @@ func WriteBytes(path string, b []byte, perm fs.FileMode) error {
 	return WriteFile(path, bytes.NewReader(b), perm)
 }
 
+// AppendLine appends b and a newline to path in one write, creating the file (and its
+// directory, mode 0o700) when missing. Lines appended concurrently by separate writers do not
+// interleave on local filesystems.
+func AppendLine(path string, b []byte, perm fs.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, perm)
+	if err != nil {
+		return err
+	}
+	_, werr := f.Write(append(append([]byte(nil), b...), '\n'))
+	return errors.Join(werr, f.Close())
+}
+
 // CopyFile copies a regular file atomically, keeping its permission bits (masked by permMask)
 // and, when keepTimes is set, its modification time.
 func CopyFile(src, dst string, permMask fs.FileMode, keepTimes bool) error {
