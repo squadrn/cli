@@ -269,3 +269,16 @@ func TestVersions(t *testing.T) {
 		t.Error("agent error reported twice")
 	}
 }
+
+func TestUsageTrackingLine(t *testing.T) {
+	e := env(t, fakeAgent{loggedIn: true}, nil)
+	e.Command = "sra"
+	e.Usage = func(account.Account) bool { return false }
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (sra usage --setup claude/main)"); !ok || c.Status != OK {
+		t.Errorf("off: %+v", c)
+	}
+	e.Usage = func(account.Account) bool { return true }
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: on"); !ok || c.Status != OK {
+		t.Errorf("on: %+v", c)
+	}
+}

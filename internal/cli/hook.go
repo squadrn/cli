@@ -49,7 +49,7 @@ type hookEnv struct {
 	now            func() time.Time
 }
 
-const hookUsage = "usage: sprawl hook guard-git | notify <title> | git <hook-name> [args...]"
+const hookUsage = "usage: sprawl hook guard-git | notify <title> | git <hook-name> [args...] | statusline [--then <command>] | limit"
 
 // runHook handles `sprawl hook …` and returns the exit code.
 func runHook(args []string, h hookEnv) int {
@@ -79,6 +79,14 @@ func runHook(args []string, h hookEnv) int {
 			return exitUsage
 		}
 		return h.git(args[1], args[2:])
+	case "statusline":
+		return h.statusline(args[1:])
+	case "limit":
+		if len(args) != 1 {
+			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			return exitUsage
+		}
+		return h.limit()
 	case "-h", "--help", "help":
 		_, _ = fmt.Fprintln(h.stdout, hookUsage)
 		return exitOK

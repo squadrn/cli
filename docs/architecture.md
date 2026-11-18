@@ -29,6 +29,7 @@
 | `update` | when to check for releases, channel selection, the cached result | network, printing |
 | `doctor` | structured health checks, including all three guard layers | printing |
 | `inuse` | which sessions run in a directory (`<dir>/.sprawl-inuse/<pid>.json`, live by pid and start time), per-repository lock files | printing |
+| `usage` | per-account usage snapshots (limits, last limit hit), merge rules, states, ranking for a swap ([ADR 0009](adr/0009-usage-and-session-handoff.md)) | provider knowledge, printing |
 | `proc` | running programs under a deadline that kills the whole process group | — |
 | `fsx` | atomic writes, copies, directory swaps | — |
 
@@ -84,6 +85,7 @@ embedded keys, then the checksum, snapshots the installed release to `previous/`
 ~/.config/sprawl/config.toml    schema, command, aliases, default provider, MCP allowlist,
                                 protected branches, git_hooks
 ~/.local/state/sprawl/          guard.log (0600, dir 0700, credentials masked), legacy-<name>-* backups
+~/.local/state/sprawl/usage/    <provider>-<name>.json usage per account (0600)
 ~/.cache/sprawl/auth.json       login status cache (60 s; failures 15 s; 0600)
 ~/.cache/sprawl/update.json     last update check and notice
 ```

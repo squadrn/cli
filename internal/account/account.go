@@ -35,7 +35,7 @@ var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,23}$`)
 // be account names: `sprawl <word> ...` would be ambiguous.
 var Commands = []string{
 	"account", "completion", "config", "deps", "doctor", "gc", "grid", "help", "hook", "ps",
-	"self-install", "self-uninstall", "self-update", "swap", "version", "wt",
+	"self-install", "self-uninstall", "self-update", "swap", "usage", "version", "wt",
 }
 
 func reserved(name string) bool {

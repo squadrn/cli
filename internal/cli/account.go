@@ -29,14 +29,7 @@ func (a *app) accountCmd() *cobra.Command {
 	ls.Flags().BoolVar(&asJSON, "json", false, "print JSON")
 	cmd.AddCommand(
 		ls,
-		&cobra.Command{
-			Use:               "add [<provider>/]<name>",
-			Short:             "Create or repair an account (shared links, allowlisted MCP, plugin)",
-			Example:           fmt.Sprintf("  %[1]s account add work\n  %[1]s account add claude/work", a.cmd),
-			Args:              oneArg,
-			RunE:              func(_ *cobra.Command, args []string) error { return a.accountAdd(args[0]) },
-			ValidArgsFunction: cobra.NoFileCompletions,
-		},
+		a.accountAddCmd(),
 		&cobra.Command{
 			Use:               "login <account>",
 			Short:             "Sign an account in",
@@ -165,7 +158,31 @@ func (a *app) accountList(asJSON bool) error {
 	return nil
 }
 
-func (a *app) accountAdd(input string) error {
+func (a *app) accountAddCmd() *cobra.Command {
+	var track, noTrack bool
+	cmd := &cobra.Command{
+		Use:     "add [<provider>/]<name>",
+		Short:   "Create or repair an account (shared links, allowlisted MCP, plugin)",
+		Example: fmt.Sprintf("  %[1]s account add work\n  %[1]s account add claude/work", a.cmd),
+		Args:    oneArg,
+		RunE: func(_ *cobra.Command, args []string) error {
+			if track && noTrack {
+				return usagef("--usage and --no-usage cannot be combined")
+			}
+			var choice *bool
+			if track || noTrack {
+				choice = &track
+			}
+			return a.accountAdd(args[0], choice)
+		},
+		ValidArgsFunction: cobra.NoFileCompletions,
+	}
+	cmd.Flags().BoolVar(&track, "usage", false, "track usage limits in the status line without asking")
+	cmd.Flags().BoolVar(&noTrack, "no-usage", false, "do not track usage limits and do not ask")
+	return cmd
+}
+
+func (a *app) accountAdd(input string, trackUsage *bool) error {
 	acct, err := a.store.Define(input)
 	if err != nil {
 		return err
@@ -181,6 +198,9 @@ func (a *app) accountAdd(input string) error {
 		return err
 	}
 	a.cache.Forget(acct.Label())
+	if err := a.offerUsageTracking(acct, trackUsage); err != nil {
+		a.warnf("usage tracking: %v; run: %s usage --setup %s", err, a.cmd, acct.Label())
+	}
 	if s, err := ag.Auth(context.Background(), acct.ConfigDir()); err != nil || !s.LoggedIn {
 		a.out("next: %s account login %s\n", a.cmd, acct.Label())
 	}
