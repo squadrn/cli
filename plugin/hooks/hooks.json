@@ -11,6 +11,9 @@
     ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Xong việc'", "async": true }] }
+    ],
+    "StopFailure": [
+      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" limit", "async": true }] }
     ]
   }
 }

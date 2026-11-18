@@ -19,6 +19,8 @@ exec sprawl account rename --help
 cmp stdout help-account-rename.txt
 exec sprawl account rm --help
 cmp stdout help-account-rm.txt
+exec sprawl usage --help
+cmp stdout help-usage.txt
 exec sprawl wt --help
 cmp stdout help-wt.txt
 exec sprawl wt ls --help
@@ -107,6 +109,7 @@ Agents:
 
 Accounts:
   account        Manage agent accounts (default: ls)
+  usage          Show each account's usage limits and which one to use next
 
 Setup:
   completion     Generate the autocompletion script for the specified shell
@@ -174,7 +177,9 @@ Examples:
   sprawl account add claude/work
 
 Flags:
-  -h, --help   help for add
+  -h, --help       help for add
+      --no-usage   do not track usage limits and do not ask
+      --usage      track usage limits in the status line without asking
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -228,6 +233,36 @@ Usage:
 Flags:
   -h, --help   help for rm
   -y, --yes    do not ask for confirmation
+
+Global Flags:
+  -a, --account string   account to run as (provider/name or name)
+  -C, --dir string       run as if started in this directory
+      --no-color         disable colors (also: NO_COLOR=1)
+-- help-usage.txt --
+Show what the status line last reported about each account's usage limits (5-hour and
+7-day windows), when it last hit a limit, and the best account to continue with in this repository.
+
+Usage is recorded by the status line, so it needs a one-time setup per settings file:
+sprawl usage --setup wraps the status line command (your own one keeps running and showing).
+
+Usage:
+  sprawl usage [<account>] [flags]
+
+Examples:
+  sprawl usage                 all accounts
+  sprawl usage work            details of claude/work
+  sprawl usage --setup --all   record usage for every account
+  sprawl usage --setup --undo  restore the previous status line
+
+Flags:
+      --all       with --setup: every account
+  -h, --help      help for usage
+      --json      print JSON
+      --refresh   query login status, plan and organisation again
+      --setup     record usage through the account's status line
+      --undo      with --setup: restore the previous status line
+      --watch     redraw every 5 seconds
+  -y, --yes       do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -1449,6 +1484,9 @@ complete -k -c sprawl -n '__sprawl_requires_order_preservation && __sprawl_prepa
     ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Xong việc'", "async": true }] }
+    ],
+    "StopFailure": [
+      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" limit", "async": true }] }
     ]
   }
 }

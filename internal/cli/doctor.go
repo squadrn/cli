@@ -38,6 +38,7 @@ func (a *app) doctorCmd() *cobra.Command {
 				Signed:   a.signers != "",
 				Git:      gitver.Detect,
 				GitHint:  gitver.Hint(runtime.GOOS),
+				Usage:    a.usageTracking,
 			}
 			if latest, ok := update.Available(Version, update.Load(a.updateStatePath())); ok {
 				env.Latest = latest
