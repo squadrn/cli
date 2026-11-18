@@ -2,6 +2,7 @@ package guard
 
 import (
 	"context"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -116,7 +117,7 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 		}
 		return nil
 	}
-	base := strings.ToLower(filepath.Base(name.val))
+	base := cmdBase(name.val)
 	switch {
 	case base == "cd" || base == "pushd":
 		if t := firstOperand(argv[1:]); t != nil && !t.dynamic {
@@ -135,6 +136,29 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 		return e.gitSub(strings.TrimPrefix(base, "git-"), argv[1:], *dir, nil, configEnv, depth)
 	case base == "eval":
 		return e.nested(argv[1:], *dir, depth, "eval")
+	case base == "pwsh" || base == "powershell":
+		words := make([]psWord, len(argv)-1)
+		for i, a := range argv[1:] {
+			words[i] = psWord{val: a.val, dynamic: a.dynamic}
+		}
+		e.psNested(words, *dir, depth)
+	case base == "wsl" || base == "winpty":
+		rest := wslCommand(argv)
+		if len(rest) == 0 {
+			if base == "wsl" {
+				e.flag(Ask, "wsl starts a shell that reads its commands from stdin, which cannot be checked")
+			}
+			return nil
+		}
+		return e.call(rest, redirs, dir, depth+1, configEnv)
+	case base == "cmd":
+		if cmdRuns(argv[1:]) && anyContainsFold(argv[1:], "git") {
+			e.flag(Ask, "cmd.exe syntax is not analysed, so a git push in it cannot be checked")
+		}
+	case base == "start" || base == "cygstart":
+		if anyContainsFold(argv[1:], "git") {
+			e.flag(Ask, base+" starts a program whose git commands cannot be checked")
+		}
 	case isShell(base):
 		return e.shell(argv, redirs, *dir, depth)
 	case isInterpreter(base):
@@ -404,7 +428,7 @@ var wrapperOptsWithValue = map[string]map[string]bool{
 func (e *extractor) unwrap(argv []arg, dir string, depth int) ([]arg, bool) {
 	configEnv := false
 	for len(argv) > 0 && !argv[0].dynamic {
-		w := strings.ToLower(filepath.Base(argv[0].val))
+		w := cmdBase(argv[0].val)
 		switch w {
 		case "sudo", "doas", "command", "builtin", "exec", "nohup", "time", "nice", "stdbuf", "caffeinate",
 			"noglob", "ionice", "chronic", "xcrun", "unbuffer", "torsocks", "proxychains", "proxychains4":
@@ -493,7 +517,7 @@ func isShell(base string) bool {
 func isInterpreter(base string) bool {
 	switch base {
 	case "python", "python2", "python3", "node", "nodejs", "deno", "bun", "perl", "ruby", "php", "lua",
-		"osascript", "rscript", "tclsh", "pwsh", "powershell", "groovy", "jshell":
+		"osascript", "rscript", "tclsh", "groovy", "jshell":
 		return true
 	}
 	return strings.HasPrefix(base, "python3.")
@@ -548,16 +572,55 @@ func scriptFlag(argv []arg) (int, *arg) {
 	return 0, nil
 }
 
+// cmdBase normalises a command word: lower case, last element of a / or \ path, no .exe — so
+// C:\Program Files\Git\cmd\git.exe and /mingw64/bin/git are both "git".
+func cmdBase(v string) string {
+	b := strings.ToLower(path.Base(strings.ReplaceAll(v, `\`, "/")))
+	return strings.TrimSuffix(b, ".exe")
+}
+
+// wslCommand returns the command wsl or winpty runs, skipping their options.
+func wslCommand(argv []arg) []arg {
+	rest := argv[1:]
+	for len(rest) > 0 && !rest[0].dynamic {
+		switch v := rest[0].val; v {
+		case "-d", "--distribution", "-u", "--user", "--cd":
+			rest = rest[min(2, len(rest)):]
+		case "-e", "--exec", "--":
+			return rest[1:]
+		default:
+			if strings.HasPrefix(v, "-") {
+				rest = rest[1:]
+				continue
+			}
+			return rest
+		}
+	}
+	return rest
+}
+
+// cmdRuns reports cmd.exe running a command line (/c, /k, //c from Git Bash).
+func cmdRuns(args []arg) bool {
+	for _, a := range args {
+		switch strings.ToLower(a.val) {
+		case "/c", "/k", "//c", "//k", "-c":
+			return true
+		}
+	}
+	return false
+}
+
 func isGitName(a arg) bool {
 	if a.dynamic {
 		return false
 	}
-	b := strings.ToLower(filepath.Base(a.val))
+	b := cmdBase(a.val)
 	return b == "git" || strings.HasPrefix(b, "git-")
 }
 
 // isGitConfigEnv reports environment variables that inject git configuration or programs.
 func isGitConfigEnv(name string) bool {
+	name = strings.ToUpper(name) // Windows environment names are case-insensitive
 	return name == "GIT_CONFIG_COUNT" || name == "GIT_CONFIG_PARAMETERS" || name == "GIT_EXEC_PATH" ||
 		name == "GIT_CONFIG" || name == "GIT_CONFIG_GLOBAL" || name == "GIT_CONFIG_SYSTEM" ||
 		strings.HasPrefix(name, "GIT_CONFIG_KEY_") || strings.HasPrefix(name, "GIT_CONFIG_VALUE_")
