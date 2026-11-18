@@ -81,6 +81,8 @@ type Env struct {
 	GitHint string
 	// ConfigErr is why the config file could not be loaded (nil when it is fine).
 	ConfigErr error
+	// Usage reports whether an account records its usage limits; nil skips the line.
+	Usage func(account.Account) bool
 }
 
 // Run performs every check. Account checks run concurrently.
@@ -391,6 +393,13 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 	}
 	if a.Spec.Caps.Plugins {
 		out = append(out, e.plugin(ctx, ag, a, g)...)
+	}
+	if e.Usage != nil && a.Spec.Caps.UsageReport {
+		if e.Usage(a) {
+			out = append(out, ok(g, "usage tracking: on"))
+		} else {
+			out = append(out, ok(g, "usage tracking: off ("+e.Command+" usage --setup "+a.Label()+")"))
+		}
 	}
 	if !a.IsMain() {
 		if fi, err := os.Stat(a.Dir); err == nil && !private(fi) {

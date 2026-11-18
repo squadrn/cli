@@ -14,6 +14,8 @@ type Caps struct {
 	Plugins bool
 	// SharedMCP: user-scope MCP servers can be copied from the main account.
 	SharedMCP bool
+	// UsageReport: the CLI reports usage limits to sprawl (status line, limit hook).
+	UsageReport bool
 }
 
 type Spec struct {
@@ -50,6 +52,9 @@ type AuthStatus struct {
 	LoggedIn bool   `json:"loggedIn"`
 	Email    string `json:"email"`
 	OrgName  string `json:"orgName"`
+	// SubscriptionType is the plan ("pro", "max", …); empty for API billing or older CLIs.
+	SubscriptionType string `json:"subscriptionType,omitempty"`
+	AuthMethod       string `json:"authMethod,omitempty"`
 }
 
 // ExitStatus is returned by Agent.Exec on platforms where the session runs as a child process
@@ -119,7 +124,7 @@ var Claude = Spec{
 	},
 	InstallHint:  "curl -fsSL https://claude.ai/install.sh | bash",
 	NativeMarker: "/.local/share/claude/versions/",
-	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true},
+	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},
 }
 
 var registry = []Spec{Claude}

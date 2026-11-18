@@ -69,8 +69,9 @@ func fakeClaudeMain(args []string) int {
 	switch {
 	case cmd == "auth status":
 		org, _ := os.ReadFile(filepath.Join(dir, ".org"))
+		plan, _ := os.ReadFile(filepath.Join(dir, ".plan"))
 		if exists(".loggedin") {
-			fmt.Printf(`{"loggedIn":true,"email":"me@%s","orgName":"%s"}`+"\n", filepath.Base(dir), strings.TrimSpace(string(org)))
+			fmt.Printf(`{"loggedIn":true,"email":"me@%s","orgName":"%s","subscriptionType":"%s"}`+"\n", filepath.Base(dir), strings.TrimSpace(string(org)), strings.TrimSpace(string(plan)))
 			return 0
 		}
 		fmt.Println(`{"loggedIn":false}`)
@@ -113,14 +114,15 @@ func fakeClaudeMain(args []string) int {
 
 // fakeClaude answers the queries sprawl makes and records every other invocation in
 // $HOME/calls.log. Inside a tmux pane it stays alive like an interactive session.
-// `auth status` reports logged in when <config dir>/.loggedin exists.
+// `auth status` reports logged in when <config dir>/.loggedin exists, with .org and .plan.
 const fakeClaude = `#!/bin/sh
 cfg=${CLAUDE_CONFIG_DIR:-<unset>}
 dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 case "$*" in
   "auth status")
     org=$(cat "$dir/.org" 2>/dev/null)
-    if [ -f "$dir/.loggedin" ]; then echo '{"loggedIn":true,"email":"me@'"$(basename "$dir")"'","orgName":"'"$org"'"}'; exit 0; fi
+    plan=$(cat "$dir/.plan" 2>/dev/null)
+    if [ -f "$dir/.loggedin" ]; then echo '{"loggedIn":true,"email":"me@'"$(basename "$dir")"'","orgName":"'"$org"'","subscriptionType":"'"$plan"'"}'; exit 0; fi
     echo '{"loggedIn":false}'; exit 1 ;;
   "auth logout") rm -f "$dir/.loggedin"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
   "mcp get "*) grep -qx "$3" "$dir/.mcp" 2>/dev/null ;;

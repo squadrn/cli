@@ -1,0 +1,170 @@
+[windows] skip 'Unix script: sh, symlinks'
+# Fixture: main (max, acme) with its own status line; work shares main's settings.json.
+cp settings.json home/.claude/settings.json
+cp empty home/.claude/.loggedin
+cp max home/.claude/.plan
+cp acme home/.claude/.org
+exec sprawl account add work --no-usage
+! stdout 'usage tracking'
+cp empty home/.claude-work/.loggedin
+cp acme home/.claude-work/.org
+
+# Fake notifiers record what the limit hook would show.
+cp notifier bin/osascript
+cp notifier bin/notify-send
+chmod 755 bin/osascript
+chmod 755 bin/notify-send
+
+# Without data nothing is an error.
+exec sprawl usage
+stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
+stdout '^claude/main +max +acme +- +- +- +- +nodata +-$'
+stdout '^claude/work +- +acme +- +- +- +- +nodata +-$'
+stdout 'not tracked: claude/main, claude/work \(run: sprawl usage --setup\)'
+
+# Setup asks first; without a terminal it needs --yes.
+exitcode 2 sprawl usage --setup
+exitcode 2 sprawl usage --undo
+exitcode 2 sprawl usage --setup --all work
+exec sprawl usage --setup --all -y
+stdout '^usage tracking on: ~/.claude/settings.json \(claude/main, claude/work\)$'
+! stdout 'claude-work'
+grep '"command": ".*/sprawl hook statusline --then .echo mine; printf ' home/.claude/settings.json
+grep '"padding": 2' home/.claude/settings.json
+grep '"model": "opus"' home/.claude/settings.json
+exec sh -c 'test -L home/.claude-work/settings.json'
+
+# Setting it up again changes nothing.
+cp home/.claude/settings.json before.json
+exec sprawl usage --setup work
+stdout '^usage tracking already on: ~/.claude/settings.json \(claude/main, claude/work\)$'
+cmp home/.claude/settings.json before.json
+exec sprawl usage --setup --all -y
+stdout 'already on'
+exec sprawl account add work
+! stdout 'usage tracking'
+
+# The wrapped command still runs, with the same input, and its output and exit status pass through.
+stdin status.json
+exec sprawl hook statusline --then 'echo mine; printf ''%s'' x'
+stdout '^mine$'
+stdout '^x$'
+stdin status.json
+! exec sprawl hook statusline --then 'cat; exit 3'
+stdout '"session_id":"s1"'
+exists home/.local/state/sprawl/usage/claude-main.json
+
+# Without --then it prints a compact line for the account in CLAUDE_CONFIG_DIR.
+env CLAUDE_CONFIG_DIR=$HOME/.claude-work
+stdin status.json
+exec sprawl hook statusline
+stdout '^work · 5h 42% · 7d 18%$'
+grep '"used_pct": 42' home/.local/state/sprawl/usage/claude-work.json
+grep '"cwd": "/repo"' home/.local/state/sprawl/usage/claude-work.json
+stdin nolimits.json
+exec sprawl hook statusline
+stdout '^work · 5h 42% · 7d 18%$'
+
+# An unknown config dir is not recorded; broken input still prints.
+env CLAUDE_CONFIG_DIR=$WORK/elsewhere
+stdin status.json
+exec sprawl hook statusline
+stdout '^5h 42% · 7d 18%$'
+! exists home/.local/state/sprawl/usage/claude-elsewhere.json
+stdin garbage.txt
+exec sprawl hook statusline
+stdout '^$'
+exitcode 2 sprawl hook statusline --bogus
+exitcode 2 sprawl hook limit extra
+
+# A turn stopped by the usage limit is recorded and notified.
+exec sh -c 'sed "s#WORKDIR#$WORK#" limit.tmpl > limit.json'
+env CLAUDE_CONFIG_DIR=$HOME/.claude-work
+stdin limit.json
+exec sprawl hook limit
+grep '"limited_session": "s2"' home/.local/state/sprawl/usage/claude-work.json
+grep '"reset_estimate"' home/.local/state/sprawl/usage/claude-work.json
+grep 'claude/work hit its usage limit \(resets (Mon |Tue |Wed |Thu |Fri |Sat |Sun )?15:45\) — sprawl swap' notified.txt
+stdin other-error.json
+exec sprawl hook limit
+env CLAUDE_CONFIG_DIR=
+
+# The table and JSON show the limit and the best account for the repository it happened in.
+mkdir repo
+cd repo
+exec sprawl usage
+stdout '^claude/work +- +acme +42% .* +18% .* +limited +just now$'
+stdout '^best for this repo: claude/main$'
+exec sprawl usage --json
+stdout '"from": "claude/work"'
+stdout '"best": "claude/main"'
+stdout '"state": "limited"'
+stdout '"tracking": true'
+stdout '"used_pct": 42'
+stdout '"session": "s2"'
+exec sprawl usage work
+stdout '^state +limited$'
+stdout '^limit hit +just now, resets .*15:45$'
+stdout '^tracking +on$'
+stdout '^best for this repo: claude/main$'
+exec sprawl usage work --json
+stdout '"account": "claude/work"'
+! stdout '"accounts"'
+! exec sprawl usage nobody
+cd $WORK
+exitcode 2 sprawl usage --watch --json
+
+# Doctor reports tracking per account.
+exec sh -c 'sprawl doctor > doctor.txt || true'
+grep 'usage tracking: on' doctor.txt
+
+# --undo restores the previous command, once.
+exec sprawl usage --setup --undo -y
+stdout '^usage tracking off: ~/.claude/settings.json \(claude/main, claude/work\)$'
+grep '"command": "echo mine; printf ''%s'' x"' home/.claude/settings.json
+! grep 'hook statusline' home/.claude/settings.json
+exec sprawl usage --setup --undo -y
+stdout 'not set up'
+
+# An account with its own settings and no status line gets one; undo removes it again.
+mkdir home/.claude-solo
+cp emptyobj home/.claude-solo/settings.json
+exec sprawl account add solo --usage
+stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
+grep '"command": ".* hook statusline"' home/.claude-solo/settings.json
+! grep 'then' home/.claude-solo/settings.json
+exec sprawl usage --setup --undo solo -y
+! grep 'statusLine' home/.claude-solo/settings.json
+exitcode 2 sprawl account add solo --usage --no-usage
+
+# self-uninstall puts every status line back.
+exec sprawl usage --setup --all -y
+exec sprawl self-uninstall --yes
+stdout 'restored the status line in ~/.claude/settings.json'
+grep '"command": "echo mine; printf ''%s'' x"' home/.claude/settings.json
+
+-- empty --
+-- emptyobj --
+{}
+-- max --
+max
+-- acme --
+acme
+-- settings.json --
+{
+  "model": "opus",
+  "statusLine": {"type": "command", "command": "echo mine; printf '%s' x", "padding": 2}
+}
+-- notifier --
+#!/bin/sh
+printf '%s\n' "$@" >> "$HOME/../notified.txt"
+-- status.json --
+{"session_id":"s1","cwd":"/repo","rate_limits":{"five_hour":{"used_percentage":42,"resets_at":4102444800},"seven_day":{"used_percentage":18.2,"resets_at":4102444800}}}
+-- nolimits.json --
+{"session_id":"s1","cwd":"/repo"}
+-- limit.tmpl --
+{"session_id":"s2","cwd":"WORKDIR/repo","hook_event_name":"StopFailure","error":"rate_limit","error_details":"429 Too Many Requests","last_assistant_message":"You've hit your session limit · resets 3:45pm"}
+-- other-error.json --
+{"session_id":"s3","cwd":"/x","error":"server_error"}
+-- garbage.txt --
+not json

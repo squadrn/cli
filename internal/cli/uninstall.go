@@ -72,6 +72,7 @@ func (a *app) uninstall(purge bool) error {
 		cancel()
 	}
 	names := append([]string{a.cmd}, a.cfg.Aliases...)
+	a.restoreStatusLines()
 	links, err := a.layout.Unlink()
 	if err != nil {
 		return err

@@ -134,6 +134,57 @@ Global options before the command: `-a <account>`, `-C <dir>`, `--no-color` (als
 Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `comacpro-2`. Names that are sprawl or
 provider subcommands (`mcp`, `wt`, …) are rejected. Account dirs are created private (`0700`).
 
+## Usage limits
+
+Claude Code reports a subscription's 5-hour and 7-day usage to its status line, and runs a
+`StopFailure` hook when a turn stops on a usage limit. sprawl records both per account, so you
+can see which account has room left before you swap.
+
+```sh
+sprawl usage                        # every account: plan, org, 5h/7d used and reset times, state
+sprawl usage work                   # details, including the last limit hit
+sprawl usage --json                 # stable JSON (below)
+sprawl usage --refresh              # also re-query login, plan and organization
+sprawl usage --watch                # redraw every 5 seconds
+sprawl usage --setup [work|--all]   # record usage through the status line (asks; -y skips)
+sprawl usage --setup --undo         # restore the previous status line
+```
+
+`--setup` wraps the status line command in `settings.json`: sprawl records what it receives, then
+runs your own command with the same input and shows its output unchanged (without one, it shows
+`work · 5h 42% · 7d 18%`). Accounts that share main's `settings.json` are all covered by one
+change. `account add` offers it once (`--usage`/`--no-usage` decide without asking);
+`self-uninstall` restores the previous command; `doctor` shows whether each account is tracked.
+When a session hits its limit, the plugin's hook records it and notifies
+*"claude/work hit its usage limit (resets 15:45) — sprawl swap"*.
+
+Usage is only known for claude.ai subscriptions (Pro, Max, …), after a session's first reply, and
+only as fresh as the last status line update. States: `ok`, `high` (5h ≥ 80% or 7d ≥ 90%),
+`limited`, `reset` (a limit or high window has reset since), `stale` (older than 6 hours),
+`nodata`, `metered` (API billing), `loggedout`, `na` (provider does not report usage). The footer
+names the best account for the current repository: the same provider, not limited, then lowest 5h
+and 7d use. Records live in `~/.local/state/sprawl/usage/` (private).
+
+`--json` prints `{"accounts": [...], "from": "...", "best": "...", "next_reset": "..."}` (`from`:
+the account last limited or active in this directory; `next_reset`: when every account is limited,
+the first reset). Each account (also printed alone by `usage <account> --json`):
+
+```json
+{
+  "account": "claude/work", "plan": "max", "org": "Acme", "email": "me@example.com",
+  "logged_in": true, "state": "limited", "tracking": true,
+  "five_hour": {"used_pct": 100, "resets_at": "2026-11-18T15:45:00+01:00"},
+  "seven_day": {"used_pct": 41, "resets_at": "2026-11-23T00:00:00+01:00"},
+  "spend": {"used_pct": 63, "resets_at": "…", "used_usd": 314.12, "limit_usd": 500, "period": "monthly"},
+  "observed_at": "2026-11-18T13:02:11+01:00",
+  "last_limit": {"at": "…", "session": "…", "cwd": "/repo", "resets_at": "…"},
+  "error": "login status unavailable (only when it is)"
+}
+```
+
+Missing values are left out; `logged_in` is `null` when the login status is unavailable. No data is
+not an error: the command exits 0.
+
 ## Parallel agents
 
 ```sh
