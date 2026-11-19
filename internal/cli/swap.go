@@ -343,16 +343,9 @@ func (a *app) pickTarget(accts []account.Account, from account.Account) (account
 	stop := a.spin(fmt.Sprintf("checking %d account(s)…", len(accts)))
 	statuses := a.statuses(accts, false)
 	stop()
-	cands := make([]usage.Candidate, len(accts))
+	cands := a.candidates(accts, statuses)
 	byLabel := map[string]account.Account{}
-	for i, acct := range accts {
-		snap, _, _ := a.usageStore().Load(acct.Provider, acct.Name)
-		st := statuses[i]
-		cands[i] = usage.Candidate{
-			Account: acct.Label(), Provider: acct.Provider,
-			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
-			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
-		}
+	for _, acct := range accts {
 		byLabel[acct.Label()] = acct
 	}
 	ranked, next := usage.Rank(cands, from.Label(), now)
@@ -383,7 +376,7 @@ func (a *app) pickTarget(accts []account.Account, from account.Account) (account
 }
 
 func plainPct(w *usage.Window, now time.Time) string {
-	if !live(w, now) {
+	if !w.Live(now) {
 		return "-"
 	}
 	return fmt.Sprintf("%.0f%%", w.UsedPct)

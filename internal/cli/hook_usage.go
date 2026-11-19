@@ -108,11 +108,11 @@ func compactUsage(name string, s usage.Snapshot, now time.Time) string {
 	if name != "" {
 		parts = append(parts, name)
 	}
-	if s.Five != nil && (s.Five.ResetsAt.IsZero() || s.Five.ResetsAt.After(now)) {
-		parts = append(parts, fmt.Sprintf("5h %.0f%%", s.Five.UsedPct))
+	if s.Five.Live(now) {
+		parts = append(parts, "5h "+plainPct(s.Five, now))
 	}
-	if s.Seven != nil && (s.Seven.ResetsAt.IsZero() || s.Seven.ResetsAt.After(now)) {
-		parts = append(parts, fmt.Sprintf("7d %.0f%%", s.Seven.UsedPct))
+	if s.Seven.Live(now) {
+		parts = append(parts, "7d "+plainPct(s.Seven, now))
 	}
 	return strings.Join(parts, " · ")
 }

@@ -119,18 +119,11 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	statuses := a.statuses(accts, refresh)
 	stop()
 	rep := usageReport{Accounts: make([]usageRow, len(accts))}
-	cands := make([]usage.Candidate, len(accts))
+	cands := a.candidates(accts, statuses)
 	cwd, _ := os.Getwd()
 	var fromAt time.Time
 	for i, acct := range accts {
-		st := statuses[i]
-		snap, _, _ := a.usageStore().Load(acct.Provider, acct.Name)
-		c := usage.Candidate{
-			Account: acct.Label(), Provider: acct.Provider,
-			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
-			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
-		}
-		cands[i] = c
+		st, c, snap := statuses[i], cands[i], cands[i].Snapshot
 		r := usageRow{
 			Account: acct.Label(), Plan: st.Status.SubscriptionType, Org: st.Status.OrgName, Email: st.Status.Email,
 			State: c.State(now), Tracking: a.usageTracking(acct),
@@ -164,6 +157,21 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	}
 	rep.NextReset = next
 	return rep
+}
+
+// candidates describes accts, with their login statuses, for usage.Rank.
+func (a *app) candidates(accts []account.Account, statuses []provider.AuthResult) []usage.Candidate {
+	cands := make([]usage.Candidate, len(accts))
+	for i, acct := range accts {
+		snap, _, _ := a.usageStore().Load(acct.Provider, acct.Name)
+		st := statuses[i]
+		cands[i] = usage.Candidate{
+			Account: acct.Label(), Provider: acct.Provider,
+			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
+			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
+		}
+	}
+	return cands
 }
 
 // metered: logged in without a subscription, billed per use (no usage limits to track).
@@ -287,12 +295,8 @@ func dash(s string) string {
 	return s
 }
 
-func live(w *usage.Window, now time.Time) bool {
-	return w != nil && (w.ResetsAt.IsZero() || w.ResetsAt.After(now))
-}
-
 func (a *app) pct(w *usage.Window, high float64, now time.Time) string {
-	if !live(w, now) {
+	if !w.Live(now) {
 		return "-"
 	}
 	s := fmt.Sprintf("%.0f%%", w.UsedPct)
@@ -312,7 +316,7 @@ func (a *app) pct(w *usage.Window, high float64, now time.Time) string {
 }
 
 func resets(w *usage.Window, now time.Time) string {
-	if !live(w, now) || w.ResetsAt.IsZero() {
+	if !w.Live(now) || w.ResetsAt.IsZero() {
 		return "-"
 	}
 	return clock(w.ResetsAt, now)
