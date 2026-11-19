@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
@@ -269,7 +270,7 @@ func TestRename(t *testing.T) {
 	must(t, err)
 	to, err := s.Rename(old, "new")
 	must(t, err)
-	if to.Label() != "claude/new" || !isDir(to.Dir) || isDir(old.Dir) {
+	if to.Label() != "claude/new" || !fsx.IsDir(to.Dir) || fsx.IsDir(old.Dir) {
 		t.Fatalf("Rename = %+v", to)
 	}
 	if _, err := s.Rename(to, "taken"); err == nil {
@@ -377,7 +378,7 @@ func TestMarkerAdopt(t *testing.T) {
 		t.Fatalf("Adopt(main) = %v", err)
 	}
 	m, _ := s.Get("main")
-	if Mark(m) != nil || isFile(filepath.Join(m.Dir, Marker)) {
+	if Mark(m) != nil || fsx.IsFile(filepath.Join(m.Dir, Marker)) {
 		t.Fatal("main got a marker")
 	}
 }
@@ -386,7 +387,7 @@ func TestRefreshSharedReconcilesEntriesAndReportsReplaced(t *testing.T) {
 	s, a, _, p := provisionFixture(t)
 	_, err := p.Provision(context.Background(), a)
 	must(t, err)
-	if !isFile(filepath.Join(a.Dir, Marker)) {
+	if !fsx.IsFile(filepath.Join(a.Dir, Marker)) {
 		t.Fatal("Provision did not mark the account")
 	}
 	main := s.MainDir(provider.Claude)
@@ -402,7 +403,7 @@ func TestRefreshSharedReconcilesEntriesAndReportsReplaced(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(a.Dir, "skills", "find-skills")); err == nil {
 		t.Error("link to a deleted skill kept")
 	}
-	if !isDir(own) {
+	if !fsx.IsDir(own) {
 		t.Error("the account's own skill was touched")
 	}
 	if len(r.Conflicts)+len(r.Replaced) != 0 {

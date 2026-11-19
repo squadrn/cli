@@ -48,7 +48,7 @@ func link(src, dst string) error {
 // it, a hard link to it, or a recorded copy that nobody has edited.
 func linksTo(dst, src string) bool {
 	if target, err := os.Readlink(dst); err == nil {
-		return samePath(target, src)
+		return fsx.SamePath(target, src)
 	}
 	if fi, err := os.Lstat(dst); err != nil || !fi.Mode().IsRegular() {
 		return false
@@ -71,14 +71,6 @@ func linkTarget(dst string) (string, bool) {
 
 // LinksTo reports whether dst in an account shares src from the main account.
 func LinksTo(dst, src string) bool { return linksTo(dst, src) }
-
-func samePath(a, b string) bool {
-	clean := func(p string) string {
-		p = strings.TrimPrefix(strings.TrimPrefix(p, `\\?\`), `\??\`)
-		return strings.ToLower(filepath.Clean(p))
-	}
-	return clean(a) == clean(b)
-}
 
 func copyShared(src, dst string) error {
 	if err := fsx.CopyFile(src, dst, 0o644, true); err != nil {

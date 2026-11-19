@@ -129,7 +129,7 @@ func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {
 	}
 	hooks := ""
 	for _, v := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if v != "" && !samePath(expandHome(v), ours) {
+		if v != "" && !fsx.SamePath(expandHome(v), ours) {
 			hooks = expandHome(v)
 		}
 	}
@@ -152,7 +152,7 @@ func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {
 	case !isRunnable(p, fi):
 		return "", nil // git skips hooks it would not run either
 	}
-	if samePath(filepath.Dir(p), ours) {
+	if fsx.SamePath(filepath.Dir(p), ours) {
 		return "", nil
 	}
 	return p, nil
@@ -165,15 +165,6 @@ func expandHome(p string) string {
 		}
 	}
 	return p
-}
-
-func samePath(a, b string) bool {
-	if a == b {
-		return true
-	}
-	ra, err1 := filepath.EvalSymlinks(a)
-	rb, err2 := filepath.EvalSymlinks(b)
-	return err1 == nil && err2 == nil && ra == rb
 }
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

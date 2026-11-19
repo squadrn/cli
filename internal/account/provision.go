@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
@@ -117,7 +118,7 @@ func linkEntries(src, dst string, skip []string, r *Report) error {
 	for _, e := range own {
 		p := filepath.Join(dst, e.Name())
 		target, ok := linkTarget(p)
-		if !ok || !within(src, target) {
+		if !ok || !fsx.Within(target, src) {
 			continue // not a link squadrn made
 		}
 		if _, err := os.Stat(target); !errors.Is(err, fs.ErrNotExist) {
@@ -129,12 +130,6 @@ func linkEntries(src, dst string, skip []string, r *Report) error {
 		r.Unlinked = append(r.Unlinked, p)
 	}
 	return nil
-}
-
-// within reports whether path is inside dir (not dir itself).
-func within(dir, path string) bool {
-	rel, err := filepath.Rel(dir, path)
-	return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
 }
 
 func linkOne(src, dst string, r *Report) error {
@@ -290,7 +285,7 @@ type Refresh struct {
 // not available) are brought up to date. Items it must not touch are reported.
 func (s Store) RefreshShared(a Account) Refresh {
 	var out Refresh
-	if a.IsMain() || !isDir(a.Dir) {
+	if a.IsMain() || !fsx.IsDir(a.Dir) {
 		return out
 	}
 	main := s.MainDir(a.Spec)

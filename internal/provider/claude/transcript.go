@@ -122,12 +122,11 @@ func LatestSessionIn(configDirs []string, dir string) (Session, error) {
 			return LatestSession(configDirs, key)
 		}
 	}
-	want := canonical(dir)
 	return latest(configDirs, func(c string) []string {
 		files, _ := filepath.Glob(filepath.Join(c, "projects", "*", "*.jsonl"))
 		var out []string
 		for _, f := range files {
-			if cwd := TranscriptCwd(f); cwd != "" && canonical(cwd) == want {
+			if cwd := TranscriptCwd(f); cwd != "" && fsx.SamePath(cwd, dir) {
 				out = append(out, f)
 			}
 		}
@@ -149,16 +148,6 @@ func latest(configDirs []string, files func(dir string) []string) (Session, erro
 		return Session{}, ErrNoSession
 	}
 	return best, nil
-}
-
-func canonical(p string) string {
-	if abs, err := filepath.Abs(p); err == nil {
-		p = abs
-	}
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		p = r
-	}
-	return filepath.Clean(p)
 }
 
 // headRecords is how many leading records are searched for the working directory: the first

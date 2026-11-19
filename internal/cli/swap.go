@@ -14,6 +14,7 @@ import (
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/grid"
 	"github.com/squadrn/squadrn/internal/inuse"
 	"github.com/squadrn/squadrn/internal/proc"
@@ -277,7 +278,7 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 	var lim usage.Snapshot
 	for _, acct := range accts {
 		snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name)
-		if ok && snap.LimitedSession != "" && within(snap.LimitedCwd, dir) && snap.LimitedAt.After(lim.LimitedAt) {
+		if ok && snap.LimitedSession != "" && fsx.Within(snap.LimitedCwd, dir) && snap.LimitedAt.After(lim.LimitedAt) {
 			lim = snap
 		}
 	}
@@ -291,7 +292,7 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 	}
 	var running []swapSource
 	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
-		if !within(ls.Cwd, dir) {
+		if !fsx.Within(ls.Cwd, dir) {
 			continue
 		}
 		if i := slices.IndexFunc(out, func(c swapSource) bool { return c.session.ID == ls.SessionID }); i >= 0 {

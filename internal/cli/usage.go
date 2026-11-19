@@ -153,7 +153,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 			dir string
 			at  time.Time
 		}{{snap.LimitedCwd, snap.LimitedAt}, {snap.Cwd, snap.ObservedAt}} {
-			if seen.dir != "" && within(cwd, seen.dir) && seen.at.After(fromAt) {
+			if seen.dir != "" && fsx.Within(cwd, seen.dir) && seen.at.After(fromAt) {
 				rep.From, fromAt = acct.Label(), seen.at
 			}
 		}
@@ -170,24 +170,6 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 func metered(s provider.AuthStatus) bool {
 	m := strings.ToLower(s.AuthMethod)
 	return s.LoggedIn && s.SubscriptionType == "" && (strings.Contains(m, "api") || strings.Contains(m, "key"))
-}
-
-// within: dir is base or inside it.
-func within(dir, base string) bool {
-	if dir == "" || base == "" {
-		return false
-	}
-	if samePath(dir, base) {
-		return true
-	}
-	rd, err1 := filepath.EvalSymlinks(dir)
-	rb, err2 := filepath.EvalSymlinks(base)
-	if err1 == nil && err2 == nil {
-		dir, base = rd, rb
-	}
-	base = filepath.Clean(base)
-	rel, err := filepath.Rel(base, dir)
-	return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) && filepath.Dir(base) != base
 }
 
 func (a *app) usageShow(target string, asJSON, refresh bool) error {
@@ -461,13 +443,6 @@ type settingsGroup struct {
 	accounts []string
 }
 
-func realPath(p string) string {
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
-	}
-	return p
-}
-
 func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error) {
 	all, err := a.store.List()
 	if err != nil {
@@ -479,14 +454,14 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 		if !t.Spec.Caps.UsageReport {
 			continue
 		}
-		key := realPath(settingsPath(t))
+		key := fsx.Real(settingsPath(t))
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
 		g := settingsGroup{path: settingsPath(t)}
 		for _, x := range all {
-			if x.Spec.Caps.UsageReport && (realPath(settingsPath(x)) == key || fsx.SameFile(settingsPath(x), key)) {
+			if x.Spec.Caps.UsageReport && (fsx.Real(settingsPath(x)) == key || fsx.SameFile(settingsPath(x), key)) {
 				g.accounts = append(g.accounts, x.Label())
 			}
 		}
@@ -530,7 +505,7 @@ func (a *app) usageSetup(target string, all, undo, yes bool) error {
 }
 
 func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
-	where := fmt.Sprintf("%s (%s)", a.tilde(realPath(g.path)), strings.Join(g.accounts, ", "))
+	where := fmt.Sprintf("%s (%s)", a.tilde(fsx.Real(g.path)), strings.Join(g.accounts, ", "))
 	cmd, has, err := claude.StatusLineCommand(g.path)
 	if err != nil {
 		return err
@@ -625,6 +600,6 @@ func (a *app) restoreStatusLines() {
 			a.warnf("could not restore the status line in %s: %v", a.tilde(g.path), err)
 			continue
 		}
-		a.out("  restored the status line in %s\n", a.tilde(realPath(g.path)))
+		a.out("  restored the status line in %s\n", a.tilde(fsx.Real(g.path)))
 	}
 }

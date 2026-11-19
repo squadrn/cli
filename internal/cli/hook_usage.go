@@ -12,6 +12,7 @@ import (
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/provider/claude"
@@ -38,20 +39,11 @@ func hookAccount(store account.Store, spec provider.Spec) (account.Account, bool
 		if a.Provider != spec.ID {
 			continue
 		}
-		if dir == "" && a.IsMain() || dir != "" && samePath(a.Dir, dir) {
+		if dir == "" && a.IsMain() || dir != "" && fsx.SamePath(a.Dir, dir) {
 			return a, true
 		}
 	}
 	return account.Account{}, false
-}
-
-func samePath(a, b string) bool {
-	if filepath.Clean(a) == filepath.Clean(b) {
-		return true
-	}
-	ra, err1 := filepath.EvalSymlinks(a)
-	rb, err2 := filepath.EvalSymlinks(b)
-	return err1 == nil && err2 == nil && ra == rb
 }
 
 // statusline records the usage the status line reports, then shows the wrapped command's output
