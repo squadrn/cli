@@ -1,8 +1,8 @@
-// Package proc runs external programs under a deadline that also holds for their children.
-//
-// exec.CommandContext alone kills only the direct child: a grandchild that keeps stdout open
-// (a git wrapper, a node CLI) blocks Output until it exits on its own. Here the child leads a
-// new process group, cancellation kills the whole group, and WaitDelay bounds the pipe drain.
+// Package proc runs external programs under a deadline that also holds for their children, and
+// answers whether a process still runs. exec.CommandContext alone kills only the direct child,
+// so a grandchild holding stdout open would block Output; here cancellation kills the whole
+// process tree (a process group on Unix, a job object on Windows) and WaitDelay bounds the pipe
+// drain.
 package proc
 
 import (

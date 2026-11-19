@@ -1,6 +1,7 @@
 // Package fsx holds filesystem primitives shared across packages: atomic writes, copies and
-// directory swaps. Writers never leave a half-written file in place, and concurrent writers
-// never share a temporary name.
+// directory swaps, lock files, path comparison, directory ACLs (Windows) and replacing an
+// executable that may be running. Writers never leave a half-written file in place, and
+// concurrent writers never share a temporary name.
 package fsx
 
 import (
