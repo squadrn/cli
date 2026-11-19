@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReplaceExecutableRestoresOnFailure(t *testing.T) {
@@ -34,5 +35,19 @@ func TestReplaceExecutableRestoresOnFailure(t *testing.T) {
 	}
 	if left, _ := filepath.Glob(filepath.Join(dir, "tool.exe.*")); len(left) != 0 {
 		t.Fatalf("leftovers: %v", left)
+	}
+}
+
+func TestMoveAside(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "sqd")
+	if err := os.WriteFile(p, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := MoveAside(p); err != nil {
+		t.Fatal(err)
+	}
+	if left := Leftovers(dir, []string{"sqd"}, time.Now()); len(left) != 1 {
+		t.Fatalf("moved aside: %v", left)
 	}
 }
