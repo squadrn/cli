@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 func TestProjectKey(t *testing.T) {
@@ -18,15 +20,15 @@ func TestProjectKey(t *testing.T) {
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ProjectKey(sub)
+	got, err := projectKey(sub)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := nonAlnum.ReplaceAllString(filepath.Join(real, ".claude", "worktrees", "feat-a"), "-")
 	if got != want {
-		t.Fatalf("ProjectKey = %q, want %q", got, want)
+		t.Fatalf("projectKey = %q, want %q", got, want)
 	}
-	if k, _ := ProjectKey("/Users/x/.claude-personal"); runtime.GOOS != "windows" && k != "-Users-x--claude-personal" {
+	if k, _ := projectKey("/Users/x/.claude-personal"); runtime.GOOS != "windows" && k != "-Users-x--claude-personal" {
 		t.Errorf("encoding = %q", k)
 	}
 }
@@ -54,11 +56,11 @@ func TestLatestSessionAcrossConfigDirs(t *testing.T) {
 	writeSession(t, b, "k", "s2", old.Add(time.Hour))
 	writeSession(t, a, "other", "s3", old.Add(2*time.Hour))
 
-	s, err := LatestSession([]string{a, b}, "k")
+	s, err := latestSession([]string{a, b}, "k")
 	if err != nil || s.ID != "s2" || s.Owner != 1 {
-		t.Fatalf("LatestSession = %+v, %v", s, err)
+		t.Fatalf("latestSession = %+v, %v", s, err)
 	}
-	if _, err := LatestSession([]string{a, b}, "missing"); !errors.Is(err, ErrNoSession) {
+	if _, err := latestSession([]string{a, b}, "missing"); !errors.Is(err, provider.ErrNoSession) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -81,18 +83,18 @@ func TestFindSession(t *testing.T) {
 	old := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeSession(t, a, "-long-folder", sid, old)
 	writeSession(t, b, "-long-folder", sid, old.Add(time.Hour))
-	s, err := FindSession([]string{a, b}, sid)
-	if err != nil || s.Owner != 1 || s.ProjectDir != "-long-folder" || s.ID != sid || !s.ModTime.Equal(old.Add(time.Hour)) {
-		t.Fatalf("FindSession = %+v, %v", s, err)
+	s, err := findSession([]string{a, b}, sid)
+	if err != nil || s.Owner != 1 || projectDir(s) != "-long-folder" || s.ID != sid || !s.ModTime.Equal(old.Add(time.Hour)) {
+		t.Fatalf("findSession = %+v, %v", s, err)
 	}
-	if _, err := FindSession([]string{a}, "../x"); !errors.Is(err, ErrBadSessionID) {
+	if _, err := findSession([]string{a}, "../x"); !errors.Is(err, provider.ErrBadSessionID) {
 		t.Fatalf("bad id: %v", err)
 	}
-	if _, err := FindSession([]string{a}, "11111111-2222-3333-4444-555555555555"); !errors.Is(err, ErrNoSession) {
+	if _, err := findSession([]string{a}, "11111111-2222-3333-4444-555555555555"); !errors.Is(err, provider.ErrNoSession) {
 		t.Fatalf("missing: %v", err)
 	}
-	if ValidSessionID("*") || !ValidSessionID(sid) {
-		t.Fatal("ValidSessionID")
+	if validSessionID("*") || !validSessionID(sid) {
+		t.Fatal("validSessionID")
 	}
 }
 
@@ -107,17 +109,17 @@ func TestLatestSessionInFallsBackToCwd(t *testing.T) {
 	write(t, filepath.Join(cfg, "projects", "-shortened-123", "s1.jsonl"), `{"type":"summary"}`+"\n"+`{"cwd":`+string(cwd)+`}`+"\n")
 	write(t, filepath.Join(cfg, "projects", "-other", "s2.jsonl"), `{"cwd":"/elsewhere"}`+"\n")
 	write(t, filepath.Join(cfg, "projects", "-junk", "s3.jsonl"), "not json")
-	s, err := LatestSessionIn([]string{cfg}, wt)
-	if err != nil || s.ID != "s1" || s.ProjectDir != "-shortened-123" {
+	s, err := latestSessionIn([]string{cfg}, wt)
+	if err != nil || s.ID != "s1" || projectDir(s) != "-shortened-123" {
 		t.Fatalf("fallback = %+v, %v", s, err)
 	}
 	// The computed folder wins when it exists.
-	key, _ := ProjectKey(wt)
+	key, _ := projectKey(wt)
 	writeSession(t, cfg, key, "s4", time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
-	if s, err := LatestSessionIn([]string{cfg}, wt); err != nil || s.ID != "s4" {
+	if s, err := latestSessionIn([]string{cfg}, wt); err != nil || s.ID != "s4" {
 		t.Fatalf("by key = %+v, %v", s, err)
 	}
-	if _, err := LatestSessionIn([]string{cfg}, filepath.Join(root, "none")); !errors.Is(err, ErrNoSession) {
+	if _, err := latestSessionIn([]string{cfg}, filepath.Join(root, "none")); !errors.Is(err, provider.ErrNoSession) {
 		t.Fatalf("none: %v", err)
 	}
 }
@@ -130,17 +132,17 @@ func TestTranscriptCwdAndLastModel(t *testing.T) {
 {"type":"assistant","message":{"model":"claude-sonnet-4-6"}}
 {"type":"assistant","message":{}}
 `)
-	if got := TranscriptCwd(p); got != "/r" {
+	if got := transcriptCwd(p); got != "/r" {
 		t.Errorf("cwd = %q", got)
 	}
-	if got := LastModel(p); got != "claude-sonnet-4-6" {
+	if got := lastModel(p); got != "claude-sonnet-4-6" {
 		t.Errorf("model = %q", got)
 	}
-	if TranscriptCwd(p+"x") != "" || LastModel(p+"x") != "" {
+	if transcriptCwd(p+"x") != "" || lastModel(p+"x") != "" {
 		t.Error("missing file")
 	}
 	write(t, p, `{"type":"summary"}`)
-	if TranscriptCwd(p) != "" {
+	if transcriptCwd(p) != "" {
 		t.Error("cwd without one")
 	}
 }
@@ -156,7 +158,7 @@ func fixture(t *testing.T, src, content string, mod time.Time) Session {
 	if err := os.Chtimes(p, mod, mod); err != nil {
 		t.Fatal(err)
 	}
-	s, err := FindSession([]string{src}, sid)
+	s, err := findSession([]string{src}, sid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +170,7 @@ func TestTransferSession(t *testing.T) {
 	src, dst := filepath.Join(root, "src"), filepath.Join(root, "dst")
 	mod := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := fixture(t, src, "one\n", mod)
-	if err := TransferSession(s, dst, false); err != nil {
+	if err := transferSession(s, dst, false); err != nil {
 		t.Fatal(err)
 	}
 	copied := filepath.Join(dst, "projects", "-p", sid+".jsonl")
@@ -189,7 +191,7 @@ func TestTransferSession(t *testing.T) {
 	// The source grew: append-only, allowed.
 	s = fixture(t, src, "one\ntwo\n", mod.Add(time.Hour))
 	write(t, filepath.Join(src, "file-history", sid, "f@v2"), "v2")
-	if err := TransferSession(s, dst, false); err != nil {
+	if err := transferSession(s, dst, false); err != nil {
 		t.Fatalf("append-only: %v", err)
 	}
 	if b, _ := os.ReadFile(copied); string(b) != "one\ntwo\n" {
@@ -201,14 +203,14 @@ func TestTransferSession(t *testing.T) {
 
 	// The target went on on its own: diverged, refused unless forced.
 	write(t, copied, "one\nthree\n")
-	if err := TransferSession(s, dst, false); !errors.Is(err, ErrDiverged) {
+	if err := transferSession(s, dst, false); !errors.Is(err, provider.ErrDiverged) {
 		t.Fatalf("diverged: %v", err)
 	}
 	write(t, copied, "one\ntwo\nthree\n") // longer than the source
-	if err := TransferSession(s, dst, false); !errors.Is(err, ErrDiverged) {
+	if err := transferSession(s, dst, false); !errors.Is(err, provider.ErrDiverged) {
 		t.Fatalf("longer target: %v", err)
 	}
-	if err := TransferSession(s, dst, true); err != nil {
+	if err := transferSession(s, dst, true); err != nil {
 		t.Fatalf("force: %v", err)
 	}
 	if b, _ := os.ReadFile(copied); string(b) != "one\ntwo\n" {
@@ -216,7 +218,7 @@ func TestTransferSession(t *testing.T) {
 	}
 
 	// Same file: nothing to do.
-	if err := TransferSession(s, src, false); err != nil {
+	if err := transferSession(s, src, false); err != nil {
 		t.Fatalf("same dir: %v", err)
 	}
 	entries, _ := os.ReadDir(filepath.Join(dst, "projects", "-p"))
@@ -233,14 +235,14 @@ func TestTransferSessionVerifiesTheCopy(t *testing.T) {
 	s := fixture(t, src, "content\n", time.Now())
 	stageHook = func(p string) { _ = os.WriteFile(p, []byte("tampered\n"), 0o600) }
 	defer func() { stageHook = nil }()
-	if err := TransferSession(s, dst, false); !errors.Is(err, ErrVerify) {
+	if err := transferSession(s, dst, false); !errors.Is(err, ErrVerify) {
 		t.Fatalf("err = %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dst, "projects", "-p", sid+".jsonl")); !os.IsNotExist(err) {
 		t.Fatal("unverified copy left in place")
 	}
 	stageHook = func(string) { _ = os.WriteFile(s.Path, []byte("content\nmore\n"), 0o600) }
-	if err := TransferSession(s, dst, false); !errors.Is(err, ErrVerify) {
+	if err := transferSession(s, dst, false); !errors.Is(err, ErrVerify) {
 		t.Fatalf("source changed: %v", err)
 	}
 	if left, _ := filepath.Glob(filepath.Join(dst, "projects", "-p", ".*")); len(left) > 0 {
@@ -259,13 +261,30 @@ func TestRunningSessions(t *testing.T) {
 	write(t, filepath.Join(a, "sessions", "x.txt"), `{"pid":15,"sessionId":"s15"}`)
 	write(t, filepath.Join(b, "sessions", "3.json"), `{"pid":3,"sessionId":"s3","cwd":"/q"}`)
 	alive := func(pid int) bool { return pid != 11 }
-	got := RunningSessions([]string{a, b, filepath.Join(root, "missing")}, alive)
+	got := runningSessions([]string{a, b, filepath.Join(root, "missing")}, alive)
 	var desc []string
 	for _, s := range got {
 		desc = append(desc, fmt.Sprintf("%d:%d:%s:%s", s.Owner, s.PID, s.SessionID, s.Cwd))
 	}
 	want := []string{"0:10:s10:/r", "1:3:s3:/q"}
 	if fmt.Sprint(desc) != fmt.Sprint(want) {
-		t.Fatalf("RunningSessions = %v, want %v", desc, want)
+		t.Fatalf("runningSessions = %v, want %v", desc, want)
+	}
+}
+
+func TestUnavailableModel(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "x.jsonl")
+	write(t, p, `{"type":"assistant","message":{"model":"claude-opus-4-7"}}`+"\n")
+	s := provider.Session{Path: p}
+	pro, max := provider.AuthStatus{SubscriptionType: "pro"}, provider.AuthStatus{SubscriptionType: "max"}
+	if got := (CLI{}).UnavailableModel(s, pro); got != "claude-opus-4-7" {
+		t.Errorf("opus on pro = %q", got)
+	}
+	if got := (CLI{}).UnavailableModel(s, max); got != "" {
+		t.Errorf("opus on max = %q", got)
+	}
+	write(t, p, `{"type":"assistant","message":{"model":"claude-sonnet-4-6"}}`+"\n")
+	if got := (CLI{}).UnavailableModel(s, pro); got != "" {
+		t.Errorf("sonnet on pro = %q", got)
 	}
 }

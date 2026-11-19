@@ -19,7 +19,6 @@ import (
 	"github.com/squadrn/squadrn/internal/inuse"
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/ui"
 	"github.com/squadrn/squadrn/internal/usage"
 	"github.com/squadrn/squadrn/internal/worktree"
@@ -67,7 +66,7 @@ already holds the conversation and it went on there, the swap is refused unless 
 
 // swapSource is a conversation that can be moved.
 type swapSource struct {
-	session claude.Session
+	session provider.Session
 	// cwd is the directory it runs in, where it is resumed.
 	cwd string
 	// worktree names the agent worktree it runs in ("" when unknown), for its grid pane.
@@ -85,9 +84,6 @@ func (a *app) swap(o swapOptions) error {
 			return err
 		}
 	}
-	if o.session != "" && !claude.ValidSessionID(o.session) {
-		return usagef("--session %q: %v", o.session, claude.ErrBadSessionID)
-	}
 	spec := a.defaultSpec()
 	var to *account.Account
 	if o.to != "" {
@@ -99,6 +95,13 @@ func (a *app) swap(o swapOptions) error {
 	}
 	if !spec.Caps.SessionTransfer {
 		return fmt.Errorf("%s cannot transfer conversations", spec.Name)
+	}
+	ag, err := a.agent(spec)
+	if err != nil {
+		return err
+	}
+	if o.session != "" && !ag.ValidSessionID(o.session) {
+		return usagef("--session %q: %v", o.session, provider.ErrBadSessionID)
 	}
 	all, err := a.store.List()
 	if err != nil {
@@ -115,7 +118,7 @@ func (a *app) swap(o swapOptions) error {
 	for i, acct := range accts {
 		dirs[i] = acct.Dir
 	}
-	src, err := a.swapSource(o, spec, accts, dirs)
+	src, err := a.swapSource(ag, o, spec, accts, dirs)
 	if err != nil {
 		return err
 	}
@@ -138,7 +141,7 @@ func (a *app) swap(o swapOptions) error {
 				return err
 			}
 		}
-		if model := claude.LastModel(src.session.Path); strings.Contains(strings.ToLower(model), "opus") && strings.EqualFold(st[1].Status.SubscriptionType, "pro") {
+		if model := ag.UnavailableModel(src.session, st[1].Status); model != "" {
 			a.warnf("the conversation uses %s; %s is on the Pro plan, which may not include it", model, to.Label())
 		}
 	}
@@ -150,11 +153,11 @@ func (a *app) swap(o swapOptions) error {
 		if err := a.confirm(o.yes, "Restart pane %s (%q) as %s; its current process is stopped", pane, src.worktree, to.Label()); err != nil {
 			return err
 		}
-	} else if err := a.quiesce(a.holders(src, from, accts, dirs), o.yes); err != nil {
+	} else if err := a.quiesce(a.holders(ag, src, from, accts, dirs), o.yes); err != nil {
 		return err
 	}
 	if from.Label() != to.Label() {
-		if err := claude.TransferSession(src.session, to.Dir, o.force); errors.Is(err, claude.ErrDiverged) {
+		if err := ag.TransferSession(src.session, to.Dir, o.force); errors.Is(err, provider.ErrDiverged) {
 			return fmt.Errorf("the conversation went on in %s after it was copied there, so moving %s's version would lose that part; re-run with --force to overwrite it", to.Label(), from.Label())
 		} else if err != nil {
 			return err
@@ -169,10 +172,6 @@ func (a *app) swap(o swapOptions) error {
 		what += " " + o.worktree
 	}
 	a.out("%s: %s → %s (session %s)\n", what, from.Label(), to.Label(), src.session.ID)
-	ag, err := a.agent(to.Spec)
-	if err != nil {
-		return err
-	}
 	if pane == "" {
 		if err := os.Chdir(src.cwd); err != nil {
 			return err
@@ -193,7 +192,7 @@ func (a *app) ledger() usage.Ledger {
 
 // swapSource finds the conversation to move: --session, --worktree, else the candidates in the
 // working directory.
-func (a *app) swapSource(o swapOptions, spec provider.Spec, accts []account.Account, dirs []string) (swapSource, error) {
+func (a *app) swapSource(ag provider.Agent, o swapOptions, spec provider.Spec, accts []account.Account, dirs []string) (swapSource, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return swapSource{}, err
@@ -208,26 +207,26 @@ func (a *app) swapSource(o swapOptions, spec provider.Spec, accts []account.Acco
 		if _, err := os.Stat(dir); err != nil {
 			return swapSource{}, fmt.Errorf("worktree not found: %s", a.tilde(dir))
 		}
-		s, err := claude.LatestSessionIn(dirs, dir)
-		if errors.Is(err, claude.ErrNoSession) {
+		s, err := ag.LatestSessionIn(dirs, dir)
+		if errors.Is(err, provider.ErrNoSession) {
 			return swapSource{}, fmt.Errorf("no conversation found for worktree %q in any account", o.worktree)
 		} else if err != nil {
 			return swapSource{}, err
 		}
 		return swapSource{session: s, cwd: dir, worktree: o.worktree}, nil
 	case o.session != "":
-		s, err := claude.FindSession(dirs, o.session)
+		s, err := ag.FindSession(dirs, o.session)
 		if err != nil {
 			return swapSource{}, fmt.Errorf("%w in any %s account", err, spec.Name)
 		}
-		return a.located(swapSource{session: s}, spec, cwd)
+		return a.located(ag, swapSource{session: s}, spec, cwd)
 	}
-	cands := a.swapCandidates(accts, dirs, cwd)
+	cands := a.swapCandidates(ag, accts, dirs, cwd)
 	switch len(cands) {
 	case 0:
 		return swapSource{}, fmt.Errorf("no conversation hit its limit or runs in %s; pass --session <id> or --worktree <name>", a.tilde(cwd))
 	case 1:
-		return a.located(cands[0], spec, cwd)
+		return a.located(ag, cands[0], spec, cwd)
 	}
 	if !a.interactive {
 		var b strings.Builder
@@ -244,13 +243,13 @@ func (a *app) swapSource(o swapOptions, spec provider.Spec, accts []account.Acco
 	if err != nil {
 		return swapSource{}, err
 	}
-	return a.located(cands[choice], spec, cwd)
+	return a.located(ag, cands[choice], spec, cwd)
 }
 
 // located fills in where a conversation runs: the directory in its transcript (falling back to
 // what the candidate knew, then the working directory) and the agent worktree that is.
-func (a *app) located(src swapSource, spec provider.Spec, cwd string) (swapSource, error) {
-	if dir := claude.TranscriptCwd(src.session.Path); dir != "" {
+func (a *app) located(ag provider.Agent, src swapSource, spec provider.Spec, cwd string) (swapSource, error) {
+	if dir := ag.SessionCwd(src.session); dir != "" {
 		if _, err := os.Stat(dir); err != nil {
 			return swapSource{}, fmt.Errorf("conversation %s was started in %s, which no longer exists", src.session.ID, dir)
 		}
@@ -267,7 +266,7 @@ func (a *app) located(src swapSource, spec provider.Spec, cwd string) (swapSourc
 
 // swapCandidates lists the conversations swap could mean in dir: the one that most recently hit
 // its limit there (unless it was moved since), then the sessions running there, newest first.
-func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string) []swapSource {
+func (a *app) swapCandidates(ag provider.Agent, accts []account.Account, dirs []string, dir string) []swapSource {
 	var out []swapSource
 	var lim usage.Snapshot
 	for _, acct := range accts {
@@ -280,12 +279,12 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 		_, moved, _ := a.ledger().Latest(func(h usage.Handoff) bool {
 			return h.Session == lim.LimitedSession && h.At.After(lim.LimitedAt)
 		})
-		if s, err := claude.FindSession(dirs, lim.LimitedSession); err == nil && !moved {
+		if s, err := ag.FindSession(dirs, lim.LimitedSession); err == nil && !moved {
 			out = append(out, swapSource{session: s, cwd: lim.LimitedCwd, limited: true, at: lim.LimitedAt})
 		}
 	}
 	var running []swapSource
-	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
+	for _, ls := range ag.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
 		if !fsx.Within(ls.Cwd, dir) {
 			continue
 		}
@@ -296,7 +295,7 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 		if slices.ContainsFunc(running, func(c swapSource) bool { return c.session.ID == ls.SessionID }) {
 			continue
 		}
-		if s, err := claude.FindSession(dirs, ls.SessionID); err == nil {
+		if s, err := ag.FindSession(dirs, ls.SessionID); err == nil {
 			running = append(running, swapSource{session: s, cwd: ls.Cwd, running: true, at: s.ModTime})
 		}
 	}
@@ -386,11 +385,11 @@ type holder struct {
 // holders are the processes that may be writing the conversation: Claude Code sessions listing
 // it in their registry, and sessions squadrn started as from in its directory (recorded both
 // there and in from's config dir) unless the registry shows they hold another conversation.
-func (a *app) holders(src swapSource, from account.Account, accts []account.Account, dirs []string) []holder {
+func (a *app) holders(ag provider.Agent, src swapSource, from account.Account, accts []account.Account, dirs []string) []holder {
 	var out []holder
 	seen := map[int]bool{os.Getpid(): true}
 	other := map[int]bool{}
-	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
+	for _, ls := range ag.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
 		if ls.SessionID != src.session.ID {
 			other[ls.PID] = true
 			continue

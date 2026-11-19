@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // Claude Code stores each conversation at <config dir>/projects/<project folder>/<session>.jsonl,
@@ -28,9 +28,9 @@ var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9]`)
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// ProjectKey encodes a working directory the way Claude Code names the project folders of short
-// paths. Only the worktree lookup uses it; see LatestSessionIn.
-func ProjectKey(dir string) (string, error) {
+// projectKey encodes a working directory the way Claude Code names the project folders of short
+// paths. Only the worktree lookup uses it; see latestSessionIn.
+func projectKey(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return "", err
@@ -41,28 +41,46 @@ func ProjectKey(dir string) (string, error) {
 	return nonAlnum.ReplaceAllString(abs, "-"), nil
 }
 
-type Session struct {
-	ID   string
-	Path string // .jsonl file
-	// ProjectDir is the name of the project folder holding it, reused in the target account.
-	ProjectDir string
-	ModTime    time.Time
-	// Owner is the index of the config dir (in the list given to the lookup) holding it.
-	Owner int
+// Session's Path is the .jsonl transcript.
+type Session = provider.Session
+
+// ErrVerify: the copy does not match the source (size or SHA-256).
+var ErrVerify = errors.New("copied conversation does not match the source")
+
+// projectDir is the name of the project folder holding s, reused in the target account.
+func projectDir(s Session) string { return filepath.Base(filepath.Dir(s.Path)) }
+
+func (CLI) ValidSessionID(id string) bool { return validSessionID(id) }
+
+func (CLI) FindSession(configDirs []string, id string) (Session, error) {
+	return findSession(configDirs, id)
 }
 
-var (
-	ErrNoSession    = errors.New("no conversation found")
-	ErrBadSessionID = errors.New("not a session ID (expected a UUID)")
-	// ErrDiverged: the target account holds a version of the conversation that is not a prefix
-	// of the source's, so copying would lose what was said there.
-	ErrDiverged = errors.New("the conversation differs in the target account")
-	// ErrVerify: the copy does not match the source (size or SHA-256).
-	ErrVerify = errors.New("copied conversation does not match the source")
-)
+func (CLI) LatestSessionIn(configDirs []string, dir string) (Session, error) {
+	return latestSessionIn(configDirs, dir)
+}
 
-// ValidSessionID reports whether id has the form of a Claude Code session ID.
-func ValidSessionID(id string) bool { return uuidPattern.MatchString(id) }
+func (CLI) RunningSessions(configDirs []string, alive func(pid int) bool) []provider.LiveSession {
+	return runningSessions(configDirs, alive)
+}
+
+func (CLI) SessionCwd(s Session) string { return transcriptCwd(s.Path) }
+
+func (CLI) TransferSession(s Session, targetConfigDir string, force bool) error {
+	return transferSession(s, targetConfigDir, force)
+}
+
+// UnavailableModel: Opus models are not part of the Pro plan.
+func (CLI) UnavailableModel(s Session, target provider.AuthStatus) string {
+	model := lastModel(s.Path)
+	if strings.Contains(strings.ToLower(model), "opus") && strings.EqualFold(target.SubscriptionType, "pro") {
+		return model
+	}
+	return ""
+}
+
+// validSessionID reports whether id has the form of a Claude Code session ID.
+func validSessionID(id string) bool { return uuidPattern.MatchString(id) }
 
 func sessionAt(path string, owner int) (Session, bool) {
 	fi, err := os.Stat(path)
@@ -70,19 +88,18 @@ func sessionAt(path string, owner int) (Session, bool) {
 		return Session{}, false
 	}
 	return Session{
-		ID:         strings.TrimSuffix(filepath.Base(path), ".jsonl"),
-		Path:       path,
-		ProjectDir: filepath.Base(filepath.Dir(path)),
-		ModTime:    fi.ModTime(),
-		Owner:      owner,
+		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
+		Path:    path,
+		ModTime: fi.ModTime(),
+		Owner:   owner,
 	}, true
 }
 
-// FindSession finds conversation id in configDirs. When several accounts hold it (it was
+// findSession finds conversation id in configDirs. When several accounts hold it (it was
 // swapped before), the most recently written copy wins.
-func FindSession(configDirs []string, id string) (Session, error) {
-	if !ValidSessionID(id) {
-		return Session{}, fmt.Errorf("%q: %w", id, ErrBadSessionID)
+func findSession(configDirs []string, id string) (Session, error) {
+	if !validSessionID(id) {
+		return Session{}, fmt.Errorf("%q: %w", id, provider.ErrBadSessionID)
 	}
 	s, err := latest(configDirs, func(dir string) []string {
 		files, _ := filepath.Glob(filepath.Join(dir, "projects", "*", id+".jsonl"))
@@ -94,33 +111,33 @@ func FindSession(configDirs []string, id string) (Session, error) {
 	return s, nil
 }
 
-// LatestSession returns the most recently written conversation in project folder key across
+// latestSession returns the most recently written conversation in project folder key across
 // config dirs.
-func LatestSession(configDirs []string, key string) (Session, error) {
+func latestSession(configDirs []string, key string) (Session, error) {
 	return latest(configDirs, func(dir string) []string {
 		files, _ := filepath.Glob(filepath.Join(dir, "projects", key, "*.jsonl"))
 		return files
 	})
 }
 
-// LatestSessionIn returns the most recent conversation started in dir. The project folder is
+// latestSessionIn returns the most recent conversation started in dir. The project folder is
 // computed from dir; when no account has that folder (Claude Code shortens long paths), the
 // transcripts whose first records name dir as their working directory are used instead.
-func LatestSessionIn(configDirs []string, dir string) (Session, error) {
-	key, err := ProjectKey(dir)
+func latestSessionIn(configDirs []string, dir string) (Session, error) {
+	key, err := projectKey(dir)
 	if err != nil {
 		return Session{}, err
 	}
 	for _, c := range configDirs {
 		if fsx.IsDir(filepath.Join(c, "projects", key)) {
-			return LatestSession(configDirs, key)
+			return latestSession(configDirs, key)
 		}
 	}
 	return latest(configDirs, func(c string) []string {
 		files, _ := filepath.Glob(filepath.Join(c, "projects", "*", "*.jsonl"))
 		var out []string
 		for _, f := range files {
-			if cwd := TranscriptCwd(f); cwd != "" && fsx.SamePath(cwd, dir) {
+			if cwd := transcriptCwd(f); cwd != "" && fsx.SamePath(cwd, dir) {
 				out = append(out, f)
 			}
 		}
@@ -139,7 +156,7 @@ func latest(configDirs []string, files func(dir string) []string) (Session, erro
 		}
 	}
 	if !found {
-		return Session{}, ErrNoSession
+		return Session{}, provider.ErrNoSession
 	}
 	return best, nil
 }
@@ -148,9 +165,9 @@ func latest(configDirs []string, files func(dir string) []string) (Session, erro
 // ones can be summaries or snapshots without it.
 const headRecords = 50
 
-// TranscriptCwd returns the working directory the conversation was started in, from the first
+// transcriptCwd returns the working directory the conversation was started in, from the first
 // records that carry one; "" when none does.
-func TranscriptCwd(path string) string {
+func transcriptCwd(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
@@ -172,8 +189,8 @@ func TranscriptCwd(path string) string {
 	return ""
 }
 
-// LastModel returns the model of the last assistant record in the conversation; "" when none.
-func LastModel(path string) string {
+// lastModel returns the model of the last assistant record in the conversation; "" when none.
+func lastModel(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
@@ -206,15 +223,15 @@ func configDirOf(s Session) string { return filepath.Dir(filepath.Dir(filepath.D
 // stageHook lets tests alter a staged copy before it is verified.
 var stageHook func(path string)
 
-// TransferSession copies conversation s into targetConfigDir under the same project folder, with
+// transferSession copies conversation s into targetConfigDir under the same project folder, with
 // its <id>/ directory and its file checkpoints, so that account can resume it. When the target
 // already holds the conversation, the source must have grown from it (append only) unless
-// force is set; otherwise ErrDiverged. The transcript is staged next to its destination,
+// force is set; otherwise provider.ErrDiverged. The transcript is staged next to its destination,
 // checked against the source (size and SHA-256) and renamed into place last; the directories
 // are replaced through a staged copy. Times are kept so "latest" stays meaningful.
-func TransferSession(s Session, targetConfigDir string, force bool) error {
+func transferSession(s Session, targetConfigDir string, force bool) error {
 	srcConfig := configDirOf(s)
-	dstDir := filepath.Join(targetConfigDir, "projects", s.ProjectDir)
+	dstDir := filepath.Join(targetConfigDir, "projects", projectDir(s))
 	dst := filepath.Join(dstDir, s.ID+".jsonl")
 	if fsx.SameFile(s.Path, dst) {
 		return nil
@@ -265,7 +282,7 @@ func appendOnly(src, dst string) error {
 		if n > 0 {
 			m, _ := io.ReadFull(sf, b[:n])
 			if m < n || !bytes.Equal(a[:n], b[:n]) {
-				return ErrDiverged
+				return provider.ErrDiverged
 			}
 		}
 		if derr == io.EOF || derr == io.ErrUnexpectedEOF {
