@@ -214,3 +214,26 @@ func unpacked(t *testing.T, binary string) string {
 	}
 	return src
 }
+
+func TestIncompleteAndInstalledCopy(t *testing.T) {
+	home := t.TempDir()
+	l := Layout{DataDir: filepath.Join(home, "data", "squadrn"), BinDir: filepath.Join(home, "bin")}
+	if l.Incomplete("v1.0.0") {
+		t.Fatal("nothing installed counts as incomplete")
+	}
+	if err := l.Install(unpacked(t, "v1-binary"), "v1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	if l.Incomplete("v1.0.0") || !l.Incomplete("v2.0.0") {
+		t.Fatal("Incomplete compares the installed VERSION")
+	}
+	if err := os.RemoveAll(filepath.Join(l.DataDir, "plugin")); err != nil {
+		t.Fatal(err)
+	}
+	if !l.Incomplete("v1.0.0") {
+		t.Fatal("a missing plugin dir is not incomplete")
+	}
+	if !l.IsInstalledCopy(l.Binary()) || !l.IsInstalledCopy(filepath.Join(l.BinDir, "sqd")) || l.IsInstalledCopy(filepath.Join(home, "squadrn")) {
+		t.Fatal("IsInstalledCopy")
+	}
+}
