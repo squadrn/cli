@@ -361,7 +361,7 @@ func TestConfigAndInstalledRelease(t *testing.T) {
 		}
 	}
 	e.Self, e.Version = bin, "1.2.0"
-	if c, _ := find(e.install(context.Background()), "installed release is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
+	if c, _ := find(e.install(context.Background()), "the installed copy of v1.2.0 is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
 		t.Fatalf("mismatch: %+v", c)
 	}
 	e.Version = "v1.1.0"
