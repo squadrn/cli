@@ -56,7 +56,10 @@ func (h hookEnv) readInput() ([]byte, error) {
 	return io.ReadAll(io.LimitReader(h.stdin, maxHookInput))
 }
 
-const hookUsage = "usage: squadrn hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit"
+// hookUsage names the installed binary, not the user's command: the plugin (through squadrn-hook)
+// and the git hook shims run hooks through it, whatever the command is called.
+const hookUsage = "usage: squadrn hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit\n" +
+	"internal: the squadrn plugin (squadrn-hook) and git hooks run this through the installed binary"
 
 // runHook handles `squadrn hook …` and returns the exit code.
 func runHook(args []string, h hookEnv) int {

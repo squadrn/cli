@@ -280,6 +280,7 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 	a.root = root
+	a.completionForEveryName()
 	return root
 }
 

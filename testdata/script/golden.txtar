@@ -616,6 +616,7 @@ Generate the autocompletion script for srn for the specified shell.
 See each sub-command's help for details on how to use the generated script.
 
 Usage:
+  srn completion [flags]
   srn completion [command]
 
 Available Commands:

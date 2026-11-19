@@ -1,4 +1,10 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
+# Hook usage names the installed binary the hooks run through.
+exec squadrn hook --help
+stdout '^usage: squadrn hook guard-git \| '
+stdout '^internal: the squadrn plugin \(squadrn-hook\) and git hooks run this through the installed binary$'
+exitcode 2 squadrn hook bogus
+
 # Repositories: one on a feature branch, one with its own protected list.
 env GIT_CONFIG_GLOBAL=/dev/null
 env GIT_CONFIG_NOSYSTEM=1
