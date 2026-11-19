@@ -192,14 +192,17 @@ func SameFile(a, b string) bool {
 	return os.SameFile(fa, fb)
 }
 
-// ReplaceExecutable installs src at dst as an executable, replacing dst even while it runs
-// (platform: replaceExecutable).
-func ReplaceExecutable(src, dst string) error { return replaceExecutable(src, dst) }
+// MoveAside renames path to <path>.old-<time>, which CleanOld deletes once nothing runs it.
+func MoveAside(path string) error { return os.Rename(path, asideName(path)) }
 
-// CleanOld removes executables that ReplaceExecutable moved aside in dir once they no longer
-// run (Windows); a no-op elsewhere. Only leftovers of names (file names such as squadrn.exe) are
-// touched: dir may be a bin dir other programs share.
-func CleanOld(dir string, names []string) { cleanOld(dir, names, time.Now()) }
+func asideName(path string) string { return path + ".old-" + stamp() }
+
+func stamp() string { return time.Now().Format("20060102-150405.000000000") }
+
+// BackupName is where an unrelated file at path is moved before squadrn takes its name.
+func BackupName(path string, now time.Time) string {
+	return path + ".bak-" + now.Format("20060102-150405")
+}
 
 // newGrace is how old a staged <name>.new-* file must be before CleanOld treats it as abandoned;
 // a younger one may belong to an update running right now.

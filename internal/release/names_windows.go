@@ -59,7 +59,7 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 	for _, n := range names {
 		dst := exe(l.BinDir, n)
 		if _, err := os.Lstat(dst); err == nil && !slices.Contains(prev, n) && !fsx.SameFile(dst, l.Binary()) {
-			backup := dst + ".bak-" + now.Format("20060102-150405")
+			backup := fsx.BackupName(dst, now)
 			if err := os.Rename(dst, backup); err != nil {
 				return res, err
 			}
@@ -109,7 +109,7 @@ func removeRunning(path string) error {
 	case err == nil, errors.Is(err, fs.ErrNotExist):
 		return nil
 	}
-	return os.Rename(path, path+".old-"+time.Now().Format("20060102-150405.000000000"))
+	return fsx.MoveAside(path)
 }
 
 // CheckInstallDir refuses a data dir whose path cmd.exe would expand or split: the plugin hooks

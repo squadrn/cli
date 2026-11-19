@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // BinaryName is the executable inside a release and in the data dir.
@@ -32,7 +34,7 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 			continue
 		}
 		if _, err := os.Lstat(link); err == nil {
-			backup := link + ".bak-" + now.Format("20060102-150405")
+			backup := fsx.BackupName(link, now)
 			if err := os.Rename(link, backup); err != nil {
 				return res, err
 			}
