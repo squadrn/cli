@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
@@ -40,16 +39,9 @@ func TestVerifyRelease(t *testing.T) {
 	if b, err := exec.Command("ssh-keygen", "-Y", "sign", "-q", "-f", key, "-n", "squadrn-release", filepath.Join(dir, release.ChecksumsName)).CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, b)
 	}
-	fakeGH := filepath.Join(dir, "gh")
-	write("gh", "#!/bin/sh\necho 'no attestations found' >&2\nexit 1\n")
-	if err := os.Chmod(fakeGH, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var stdout, stderr bytes.Buffer
 	a := &app{cmd: "squadrn", stdout: &stdout, stderr: &stderr, signers: string(pub)}
-	ctx := context.Background()
-	if err := a.verifyRelease(ctx, dir, asset, "me/rel"); err != nil {
+	if err := a.verifyRelease(dir, asset); err != nil {
 		t.Fatalf("signed release: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "verified release signature") || stderr.Len() != 0 {
@@ -58,17 +50,17 @@ func TestVerifyRelease(t *testing.T) {
 
 	// A checksums file changed after signing is refused before the archive is looked at.
 	write(release.ChecksumsName, "0000  "+asset+"\n")
-	if err := a.verifyRelease(ctx, dir, asset, "me/rel"); err == nil || !strings.Contains(err.Error(), "not valid") {
+	if err := a.verifyRelease(dir, asset); err == nil || !strings.Contains(err.Error(), "not valid") {
 		t.Fatalf("tampered checksums: %v", err)
 	}
 	// A release without a signature is refused by a build that has keys.
 	_ = os.Remove(filepath.Join(dir, release.SignatureName))
-	if err := a.verifyRelease(ctx, dir, asset, "me/rel"); err == nil || !strings.Contains(err.Error(), "has no signature") {
+	if err := a.verifyRelease(dir, asset); err == nil || !strings.Contains(err.Error(), "has no signature") {
 		t.Fatalf("unsigned release: %v", err)
 	}
 	// A build without keys falls back to the checksum, and says so.
 	a.signers = ""
-	if err := a.verifyRelease(ctx, dir, asset, "me/rel"); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+	if err := a.verifyRelease(dir, asset); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("no keys, bad checksum: %v", err)
 	}
 	if !strings.Contains(stderr.String(), "no release signing key") {

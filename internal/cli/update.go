@@ -191,7 +191,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 			return fmt.Errorf("download %s: %s", name, releaseFailure(err, repo, tag))
 		}
 	}
-	if err := a.verifyRelease(ctx, tmp, asset, repo); err != nil {
+	if err := a.verifyRelease(tmp, asset); err != nil {
 		return err
 	}
 	src := filepath.Join(tmp, "release")
@@ -278,9 +278,9 @@ func releaseFailure(err error, repo, tag string) string {
 	return err.Error()
 }
 
-// verifyRelease checks, in order: the signature of checksums.txt against the keys built into
-// this binary, the archive's checksum, and GitHub build provenance where it exists.
-func (a *app) verifyRelease(ctx context.Context, dir, asset, repo string) error {
+// verifyRelease checks the signature of checksums.txt against the keys built into this binary,
+// then the archive's checksum.
+func (a *app) verifyRelease(dir, asset string) error {
 	sums, err := os.ReadFile(filepath.Join(dir, release.ChecksumsName))
 	if err != nil {
 		return err
@@ -296,11 +296,7 @@ func (a *app) verifyRelease(ctx context.Context, dir, asset, repo string) error 
 	default:
 		a.out("verified release signature\n")
 	}
-	archive := filepath.Join(dir, asset)
-	if err := release.VerifyChecksum(filepath.Join(dir, release.ChecksumsName), archive); err != nil {
-		return err
-	}
-	return a.verifyAttestation(ctx, archive, repo)
+	return release.VerifyChecksum(filepath.Join(dir, release.ChecksumsName), filepath.Join(dir, asset))
 }
 
 // releaseNotes indents the first max lines of a release body.
@@ -323,30 +319,6 @@ func (a *app) rollback() error {
 	}
 	a.out("rolling back v%s → v%s\n", strings.TrimPrefix(a.layout.Version(), "v"), version)
 	return a.installRelease(prev, version, nameChoice{})
-}
-
-// verifyAttestation checks the build provenance GitHub attached to the archive, as an extra
-// when gh is installed; the signature is what installs rely on.
-func (a *app) verifyAttestation(ctx context.Context, archive, repo string) error {
-	bin, _ := exec.LookPath("gh")
-	if bin == "" {
-		return nil
-	}
-	owner, _, _ := strings.Cut(repo, "/")
-	out, err := proc.Output(ctx, proc.Options{}, bin, "attestation", "verify", archive, "--owner", owner)
-	if err == nil {
-		a.out("verified build provenance of %s\n", filepath.Base(archive))
-		return nil
-	}
-	msg := err.Error() + " " + string(out)
-	if strings.Contains(msg, "no attestations found") || strings.Contains(msg, "unknown command") || strings.Contains(msg, "HTTP 404") ||
-		strings.Contains(msg, "HTTP 403") || strings.Contains(msg, "gh auth login") || strings.Contains(msg, "not logged") {
-		if a.signers == "" {
-			a.warnf("%s has no build attestation; verified by checksum only", filepath.Base(archive))
-		}
-		return nil
-	}
-	return fmt.Errorf("build provenance check failed for %s: %w", filepath.Base(archive), err)
 }
 
 // nameChoice is what the user asked for at install; empty fields keep the configured names.

@@ -35,8 +35,7 @@ curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.s
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
 `~/.local/share/squadrn/bin/squadrn`, links your command name(s) from `~/.local/bin`, and installs
-the squadrn plugin into every Claude account. With [gh](https://cli.github.com) installed and
-logged in it also verifies GitHub's build provenance.
+the squadrn plugin into every Claude account.
 
 ### Windows (beta)
 
@@ -102,7 +101,7 @@ and fish (`~/.config/fish/completions`) are written when those directories exist
 `squadrn completion zsh|bash|fish` prints them.
 
 Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`.
-Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`, build provenance).
+Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`).
 Updates read the public GitHub API; set `GH_TOKEN` or `GITHUB_TOKEN` (or log in with `gh`) only if
 you hit its rate limit. Examples below use `squadrn`; `sqd` works the same.
 

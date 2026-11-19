@@ -171,7 +171,7 @@ func (e Env) install(ctx context.Context) []Check {
 		name   string
 		status Status
 		why    string
-	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", OK, "optional: PR detection in gc, the branch protection check, build provenance"}} {
+	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", OK, "optional: PR detection in gc, the branch protection check"}} {
 		switch _, err := e.LookPath(t.name); {
 		case err != nil && t.status == OK:
 			out = append(out, ok(g, t.name+" not installed ("+t.why+")"))
