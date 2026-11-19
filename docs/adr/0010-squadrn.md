@@ -34,8 +34,8 @@ someone else's tool in searches, package registries and conversation.
 | Signature namespace | `sprawl-release` | `squadrn-release` (same key, `signers.pub` unchanged) |
 | Signing key secret | `SPRAWL_SIGNING_KEY` | `SQUADRN_SIGNING_KEY` |
 
-`SPRAWL_RELEASES_*` (releases repository settings) stay until the separate releases repository
-goes away with the move to the public repository.
+`SPRAWL_RELEASES_*` (releases repository settings) stayed until the separate releases
+repository went away with the move to the public repository (ADR 0007).
 
 ## Previous names: no compatibility
 

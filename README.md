@@ -11,51 +11,50 @@ Platforms: macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in
 
 ## Install
 
-Squadrn is private software (see [LICENSE](LICENSE)). Releases live in a separate
-repository that holds binaries only; access is by invitation. With [gh](https://cli.github.com)
-logged in to the account that was invited:
+macOS and Linux (needs `curl` or `wget`, `git` 2.31+ and `ssh-keygen`; no GitHub account):
 
 ```sh
-gh release download -R OWNER/sprawl-releases -p install.sh -O - | sh
+curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh
 ```
 
-This installs the latest stable release. For another one, a pre-release included, name its tag
-(`gh release list -R OWNER/sprawl-releases` lists them); from 1.2.0-rc.3 on the installer installs
-the release it comes from (with older ones, also pass `--version`):
+This installs the latest stable release. The installer installs the release it was downloaded
+from, so for another one (a pre-release included; see
+[releases](https://github.com/squadrn/cli/releases)) take that release's installer:
 
 ```sh
-gh release download vX.Y.Z -R OWNER/sprawl-releases -p install.sh -O - | sh -s -- --version vX.Y.Z
+curl -fsSL https://github.com/squadrn/cli/releases/download/vX.Y.Z/install.sh | sh
 ```
 
 The default command is **`squadrn`** with the short alias **`sqd`**. At a terminal the installer
 asks for other names (Enter keeps the default); or pass them up front (`--alias ''` installs no
-alias):
+alias; `SQUADRN_COMMAND`, `SQUADRN_ALIASES` and `SQUADRN_VERSION` work too):
 
 ```sh
-gh release download -R OWNER/sprawl-releases -p install.sh -O - | sh -s -- --name ai --alias ''
+curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh -s -- --name ai --alias ''
 ```
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
 `~/.local/share/squadrn/bin/squadrn`, links your command name(s) from `~/.local/bin`, and installs
-the squadrn plugin into every Claude account.
+the squadrn plugin into every Claude account. With [gh](https://cli.github.com) installed and
+logged in it also verifies GitHub's build provenance.
 
 ### Windows (beta)
 
-Requires [Git for Windows](https://git-scm.com/download/win) 2.31+ and `gh`. Windows builds ship
-in pre-releases until 1.2.0, so name the release (the newest one below; any tag from
-`gh release list -R OWNER/sprawl-releases` that has a `.zip`). In PowerShell:
+Requires [Git for Windows](https://git-scm.com/download/win) 2.31+. In PowerShell:
 
 ```powershell
-$tag = gh release list -R OWNER/sprawl-releases --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName'
-& ([scriptblock]::Create((gh release download $tag -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String))) -Version $tag
-# with options:
-& ([scriptblock]::Create((gh release download $tag -R OWNER/sprawl-releases -p install.ps1 -O - | Out-String))) -Version $tag -Name ai -Alias ''
+irm https://github.com/squadrn/cli/releases/latest/download/install.ps1 | iex
 ```
 
-From 1.2.0-rc.3 on, the installer installs the release it was downloaded from and `-Version` is
-only needed for another one. A failed install prints the reason in red and leaves the window
-open. `-AddToProfile` loads tab completion from your PowerShell profile; `self-uninstall` removes
-that line again.
+`| iex` cannot pass options: set `$env:SQUADRN_COMMAND`, `$env:SQUADRN_ALIASES` or
+`$env:SQUADRN_VERSION` first, or use the script block form:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/squadrn/cli/releases/latest/download/install.ps1))) -Name ai -Alias '' -AddToProfile
+```
+
+A failed install prints the reason in red and leaves the window open. `-AddToProfile` loads tab
+completion from your PowerShell profile; `self-uninstall` removes that line again.
 
 Everything above works the same, with these differences:
 - `grid`, `ps` and `swap` inside a pane need tmux and are not available; run each agent with
@@ -102,8 +101,18 @@ Completions for zsh (`~/.zsh/completions`), bash (`~/.local/share/bash-completio
 and fish (`~/.config/fish/completions`) are written when those directories exist; otherwise
 `squadrn completion zsh|bash|fish` prints them.
 
-Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`/`swap`; `gh` for installing
-and updating. Examples below use `squadrn`; `sqd` works the same.
+Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`/`swap`.
+Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`, build provenance).
+Updates read the public GitHub API; set `GH_TOKEN` or `GITHUB_TOKEN` (or log in with `gh`) only if
+you hit its rate limit. Examples below use `squadrn`; `sqd` works the same.
+
+## Use within Anthropic's terms
+
+Squadrn runs Claude Code under accounts you own — for example your work organization's account
+and your personal one — and keeps them apart. It is not a way to share an account with other
+people or to get around usage limits: each account stays bound by its own plan, limits and the
+[terms](https://www.anthropic.com/legal/consumer-terms) of the organization it belongs to.
+`usage` and `swap` help you continue a conversation on the right one of your accounts.
 
 ## Accounts
 
@@ -135,14 +144,14 @@ Global options before the command: `-a <account>`, `-C <dir>`, `--no-color` (als
 A dir named like an account but not made by squadrn (no `.squadrn-account` marker) is not an
 account: `account ls` lists it as unmanaged and `account adopt` makes it one.
 
-Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `comacpro-2`. Names that are squadrn or
+Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `acme-2`. Names that are squadrn or
 provider subcommands (`mcp`, `wt`, …) are rejected. Account dirs are created private (`0700`).
 
 ## Usage limits
 
 Claude Code reports a subscription's 5-hour and 7-day usage to its status line, and runs a
 `StopFailure` hook when a turn stops on a usage limit. squadrn records both per account, so you
-can see which account has room left before you swap.
+can see where each of your accounts stands and continue on the right one.
 
 ```sh
 squadrn usage                        # every account: plan, org, 5h/7d used and reset times, state
@@ -171,8 +180,8 @@ and 7d use. Records live in `~/.local/state/squadrn/usage/` (private).
 
 ## Swap
 
-`swap` moves a conversation to another account and resumes it there, in the directory it was
-started in.
+`swap` moves a conversation to another of your accounts and resumes it there, in the directory it
+was started in.
 
 ```sh
 squadrn swap                          # the conversation that just hit its limit here; pick the target
@@ -230,7 +239,7 @@ squadrn grid ~/repo feat-1 feat-2 feat-3 --spread        # spread over logged-in
 squadrn grid ~/repo personal:chore-c                     # add a pane to the running grid
 squadrn grid ls | attach [repo] | stop [repo]            # manage running grids
 squadrn ps [--json]                                      # which agent runs as which account
-squadrn swap [--to personal]                             # account hit its limit: move the conversation
+squadrn swap [--to personal]                             # continue the conversation on another account
 squadrn deps feat-a                                      # install dependencies (exit status passes through)
 squadrn gc [--json]                                      # merged/empty worktrees; --yes removes them
 squadrn gc --yes --force                                 # also those git refuses (submodules)
@@ -244,7 +253,8 @@ Worktree names are `<type>-<slug>` (`feat-otp-login`, `fix-cart-total`); Claude 
 
 ## Git push guard
 
-Three layers keep agents from force-pushing or pushing to protected branches:
+The guard is a safety net against agents' mistakes, not a sandbox: it does not contain a hostile
+process. Three layers keep agents from force-pushing or pushing to protected branches:
 
 1. **Pre-tool hook.** The squadrn plugin runs `squadrn hook guard-git` before every Bash command an
    agent runs. It parses the command as shell — pipelines, `$(…)`, `bash -c`, `eval`, here-documents
@@ -276,6 +286,10 @@ Protected branches default to `main master develop release/*`; set your own list
 ```sh
 git config squadrn.protectedBranches "production staging"
 ```
+
+Known limit: layer 1 denies `--no-verify`, but when it cannot see the command (a script or an
+interpreter runs git), git's `--no-verify` skips layer 2's pre-push hook. Branch protection on
+the server is the real backstop; turn it on for every branch that matters.
 
 Decisions other than allow are logged to `~/.local/state/squadrn/guard.log` (`0600`, credentials
 masked) with the layer that made them. `squadrn doctor` also suggests `permissions.deny` rules so
@@ -328,11 +342,10 @@ must set `git config squadrn.protectedBranches` instead.
 
 ## Releasing (maintainer)
 
-Source and releases live in two repositories (ADR 0007): this one (private, source) and
-`hoangthaininh/sprawl-releases` (private, binaries only; users are invited there with read
-access). Release steps, the secrets they depend on, renewing the token and handling the signing
-key: [docs/maintaining.md](docs/maintaining.md). A monthly `maintenance` workflow checks those
-secrets and fails (GitHub emails you) before anything expires.
+Releases are published in this repository by the `release` workflow when a `vX.Y.Z` tag is
+pushed (ADR 0007): GoReleaser with the workflow's own token, signed with `SQUADRN_SIGNING_KEY`.
+Steps and key handling: [docs/maintaining.md](docs/maintaining.md). A monthly `maintenance`
+workflow checks that the signing secret still matches `signers.pub`.
 
 ## Development
 
@@ -344,3 +357,8 @@ make vuln       # govulncheck
 
 Architecture: [docs/architecture.md](docs/architecture.md) · decisions: [docs/adr](docs/adr) ·
 [CHANGELOG](CHANGELOG.md). Actions are pinned by commit.
+
+## License
+
+[Apache License 2.0](LICENSE); see [NOTICE](NOTICE). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md);
+security reports: [SECURITY.md](SECURITY.md).

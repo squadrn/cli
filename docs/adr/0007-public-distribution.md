@@ -1,63 +1,63 @@
-# 0007 — Private distribution and updates
+# 0007 — Public distribution and updates
 
 ## Status
 
-Accepted (1.0.0).
+Accepted (2.0.0). Supersedes the private model of 1.x (history below).
 
 ## Context
 
-The source stays private. Users (friends, colleagues, people the author invites) must be able to
-install and update without seeing the source, and access must be revocable. Updates should be
-announced, never forced, the way Claude Code does it.
-
-Installing from the source repository would require read access to it, which is access to the
-code. GitHub artifact attestations are not available for private repositories on personal plans,
-so they cannot be the proof that a release is genuine. macOS ships LibreSSL without ed25519, so
-`openssl` cannot verify signatures there.
+The source is public under the Apache License 2.0 in `squadrn/cli`. Anyone should be able to
+install and update with one command, without a GitHub account or `gh`, and still get only
+releases signed by the project. Updates should be announced, never forced, the way Claude Code
+does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signatures there.
 
 ## Decision
 
-1. **Two repositories.** Source in `OWNER/cli`; releases (archives, checksums,
-   signature, `install.sh`, notes from the CHANGELOG) in `OWNER/sprawl-releases`, which holds no
-   source. Users install with `gh release download … install.sh | sh`; gh handles the
-   authentication, so squadrn never stores a token. (A GitHub CLI extension would read better, but
-   gh requires such repositories to be named `gh-*`.) Users are read collaborators of the releases
-   repository only. CI publishes there with a fine-grained token limited to that repository.
-   Revoking access stops updates.
-2. **Signed releases.** CI signs `checksums.txt` with an ed25519 key in the SSH signature format
+1. **One public repository.** Source and releases (archives, `checksums.txt`, its signature,
+   `install.sh`, `install.ps1`, notes from the CHANGELOG) live in `squadrn/cli`. The `release`
+   workflow publishes with the workflow's own `GITHUB_TOKEN` (`contents: write` on that job only);
+   no personal access token exists.
+2. **One-line installers over HTTPS.**
+   `curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh` and
+   `irm https://github.com/squadrn/cli/releases/latest/download/install.ps1 | iex`. Each installer
+   is rendered with its release's tag and the trusted public keys, installs that release by
+   default (`--version`/`-Version` or `SQUADRN_VERSION` for another), and downloads from
+   `github.com/squadrn/cli/releases/download` with curl, wget or `Invoke-WebRequest`.
+3. **Signed releases.** CI signs `checksums.txt` with an ed25519 key in the SSH signature format
    (`ssh-keygen -Y sign -n squadrn-release`). Public keys are committed in
-   `internal/release/signers.pub` and embedded in every build and in `install.sh`. `self-update`
-   verifies in Go (stdlib only) and refuses unsigned or wrongly signed releases; `install.sh`
-   verifies with `ssh-keygen -Y verify`, present on macOS and Linux. Several keys may be listed to
-   rotate. Attestations are still produced and checked where GitHub supports them.
-3. **Notices, not forced updates.** A detached `self-update --background` refreshes
-   `~/.cache/squadrn/update.json` at most once a day; at a terminal, commands show a one-line notice
-   at most every 6 hours. Never in hooks, CI, `--json` or non-terminals; opt out with
+   `internal/release/signers.pub` and embedded in every build and installer. `self-update`
+   verifies in Go (stdlib only) and refuses unsigned or wrongly signed releases; the installers
+   verify with `ssh-keygen -Y verify`. Several keys may be listed to rotate. GitHub artifact
+   attestations are produced too and checked as an extra when `gh` is installed and logged in.
+4. **Updates from the REST API.** `self-update` and the background check read
+   `api.github.com/repos/squadrn/cli/releases` and download asset URLs with Go's `net/http`
+   (environment proxy settings, timeouts). No token is needed; `GH_TOKEN`, `GITHUB_TOKEN` or gh's
+   login only raise the rate limit (and let the release workflow test its own drafts). The
+   repository is fixed at build time (`-X …/cli.Repo=squadrn/cli`); only `--repo` overrides it.
+5. **Notices, not forced updates.** A detached `self-update --background` refreshes
+   `~/.cache/squadrn/update.json` at most once a day; at a terminal, commands show a one-line
+   notice at most every 6 hours. Never in hooks, CI, `--json` or non-terminals; opt out with
    `update_check = false` or `SQUADRN_NO_UPDATE_CHECK`. Channels: stable, beta (pre-releases).
-4. **Reversible.** Each install keeps the previous release in `~/.local/share/squadrn/previous/`
+6. **Reversible.** Each install keeps the previous release in `~/.local/share/squadrn/previous/`
    (`self-update --rollback`); `self-uninstall` removes everything squadrn installed.
-5. **License.** Proprietary terms ship with every archive.
 
 ## Consequences
 
-- Users need a GitHub account and `gh`. A self-hosted download service with per-user tokens can
-  replace the releases repository later without changing the signature or update logic.
-- Losing the signing key forces every user to reinstall once with `install.sh`; the key is backed
-  up outside GitHub (pass or an encrypted file).
-- Anything handed to users can be copied; the license, not technology, covers redistribution.
+- The one-line install pipes the installer straight into a shell, so that first step trusts
+  GitHub and the repository's write access. `checksums.txt` lists both installers, so a copy
+  checked by hand (`ssh-keygen -Y verify` as `install.sh` does) is covered by the signature.
+  Everything the installer then downloads is verified against the keys embedded in it, and every
+  later update against the keys embedded in the installed binary.
+- Releases are published as drafts and made visible only after the upgrade jobs (install the
+  previous release, update to the draft, roll back) pass.
+- Anonymous API use is rate limited (60 requests an hour per IP); one update check costs one
+  request, an update two plus its downloads.
+- Losing the signing key forces every user to reinstall once; the key is backed up outside GitHub.
 
-## Addendum (1.2.0): what the signature covers
+## History
 
-`checksums.txt` also lists `install.sh` and `install.ps1`, so the signature covers the installers
-too. That protects copies checked by hand (download the installer with `checksums.txt` and
-`checksums.txt.sig`, then `ssh-keygen -Y verify` as `install.sh` does). The one-line install
-pipes the installer from `gh` straight into a shell, so nothing verifies the installer itself
-before it runs: that first step trusts GitHub, the releases repository's write access and the
-user's gh login. Everything the installer then downloads is verified against the keys embedded
-in it, and every later update against the keys embedded in the installed binary.
-
-Each installer is rendered with the tag of the release it ships in and installs that release by
-default, so `gh release download vX.Y.Z -p install.ps1` installs vX.Y.Z even when the latest
-stable release has no build for the platform. Releases are published as drafts and made visible
-only after the release workflow's upgrade jobs (install the previous release, update, roll back)
-pass against the draft.
+Until 1.x the source was private: releases went to a separate binaries-only repository that
+users were invited to read, installed with `gh release download … | sh` and published with a
+fine-grained token (`sprawl-releases`). Making the source public (ADR 0010, Step C of the move
+to `squadrn/cli`) removed the reason for the second repository, the token and the `gh`
+requirement; the signature model stayed.

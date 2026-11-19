@@ -1,6 +1,6 @@
 # 0003 — Distribute through a private GitHub repository and gh
 
-Status: accepted (v2.0.0)
+Status: superseded by 0007 (public distribution)
 
 ## Context
 

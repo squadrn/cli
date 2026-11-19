@@ -35,6 +35,9 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
   by golden files (`-update` rewrites them; review the diff). Windows is in progress and not yet
   supported for users.
 - Git 2.31 or newer (`internal/gitver`).
+- Distribution is public (ADR 0007): releases are published in `squadrn/cli` by the release
+  workflow with `GITHUB_TOKEN`; installers and `self-update` use plain HTTPS and the GitHub REST
+  API. `gh` is optional at runtime and never required to install or update.
 - Never read or print the release signing key; `scripts/release-key.sh` and CI handle it.
   Releases, secrets and key handling: `docs/maintaining.md`.
 
