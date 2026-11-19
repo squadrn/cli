@@ -86,6 +86,17 @@ stderr 'claude/work is in use by pid 1 \(claude/work\); stop it first \(or use -
 stderr 'in use by pid 1'
 rm home/.claude-work/.squadrn-inuse/1.json
 
+# login runs the agent's login and says who is logged in.
+exec squadrn account login work
+stdout '^logged in to claude/work as me@.claude-work$'
+grep 'args=auth login' home/calls.log
+exec squadrn account logout work
+env FAKE_LOGIN_FAILS=1
+! exec squadrn account login work
+stderr 'claude/work is still not logged in; try again: srn account login claude/work'
+env FAKE_LOGIN_FAILS=
+exec squadrn account login work
+
 # logout keeps the dir; rename logs out first, moves it and rewrites the plugin registry's paths.
 exec squadrn account logout work
 stdout 'logged out claude/work'

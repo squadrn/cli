@@ -31,6 +31,9 @@ func lookPath() (string, error) {
 // ctrl-c reaches every process attached to the console. squadrn must survive it so it can
 // return the child's status: signal.Notify keeps Go's console handler from exiting (Ignore
 // would let the default handler kill squadrn), and claude decides what ctrl-c means.
+// runChild runs bin as a child on the console and waits for it; on Windows that is run.
+func runChild(bin string, argv, env []string) error { return run(bin, argv, env) }
+
 func run(bin string, argv, env []string) error {
 	cmd := exec.Command(bin, argv[1:]...)
 	cmd.Env = env

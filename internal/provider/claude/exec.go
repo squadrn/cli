@@ -90,6 +90,20 @@ func (CLI) WorktreeArgs(name string) []string { return []string{"--worktree", na
 
 func (CLI) ResumeArgs(session string) []string { return []string{"--resume", session} }
 
+// Run runs an interactive claude command as a child and returns when it ends (platform:
+// runChild); a non-zero exit is an ExitStatus.
+func (c CLI) Run(configDir string, args []string) error {
+	argv := append([]string{"claude"}, args...)
+	if err := runChild(c.Bin, argv, c.env(configDir)); err != nil {
+		var es provider.ExitStatus
+		if errors.As(err, &es) {
+			return es
+		}
+		return fmt.Errorf("run %s: %w", c.Bin, err)
+	}
+	return nil
+}
+
 // Exec runs an interactive claude session in place of squadrn (platform: run).
 func (c CLI) Exec(configDir string, args []string) error {
 	argv := append([]string{"claude"}, args...)

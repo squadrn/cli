@@ -241,8 +241,22 @@ func (a *app) accountLogin(input string) error {
 	if err != nil {
 		return err
 	}
+	a.banner(acct)
+	err = ag.Run(acct.ConfigDir(), ag.LoginArgs())
 	a.cache.Forget(acct.Label())
-	return a.session(ag, acct, ag.LoginArgs(), "")
+	if err != nil {
+		return err
+	}
+	s, err := ag.Auth(context.Background(), acct.ConfigDir())
+	if err != nil || !s.LoggedIn {
+		return fmt.Errorf("%s is still not logged in; try again: %s account login %s", acct.Label(), a.cmd, acct.Label())
+	}
+	if s.Email != "" {
+		a.out("logged in to %s as %s\n", acct.Label(), s.Email)
+	} else {
+		a.out("logged in to %s\n", acct.Label())
+	}
+	return nil
 }
 
 func (a *app) accountLogout(input string) error {
