@@ -93,8 +93,8 @@ func TestFindSession(t *testing.T) {
 	if _, err := findSession([]string{a}, "11111111-2222-3333-4444-555555555555"); !errors.Is(err, provider.ErrNoSession) {
 		t.Fatalf("missing: %v", err)
 	}
-	if validSessionID("*") || !validSessionID(sid) {
-		t.Fatal("validSessionID")
+	if provider.Claude.SessionID.MatchString("*") || !provider.Claude.SessionID.MatchString(sid) {
+		t.Fatal("Spec.SessionID")
 	}
 }
 

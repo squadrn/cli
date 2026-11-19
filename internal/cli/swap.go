@@ -96,12 +96,12 @@ func (a *app) swap(o swapOptions) error {
 	if !spec.Caps.SessionTransfer {
 		return fmt.Errorf("%s cannot transfer conversations", spec.Name)
 	}
+	if o.session != "" && !spec.SessionID.MatchString(o.session) {
+		return usagef("--session %q: %v", o.session, provider.ErrBadSessionID)
+	}
 	ag, err := a.agent(spec)
 	if err != nil {
 		return err
-	}
-	if o.session != "" && !ag.ValidSessionID(o.session) {
-		return usagef("--session %q: %v", o.session, provider.ErrBadSessionID)
 	}
 	all, err := a.store.List()
 	if err != nil {

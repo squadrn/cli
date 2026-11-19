@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,8 @@ type Spec struct {
 	// Subcommands of the agent CLI: `squadrn <account> <subcommand>` passes them through, and
 	// they cannot be account names.
 	Subcommands []string
+	// SessionID is the form of a conversation's ID (Caps.SessionTransfer).
+	SessionID *regexp.Regexp
 	// Plugin is the squadrn plugin's ID in the CLI.
 	Plugin string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
@@ -130,7 +133,6 @@ type Agent interface {
 	EnablePluginArgs() []string
 
 	// Conversations (Caps.SessionTransfer), looked up across the given config dirs.
-	ValidSessionID(id string) bool
 	FindSession(configDirs []string, id string) (Session, error)
 	// LatestSessionIn is the most recent conversation started in dir.
 	LatestSessionIn(configDirs []string, dir string) (Session, error)
@@ -165,6 +167,7 @@ var Claude = Spec{
 		"agents", "attach", "auth", "auto-mode", "doctor", "gateway", "import", "install", "logs", "mcp",
 		"migrate-installer", "plugin", "plugins", "purge", "respawn", "setup-token", "update",
 	},
+	SessionID:    regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
 	Plugin:       "squadrn@squadrn",
 	InstallHint:  "curl -fsSL https://claude.ai/install.sh | bash",
 	NativeMarker: "/.local/share/claude/versions/",

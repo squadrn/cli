@@ -26,8 +26,6 @@ import (
 
 var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9]`)
 
-var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
 // projectKey encodes a working directory the way Claude Code names the project folders of short
 // paths. Only the worktree lookup uses it; see latestSessionIn.
 func projectKey(dir string) (string, error) {
@@ -49,8 +47,6 @@ var ErrVerify = errors.New("copied conversation does not match the source")
 
 // projectDir is the name of the project folder holding s, reused in the target account.
 func projectDir(s Session) string { return filepath.Base(filepath.Dir(s.Path)) }
-
-func (CLI) ValidSessionID(id string) bool { return validSessionID(id) }
 
 func (CLI) FindSession(configDirs []string, id string) (Session, error) {
 	return findSession(configDirs, id)
@@ -79,9 +75,6 @@ func (CLI) UnavailableModel(s Session, target provider.AuthStatus) string {
 	return ""
 }
 
-// validSessionID reports whether id has the form of a Claude Code session ID.
-func validSessionID(id string) bool { return uuidPattern.MatchString(id) }
-
 func sessionAt(path string, owner int) (Session, bool) {
 	fi, err := os.Stat(path)
 	if err != nil || !fi.Mode().IsRegular() {
@@ -98,7 +91,7 @@ func sessionAt(path string, owner int) (Session, bool) {
 // findSession finds conversation id in configDirs. When several accounts hold it (it was
 // swapped before), the most recently written copy wins.
 func findSession(configDirs []string, id string) (Session, error) {
-	if !validSessionID(id) {
+	if !provider.Claude.SessionID.MatchString(id) {
 		return Session{}, fmt.Errorf("%q: %w", id, provider.ErrBadSessionID)
 	}
 	s, err := latest(configDirs, func(dir string) []string {
