@@ -1,6 +1,6 @@
 //go:build !windows
 
-package cli
+package claude
 
 import (
 	"os"
@@ -17,8 +17,8 @@ func statusLineWord(s, _ string) (string, error) {
 	return proc.ShellQuote(s), nil
 }
 
-// statusLineShell runs a status line command the way Claude Code does: through the user's shell.
-func statusLineShell(command string) (string, []string) {
+// StatusLineShell runs a status line command the way Claude Code does: through the user's shell.
+func StatusLineShell(command string) (string, []string) {
 	sh := os.Getenv("SHELL")
 	if sh == "" {
 		sh = "/bin/sh"

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/squadrn/squadrn/internal/fsx"
 )
@@ -66,6 +67,69 @@ func SetStatusLineCommand(path, command string) error {
 		perm = fi.Mode().Perm()
 	}
 	return fsx.WriteBytes(real, append(obj.encode(""), '\n'), perm)
+}
+
+// WrapStatusLine is the status line command that runs bin with hook (its arguments, e.g.
+// "hook statusline") and then old ("" for none) through --then. home shortens paths on Windows.
+func WrapStatusLine(bin, hook, old, home string) (string, error) {
+	q, err := statusLineWord(bin, home)
+	if err != nil {
+		return "", err
+	}
+	cmd := q + " " + hook
+	if old != "" {
+		q, err := statusLineWord(old, home)
+		if err != nil {
+			return "", err
+		}
+		cmd += " --then " + q
+	}
+	return cmd, nil
+}
+
+// UnwrapStatusLine recognises a command WrapStatusLine made for hook and returns the wrapped one.
+func UnwrapStatusLine(cmd, hook string) (old string, ours bool) {
+	_, rest, ok := shellWord(cmd)
+	if !ok || !strings.HasPrefix(rest, " "+hook) {
+		return "", false
+	}
+	rest = strings.TrimPrefix(rest, " "+hook)
+	if rest == "" {
+		return "", true
+	}
+	if !strings.HasPrefix(rest, " --then ") {
+		return "", false
+	}
+	old, rest, ok = shellWord(strings.TrimPrefix(rest, " --then "))
+	if !ok || rest != "" {
+		return "", false
+	}
+	return old, true
+}
+
+// shellWord splits off the first word, as statusLineWord writes it: plain characters, '…'
+// quoted runs and \' for a quote between them.
+func shellWord(s string) (word, rest string, ok bool) {
+	var b strings.Builder
+	i := 0
+	for i < len(s) && s[i] != ' ' {
+		switch {
+		case s[i] == '\'':
+			j := strings.IndexByte(s[i+1:], '\'')
+			if j < 0 {
+				return "", "", false
+			}
+			b.WriteString(s[i+1 : i+1+j])
+			i += j + 2
+		case s[i] == '\\' && i+1 < len(s) && s[i+1] == '\'':
+			b.WriteByte('\'')
+			i += 2
+		default:
+			b.WriteByte(s[i])
+			i++
+		}
+	}
+	return b.String(), s[i:], i > 0
 }
 
 // object is a JSON object that keeps its keys in file order.
