@@ -30,6 +30,11 @@ func isolateGit(t testing.TB) {
 	for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 		t.Setenv(k, "t@t")
 	}
+	// Directories of previous product names resolve under the fixture's home (CI runners set
+	// XDG_CONFIG_HOME).
+	for _, k := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+		t.Setenv(k, "")
+	}
 }
 
 // newRepos creates real repositories covering every configuration the guard reads.
