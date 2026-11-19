@@ -11,9 +11,8 @@ is lost. Design: [ADR 0007](adr/0007-public-distribution.md).
 | signing key backup | your password manager (and `pass` if installed) | copy of the private key | keep it there; GitHub cannot show a secret again |
 | `internal/release/signers.pub` | this repository | public keys every build and installer trusts | — |
 
-Publishing uses the workflow's own `GITHUB_TOKEN`; there is no token to renew. The `maintenance`
-workflow runs on the 1st of every month (and on demand: *Actions → maintenance → Run workflow*)
-and fails — GitHub emails you — when the signing key no longer matches `signers.pub`.
+Publishing uses the workflow's own `GITHUB_TOKEN`. `scripts/sign.sh` verifies every new signature
+against `signers.pub`, so a secret that no longer matches fails the release while it is a draft.
 
 ## Release
 
@@ -44,8 +43,9 @@ irm https://github.com/squadrn/squadrn/releases/download/vX.Y.Z/install.ps1 | ie
 Pre-releases (`vX.Y.Z-rc.N`) need their own `## X.Y.Z-rc.N` CHANGELOG section; installing a
 pre-release switches an install without a chosen channel to the beta channel (`self-install`).
 
-If `upgrade` fails, the draft stays invisible: fix the problem, delete the draft
-(`gh release delete vX.Y.Z -R squadrn/squadrn --yes`), then move the tag (below). The upgrade jobs
+If the release workflow fails before `publish`, the draft stays invisible: fix the problem, push
+`main`, delete the draft (`gh release delete vX.Y.Z -R squadrn/squadrn --yes`), then move the tag:
+`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`, tag again and push it. The upgrade jobs
 read the draft with the workflow token (`contents: write`): GitHub shows drafts only to tokens
 with push access.
 
@@ -65,11 +65,6 @@ standard (non-admin) user with Defender on:
   denied or asked each time
 - `squadrn self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
 - colours and the account picker in Windows Terminal and the classic console
-- `scripts/windows-spike.ps1` once per Claude Code major version (hook and tool behaviour)
-
-If the release workflow fails before publishing, fix it (and delete a leftover draft), push
-`main`, then move the tag:
-`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`, tag again and push it.
 
 ## Repository settings
 

@@ -34,5 +34,7 @@ and [docs/architecture.md](docs/architecture.md).
   commits or pull request descriptions.
 - Pull requests target `main`; never force-push a branch under review.
 
+Releases, signing keys and repository settings: [docs/maintaining.md](docs/maintaining.md).
+
 By contributing you agree that your contribution is licensed under the
 [Apache License 2.0](LICENSE).
