@@ -64,7 +64,6 @@ standard (non-admin) user with Defender on:
   denied or asked each time
 - `squadrn self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
 - colours and the account picker in Windows Terminal and the classic console
-- `scripts/windows-spike.ps1` once per Claude Code major version (hook and tool behaviour)
 
 If the release workflow fails before publishing, fix it (and delete a leftover draft), push
 `main`, then move the tag:
