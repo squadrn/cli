@@ -93,10 +93,10 @@ jobs:
           PREV: ${{ steps.prev.outputs.tag }}
         run: |
           gh release download "$TAG" -R "$REPO" -p install.sh -O install.sh
-          sh install.sh --version "$PREV" --name squadrn --alias ''
+          sh install.sh --version "$PREV" --command squadrn --alias ''
           export PATH="$HOME/.local/bin:$PATH"
           squadrn version
-          squadrn self-update --version "$TAG"
+          squadrn self-update --tag "$TAG"
           test "$(squadrn version)" = "squadrn ${TAG#v}"
           squadrn doctor --json >/dev/null || true
           squadrn self-update --rollback
@@ -114,7 +114,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed" }
           $squadrn = Join-Path $env:USERPROFILE ".local\bin\squadrn.exe"
           & $squadrn version
-          & $squadrn self-update --version $env:TAG
+          & $squadrn self-update --tag $env:TAG
           if ((& $squadrn version) -ne "squadrn $($env:TAG.TrimStart('v'))") { throw "self-update did not reach $env:TAG" }
 
   # Only a release whose upgrade path works becomes visible to users.
@@ -143,7 +143,7 @@ jobs:
     steps:
       - name: The one-line installer and self-update --check see the release on its channel
         run: |
-          curl -fsSL "https://github.com/$REPO/releases/download/$TAG/install.sh" | sh -s -- --name squadrn --alias ''
+          curl -fsSL "https://github.com/$REPO/releases/download/$TAG/install.sh" | sh -s -- --command squadrn --alias ''
           export PATH="$HOME/.local/bin:$PATH"
           case $TAG in *-*) want=beta ;; *) want=stable ;; esac
           test "$(squadrn config get update_channel)" = "$want"

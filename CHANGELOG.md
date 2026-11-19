@@ -11,7 +11,7 @@ worktrees, with a guard against destructive pushes. Apache-2.0.
 - **Parallel work:** `wt <name>` runs an agent in its own worktree; `grid` lays several out in tmux
   (macOS, Linux); `ps`, `gc` (never deletes unmerged or in-use work), `deps`.
 - **Usage limits:** `usage` shows each account's 5-hour and weekly usage from Claude Code's status
-  line (`usage --setup`), with the best account for the current repository.
+  line (`usage setup`), with the best account for the current repository.
 - **Swap:** `swap` continues a conversation on another of your accounts by session ID, after
   stopping the old session; checkpoints for `/rewind` move with it.
 - **Push guard:** a Claude Code hook (Bash and PowerShell) and a git pre-push hook stop force pushes
