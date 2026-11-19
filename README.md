@@ -302,7 +302,8 @@ the server is the real backstop; turn it on for every branch that matters.
 
 Decisions other than allow are logged to `~/.local/state/squadrn/guard.log` (`0600`, credentials
 masked) with the layer that made them. `srn doctor` also suggests `permissions.deny` rules so
-agents cannot edit squadrn's own files with their file tools.
+agents cannot edit squadrn's own files with their file tools (`Edit(…)` rules, which cover every
+file-editing tool).
 
 ## Configuration
 

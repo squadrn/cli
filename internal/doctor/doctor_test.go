@@ -239,15 +239,24 @@ func TestDenyRules(t *testing.T) {
 	e := env(t, fakeAgent{}, nil)
 	e.Layout.DataDir = config.DirsFor(e.Store.Home, config.Slug).Data
 	settings := filepath.Join(e.Store.Home, ".claude", "settings.json")
-	if c, _ := find(e.settings(), "edit squadrn"); c.Status != Warn || !strings.Contains(c.Fix, `"Edit(~/.local/share/squadrn/**)"`) {
+	if c, _ := find(e.settings(), "edit squadrn"); c.Status != Warn || !strings.HasSuffix(c.Fix, `: ["Edit(~/.local/share/squadrn/**)","Edit(~/.config/squadrn/**)"]`) {
 		t.Fatalf("no settings: %+v", c)
 	}
-	body := `{"permissions":{"deny":["Edit(~/.local/share/squadrn/**)","Write(~/.local/share/squadrn/**)","Edit(~/.config/squadrn/**)","Write(~/.config/squadrn/**)"]}}`
-	if err := os.WriteFile(settings, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if c, _ := find(e.settings(), "cannot edit squadrn"); c.Status != OK {
-		t.Fatalf("with rules: %+v", c)
+	for _, tt := range []struct {
+		name string
+		deny string
+		want Status
+	}{
+		{"edit rules", `"Edit(~/.local/share/squadrn/**)","Edit(~/.config/squadrn/**)"`, OK},
+		{"edit and write rules", `"Edit(~/.local/share/squadrn/**)","Write(~/.local/share/squadrn/**)","Edit(~/.config/squadrn/**)","Write(~/.config/squadrn/**)"`, OK},
+		{"write rules only", `"Write(~/.local/share/squadrn/**)","Write(~/.config/squadrn/**)"`, Warn},
+	} {
+		if err := os.WriteFile(settings, []byte(`{"permissions":{"deny":[`+tt.deny+`]}}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if c, _ := find(e.settings(), "edit squadrn"); c.Status != tt.want || strings.Contains(c.Fix, "Write(") {
+			t.Fatalf("%s: %+v", tt.name, c)
+		}
 	}
 	if err := os.WriteFile(settings, []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
