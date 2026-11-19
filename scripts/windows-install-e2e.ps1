@@ -31,7 +31,7 @@ New-Item -ItemType Directory -Force -Path $pub, "$rel\plugin\hooks", "$rel\.clau
 # The release: what goreleaser puts into the Windows zip, built from this checkout.
 & go build -trimpath -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=$version" -o "$rel\squadrn.exe" ./cmd/squadrn
 if ($LASTEXITCODE -ne 0) { throw "go build failed" }
-Copy-Item -Recurse -Force plugin\.claude-plugin, plugin\agents, plugin\bin, plugin\README.md "$rel\plugin\"
+Copy-Item -Recurse -Force plugin\.claude-plugin, plugin\agents, plugin\README.md "$rel\plugin\"
 Copy-Item -Force scripts\hooks.windows.json "$rel\plugin\hooks\hooks.json"
 Copy-Item -Force .claude-plugin\marketplace.json "$rel\.claude-plugin\"
 $zip = Join-Path $pub "squadrn_${version}_windows_amd64.zip"

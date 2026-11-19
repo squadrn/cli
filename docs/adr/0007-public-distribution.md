@@ -1,8 +1,6 @@
 # 0007 — Public distribution and updates
 
-## Status
-
-Accepted (v1.0.0). Supersedes ADR 0003.
+Status: accepted (v1.0.0)
 
 ## Context
 
@@ -28,7 +26,9 @@ does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signat
    `internal/release/signers.pub` and embedded in every build and installer. `self-update`
    verifies in Go (stdlib only) and refuses unsigned or wrongly signed releases; the installers
    verify with `ssh-keygen -Y verify`. Several keys may be listed to rotate. GitHub artifact
-   attestations are produced too and checked as an extra when `gh` is installed and logged in.
+   attestations are produced too; the installers do not check them (verify by hand with
+   `gh attestation verify`), `self-update` checks them as an extra when `gh` is installed and
+   logged in.
 4. **Updates from the REST API.** `self-update` and the background check read
    `api.github.com/repos/squadrn/squadrn/releases` and download asset URLs with Go's `net/http`
    (environment proxy settings, timeouts). No token is needed; `GH_TOKEN`, `GITHUB_TOKEN` or gh's
@@ -38,7 +38,12 @@ does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signat
    `~/.cache/squadrn/update.json` at most once a day; at a terminal, commands show a one-line
    notice at most every 6 hours. Never in hooks, CI, `--json` or non-terminals; opt out with
    `update_check = false` or `SQUADRN_NO_UPDATE_CHECK`. Channels: stable, beta (pre-releases).
-6. **Reversible.** Each install keeps the previous release in `~/.local/share/squadrn/previous/`
+6. **Placement in Go.** The installers only download, verify and extract; `squadrn self-install`
+   does everything else (layout, command names, completions, plugin in every account), so
+   it is covered by tests and shared by `self-update`. The installed data dir doubles as a local
+   plugin marketplace that every account registers, and the release version is stamped into the
+   installed `plugin.json`, so Claude Code sees every release as a plugin update.
+7. **Reversible.** Each install keeps the previous release in `~/.local/share/squadrn/previous/`
    (`self-update --rollback`); `self-uninstall` removes everything squadrn installed.
 
 ## Consequences
@@ -53,3 +58,5 @@ does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signat
 - Anonymous API use is rate limited (60 requests an hour per IP); one update check costs one
   request, an update two plus its downloads.
 - Losing the signing key forces every user to reinstall once; the key is backed up outside GitHub.
+- Signing verifies the new signature against `signers.pub` (`scripts/sign.sh`), so a signing
+  secret that installed copies would refuse fails the release while it is a draft.
