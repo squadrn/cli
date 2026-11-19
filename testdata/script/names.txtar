@@ -12,6 +12,20 @@ grep '^aliases = \["squadrn"\]' home/.config/squadrn/config.toml
 exec sh -c 'readlink home/.local/bin/srn && readlink home/.local/bin/squadrn'
 stdout -count=2 'home/.local/share/squadrn/bin/squadrn$'
 
+# Choosing the default alias as the command on a fresh machine swaps the two names.
+env HOME=$WORK/full
+env XDG_CONFIG_HOME=$WORK/full/.config
+env XDG_DATA_HOME=$WORK/full/.local/share
+env XDG_STATE_HOME=$WORK/full/.local/state
+env XDG_CACHE_HOME=$WORK/full/.cache
+mkdir full/.claude
+exec squadrn self-install rel --command squadrn
+grep '^command = "squadrn"' full/.config/squadrn/config.toml
+grep '^aliases = \["srn"\]' full/.config/squadrn/config.toml
+exec squadrn self-install rel --command ai
+grep '^command = "ai"' full/.config/squadrn/config.toml
+grep '^aliases = \["srn"\]' full/.config/squadrn/config.toml
+
 # Choosing no alias at install is respected.
 env HOME=$WORK/bare
 env XDG_CONFIG_HOME=$WORK/bare/.config

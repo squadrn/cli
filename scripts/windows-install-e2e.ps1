@@ -65,6 +65,7 @@ foreach ($shell in "powershell.exe", "pwsh") {
     Check ($out -match "verified release signature") "${shell}: signature verified" $out
     Check ((& "$bin\squadrn.exe" version) -eq "squadrn $version") "${shell}: installed $Tag without -Version"
     Check ($out -notmatch "install\.ps1:") "${shell}: the install reports no error" $out
+    Check (Test-Path "$bin\srn.exe") "${shell}: -Command squadrn swaps with the default, srn is the alias" $out
     Check ($out -match "EAP=Continue") "${shell}: the session keeps its ErrorActionPreference" $out
     Check ($out -match "following the beta channel") "${shell}: a pre-release follows the beta channel" $out
     $cfg = Join-Path $env:USERPROFILE ".config\squadrn\config.toml"
