@@ -16,7 +16,8 @@
   `config get --json` give lists as arrays and `git_hooks`/`update_check` as booleans.
 - `wt rm` decides before removing anything: an unmerged branch is refused up front, or with
   `--force-branch` the worktree and branch go together ("deleted branch …"); a branch left without
-  its worktree is deleted with `--force-branch`. Refusals name the real reason and the worktree.
+  its worktree follows the same rule (merged: deleted; unmerged: `--force-branch`). Refusals name
+  the real reason and the worktree.
 - `account add` creates main's `settings.json` (`{}`) when it is missing, so accounts always link
   to it; `account add <account> --relink` moves an account's own copies of shared files aside
   (`.bak-<time>`) and links main's, and is what `doctor` and the session warning suggest.

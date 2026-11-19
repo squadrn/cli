@@ -104,10 +104,19 @@ stdout 'deleted branch worktree-feat-open'
 exec git branch --list worktree-feat-open
 ! stdout .
 
-# A branch left without its worktree is deleted with --force-branch.
-exec git branch worktree-feat-orphan
+# A branch left without its worktree: merged, it is deleted like an attached one; unmerged, it
+# needs --force-branch.
+exec git branch worktree-feat-done
+exec squadrn wt rm feat-done
+stdout '^deleted branch worktree-feat-done$'
+exec git branch --list worktree-feat-done
+! stdout .
+exec git worktree add -q -b worktree-feat-orphan .claude/worktrees/feat-orphan
+exec git -C .claude/worktrees/feat-orphan commit -q --allow-empty -m wip
+exec git worktree remove .claude/worktrees/feat-orphan
 ! exec squadrn wt rm feat-orphan
-stderr 'worktree feat-orphan is gone, but its branch worktree-feat-orphan is left; delete it with --force-branch'
+stderr 'worktree feat-orphan is gone, but its branch worktree-feat-orphan with unmerged commits is left; delete it with --force-branch'
+exitcode 2 squadrn wt rm feat-orphan --force-branch
 exec squadrn wt rm feat-orphan --force-branch -y
 stdout '^deleted branch worktree-feat-orphan$'
 exec git branch --list worktree-feat-orphan

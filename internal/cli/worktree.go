@@ -227,14 +227,22 @@ func (a *app) wtRmCmd() *cobra.Command {
 	return cmd
 }
 
-// rmOrphanBranch handles `wt rm <name>` when the worktree is gone but its agent branch is left.
+// rmOrphanBranch handles `wt rm <name>` when the worktree is gone but its agent branch is left:
+// a merged branch is deleted, an unmerged one only with --force-branch.
 func (a *app) rmOrphanBranch(ctx context.Context, repo worktree.Repo, name string, forceBranch, yes bool) error {
 	branch := worktree.AgentBranch(name)
-	if !forceBranch {
-		return fmt.Errorf("worktree %s is gone, but its branch %s is left; delete it with --force-branch", name, branch)
-	}
-	if err := a.confirm(yes, "Delete branch %s even if unmerged", branch); err != nil {
+	unmerged, err := repo.Unmerged(ctx, branch)
+	if err != nil {
 		return err
+	}
+	// Same rule as with the worktree: merged goes, unmerged needs --force-branch (and asks).
+	if unmerged {
+		if !forceBranch {
+			return fmt.Errorf("worktree %s is gone, but its branch %s with unmerged commits is left; delete it with --force-branch", name, branch)
+		}
+		if err := a.confirm(yes, "Delete branch %s with its unmerged commits", branch); err != nil {
+			return err
+		}
 	}
 	if err := repo.DeleteBranch(ctx, name); err != nil {
 		return err
