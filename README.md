@@ -35,8 +35,8 @@ curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.s
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
 `~/.local/share/squadrn/bin/squadrn`, links your command name(s) from `~/.local/bin`, and installs
-the squadrn plugin into every Claude account. With [gh](https://cli.github.com) installed and
-logged in it also verifies GitHub's build provenance.
+the squadrn plugin into every Claude account. Releases also carry GitHub build provenance; verify
+an archive by hand with `gh attestation verify <archive> --repo squadrn/squadrn`.
 
 ### Windows (beta)
 

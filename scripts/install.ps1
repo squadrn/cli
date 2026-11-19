@@ -26,10 +26,9 @@ param(
 function Invoke-Native {
     # Runs a program with $ErrorActionPreference relaxed: Windows PowerShell 5.1 turns redirected
     # stderr into errors, which 'Stop' would make fatal. Callers check $LASTEXITCODE.
-    param([string]$FilePath, [string[]]$ArgumentList, [switch]$Quiet, [switch]$Merge)
+    param([string]$FilePath, [string[]]$ArgumentList, [switch]$Merge)
     $ErrorActionPreference = "Continue"
-    if ($Quiet) { & $FilePath @ArgumentList 2>$null }
-    elseif ($Merge) { & $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" } }
+    if ($Merge) { & $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" } }
     else { & $FilePath @ArgumentList }
 }
 
@@ -167,20 +166,6 @@ __SQUADRN_SIGNERS__
         if (-not $expected) { throw "checksums.txt has no entry for $asset" }
         $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $asset)).Hash.ToLower()
         if ($actual -ne $expected) { throw "checksum mismatch for $asset" }
-
-        # Build provenance as an extra when gh is installed and logged in; the signature is what
-        # the install relies on.
-        if (Get-Command gh -ErrorAction SilentlyContinue) {
-            $null = Invoke-Native gh @("auth", "status") -Quiet
-            if ($LASTEXITCODE -eq 0) {
-                $out = Invoke-Native gh @("attestation", "verify", (Join-Path $tmp $asset), "--repo", $Repo) -Merge | Out-String
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Host "verified build provenance of $asset"
-                } elseif ($out -notmatch "no attestations found|unknown command|HTTP 404") {
-                    throw "build provenance check failed for ${asset}: $($out.Trim())"
-                }
-            }
-        }
 
         $release = Join-Path $tmp "release"
         Expand-Archive -Path (Join-Path $tmp $asset) -DestinationPath $release
