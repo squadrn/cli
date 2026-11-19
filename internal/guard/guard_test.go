@@ -269,7 +269,7 @@ var decideCases = []decideCase{
 	{Allow, "feat", `ls ~/push`},
 	{Ask, "feat", `echo x | xargs echo push`},
 
-	// G1: git subcommands that are neither built-ins nor visible aliases; alias definitions.
+	// git subcommands that are neither built-ins nor visible aliases; alias definitions.
 	{Ask, "feat", `git config alias.pp 'push --no-verify -f origin HEAD:main' && git pp`},
 	{Ask, "feat", `git pp origin feat-x`},
 	{Ask, "feat", `git config --global alias.pp push`},
@@ -279,7 +279,7 @@ var decideCases = []decideCase{
 	{Allow, "feat", `git config --get alias.st`},
 	{Allow, "feat", `git config user.name bot`},
 	{Allow, "feat", `git config --unset alias.pp`},
-	// G2: settings and variables that make git run a program.
+	// settings and variables that make git run a program.
 	{Ask, "feat", `git -c core.sshCommand='ssh -i k' fetch`},
 	{Ask, "feat", `git -c core.fsmonitor=./x status`},
 	{Ask, "feat", `git -c alias.p=push p origin feat-x`},
@@ -300,7 +300,7 @@ var decideCases = []decideCase{
 	{Allow, "feat", `git config core.pager`},
 	{Allow, "feat", `git config get core.editor`},
 	{Allow, "feat", `GIT_TRACE=1 git status`},
-	// G3: agents cannot lower the guard's policy.
+	// agents cannot lower the guard's policy.
 	{Deny, "feat", `squadrn config set protected_branches none`},
 	{Deny, "feat", `sqd config set git_hooks false`},
 	{Deny, "feat", `~/.local/bin/ai config set protected_branches x`},
@@ -318,7 +318,7 @@ var decideCases = []decideCase{
 	{Ask, "feat", `echo x > ~/.local/state/squadrn/guard.log`},
 	{Ask, "feat", `cp x ~/.local/share/squadrn/plugin/hooks/hooks.json`},
 	{Allow, "feat", `cp ~/.config/squadrn/config.toml /tmp/backup.toml`},
-	// G4: programs that run other commands.
+	// programs that run other commands.
 	{Deny, "feat", `trap 'git push -f' EXIT`},
 	{Allow, "feat", `trap - EXIT`},
 	{Deny, "feat", `busybox sh -c 'git push -f'`},
@@ -339,7 +339,7 @@ var decideCases = []decideCase{
 	{Allow, "feat", `sed 's/github/gitlab/' f`},
 	{Ask, "feat", `vim -c '!git push origin main'`},
 	{Ask, "feat", `ruby -e 'system("git", "push")'`},
-	// G5: the environment that points git elsewhere or disables layer 2.
+	// the environment that points git elsewhere or disables layer 2.
 	{Ask, "feat", `GIT_DIR=/tmp/x make`},
 	{Ask, "feat", `export GIT_WORK_TREE=/tmp`},
 	{Ask, "feat", `unset GIT_EXEC_PATH`},
@@ -351,7 +351,7 @@ var decideCases = []decideCase{
 	{Deny, "feat", `rm -rf ~/.local/share/squadrn/git-hooks`},
 	{Deny, "feat", `rm -rf ~/.local/share/squadrn`},
 	{Deny, "feat", `truncate -s0 ~/.local/share/squadrn/git-hooks/pre-push`},
-	// G6: GitHub CLI writes to branches.
+	// GitHub CLI writes to branches.
 	{Deny, "feat", `gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=abc -F force=true`},
 	{Deny, "feat", `gh api repos/o/r/git/refs -f ref=refs/heads/main -f sha=x`},
 	{Deny, "feat", `gh api --method DELETE repos/o/r/git/refs/heads/main`},
@@ -375,7 +375,7 @@ var decideCases = []decideCase{
 	{Allow, "feat", `gh -R o/r pr view 3`},
 	{Allow, "feat", `gh run list && gh pr checks`},
 	{Allow, "feat", `gh ruleset list`},
-	// G7: transports and bridges that push without git push.
+	// transports and bridges that push without git push.
 	{Deny, "feat", `git remote-https origin https://github.com/o/r`},
 	{Deny, "feat", `git remote-ext origin 'ext::sh -c x'`},
 	{Deny, "feat", `git http-push https://x/r main`},
@@ -387,38 +387,38 @@ var decideCases = []decideCase{
 	{Ask, "feat", `git p4 submit`},
 	{Ask, "feat", `git svn dcommit`},
 	{Allow, "feat", `git svn fetch`},
-	// G8: a refspec without a colon goes where remote.<r>.push or the upstream maps it.
+	// a refspec without a colon goes where remote.<r>.push or the upstream maps it.
 	{Deny, "feat", `git -c remote.origin.push=refs/heads/feat-x:refs/heads/main push origin feat-x`},
 	{Deny, "feat", `git -c 'remote.origin.push=refs/heads/*:refs/heads/release/*' push origin feat-x`},
 	{Deny, "feat", `git -c remote.origin.push=+refs/heads/feat-x:refs/heads/feat-x push origin feat-x`},
 	{Deny, "upstream", `git push origin feat-x`},
 	{Allow, "upstream", `git push other feat-x`},
 	{Allow, "feat", `git -c remote.origin.push=refs/heads/feat-x:refs/heads/feat-y push origin feat-x`},
-	// G9: mirror remotes.
+	// mirror remotes.
 	{Deny, "feat", `git -c remote.origin.mirror=true push origin feat-x`},
 	{Deny, "feat", `git -c remote.origin.mirror push`},
 	{Allow, "feat", `git -c remote.origin.mirror=false push origin feat-x`},
-	// G10: push configuration written earlier on the same line.
+	// push configuration written earlier on the same line.
 	{Ask, "feat", `git config remote.origin.push refs/heads/feat-x:refs/heads/main && git push origin feat-x`},
 	{Ask, "feat", `git config push.default upstream; git push`},
 	{Ask, "feat", `git branch -u origin/main && git push`},
 	{Ask, "feat", `git remote add --mirror=push m url; git push m`},
 	{Allow, "feat", `git push origin feat-x && git config push.default simple`},
-	// G11: --git-dir and GIT_DIR name the repository.
+	// --git-dir and GIT_DIR name the repository.
 	{Deny, "feat", `git --git-dir={main}/.git push`},
 	{Deny, "feat", `git --git-dir {main}/.git --work-tree {main} push`},
 	{Deny, "feat", `GIT_DIR={main}/.git git push`},
 	{Ask, "feat", `git --git-dir=nowhere push origin feat-x`},
 	{Ask, "feat", `git --git-dir="$D" push origin feat-x`},
 	{Allow, "feat", `git --git-dir=.git push origin feat-x`},
-	// G13: shell aliases for git push.
+	// shell aliases for git push.
 	{Ask, "feat", `gp`},
 	{Ask, "feat", `gpf!`},
 	{Ask, "feat", `ggpush`},
 	{Ask, "feat", `gpsup`},
 	{Allow, "feat", `gpg --verify x.sig`},
 	{Allow, "feat", `gprof a.out`},
-	// G15: fewer prompts for forms git resolves safely.
+	// fewer prompts for forms git resolves safely.
 	{Allow, "feat", `git push origin "$(git branch --show-current)"`},
 	{Allow, "feat", `git push -u origin $(git rev-parse --abbrev-ref HEAD)`},
 	{Deny, "main", `git push origin "$(git symbolic-ref --short -q HEAD)"`},
