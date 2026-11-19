@@ -2,20 +2,13 @@ BIN     := bin/squadrn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/squadrn/squadrn/internal/cli.Version=$(VERSION)
 
-.PHONY: build test race cover cover-gates vuln lint fmt check validate hooks clean
+.PHONY: build race cover-gates cover-gates-windows vuln lint fmt check validate hooks clean
 
 build:
 	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/squadrn
 
-test:
-	go test ./...
-
 race:
 	go test -race ./...
-
-cover:
-	go test -coverprofile=coverage.out ./internal/...
-	go tool cover -func=coverage.out | tail -1
 
 # Minimum statement coverage per package: the guard is the security boundary.
 COVER_GATES := guard:95 githook:85 grid:70 doctor:70 install:80 release:80 update:95 ui:90 worktree:75 proc:85 fsx:75 usage:90 inuse:85
@@ -25,11 +18,16 @@ COVER_GATES_WINDOWS := guard:93 githook:70 install:75 release:65 update:95 ui:90
 cover-gates:
 	@scripts/cover-gates.sh $(COVER_GATES)
 
+# Run on Windows (CI job "windows", through Git Bash).
+cover-gates-windows:
+	@scripts/cover-gates.sh $(COVER_GATES_WINDOWS)
+
 vuln:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 
 lint:
 	golangci-lint run ./...
+	GOOS=windows go vet ./...
 	shellcheck -s sh plugin/bin/squadrn-hook scripts/*.sh .githooks/*
 	actionlint .github/workflows/*.yml
 
@@ -46,4 +44,4 @@ hooks:
 	git config core.hooksPath .githooks
 
 clean:
-	rm -rf bin build dist coverage.out
+	rm -rf bin build dist

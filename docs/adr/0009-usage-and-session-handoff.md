@@ -1,8 +1,6 @@
 # 0009 — Usage limits and session handoff
 
-## Status
-
-Accepted. U1 ships with this ADR; S1 implemented; S2 is later.
+Status: accepted (v1.0.0)
 
 ## Context
 
@@ -11,7 +9,7 @@ model-specific weekly limits). `swap` already moves a conversation between accou
 the user has to notice the limit, guess which account still has room and type the swap. squadrn
 needs to know each account's usage, and, later, to hand a stopped session over with less typing.
 
-Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **D** = documented,
+Facts about Claude Code (as of Claude Code 2.1.327). **D** = documented,
 **I** = internal (observed, may change without notice; isolated in `provider/claude`).
 
 | Fact | |
@@ -28,16 +26,16 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
 
 ## Decision
 
-### U1 — `squadrn usage` (this change)
+### U1 — `squadrn usage`
 
 - **Package `usage`** (no provider knowledge, never prints): `Snapshot` (windows, spend, last
   observation, last limit hit with session, cwd and reset estimate), `Merge` (the newer
   observation wins per window; an older one fills gaps that have not reset; a recorded limit stays
   until a later observation shows every reported window below 100% or its reset passes),
   `Effective(now)` → `limited | high | ok | reset | stale | nodata` (plus `metered | na |
-  loggedout` from the account), `Rank` (drop logged-out, limited, the source, other providers and
-  — on request — other organisations; then reset/ok before nodata/stale before high before
-  metered; then lower 5h, lower 7d, fresher). Thresholds are constants for now: high at 5h ≥ 80%
+  loggedout` from the account), `Rank` (drop logged-out, limited, the source and other
+  providers; then reset/ok before nodata/stale before high before metered; then lower 5h, lower
+  7d, fresher). Thresholds are constants for now: high at 5h ≥ 80%
   or 7d ≥ 90%, stale after 6 hours.
 - **Store**: one file per account, `~/.local/state/squadrn/usage/<provider>-<name>.json` (fixed
   identifiers, `0600`, atomic writes). A status line update is written only when a value changed
@@ -51,7 +49,7 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
   estimates the reset from "resets 3:45pm" in the last message (local time, next occurrence;
   fallback: the stored 5-hour `resets_at`) and notifies "claude/work hit its usage limit (resets
   15:45) — sqd swap".
-- **Setup**: `squadrn usage --setup [account | --all] [--undo] [-y]` wraps `statusLine.command`
+- **Setup**: `squadrn usage setup [<account> | --all] [--undo] [-y]` wraps `statusLine.command`
   (other fields and keys kept in place). `settings.json` is usually a link to main's, so the change
   is written through the link and covers every account sharing it; the output names them. The
   command is `<installed binary> hook statusline --then '<old>'`, quoted for POSIX shells on Unix;
@@ -65,7 +63,7 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
   the account most recently limited or active in this directory. PLAN/ORG come from the auth
   cache. The JSON schema is documented in the README.
 
-### S1 — swap by session (implemented)
+### S1 — swap by session
 
 - Find a conversation by session ID with a glob `<config>/projects/*/<id>.jsonl` instead of
   computing the project key (whose encoding is internal and differs on Windows), and copy
@@ -79,8 +77,8 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
   cwd).
 - Moving to an account of another organisation always asks.
 - As built: the transcript moves under the source's project folder name (Claude Code shortens long
-  keys with a hash, so the key is never computed for a session ID; the legacy worktree form
-  computes it and falls back to the transcripts whose first records name the worktree as `cwd`).
+  keys with a hash, so the key is never computed for a session ID; `--worktree <name>` computes
+  it and falls back to the transcripts whose first records name the worktree as `cwd`).
   `<session>/` and `file-history/<session>/` are replaced through a staged copy; the transcript is
   staged, checked (size, SHA-256) and renamed last. A target copy that is not a prefix of the
   source (it went on there) is refused unless `--force`. Candidates without `--session`: the latest
@@ -97,12 +95,13 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
 
 - A supervisor watches limit events and acts by `swap_policy`: `ask` (default) offers the swap,
   `auto` performs it.
-- `auto` never crosses organisations, and sends no continuation prompt unless one is configured.
+- `auto` never crosses organisations: its ranking leaves out accounts of other organisations.
+- `auto` sends no continuation prompt unless one is configured.
 
 ### Decisions recorded
 
 1. The status line wrapper is offered once at `account add` (asked) and through
-   `usage --setup`; it is never installed silently.
+   `usage setup`; it is never installed silently.
 2. S2's default policy is `ask`.
 3. `auto` never moves a session to another organisation.
 4. `auto` sends no continuation prompt by default.
@@ -115,8 +114,8 @@ Facts about Claude Code (Claude Code 2.1.327, official docs read 2026-11-18). **
   through `StopFailure`, but a later status line update below 100% clears it although that model
   may still be limited.
 - The status line now depends on the installed squadrn binary; `self-uninstall` restores it, a
-  manual removal of squadrn leaves a status line that prints nothing until `--setup --undo` or an
-  edit.
+  manual removal of squadrn leaves a status line that prints nothing until `usage setup --undo`
+  or an edit.
 - On Windows, a `settings.json` shared by hard link stops being shared when it is rewritten
   (atomic replace); symlinks and copies behave as on Unix.
 - The limit message wording and the `subscriptionType`/`authMethod` values are internal; parsers

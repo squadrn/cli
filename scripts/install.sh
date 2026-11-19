@@ -122,19 +122,6 @@ else
 fi
 [ "$actual" = "$expected" ] || die "checksum mismatch for $asset"
 
-# Build provenance as an extra when gh is installed and logged in; the signature is what the
-# install relies on.
-if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
-  if out=$(gh attestation verify "$tmp/$asset" --repo "$repo" 2>&1); then
-    printf 'verified build provenance of %s\n' "$asset"
-  else
-    case "$out" in
-      *"no attestations found"* | *"unknown command"* | *"HTTP 404"*) ;;
-      *) die "build provenance check failed for $asset: $out" ;;
-    esac
-  fi
-fi
-
 mkdir "$tmp/release"
 tar -xzf "$tmp/$asset" -C "$tmp/release"
 

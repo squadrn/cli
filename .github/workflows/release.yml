@@ -85,14 +85,6 @@ jobs:
         run: |
           prev=$(gh release list --repo "$REPO" --limit 100 --json tagName,isPrerelease,isDraft |
             jq -r -f scripts/previous-release.jq)
-          # Only a release with an archive for this platform is an upgrade path (the first release of a
-          # platform has no predecessor there).
-          if [ -n "$prev" ]; then
-            ext=.tar.gz
-            [ "$RUNNER_OS" = Windows ] && ext=.zip
-            ours=$(gh release view "$prev" --repo "$REPO" --json assets --jq "[.assets[].name | select(startswith(\"squadrn_\") and endswith(\"$ext\"))] | length")
-            [ "$ours" -gt 0 ] || prev=""
-          fi
           echo "tag=$prev" >>"$GITHUB_OUTPUT"
           echo "previous release: ${prev:-none}"
       - name: Install the previous release, update, roll back (Linux)
