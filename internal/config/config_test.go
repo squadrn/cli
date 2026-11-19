@@ -216,3 +216,22 @@ func TestEnvOverrides(t *testing.T) {
 		t.Fatal("shared_mcp override not reported")
 	}
 }
+
+func TestReadOrEmpty(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if _, fresh, err := ReadOrEmpty(path); err != nil || !fresh {
+		t.Fatalf("nothing: %v %v", fresh, err)
+	}
+	if err := os.WriteFile(path, []byte("command = \"sx\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, fresh, err := ReadOrEmpty(path); err != nil || fresh || cfg.Command != "sx" {
+		t.Fatalf("existing: %+v %v %v", cfg, fresh, err)
+	}
+	if err := os.WriteFile(path, []byte("bogus = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ReadOrEmpty(path); err == nil {
+		t.Fatal("an invalid config must be an error")
+	}
+}

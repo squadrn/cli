@@ -106,7 +106,7 @@ func TestDefaultBaseWithoutAnyBranch(t *testing.T) {
 	}
 }
 
-func TestRemoveOneAndAgents(t *testing.T) {
+func TestRemoveAndAgents(t *testing.T) {
 	ctx := context.Background()
 	root := newRepoWithOrigin(t)
 	repo := Repo{Root: root, Subdir: ".claude/worktrees"}
@@ -124,19 +124,29 @@ func TestRemoveOneAndAgents(t *testing.T) {
 	if dirty, _ := Dirty(ctx, repo.Dir("feat-a")); !dirty {
 		t.Fatal("Dirty = false")
 	}
-	if err := repo.RemoveOne(ctx, "feat-a", false, false); err == nil {
+	if err := removeNamed(t, repo, "feat-a", false, false); err == nil {
 		t.Fatal("removed a dirty worktree without force")
 	}
-	if err := repo.RemoveOne(ctx, "feat-a", true, true); err != nil {
+	if err := removeNamed(t, repo, "feat-a", true, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RemoveOne(ctx, "feat-b", false, false); !errors.Is(err, ErrUnmerged) {
+	if err := removeNamed(t, repo, "feat-b", false, false); !errors.Is(err, ErrUnmerged) {
 		t.Fatalf("unmerged branch: %v", err)
 	}
-	if err := repo.RemoveOne(ctx, "nope", false, false); err == nil {
+	if err := removeNamed(t, repo, "nope", false, false); err == nil {
 		t.Fatal("missing worktree: no error")
 	}
 	if _, err := Open(ctx, t.TempDir(), ""); err == nil {
 		t.Fatal("Open outside a repository")
 	}
+}
+
+// removeNamed removes the agent worktree name the way `wt rm` does: find it, then remove it.
+func removeNamed(t *testing.T, repo Repo, name string, forceTree, forceBranch bool) error {
+	t.Helper()
+	w, err := repo.Find(context.Background(), name)
+	if err != nil {
+		return err
+	}
+	return repo.Remove(context.Background(), w, forceTree, forceBranch)
 }

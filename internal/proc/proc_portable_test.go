@@ -99,3 +99,16 @@ func TestPortableOrphanedGrandchildDoesNotHang(t *testing.T) {
 		t.Fatalf("err = %v, want the bounded pipe wait", err)
 	}
 }
+
+func TestAlive(t *testing.T) {
+	self := os.Getpid()
+	if !Alive(self, StartTime(self)) || !Alive(self, "") {
+		t.Fatal("this process is not alive")
+	}
+	if Alive(0, "") || Alive(999999999, "") {
+		t.Fatal("a missing process is alive")
+	}
+	if StartTime(self) != "" && Alive(self, "not the start time") {
+		t.Fatal("a reused pid counts as the same process")
+	}
+}

@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -47,6 +46,14 @@ type hookEnv struct {
 	stdin          io.Reader
 	stdout, stderr io.Writer
 	now            func() time.Time
+}
+
+// maxHookInput bounds what a hook reads from the agent CLI.
+const maxHookInput = 4 << 20
+
+// readInput reads the JSON the agent CLI passes a hook on stdin.
+func (h hookEnv) readInput() ([]byte, error) {
+	return io.ReadAll(io.LimitReader(h.stdin, maxHookInput))
 }
 
 const hookUsage = "usage: squadrn hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit"
@@ -147,7 +154,7 @@ func (h hookEnv) guardGit() {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), hookDeadline)
 	defer cancel()
-	raw, err := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
+	raw, err := h.readInput()
 	if err != nil {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "guard could not read the hook input"}
 		return
@@ -268,37 +275,23 @@ func (h hookEnv) gitFail(name string, err error) int {
 // notify shows a desktop notification titled "Claude: <title>" with the project name.
 // It is fire-and-forget: a missing notifier is not an error.
 func (h hookEnv) notify(title string) {
-	raw, _ := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
+	raw, _ := h.readInput()
 	var in hookInput
 	_ = json.Unmarshal(raw, &in)
 	project := in.Cwd
 	if project == "" {
 		project, _ = os.Getwd()
 	}
-	argv := notifyCommand(runtime.GOOS, "Claude: "+title, filepath.Base(project))
+	desktopNotify("Claude: "+title, filepath.Base(project))
+}
+
+// desktopNotify shows a desktop notification where the platform has a notifier; best effort.
+func desktopNotify(title, body string) {
+	argv := notifyCommand(title, body)
 	if argv == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, _ = proc.Output(ctx, proc.Options{}, argv[0], argv[1:]...)
-}
-
-// notifyCommand passes text as arguments, never as script source, so titles cannot inject code.
-func notifyCommand(goos, title, body string) []string {
-	switch goos {
-	case "darwin":
-		return []string{
-			"osascript",
-			"-e", "on run argv",
-			"-e", `display notification (item 2 of argv) with title (item 1 of argv) sound name "Glass"`,
-			"-e", "end run",
-			title, body,
-		}
-	case "linux":
-		if path, err := exec.LookPath("notify-send"); err == nil {
-			return []string{path, "--app-name=Claude", title, body}
-		}
-	}
-	return nil
 }

@@ -108,23 +108,3 @@ func TestMetered(t *testing.T) {
 		}
 	}
 }
-
-func TestWithin(t *testing.T) {
-	dir := t.TempDir()
-	tests := []struct {
-		dir, base string
-		want      bool
-	}{
-		{dir, dir, true},
-		{dir + "/sub", dir, true},
-		{dir, dir + "/sub", false},
-		{"/etc", "/", false},
-		{"", dir, false},
-		{dir + "x", dir, false},
-	}
-	for _, tt := range tests {
-		if got := within(tt.dir, tt.base); got != tt.want {
-			t.Errorf("within(%q, %q) = %v", tt.dir, tt.base, got)
-		}
-	}
-}

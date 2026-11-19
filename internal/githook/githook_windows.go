@@ -36,21 +36,27 @@ func HookCommand(path string, args []string) (string, []string) {
 	if strings.EqualFold(filepath.Ext(path), ".exe") {
 		return path, args
 	}
-	return gitShell(), append([]string{path}, args...)
-}
-
-// gitShell finds sh.exe of the Git for Windows installation that provides git.
-func gitShell() string {
-	if git, err := exec.LookPath("git"); err == nil {
-		root := filepath.Dir(filepath.Dir(git)) // …\Git\cmd\git.exe or …\Git\bin\git.exe
-		for _, c := range []string{filepath.Join(root, "usr", "bin", "sh.exe"), filepath.Join(root, "bin", "sh.exe")} {
-			if fi, err := os.Stat(c); err == nil && fi.Mode().IsRegular() {
-				return c
-			}
+	sh := GitShell()
+	if sh == "" {
+		sh = "sh.exe"
+		if p, err := exec.LookPath("sh"); err == nil {
+			sh = p
 		}
 	}
-	if sh, err := exec.LookPath("sh"); err == nil {
-		return sh
+	return sh, append([]string{path}, args...)
+}
+
+// GitShell finds sh.exe of the Git for Windows installation that provides git; "" if none.
+func GitShell() string {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return ""
 	}
-	return "sh.exe"
+	root := filepath.Dir(filepath.Dir(git)) // …\Git\cmd\git.exe or …\Git\bin\git.exe
+	for _, c := range []string{filepath.Join(root, "usr", "bin", "sh.exe"), filepath.Join(root, "bin", "sh.exe")} {
+		if fi, err := os.Stat(c); err == nil && fi.Mode().IsRegular() {
+			return c
+		}
+	}
+	return ""
 }

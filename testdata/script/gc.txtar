@@ -23,7 +23,7 @@ cd repo
 exec squadrn gc
 stdout '^base: main$'
 stdout 'remove +feat-merged +merged or no commits \(with 1 ignored path\(s\)\)'
-stdout 'keep +feat-busy +in use \(pid 1, claude/main\)'
+stdout 'keep +feat-busy +in use by pid 1 \(claude/main\)'
 stdout 'keep +feat-hidden +uncommitted changes'
 stdout 'remove +feat-foreign +merged or no commits'
 stdout 'keep +feat-open +unmerged commits'

@@ -12,6 +12,7 @@ import (
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/install"
+	"github.com/squadrn/squadrn/internal/release"
 )
 
 func (a *app) selfUninstallCmd() *cobra.Command {
@@ -44,22 +45,12 @@ func (a *app) uninstall(purge bool) error {
 	if err != nil {
 		return err
 	}
-	seen := map[string]bool{}
-	for _, acct := range accts {
-		if seen[acct.Provider] {
-			continue
-		}
-		seen[acct.Provider] = true
-		ag, err := a.agent(acct.Spec)
+	for _, idx := range byProvider(accts) {
+		same := pick(accts, idx)
+		ag, err := a.agent(same[0].Spec)
 		if err != nil {
-			a.warnf("%v; remove the plugin yourself: %s plugin uninstall squadrn@squadrn", err, acct.Spec.Binary)
+			a.warnf("%v; remove the plugin yourself: %s plugin uninstall squadrn@squadrn", err, same[0].Spec.Binary)
 			continue
-		}
-		same := accts[:0:0]
-		for _, x := range accts {
-			if x.Provider == acct.Provider {
-				same = append(same, x)
-			}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		for label, err := range install.RemovePlugins(ctx, same, ag) {
@@ -79,8 +70,9 @@ func (a *app) uninstall(purge bool) error {
 	}
 	for _, l := range links {
 		a.out("  removed %s\n", a.tilde(l))
-		names = append(names, strings.TrimSuffix(filepath.Base(l), ".exe"))
-		a.removeCompletions(strings.TrimSuffix(filepath.Base(l), ".exe"))
+		name := release.CommandName(filepath.Base(l))
+		names = append(names, name)
+		a.removeCompletions(name)
 	}
 	a.removeProfileLines()
 	// Executables still running (this one, a session, a hook) cannot be deleted on Windows; they

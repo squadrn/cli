@@ -10,17 +10,16 @@ package inuse
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 // Dir is the registry directory inside a used directory. It is a fixed identifier.
@@ -47,7 +46,7 @@ func entryPath(dir, reg string, pid int) string {
 func Acquire(dir string, e Entry) error {
 	Active(dir)
 	e.PID = os.Getpid()
-	e.Started = startTime(e.PID)
+	e.Started = proc.StartTime(e.PID)
 	b, err := json.Marshal(e)
 	if err != nil {
 		return err
@@ -94,7 +93,7 @@ func active(reg string) []Entry {
 		if err == nil {
 			err = json.Unmarshal(b, &e)
 		}
-		if err != nil || e.PID != pid || !Live(e.PID, e.Started) {
+		if err != nil || e.PID != pid || !proc.Alive(e.PID, e.Started) {
 			_ = os.Remove(p)
 			continue
 		}
@@ -104,71 +103,4 @@ func active(reg string) []Entry {
 		_ = os.Remove(reg)
 	}
 	return out
-}
-
-// Live reports whether pid runs and, when started is known, is the same process.
-func Live(pid int, started string) bool {
-	if pid <= 0 || !alive(pid) {
-		return false
-	}
-	if started == "" {
-		return true
-	}
-	now := startTime(pid)
-	return now == "" || now == started
-}
-
-// ErrLocked means another live process holds the lock.
-var ErrLocked = errors.New("locked by another process")
-
-// Lock takes an exclusive lock file at path, waiting up to wait for a live holder to let go. A
-// lock whose holder is gone is taken over. unlock removes it.
-func Lock(path string, wait time.Duration) (unlock func(), err error) {
-	deadline := time.Now().Add(wait)
-	self := lockOwner{PID: os.Getpid(), Started: startTime(os.Getpid())}
-	content, err := json.Marshal(self)
-	if err != nil {
-		return nil, err
-	}
-	for {
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-		if err == nil {
-			_, werr := f.Write(content)
-			cerr := f.Close()
-			if werr != nil || cerr != nil {
-				_ = os.Remove(path)
-				return nil, errors.Join(werr, cerr)
-			}
-			return func() { _ = os.Remove(path) }, nil
-		}
-		if !errors.Is(err, fs.ErrExist) {
-			return nil, err
-		}
-		b, rerr := os.ReadFile(path)
-		var owner lockOwner
-		// An empty or unreadable file is being written right now: held until the deadline.
-		switch {
-		case errors.Is(rerr, fs.ErrNotExist):
-			continue // released between the two calls
-		case rerr == nil && json.Unmarshal(b, &owner) == nil && !Live(owner.PID, owner.Started):
-			// The holder died without unlocking. Remove the file only if it is still the one read.
-			if cur, err := os.ReadFile(path); err == nil && string(cur) == string(b) {
-				_ = os.Remove(path)
-			}
-			continue
-		}
-		if time.Now().After(deadline) {
-			holder := ""
-			if owner.PID > 0 {
-				holder = fmt.Sprintf(" (pid %d)", owner.PID)
-			}
-			return nil, fmt.Errorf("%s: %w%s", path, ErrLocked, holder)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-type lockOwner struct {
-	PID     int    `json:"pid"`
-	Started string `json:"started,omitempty"`
 }

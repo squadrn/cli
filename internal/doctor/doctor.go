@@ -208,15 +208,15 @@ func (e Env) installedRelease() (Check, bool) {
 	if !fsx.IsFile(bin) || e.Self == "" {
 		return Check{}, false
 	}
-	if !fsx.SameFile(e.Self, bin) && filepath.Clean(filepath.Dir(e.Self)) != filepath.Clean(e.Layout.BinDir) {
+	if !e.Layout.IsInstalledCopy(e.Self) {
 		return Check{}, false // a development build or another copy; self-update warns about it
 	}
 	running := strings.TrimPrefix(e.Version, "v")
 	if !release.Valid(running) {
 		return Check{}, false
 	}
-	if v := e.Layout.Version(); v != running || e.Layout.Marketplace() == "" {
-		return bad(g, Fail, fmt.Sprintf("installed release is incomplete (VERSION %q, running %s)", v, running), e.Command+" self-update"), true
+	if e.Layout.Incomplete(running) {
+		return bad(g, Fail, fmt.Sprintf("installed release is incomplete (VERSION %q, running %s)", e.Layout.Version(), running), e.Command+" self-update"), true
 	}
 	return ok(g, "installed release "+running), true
 }

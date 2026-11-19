@@ -2,11 +2,9 @@ package inuse
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestAcquireActiveRelease(t *testing.T) {
@@ -62,42 +60,3 @@ func TestActiveDropsStaleEntries(t *testing.T) {
 }
 
 func itoa(n int) string { b, _ := json.Marshal(n); return string(b) }
-
-func TestLive(t *testing.T) {
-	if !Live(os.Getpid(), startTime(os.Getpid())) || !Live(os.Getpid(), "") {
-		t.Fatal("this process is not live")
-	}
-	if Live(0, "") || Live(999999999, "") {
-		t.Fatal("a missing process is live")
-	}
-}
-
-func TestLock(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "x.lock")
-	unlock, err := Lock(path, time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Lock(path, 100*time.Millisecond); !errors.Is(err, ErrLocked) {
-		t.Fatalf("second Lock: %v", err)
-	}
-	unlock()
-	unlock, err = Lock(path, time.Second)
-	if err != nil {
-		t.Fatalf("Lock after unlock: %v", err)
-	}
-	unlock()
-
-	// A lock left by a dead process is taken over.
-	if err := os.WriteFile(path, []byte(`{"pid":999999999}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	unlock, err = Lock(path, time.Second)
-	if err != nil {
-		t.Fatalf("stale lock: %v", err)
-	}
-	unlock()
-	if _, err := Lock(filepath.Join(t.TempDir(), "missing", "x.lock"), 0); err == nil {
-		t.Fatal("Lock in a missing dir succeeded")
-	}
-}

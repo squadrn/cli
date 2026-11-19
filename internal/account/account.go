@@ -160,9 +160,9 @@ func (s Store) account(spec provider.Spec, name string) Account {
 // account needs its dir with Marker.
 func (s Store) exists(a Account) bool {
 	if a.IsMain() {
-		return a.Provider == s.defaultProvider() || isDir(a.Dir)
+		return a.Provider == s.defaultProvider() || fsx.IsDir(a.Dir)
 	}
-	return isDir(a.Dir) && isFile(filepath.Join(a.Dir, Marker))
+	return fsx.IsDir(a.Dir) && fsx.IsFile(filepath.Join(a.Dir, Marker))
 }
 
 // Mark records a's dir as managed by squadrn.
@@ -197,7 +197,7 @@ func (s Store) Adopt(input string) (Account, error) {
 	if err != nil {
 		return Account{}, err
 	}
-	if !isDir(a.Dir) {
+	if !fsx.IsDir(a.Dir) {
 		return Account{}, NotFoundError{a.Ref}
 	}
 	return a, Mark(a)
@@ -307,7 +307,7 @@ func (s Store) candidates(spec provider.Spec) ([]string, error) {
 	var names []string
 	for _, m := range matches {
 		name := strings.TrimPrefix(filepath.Base(m), spec.DirPrefix)
-		if isDir(m) && ValidateName(name) == nil && name != Main {
+		if fsx.IsDir(m) && ValidateName(name) == nil && name != Main {
 			names = append(names, name)
 		}
 	}
@@ -379,19 +379,9 @@ func (s Store) Rename(a Account, newName string) (Account, error) {
 // trashDirs returns where trashed files go and, for the freedesktop trash, where their
 // .trashinfo files go ("" on macOS).
 func trashDirs(home string) (files, info string) {
-	if mac := filepath.Join(home, ".Trash"); isDir(mac) {
+	if mac := filepath.Join(home, ".Trash"); fsx.IsDir(mac) {
 		return mac, ""
 	}
 	base := config.DirsFor(home, "Trash").Data
 	return filepath.Join(base, "files"), filepath.Join(base, "info")
-}
-
-func isDir(path string) bool {
-	fi, err := os.Stat(path)
-	return err == nil && fi.IsDir()
-}
-
-func isFile(path string) bool {
-	fi, err := os.Stat(path)
-	return err == nil && fi.Mode().IsRegular()
 }

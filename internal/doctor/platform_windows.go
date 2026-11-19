@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/githook"
 	"github.com/squadrn/squadrn/internal/proc"
 )
 
@@ -114,7 +115,7 @@ func (e Env) platform(ctx context.Context) []Check {
 		out = append(out, ok(g, "Git Bash (Claude Code's Bash tool)"))
 	}
 	if root != "" {
-		if firstFile(filepath.Join(root, "usr", "bin", "sh.exe"), filepath.Join(root, "bin", "sh.exe")) == "" {
+		if githook.GitShell() == "" {
 			out = append(out, bad(g, Fail, "sh.exe of Git for Windows not found: repository hooks cannot be chained", "reinstall Git for Windows"))
 		}
 		if firstFile(filepath.Join(root, "usr", "bin", "ssh-keygen.exe")) != "" {

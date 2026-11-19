@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -16,20 +15,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/worktree"
 )
-
-func (a *app) requireTmux(what string) error {
-	if runtime.GOOS == "windows" {
-		return fmt.Errorf("%s is not available on Windows: it runs agents in tmux panes; start each agent in its own terminal with: %s wt <name>", what, a.cmd)
-	}
-	if _, err := exec.LookPath("tmux"); err != nil {
-		return fmt.Errorf("tmux is required for %s", what)
-	}
-	return nil
-}
 
 func (a *app) gridCmd() *cobra.Command {
 	var spread bool
@@ -107,7 +97,7 @@ func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool
 	if err != nil {
 		return err
 	}
-	unlock, err := inuse.Lock(filepath.Join(common, "squadrn-grid.lock"), 30*time.Second)
+	unlock, err := fsx.Lock(filepath.Join(common, "squadrn-grid.lock"), 30*time.Second)
 	if err != nil {
 		return fmt.Errorf("another %s grid is starting agents in this repository: %w", a.cmd, err)
 	}
@@ -149,7 +139,7 @@ func (a *app) startGrid(ctx context.Context, repo worktree.Repo, agents []grid.A
 			a.warnf("%q is already running in %s; skipped", ag.Name, session)
 			continue
 		}
-		command := grid.ShellQuote(selfPath(), "-a", ag.Account, "wt", ag.Name)
+		command := proc.ShellQuote(selfPath(), "-a", ag.Account, "wt", ag.Name)
 		if session, err = t.Start(ctx, a.cmd, repo.Root, repo.Root, cols, rows, ag, command); err != nil {
 			return "", err
 		}
@@ -338,7 +328,7 @@ func (a *app) psCmd() *cobra.Command {
 
 // panes lists agent panes of root's grid; none when tmux is missing or no grid runs.
 func (a *app) panes(root string) []grid.Pane {
-	if exec.Command("tmux", "-V").Run() != nil {
+	if !hasTmux() {
 		return nil
 	}
 	ctx := context.Background()
@@ -367,7 +357,7 @@ func (a *app) paneIn(dir, key string) string {
 
 // anyPane returns a pane of any grid running as account label.
 func (a *app) anyPane(label string) string {
-	if exec.Command("tmux", "-V").Run() != nil {
+	if !hasTmux() {
 		return ""
 	}
 	panes, _ := grid.Tmux{}.Panes(context.Background(), "")

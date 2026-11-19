@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // BinaryName is the executable inside a release and in the data dir.
@@ -14,6 +16,9 @@ const BinaryName = "squadrn"
 
 // executableName is the file name of command name in the bin dir.
 func executableName(name string) string { return name }
+
+// CommandName is the command a file in the bin dir provides.
+func CommandName(file string) string { return file }
 
 // LinkCommands makes every name in names a link to the binary in BinDir and removes links to the
 // binary whose name is no longer wanted. A file that is not such a link is moved aside instead
@@ -32,7 +37,7 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 			continue
 		}
 		if _, err := os.Lstat(link); err == nil {
-			backup := link + ".bak-" + now.Format("20060102-150405")
+			backup := fsx.BackupName(link, now)
 			if err := os.Rename(link, backup); err != nil {
 				return res, err
 			}

@@ -5,6 +5,7 @@ package proc
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -46,5 +47,18 @@ func TestOptionsDirEnvStdin(t *testing.T) {
 func TestExitCodeOfNonExitError(t *testing.T) {
 	if ExitCode(errors.New("x")) != -1 {
 		t.Fatal("non-exit error must map to -1")
+	}
+}
+
+func TestShellQuoteRoundTrips(t *testing.T) {
+	argv := []string{"/path with space/squadrn", "-a", "it's", "--resume", `$(rm -rf ~)`, ""}
+	script := "for a in " + ShellQuote(argv...) + "; do printf '[%s]\n' \"$a\"; done"
+	got, err := exec.Command("sh", "-c", script).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "[/path with space/squadrn]\n[-a]\n[it's]\n[--resume]\n[$(rm -rf ~)]\n[]\n"
+	if string(got) != want {
+		t.Fatalf("shell saw:\n%s", got)
 	}
 }

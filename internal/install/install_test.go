@@ -23,21 +23,6 @@ func write(t *testing.T, path, body string) {
 	}
 }
 
-func TestLoadConfig(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "squadrn.toml")
-	if _, fresh, err := LoadConfig(path); err != nil || !fresh {
-		t.Fatalf("nothing: %v %v", fresh, err)
-	}
-	write(t, path, "command = \"sx\"\n")
-	if cfg, fresh, err := LoadConfig(path); err != nil || fresh || cfg.Command != "sx" {
-		t.Fatalf("existing: %+v %v %v", cfg, fresh, err)
-	}
-	write(t, path, "bogus = 1\n")
-	if _, _, err := LoadConfig(path); err == nil {
-		t.Fatal("an invalid config must be an error")
-	}
-}
-
 func TestNameCheck(t *testing.T) {
 	dir := t.TempDir()
 	layout := release.Layout{DataDir: filepath.Join(dir, "data"), BinDir: filepath.Join(dir, "bin")}

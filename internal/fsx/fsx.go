@@ -1,6 +1,7 @@
 // Package fsx holds filesystem primitives shared across packages: atomic writes, copies and
-// directory swaps. Writers never leave a half-written file in place, and concurrent writers
-// never share a temporary name.
+// directory swaps, lock files, path comparison, directory ACLs (Windows) and replacing an
+// executable that may be running. Writers never leave a half-written file in place, and
+// concurrent writers never share a temporary name.
 package fsx
 
 import (
@@ -192,14 +193,10 @@ func SameFile(a, b string) bool {
 	return os.SameFile(fa, fb)
 }
 
-// ReplaceExecutable installs src at dst as an executable, replacing dst even while it runs
-// (platform: replaceExecutable).
-func ReplaceExecutable(src, dst string) error { return replaceExecutable(src, dst) }
-
-// CleanOld removes executables that ReplaceExecutable moved aside in dir once they no longer
-// run (Windows); a no-op elsewhere. Only leftovers of names (file names such as squadrn.exe) are
-// touched: dir may be a bin dir other programs share.
-func CleanOld(dir string, names []string) { cleanOld(dir, names, time.Now()) }
+// BackupName is where an unrelated file at path is moved before squadrn takes its name.
+func BackupName(path string, now time.Time) string {
+	return path + ".bak-" + now.Format("20060102-150405")
+}
 
 // newGrace is how old a staged <name>.new-* file must be before CleanOld treats it as abandoned;
 // a younger one may belong to an update running right now.

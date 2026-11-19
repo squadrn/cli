@@ -14,8 +14,10 @@ import (
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/grid"
 	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/ui"
@@ -180,10 +182,9 @@ func (a *app) swap(o swapOptions) error {
 		if err := os.Chdir(src.cwd); err != nil {
 			return err
 		}
-		a.banner(*to)
-		return a.session(ag, *to, ag.ResumeArgs(src.session.ID))
+		return a.session(ag, *to, ag.ResumeArgs(src.session.ID), "")
 	}
-	command := grid.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(src.session.ID)...)...)
+	command := proc.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(src.session.ID)...)...)
 	if err := (grid.Tmux{}).Respawn(context.Background(), pane, src.cwd, grid.Agent{Account: to.Label(), Name: src.worktree}, command); err != nil {
 		return err
 	}
@@ -276,7 +277,7 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 	var lim usage.Snapshot
 	for _, acct := range accts {
 		snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name)
-		if ok && snap.LimitedSession != "" && within(snap.LimitedCwd, dir) && snap.LimitedAt.After(lim.LimitedAt) {
+		if ok && snap.LimitedSession != "" && fsx.Within(snap.LimitedCwd, dir) && snap.LimitedAt.After(lim.LimitedAt) {
 			lim = snap
 		}
 	}
@@ -289,8 +290,8 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 		}
 	}
 	var running []swapSource
-	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return inuse.Live(pid, "") }) {
-		if !within(ls.Cwd, dir) {
+	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
+		if !fsx.Within(ls.Cwd, dir) {
 			continue
 		}
 		if i := slices.IndexFunc(out, func(c swapSource) bool { return c.session.ID == ls.SessionID }); i >= 0 {
@@ -341,16 +342,9 @@ func (a *app) pickTarget(accts []account.Account, from account.Account) (account
 	stop := a.spin(fmt.Sprintf("checking %d account(s)…", len(accts)))
 	statuses := a.statuses(accts, false)
 	stop()
-	cands := make([]usage.Candidate, len(accts))
+	cands := a.candidates(accts, statuses)
 	byLabel := map[string]account.Account{}
-	for i, acct := range accts {
-		snap, _, _ := a.usageStore().Load(acct.Provider, acct.Name)
-		st := statuses[i]
-		cands[i] = usage.Candidate{
-			Account: acct.Label(), Provider: acct.Provider,
-			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
-			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
-		}
+	for _, acct := range accts {
 		byLabel[acct.Label()] = acct
 	}
 	ranked, next := usage.Rank(cands, from.Label(), now)
@@ -381,7 +375,7 @@ func (a *app) pickTarget(accts []account.Account, from account.Account) (account
 }
 
 func plainPct(w *usage.Window, now time.Time) string {
-	if !live(w, now) {
+	if !w.Live(now) {
 		return "-"
 	}
 	return fmt.Sprintf("%.0f%%", w.UsedPct)
@@ -401,7 +395,7 @@ func (a *app) holders(src swapSource, from account.Account, accts []account.Acco
 	var out []holder
 	seen := map[int]bool{os.Getpid(): true}
 	other := map[int]bool{}
-	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return inuse.Live(pid, "") }) {
+	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
 		if ls.SessionID != src.session.ID {
 			other[ls.PID] = true
 			continue
@@ -432,7 +426,7 @@ var errNoInterrupt = errors.New("cannot interrupt another console's process")
 
 func (a *app) quiesce(hs []holder, yes bool) error {
 	for _, h := range hs {
-		if !inuse.Live(h.pid, h.started) {
+		if !proc.Alive(h.pid, h.started) {
 			continue // ended with another holder (Windows: squadrn and its claude child)
 		}
 		if err := a.confirm(yes, "Stop the %s that holds the conversation", h.desc); err != nil {
@@ -447,7 +441,7 @@ func (a *app) quiesce(hs []holder, yes bool) error {
 				return err
 			}
 		}
-		if err := stopProcess(h.pid, true); err != nil && inuse.Live(h.pid, h.started) {
+		if err := stopProcess(h.pid, true); err != nil && proc.Alive(h.pid, h.started) {
 			return fmt.Errorf("stop the %s: %w", h.desc, err)
 		}
 		if !a.waitGone(h) {
@@ -459,7 +453,7 @@ func (a *app) quiesce(hs []holder, yes bool) error {
 
 func (a *app) waitGone(h holder) bool {
 	deadline := time.Now().Add(stopWait)
-	for inuse.Live(h.pid, h.started) {
+	for proc.Alive(h.pid, h.started) {
 		if time.Now().After(deadline) {
 			return false
 		}

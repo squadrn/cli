@@ -11,18 +11,18 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// replaceExecutable installs src at dst while dst may be running. Windows refuses to overwrite or
+// ReplaceExecutable installs src at dst while dst may be running. Windows refuses to overwrite or
 // delete a running image but allows renaming it, so the old file moves aside to
 // <dst>.old-<time> and the new one takes its name. CleanOld removes the leftovers once nothing
 // runs them. Renames are retried briefly: antivirus scanners hold new files for a moment.
-func replaceExecutable(src, dst string) error {
+func ReplaceExecutable(src, dst string) error {
 	tmp := dst + ".new-" + stamp()
 	if err := CopyFile(src, tmp, 0o755, false); err != nil {
 		return err
 	}
 	old := ""
 	if _, err := os.Lstat(dst); err == nil {
-		old = dst + ".old-" + stamp()
+		old = asideName(dst)
 		if err := retry(func() error { return rename(dst, old) }); err != nil {
 			_ = os.Remove(tmp)
 			return fmt.Errorf("move %s aside: %w", dst, err)
@@ -44,8 +44,6 @@ func replaceExecutable(src, dst string) error {
 // rename is os.Rename; tests replace it to inject failures.
 var rename = os.Rename
 
-func stamp() string { return time.Now().Format("20060102-150405.000000000") }
-
 // retry repeats op while Windows reports the file as in use.
 func retry(op func() error) error {
 	var err error
@@ -63,9 +61,18 @@ func busy(err error) bool {
 		errors.Is(err, windows.ERROR_LOCK_VIOLATION)
 }
 
-// cleanOld deletes executables moved aside by earlier updates; ones still running stay.
-func cleanOld(dir string, names []string, now time.Time) {
-	for _, p := range Leftovers(dir, names, now) {
+// CleanOld deletes the executables ReplaceExecutable moved aside in dir; ones still running stay.
+// Only leftovers of names (file names such as squadrn.exe) are touched: dir may be a bin dir
+// other programs share.
+func CleanOld(dir string, names []string) {
+	for _, p := range Leftovers(dir, names, time.Now()) {
 		_ = os.Remove(p)
 	}
 }
+
+// MoveAside renames path to <path>.old-<time>, which CleanOld deletes once nothing runs it.
+func MoveAside(path string) error { return os.Rename(path, asideName(path)) }
+
+func asideName(path string) string { return path + ".old-" + stamp() }
+
+func stamp() string { return time.Now().Format("20060102-150405.000000000") }

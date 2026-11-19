@@ -1,6 +1,6 @@
 //go:build !windows
 
-package inuse
+package proc
 
 import (
 	"context"
@@ -10,22 +10,21 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/squadrn/squadrn/internal/proc"
 )
 
-func alive(pid int) bool {
+// running reports whether pid exists (EPERM: it runs as another user).
+func running(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-// startTime is the process start time from ps(1), the same on macOS and Linux and unchanged by
+// StartTime is the process start time from ps(1), the same on macOS and Linux and unchanged by
 // exec. "" when ps is unavailable.
-func startTime(pid int) string {
+func StartTime(pid int) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	env := append(os.Environ(), "LC_ALL=C", "TZ=UTC")
-	out, err := proc.Output(ctx, proc.Options{Env: env}, "ps", "-o", "lstart=", "-p", strconv.Itoa(pid))
+	out, err := Output(ctx, Options{Env: env}, "ps", "-o", "lstart=", "-p", strconv.Itoa(pid))
 	if err != nil {
 		return ""
 	}

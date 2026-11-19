@@ -1,6 +1,6 @@
 //go:build windows
 
-package inuse
+package proc
 
 import (
 	"errors"
@@ -9,17 +9,14 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// stillActive is the exit code GetExitCodeProcess reports for a running process.
 const stillActive = 259
 
-func open(pid int) (windows.Handle, bool) {
-	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
-	return h, err == nil
-}
-
-func alive(pid int) bool {
+// running reports whether pid runs. A process squadrn may not open is treated as running.
+func running(pid int) bool {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-		return true // exists, owned by someone else
+		return true
 	} else if err != nil {
 		return false
 	}
@@ -28,10 +25,10 @@ func alive(pid int) bool {
 	return windows.GetExitCodeProcess(h, &code) == nil && code == stillActive
 }
 
-// startTime is the process creation time in 100 ns units; "" when it cannot be read.
-func startTime(pid int) string {
-	h, ok := open(pid)
-	if !ok {
+// StartTime is the process creation time in 100 ns units; "" when it cannot be read.
+func StartTime(pid int) string {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+	if err != nil {
 		return ""
 	}
 	defer func() { _ = windows.CloseHandle(h) }()

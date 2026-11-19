@@ -64,7 +64,8 @@ const (
 	LoggedOut State = "loggedout"
 )
 
-func live(w *Window, now time.Time) bool {
+// Live reports whether w describes the window at now: known and not yet reset.
+func (w *Window) Live(now time.Time) bool {
 	return w != nil && (w.ResetsAt.IsZero() || w.ResetsAt.After(now))
 }
 
@@ -102,14 +103,14 @@ func (s Snapshot) Effective(now time.Time) State {
 		}
 	}
 	for _, w := range []*Window{s.Five, s.Seven} {
-		if live(w, now) && w.UsedPct >= 100 {
+		if w.Live(now) && w.UsedPct >= 100 {
 			return Limited
 		}
 	}
 	if s.Spend != nil && s.Spend.UsedPct >= 100 && (s.Spend.ResetsAt.IsZero() || s.Spend.ResetsAt.After(now)) {
 		return Limited
 	}
-	high := (live(s.Five, now) && s.Five.UsedPct >= HighFive) || (live(s.Seven, now) && s.Seven.UsedPct >= HighSeven)
+	high := (s.Five.Live(now) && s.Five.UsedPct >= HighFive) || (s.Seven.Live(now) && s.Seven.UsedPct >= HighSeven)
 	wasHigh := !s.LimitedAt.IsZero() ||
 		(expired(s.Five, now) && s.Five.UsedPct >= HighFive) || (expired(s.Seven, now) && s.Seven.UsedPct >= HighSeven)
 	switch {
@@ -135,10 +136,10 @@ func merge(old, obs Snapshot) Snapshot {
 		newer, older = old, obs
 	}
 	m := newer
-	if m.Five == nil && live(older.Five, newer.ObservedAt) {
+	if m.Five == nil && older.Five.Live(newer.ObservedAt) {
 		m.Five = older.Five
 	}
-	if m.Seven == nil && live(older.Seven, newer.ObservedAt) {
+	if m.Seven == nil && older.Seven.Live(newer.ObservedAt) {
 		m.Seven = older.Seven
 	}
 	if m.Spend == nil {
@@ -288,7 +289,7 @@ func Rank(cands []Candidate, from string, now time.Time) (ranked []Candidate, ne
 }
 
 func used(w *Window, now time.Time) float64 {
-	if !live(w, now) {
+	if !w.Live(now) {
 		return 0
 	}
 	return w.UsedPct

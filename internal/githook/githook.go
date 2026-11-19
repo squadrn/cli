@@ -65,7 +65,7 @@ func Install(dir, binary, configFile string) error {
 
 func shim(name, binary, configFile string) []byte {
 	return fmt.Appendf(nil, "#!/bin/sh\n%s: runs the push check, then the repository's own %s hook.\nexec %s hook git %s %s %s \"$@\"\n",
-		marker, name, shellQuote(filepath.ToSlash(binary)), ConfigFlag, shellQuote(filepath.ToSlash(configFile)), name)
+		marker, name, proc.ShellQuote(filepath.ToSlash(binary)), ConfigFlag, proc.ShellQuote(filepath.ToSlash(configFile)), name)
 }
 
 // ConfigFlag passes the config file baked into a shim to `squadrn hook git`.
@@ -129,7 +129,7 @@ func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {
 	}
 	hooks := ""
 	for _, v := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if v != "" && !samePath(expandHome(v), ours) {
+		if v != "" && !fsx.SamePath(expandHome(v), ours) {
 			hooks = expandHome(v)
 		}
 	}
@@ -152,7 +152,7 @@ func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {
 	case !isRunnable(p, fi):
 		return "", nil // git skips hooks it would not run either
 	}
-	if samePath(filepath.Dir(p), ours) {
+	if fsx.SamePath(filepath.Dir(p), ours) {
 		return "", nil
 	}
 	return p, nil
@@ -166,14 +166,3 @@ func expandHome(p string) string {
 	}
 	return p
 }
-
-func samePath(a, b string) bool {
-	if a == b {
-		return true
-	}
-	ra, err1 := filepath.EvalSymlinks(a)
-	rb, err2 := filepath.EvalSymlinks(b)
-	return err1 == nil && err2 == nil && ra == rb
-}
-
-func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

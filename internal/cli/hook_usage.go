@@ -3,15 +3,14 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/provider/claude"
@@ -38,20 +37,11 @@ func hookAccount(store account.Store, spec provider.Spec) (account.Account, bool
 		if a.Provider != spec.ID {
 			continue
 		}
-		if dir == "" && a.IsMain() || dir != "" && samePath(a.Dir, dir) {
+		if dir == "" && a.IsMain() || dir != "" && fsx.SamePath(a.Dir, dir) {
 			return a, true
 		}
 	}
 	return account.Account{}, false
-}
-
-func samePath(a, b string) bool {
-	if filepath.Clean(a) == filepath.Clean(b) {
-		return true
-	}
-	ra, err1 := filepath.EvalSymlinks(a)
-	rb, err2 := filepath.EvalSymlinks(b)
-	return err1 == nil && err2 == nil && ra == rb
 }
 
 // statusline records the usage the status line reports, then shows the wrapped command's output
@@ -68,7 +58,7 @@ func (h hookEnv) statusline(args []string) int {
 		_, _ = fmt.Fprintln(h.stderr, hookUsage)
 		return exitUsage
 	}
-	raw, _ := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
+	raw, _ := h.readInput()
 	name, snap := h.recordStatus(raw)
 	if then != "" {
 		bin, argv := statusLineShell(then)
@@ -116,11 +106,11 @@ func compactUsage(name string, s usage.Snapshot, now time.Time) string {
 	if name != "" {
 		parts = append(parts, name)
 	}
-	if s.Five != nil && (s.Five.ResetsAt.IsZero() || s.Five.ResetsAt.After(now)) {
-		parts = append(parts, fmt.Sprintf("5h %.0f%%", s.Five.UsedPct))
+	if s.Five.Live(now) {
+		parts = append(parts, "5h "+plainPct(s.Five, now))
 	}
-	if s.Seven != nil && (s.Seven.ResetsAt.IsZero() || s.Seven.ResetsAt.After(now)) {
-		parts = append(parts, fmt.Sprintf("7d %.0f%%", s.Seven.UsedPct))
+	if s.Seven.Live(now) {
+		parts = append(parts, "7d "+plainPct(s.Seven, now))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -128,18 +118,10 @@ func compactUsage(name string, s usage.Snapshot, now time.Time) string {
 // limit records a turn that stopped on a usage limit (StopFailure, matcher rate_limit) and
 // tells the user which command moves the session to another account.
 func (h hookEnv) limit() int {
-	raw, _ := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
-	msg := h.recordLimit(raw)
-	if msg == "" {
-		return exitOK
+	raw, _ := h.readInput()
+	if msg := h.recordLimit(raw); msg != "" {
+		desktopNotify("Claude: usage limit", msg)
 	}
-	argv := notifyCommand(runtime.GOOS, "Claude: usage limit", msg)
-	if argv == nil {
-		return exitOK
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, _ = proc.Output(ctx, proc.Options{}, argv[0], argv[1:]...)
 	return exitOK
 }
 
