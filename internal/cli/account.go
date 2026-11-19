@@ -90,7 +90,11 @@ func (a *app) accountAdoptCmd() *cobra.Command {
 			if acct, err = a.store.Adopt(args[0]); err != nil {
 				return err
 			}
-			a.out("adopted %s (%s); link main's settings with: %s account add %s\n", acct.Label(), a.tilde(acct.Dir), a.cmd, acct.Label())
+			hint := a.cmd + " account add " + acct.Label()
+			if len(account.Provisioner{Store: a.store}.Conflicts(acct)) > 0 {
+				hint = a.relinkHint(acct) // it has its own copies: a plain add would keep them
+			}
+			a.out("adopted %s (%s); link main's settings with: %s\n", acct.Label(), a.tilde(acct.Dir), hint)
 			return nil
 		},
 	}

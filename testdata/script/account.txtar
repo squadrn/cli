@@ -61,6 +61,7 @@ stderr 'exists but is not a squadrn account .*run: srn account adopt tool$'
 exitcode 2 squadrn account adopt tool
 exec squadrn account adopt tool --yes
 stdout 'adopted claude/tool'
+stdout 'link main.s settings with: srn account add claude/tool$'
 exists home/.claude-tool/.squadrn-account
 exec squadrn account adopt tool
 stdout 'already an account'
