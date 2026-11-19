@@ -37,8 +37,6 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 - Git 2.31 or newer (`internal/gitver`).
 - Never read or print the release signing key; `scripts/release-key.sh` and CI handle it.
   Releases, secrets and key handling: `docs/maintaining.md`.
-- Previous product names (`sprawl`, `squad`) live in `config.PreviousNames`; every legacy
-  identifier derives from it (ADR 0010). Never hard-code an old name elsewhere.
 
 ## Commits
 

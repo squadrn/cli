@@ -9,7 +9,7 @@ Accepted (1.0.0).
 The pre-tool hook was the only guard and decided from the command text. A review reproduced
 bypasses that all came back *allow*: quoting (`pu''sh`), case (`Git push`), git's option prefixes
 (`--forc`), `-c alias.p=push`, repository aliases, `heads/main`, wildcard refspecs, here-strings,
-`| bash`, brace expansion, and a repository's `sprawl.protectedBranches` replacing the user's list.
+`| bash`, brace expansion, and a repository's `squadrn.protectedBranches` replacing the user's list.
 Timeouts and git errors also ended in *allow*. Text analysis of a Turing-complete shell cannot be
 complete; the question is what happens when it is not.
 
@@ -19,9 +19,9 @@ complete; the question is what happens when it is not.
    `$'…'`, case); options resolve by prefix like git; aliases (command line and repository) and
    `push.default`/`remote.*.push`/upstream are resolved. Anything only known at runtime, any parse
    error, git failure or the 3 s deadline yields *ask*. No text pre-filter.
-2. **Layer 2 sees the real refs.** Sessions sprawl starts get `core.hooksPath` through
+2. **Layer 2 sees the real refs.** Sessions squadrn starts get `core.hooksPath` through
    `GIT_CONFIG_COUNT/KEY/VALUE` (appended, never replacing the user's entries). The shim calls
-   `sprawl hook git <name>`; `pre-push` judges each ref update (protected destination, deletion,
+   `squadrn hook git <name>`; `pre-push` judges each ref update (protected destination, deletion,
    non-fast-forward via `merge-base --is-ancestor`) and *denies* anything it cannot verify, then
    chains to the repository's own hook with the same arguments and input. Other hook names only chain.
    Overriding `core.hooksPath`, `--no-verify`, or unsetting/exporting `GIT_CONFIG_*` in a command is
@@ -33,10 +33,10 @@ complete; the question is what happens when it is not.
 
 - Some legitimate commands now ask (interpreters with inline code, `xargs`, `bash -s`). That is the
   intended trade: a prompt is cheap, a force push to `main` is not.
-- Every git hook in a sprawl session starts the sprawl binary (~5 ms). Hot-path hooks
+- Every git hook in a squadrn session starts the squadrn binary (~5 ms). Hot-path hooks
   (`reference-transaction`, `post-index-change`, `fsmonitor-watchman`) are not shimmed, so a
-  repository's own hooks of those names do not run inside sprawl sessions.
-- Pushes started outside sprawl sessions are only stopped by layer 3.
+  repository's own hooks of those names do not run inside squadrn sessions.
+- Pushes started outside squadrn sessions are only stopped by layer 3.
 
 ## Hardening 2026-11
 
@@ -55,13 +55,13 @@ A security audit found commands that reached git or GitHub without a decision. L
   `GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_SSH(_COMMAND)`, `GIT_EDITOR`, `GIT_SEQUENCE_EDITOR`,
   `GIT_PAGER`, `GIT_ASKPASS`, `GIT_EXTERNAL_DIFF`, `GIT_PROXY_COMMAND` before any command, and
   `env -i`, ask. Other `GIT_*` (`GIT_TRACE`, `GIT_TERMINAL_PROMPT`) stay allowed, also in PowerShell.
-- **Policy is the user's.** `sprawl|sra|sprawl-hook|<configured names> config set
+- **Policy is the user's.** `squadrn|sqd|squadrn-hook|<configured names> config set
   protected_branches|git_hooks` is denied, as are writes (redirections, `tee`, `sed -i`, `cp`/`mv`/
   `ln`/`install`, `rm`, `chmod`, `truncate`, `Set-Content`/`Out-File`/`Copy-Item`/`Remove-Item`, …)
-  to the config file or the git hooks; other writes into sprawl's config, data or state dirs ask.
+  to the config file or the git hooks; other writes into squadrn's config, data or state dirs ask.
   Layer 2 no longer reads the policy from the pushing process's environment: the shims pass the
-  config file's absolute path (`sprawl hook git --config <file> <hook>`), fixed at install;
-  repository additions (`git config sprawl.protectedBranches`) still apply.
+  config file's absolute path (`squadrn hook git --config <file> <hook>`), fixed at install;
+  repository additions (`git config squadrn.protectedBranches`) still apply.
 - **Executors.** `trap` bodies are judged; `busybox <applet>` is the applet; `git-bash`, `bash.exe`
   and `sh.exe` are shells; `git-cmd`, `ssh`, `tmux` (commands that run something), `expect`, `su`,
   `xargs` and `parallel` ask when their words mention git or push; `source`/`.` ask except for the

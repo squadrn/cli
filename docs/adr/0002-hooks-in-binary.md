@@ -1,4 +1,4 @@
-# 0002 — Hooks run inside the sprawl binary, behind a fail-closed shim
+# 0002 — Hooks run inside the squadrn binary, behind a fail-closed shim
 
 Status: accepted (v2.0.0)
 
@@ -10,9 +10,9 @@ Claude Code as non-blocking — the tool call goes through.
 
 ## Decision
 
-Hooks are `sprawl hook guard-git` and `sprawl hook notify`. The plugin ships only `bin/sprawl-hook`,
-which execs the binary at its fixed install path (else `sprawl` on PATH), independent of the user's
-command name. If sprawl is missing, the shim denies any command mentioning `push`. Inside sprawl, every internal failure (panic, unreadable input) becomes an `ask`
+Hooks are `squadrn hook guard-git` and `squadrn hook notify`. The plugin ships only `bin/squadrn-hook`,
+which execs the binary at its fixed install path (else `squadrn` on PATH), independent of the user's
+command name. If squadrn is missing, the shim denies any command mentioning `push`. Inside squadrn, every internal failure (panic, unreadable input) becomes an `ask`
 decision, never an error exit.
 
 ## Consequences

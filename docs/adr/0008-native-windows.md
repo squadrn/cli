@@ -9,7 +9,7 @@ macOS only" rule in AGENTS.md once Windows support ships.
 ## Context
 
 Some developers run Claude Code natively on Windows (PowerShell, Windows Terminal), not in WSL.
-sprawl does not build for Windows today (`internal/proc` uses `Setpgid`/`kill(-pid)`), and about
+squadrn does not build for Windows today (`internal/proc` uses `Setpgid`/`kill(-pid)`), and about
 20 files rely on Unix behaviour: process replacement, symlinks, `O_NOFOLLOW`, tmux, `sh` scripts,
 execute bits.
 
@@ -66,13 +66,13 @@ overrides `GIT_CONFIG_COUNT`.
 | Seam (pair) | Unix (moved verbatim) | Windows |
 |---|---|---|
 | `proc.setup(cmd)` / cancel | process group, `kill(-pid)` | Job Object with `KILL_ON_JOB_CLOSE`, child created suspended → assigned → resumed; cancel = `TerminateJobObject` |
-| `claude.run(bin, argv, env)` (behind `Agent.Exec`) | `syscall.Exec` | child process with inherited console handles; `signal.Notify` and drain `os.Interrupt` while it runs (not `Ignore`, which would let ctrl-c kill sprawl); save/restore console modes; return the child's status unclamped as `childExit` |
+| `claude.run(bin, argv, env)` (behind `Agent.Exec`) | `syscall.Exec` | child process with inherited console handles; `signal.Notify` and drain `os.Interrupt` while it runs (not `Ignore`, which would let ctrl-c kill squadrn); save/restore console modes; return the child's status unclamped as `childExit` |
 | `cli.detach(cmd)` | `Setsid` | `CREATE_NO_WINDOW \| CREATE_NEW_PROCESS_GROUP \| CREATE_BREAKAWAY_FROM_JOB` (retry without breakaway on `ACCESS_DENIED`) |
 | `guard.openLog(path)` | `O_NOFOLLOW` | `CreateFile` with `FILE_FLAG_OPEN_REPARSE_POINT`; refuse a reparse point or a link count > 1 (race-free) |
 | `fsx.ReplaceExecutable(src, dst)` | atomic rename (today's behaviour) | write temp → rename existing to `.old-<time>` (allowed while running) → rename temp in; retry on sharing violations (Defender); `fsx.CleanOld(dir)` at start tolerates `ACCESS_DENIED` |
 | `account.link(src, dst) (Mode, error)` / `linkedTo(dst)` | symlink (today's behaviour) | symlink → directory **junction** → file **hard link** → file **copy with recorded hash**; `doctor` reads `Mode` as data |
 | `githook.isRunnable` / `githook.hookCommand(path, args)` | execute bit; run `path` | any regular file starting with `#!` or ending `.exe`; run through Git for Windows' `sh.exe` (next to `git.exe`), exactly as Git does |
-| `release.binaryName`, `release.archiveExt` | `sprawl`, `.tar.gz` | `sprawl.exe`, `.zip` |
+| `release.binaryName`, `release.archiveExt` | `squadrn`, `.tar.gz` | `squadrn.exe`, `.zip` |
 | `cli.terminal()` | — | enable `ENABLE_VIRTUAL_TERMINAL_PROCESSING` on stdout/stderr |
 
 Shared (no pair): `fsx.SameFile(a, b)` replaces `EvalSymlinks` identity checks in `install` and
@@ -82,18 +82,18 @@ platform.
 ### Components
 
 1. **Layout.** Unchanged and already portable: `config.DirsFor` uses `filepath.Join` and honours
-   XDG. On Windows that gives `%USERPROFILE%\.local\share\sprawl` etc., the same convention as
+   XDG. On Windows that gives `%USERPROFILE%\.local\share\squadrn` etc., the same convention as
    Claude Code; `%USERPROFILE%\.local\bin` is usually on PATH already (Claude's installer adds it).
 2. **Commands and aliases on Windows: copies, not links.** Hard links cannot follow a
    rename-aside update and a running link cannot be removed (review R3). Each name
-   (`sprawl.exe`, `sra.exe`, …) is a copy updated with `fsx.ReplaceExecutable`. "Ours" is decided
+   (`squadrn.exe`, `sqd.exe`, …) is a copy updated with `fsx.ReplaceExecutable`. "Ours" is decided
    by the configured names (`install.Names`) plus a stamp check, not by link targets; `doctor`
    fails when a copy differs from the installed binary (stale guard code).
 3. **Plugin hooks on Windows: exec form, fail closed.** The Windows archive ships its own
    `plugin/hooks/hooks.json` (built, not rewritten at install). Every hook (PreToolUse,
    Notification, Stop) is exec form through `cmd.exe`, so a missing, quarantined or blocked
    binary blocks the tool call instead of letting it through:
-   `cmd.exe /d /c "<plugin root>\..\bin\sprawl.exe" hook guard-git || exit /b 2`
+   `cmd.exe /d /c "<plugin root>\..\bin\squadrn.exe" hook guard-git || exit /b 2`
    (spike S1 settles quoting and `${CLAUDE_PLUGIN_ROOT}` expansion). Install paths containing
    `% ^ & !` are refused. Unix keeps its shell-form `hooks.json` and `sh` shim byte for byte; only
    the matcher becomes `Bash|PowerShell`. `doctor` *executes* the hook with a probe payload.
@@ -119,8 +119,8 @@ platform.
      go through the existing push judgement (deny/ask/allow). `-EncodedCommand` is never decoded.
 5. **Push guard, layer 2.** Shims unchanged (Git for Windows runs them through its `sh`; paths
    written with `/`). Chaining to the repository's own hook keeps today's design on every
-   platform: sprawl resolves the original hook and runs it **with the environment unchanged**, so
-   a `git push` started inside a repository hook still reaches sprawl's pre-push. On Windows the
+   platform: squadrn resolves the original hook and runs it **with the environment unchanged**, so
+   a `git push` started inside a repository hook still reaches squadrn's pre-push. On Windows the
    hook runs through `sh.exe` (seam above), which also fixes a latent bug: Go reports no execute
    bit on Windows, so today's lookup would silently skip every hook.
 6. **Shared items between accounts.** Mode order per seam above. Copies record a hash at copy
@@ -131,13 +131,13 @@ platform.
 7. **Install (`install.ps1`).** Two bootstraps, one per shell family: `install.sh` (macOS and
    Linux) and `install.ps1` (Windows); no per-OS scripts, no "universal" installer. Each does only
    what must happen before the binary can be trusted — check requirements, download, verify the
-   signature and checksum, extract — then hands over to `sprawl self-install`, where every other
+   signature and checksum, extract — then hands over to `squadrn self-install`, where every other
    step lives once, in tested Go. Both share one parameter contract (`--name/-Name`,
    `--alias/-Alias`, `--version/-Version`, `--force/-Force`), messages and exit codes, and are
    rendered from one script (`render-install.sh <template> <out>`), ASCII only (Windows PowerShell 5.1 misreads BOM-less UTF-8), checked by
    PSScriptAnalyzer in CI. Steps: require Git for Windows ≥ 2.31 → `gh release download` →
    signature with `ssh-keygen` from Git for Windows (`usr\bin`, absolute path), else built-in
-   OpenSSH only if ≥ 8.1 (absolute `System32` path), else refuse → checksum → extract → `sprawl.exe
+   OpenSSH only if ≥ 8.1 (absolute `System32` path), else refuse → checksum → extract → `squadrn.exe
    self-install`. PATH via `[Environment]::SetEnvironmentVariable('Path', …, 'User')` reading the
    raw registry value. Documented invocation works under the default execution policy
    (script block from `gh` output, or `-ExecutionPolicy Bypass -File`). `install.sh` detects
@@ -146,7 +146,7 @@ platform.
    snapshot with `fsx.ReplaceExecutable`; errors renaming `previous/` are retried and reported (no
    silent wrong rollback). `self-uninstall` on Windows schedules deletion of the running
    executable with a detached `cmd.exe` cleanup after exit.
-9. **Directory ACLs.** When sprawl's data/bin directories are created outside `%USERPROFILE%`
+9. **Directory ACLs.** When squadrn's data/bin directories are created outside `%USERPROFILE%`
    (XDG, other drives), they get a protected DACL (owner, SYSTEM, Administrators); `doctor`
    verifies it. Inside the profile, the profile's ACL already applies.
 10. **Doctor on Windows.** Git for Windows and its version; Git Bash; `sh.exe`; signature tool;
@@ -174,7 +174,7 @@ platform.
 
 - **Unix safety net first** (lands before the refactor): baseline tag `pre-windows`; golden files
   for every `--help`, `completion bash|zsh|fish`, the guard decision corpus (every `TestDecide`
-  row through `sprawl hook guard-git`), the install layout listing after `self-install`, release
+  row through `squadrn hook guard-git`), the install layout listing after `self-install`, release
   archive names and contents (`goreleaser release --snapshot --skip=publish,sign`), and a byte
   comparison of `hooks.json` allowing only the matcher change.
 - `.gitattributes` with `* text=auto eol=lf` before the first Windows checkout.
@@ -221,17 +221,17 @@ errors); Windows is announced with 1.2.0.
 
 | # | Finding (reviewer) | Resolution |
 |---|---|---|
-| R1 | `git -c core.hooksPath=… hook run` exports `GIT_CONFIG_PARAMETERS`, which outranks sprawl's `GIT_CONFIG_COUNT`: a push inside a repository hook would skip layer 2, on every platform (architecture, security); `--to-stdin` needs Git 2.40, not 2.36 (platform, verified); the floor would lock Ubuntu 22.04 users out of pushing after an update (release) | Chaining stays exec-based with the environment unchanged; Windows runs hooks through `sh.exe`. Git floor back to the honest 2.31 |
+| R1 | `git -c core.hooksPath=… hook run` exports `GIT_CONFIG_PARAMETERS`, which outranks squadrn's `GIT_CONFIG_COUNT`: a push inside a repository hook would skip layer 2, on every platform (architecture, security); `--to-stdin` needs Git 2.40, not 2.36 (platform, verified); the floor would lock Ubuntu 22.04 users out of pushing after an update (release) | Chaining stays exec-based with the environment unchanged; Windows runs hooks through `sh.exe`. Git floor back to the honest 2.31 |
 | R2 | Exec-form hook fails open if the binary cannot start (Defender, Smart App Control, missing file) (security) | `cmd.exe … \|\| exit /b 2` wrapper, doctor probe, code signing for GA |
 | R3 | Hard links break with rename-aside updates; running links cannot be removed; identity checks via `EvalSymlinks` miss hard links (all) | Copies updated with `ReplaceExecutable`; "ours" by configured names; `fsx.SameFile`; staleness check |
-| R4 | `signal.Ignore(os.Interrupt)` lets the console kill sprawl on ctrl-c (platform) | `signal.Notify` and drain; console mode restore |
+| R4 | `signal.Ignore(os.Interrupt)` lets the console kill squadrn on ctrl-c (platform) | `signal.Notify` and drain; console mode restore |
 | R5 | `taskkill /T` misses orphaned grandchildren (architecture, platform, QA) | Job Objects, created suspended |
 | R6 | `DETACHED_PROCESS` flashes console windows for `gh` (platform) | `CREATE_NO_WINDOW` and breakaway |
 | R7 | PowerShell rule "ask when it mentions push" is a text pre-filter, bypassable by string building, escapes, Unicode, prefixes (architecture, security) | Allow-list analyser; ask whenever git could run |
 | R8 | Windows launchers drop `GIT_CONFIG_*`; `wsl git push` unhandled; env names case-insensitive (security) | Parser additions and asks in component 4 |
 | R9 | One-way copy sync silently loses edits; junction semantics changed in Go 1.23 (platform, QA) | Hash-guarded refresh; reparse-point-aware deletion; spike S12 |
 | R10 | Built-in OpenSSH on older Windows lacks `-Y verify` (platform, security, release) | Git for Windows' `ssh-keygen` first, absolute paths, fail closed |
-| R11 | Asset name and binary name hard-coded (`.tar.gz`, `sprawl`) (architecture, release) | `binaryName`/`archiveExt` seams; golden test for Unix names |
+| R11 | Asset name and binary name hard-coded (`.tar.gz`, `squadrn`) (architecture, release) | `binaryName`/`archiveExt` seams; golden test for Unix names |
 | R12 | CRLF checkout breaks scripts on Windows; lint/coverage only on Linux (QA) | `.gitattributes`; Windows vet/lint on Linux; per-OS gates |
 | R13 | rc tags need their own CHANGELOG section; install of an rc should set the beta channel; zips not attested (release) | Runbook update; `install.ps1` sets channel; attest `dist/*.zip` |
 | R14 | Today's hook lookup never finds a hook on Windows (no execute bits) (platform) | `isRunnable` seam |

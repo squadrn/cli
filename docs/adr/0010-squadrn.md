@@ -37,34 +37,27 @@ someone else's tool in searches, package registries and conversation.
 `SPRAWL_RELEASES_*` (releases repository settings) stay until the separate releases repository
 goes away with the move to the public repository.
 
-## Compatibility
+## Previous names: no compatibility
 
-Previous names are `config.PreviousNames = ["sprawl", "squad"]`, newest first; every legacy
-identifier is derived from that list. Through the whole 2.x line:
+Squadrn is a clean break. It neither migrates nor honours anything of sprawl or squad: no old
+config, dirs, plugins, command links, markers, tmux options, environment variables, git keys or
+release signatures, and the code carries no list of previous names. Compatibility code is
+security-relevant (the guard would have to keep trusting old keys and paths) for a user base
+small enough to reinstall once.
 
-- The first install of Squadrn migrates sprawl's (and squad's) config, data and state dirs into a
-  backup under `~/.local/state/squadrn/legacy-<name>-*`, uninstalls `sprawl@sprawl` and
-  `squad@squad` from every account, installs `squadrn@squadrn`, and removes command links (or, on
-  Windows, the copies listed in the old manifest) only where they point to the old install.
-- Command names the user chose are kept (`ai` stays `ai`); the old defaults (`sprawl` + `sra`,
-  `squad` + `sq`) become `squadrn` + `sqd`.
-- `sprawl.protectedBranches` and `squad.protectedBranches` keep protecting branches in both guard
-  layers: a rename must never drop protection.
-- Old markers are read and rewritten under the new names; live entries of `.sprawl-inuse` move
-  into `.squadrn-inuse`; grids tagged with `@sprawl_*` options are still found and joined.
-- `SPRAWL_*` variables are read when the `SQUADRN_*` one is unset, with a one-line warning on
-  stderr (never from hooks, whose output the agent CLI reads).
-- The guard treats the old names (`sprawl`, `sra`, `sprawl-hook`, `squad`, …) and the old dirs
-  like the current ones: changing the policy through them is denied.
+Coming from sprawl:
 
-Not carried over: release signatures in the `sprawl-release` namespace. A sprawl binary cannot
-update itself to Squadrn (other asset names, other namespace); users install Squadrn once with the
-installer and the migration above runs then. The release workflow's upgrade test skips
-predecessors without `squadrn_*` assets for the same reason.
+1. `sprawl self-uninstall --purge` removes the old tool, its plugin in every account and its
+   files.
+2. Install Squadrn fresh with the installer.
+3. Repositories that set `git config sprawl.protectedBranches` must set
+   `git config squadrn.protectedBranches` instead: that protection is **not carried over**.
+
+The release workflow's upgrade test skips predecessors without `squadrn_*` assets: an earlier
+release cannot update itself to Squadrn.
 
 ## Consequences
 
-- Version 2.0.0: the command, paths and plugin id change, which is a breaking change for scripts
-  that call `sprawl` or read its paths, even though installs migrate themselves.
-- Code, docs and help say Squadrn; the old names appear only in `config.PreviousNames`, the legacy
-  handling and its tests, ADR history and the changelog.
+- Version 2.0.0: the command, paths, environment variables and plugin id change, and nothing is
+  migrated.
+- Code, docs and help say Squadrn; the old names appear only in ADR history and the changelog.

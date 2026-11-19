@@ -24,7 +24,7 @@
 | `worktree` | repo root, agent worktrees, gc classification, removal, lockfile detection | tmux |
 | `guard` | shell parsing, push decisions (pre-tool and pre-push), protected-branch policy, decision log | I/O beyond git and the log |
 | `githook` | git hook shims, `core.hooksPath` injection, chaining to the repository's own hooks | decisions |
-| `install` | config adoption, command-name checks, migration of previous names, plugin rollout | printing, network |
+| `install` | config loading, command-name checks, plugin rollout | printing, network |
 | `release` | signature and checksum verification, bounded extraction, installed layout, snapshots for rollback, version order | network (cli calls gh) |
 | `update` | when to check for releases, channel selection, the cached result | network, printing |
 | `doctor` | structured health checks, including all three guard layers | printing |
@@ -95,7 +95,7 @@ embedded keys, then the checksum, snapshots the installed release to `previous/`
 ~/.local/bin/<command|alias> → ~/.local/share/squadrn/bin/squadrn
 ~/.config/squadrn/config.toml    schema, command, aliases, default provider, MCP allowlist,
                                 protected branches, git_hooks
-~/.local/state/squadrn/          guard.log (0600, dir 0700, credentials masked), legacy-<name>-* backups
+~/.local/state/squadrn/          guard.log (0600, dir 0700, credentials masked)
 ~/.local/state/squadrn/usage/    <provider>-<name>.json usage per account (0600)
 ~/.cache/squadrn/auth.json       login status cache (60 s; failures 15 s; 0600)
 ~/.cache/squadrn/update.json     last update check and notice

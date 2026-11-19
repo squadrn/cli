@@ -123,7 +123,7 @@ squadrn account add work             # create or repair claude/work
 squadrn account login work
 squadrn account ls [--json]
 squadrn account logout work
-squadrn account adopt squad          # make an existing ~/.claude-squad an account (asks; --yes)
+squadrn account adopt other          # make an existing ~/.claude-other an account (asks; --yes)
 squadrn account rename work job      # logs work out first; log in again as job
 squadrn account rm work              # logs out and moves the dir to the trash
 ```
@@ -305,7 +305,7 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 | Path | Contents |
 |---|---|
 | `~/.local/share/squadrn/` | binary, plugin, local plugin marketplace, `git-hooks/`, `previous/` (rollback) |
-| `~/.local/state/squadrn/` | guard log, migration backups |
+| `~/.local/state/squadrn/` | guard log, usage records |
 | `~/.cache/squadrn/` | login status cache, update check |
 
 ## Exit codes
@@ -314,18 +314,17 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 (ctrl-c, esc) · `deps` passes the package manager's status through. Commands with `--json` print
 machine-readable output on stdout.
 
-## Migrating from sprawl or squad
+## Coming from sprawl
 
-Squadrn was called Sprawling Agents (`sprawl`) before 2.0, and squad before that (ADR 0010).
-Installing Squadrn over either adopts its settings; command names you chose (say `ai`) are kept,
-while the old defaults (`sprawl` + `sra`, `squad` + `sq`) become `squadrn` + `sqd`. In every
-account it replaces the `sprawl@sprawl` (or `squad@squad`) plugin with `squadrn@squadrn`, removes
-command links that pointed to the old install, rewrites `.sprawl-account` markers, moves the old
-guard log to `~/.local/state/squadrn/legacy-logs/` and backs the old files up under
-`~/.local/state/squadrn/legacy-<name>-*`. Still honoured through 2.x: `git config
-sprawl.protectedBranches` (and `squad.protectedBranches`), grids started by the old release, and
-`SPRAWL_*` environment variables (with a warning to rename them to `SQUADRN_*`). Releases signed
-before the rename do not update to Squadrn: install it once with the installer.
+Squadrn was called Sprawling Agents (`sprawl`) before 2.0 and does not migrate it (ADR 0010).
+Uninstall the old tool first, then install Squadrn fresh:
+
+```sh
+sprawl self-uninstall --purge
+```
+
+Protection is not carried over: a repository that set `git config sprawl.protectedBranches`
+must set `git config squadrn.protectedBranches` instead.
 
 ## Releasing (maintainer)
 
