@@ -13,9 +13,9 @@ import (
 
 func items() []Item {
 	return []Item{
-		{Label: "claude/main", Detail: "a@cmp.com", Active: true},
-		{Label: "claude/personal", Detail: "b@cmp.com", Active: true},
-		{Label: "claude/comacpro-1", Status: "not logged in"},
+		{Label: "claude/main", Detail: "a@example.com", Active: true},
+		{Label: "claude/personal", Detail: "b@example.com", Active: true},
+		{Label: "claude/acme-1", Status: "not logged in"},
 		{Label: "+ add a new account"},
 	}
 }
@@ -56,7 +56,7 @@ func TestPickerNavigatesAndWraps(t *testing.T) {
 }
 
 func TestPickerFiltersAndMapsBackToItemIndex(t *testing.T) {
-	if m := press(newPicker("›", items()), "comac", enter); m.chosen != 2 {
+	if m := press(newPicker("›", items()), "acme", enter); m.chosen != 2 {
 		t.Fatalf("chosen = %d", m.chosen)
 	}
 	if m := press(newPicker("›", items()), "b@", enter); m.chosen != 1 {
@@ -92,7 +92,7 @@ func TestPickerCancels(t *testing.T) {
 
 func TestPickerView(t *testing.T) {
 	v := newPicker("›", items()).View()
-	for _, want := range []string{"claude/main", "a@cmp.com", "not logged in", "+ add a new account"} {
+	for _, want := range []string{"claude/main", "a@example.com", "not logged in", "+ add a new account"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q:\n%s", want, v)
 		}

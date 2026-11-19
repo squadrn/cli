@@ -61,7 +61,7 @@ func TestParseRef(t *testing.T) {
 
 func TestValidateName(t *testing.T) {
 	for name, want := range map[string]error{
-		"main": nil, "comacpro-2": nil, "ab": nil,
+		"main": nil, "acme-2": nil, "ab": nil,
 		"a": ErrInvalidName, "Personal": ErrInvalidName, "2fa": ErrInvalidName, "a_b": ErrInvalidName,
 		strings.Repeat("a", 25): ErrInvalidName,
 		"mcp":                   ErrReserved, "wt": ErrReserved, "self-update": ErrReserved, "config": ErrReserved,
