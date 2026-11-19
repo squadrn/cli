@@ -51,7 +51,7 @@ func TestParseRef(t *testing.T) {
 		"personal":        {"", "personal"},
 		"claude/personal": {"claude", "personal"},
 		"codex/work":      {"codex", "work"},
-		"ccx-personal":    {"", "ccx-personal"},
+		"acme-personal":   {"", "acme-personal"},
 	} {
 		if p, n := parseRef(in); p != want[0] || n != want[1] {
 			t.Errorf("parseRef(%q) = %q, %q", in, p, n)
@@ -126,7 +126,7 @@ func TestGetAcrossProviders(t *testing.T) {
 func TestExistsRoutesOnlyRealAccounts(t *testing.T) {
 	s := newStore(t, "personal")
 	for in, want := range map[string]bool{
-		"personal": true, "claude/personal": true, "ccx-personal": false, "main": true,
+		"personal": true, "claude/personal": true, "acme-personal": false, "main": true,
 		"fix": false, "mcp": false, "--help": false, "codex/personal": false,
 	} {
 		if got := s.Exists(in); got != want {
