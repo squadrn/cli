@@ -7,11 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/release"
 )
 
 func write(t *testing.T, path, body string) {
@@ -25,25 +24,17 @@ func write(t *testing.T, path, body string) {
 }
 
 func TestLoadConfig(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "sprawl.toml")
-	legacy := filepath.Join(dir, "squad.toml")
-
-	if _, from, fresh, err := LoadConfig(path, []string{legacy}); err != nil || !fresh || from != "" {
-		t.Fatalf("nothing: %q %v %v", from, fresh, err)
-	}
-	write(t, legacy, "command = \"squad\"\nshared_mcp = [\"codegraph\"]\n")
-	cfg, from, fresh, err := LoadConfig(path, []string{legacy})
-	if err != nil || !fresh || from != legacy || cfg.Command != "" || len(cfg.SharedMCP) != 1 {
-		t.Fatalf("legacy: %+v %q %v %v", cfg, from, fresh, err)
+	path := filepath.Join(t.TempDir(), "squadrn.toml")
+	if _, fresh, err := LoadConfig(path); err != nil || !fresh {
+		t.Fatalf("nothing: %v %v", fresh, err)
 	}
 	write(t, path, "command = \"sx\"\n")
-	if cfg, _, fresh, err := LoadConfig(path, []string{legacy}); err != nil || fresh || cfg.Command != "sx" {
+	if cfg, fresh, err := LoadConfig(path); err != nil || fresh || cfg.Command != "sx" {
 		t.Fatalf("existing: %+v %v %v", cfg, fresh, err)
 	}
 	write(t, path, "bogus = 1\n")
-	if _, _, _, err := LoadConfig(path, nil); err == nil {
-		t.Fatal("invalid config accepted")
+	if _, _, err := LoadConfig(path); err == nil {
+		t.Fatal("an invalid config must be an error")
 	}
 }
 
@@ -62,13 +53,13 @@ func TestNameCheck(t *testing.T) {
 		return "", errors.New("not found")
 	}
 	n := NameCheck{Layout: layout, Accepted: map[string]bool{}, LookPath: look}
-	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"mine"}}); err != nil {
+	if err := n.Check(config.Config{Command: "squadrn", Aliases: []string{"mine"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"sx"}}); !errors.Is(err, ErrNameTaken) {
+	if err := n.Check(config.Config{Command: "squadrn", Aliases: []string{"sx"}}); !errors.Is(err, ErrNameTaken) {
 		t.Fatalf("clash: %v", err)
 	}
-	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"sprawl"}}); !errors.Is(err, ErrDuplicateName) {
+	if err := n.Check(config.Config{Command: "squadrn", Aliases: []string{"squadrn"}}); !errors.Is(err, ErrDuplicateName) {
 		t.Fatalf("duplicate: %v", err)
 	}
 	if err := n.Check(config.Config{Command: "con"}); !errors.Is(err, config.ErrInvalidCommand) {
@@ -98,39 +89,6 @@ func TestNameCheck(t *testing.T) {
 	}
 }
 
-func TestMigrateLegacy(t *testing.T) {
-	home := t.TempDir()
-	for _, k := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
-		t.Setenv(k, "")
-	}
-	old := config.DirsFor(home, "squad")
-	write(t, filepath.Join(old.Data, "bin", "squad"), "")
-	write(t, filepath.Join(old.State, "guard.log"), "line\n")
-	write(t, filepath.Join(old.Config, "config.toml"), "")
-	write(t, filepath.Join(old.Cache, "auth.json"), "{}")
-	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	moved, errs := MigrateLegacy(home, now)
-	if len(errs) != 0 || len(moved) != 1 || moved[0].Name != "squad" {
-		t.Fatalf("MigrateLegacy = %+v, %v", moved, errs)
-	}
-	state := config.DirsFor(home, config.Slug).State
-	if b, _ := os.ReadFile(filepath.Join(state, "legacy-logs", "squad-guard.log")); string(b) != "line\n" {
-		t.Error("guard log not kept")
-	}
-	for _, gone := range []string{old.Data, old.State, old.Config, old.Cache} {
-		if _, err := os.Stat(gone); !os.IsNotExist(err) {
-			t.Errorf("%s still exists", gone)
-		}
-	}
-	entries, _ := os.ReadDir(moved[0].Backup)
-	if len(entries) != 3 || !strings.HasSuffix(moved[0].Backup, "legacy-squad-20260102-030405") {
-		t.Errorf("backup %s holds %d entries", moved[0].Backup, len(entries))
-	}
-	if again, _ := MigrateLegacy(home, now); len(again) != 0 {
-		t.Error("second migration moved something")
-	}
-}
-
 type fakeRunner struct {
 	plugins string
 	fail    string
@@ -147,7 +105,7 @@ func (f *fakeRunner) Output(_ context.Context, _ string, args ...string) ([]byte
 	case "plugin list --json":
 		return []byte(f.plugins), nil
 	case "plugin marketplace list --json":
-		return []byte(`[{"name":"sprawl"},{"name":"squad"}]`), nil
+		return []byte(`[{"name":"squadrn"}]`), nil
 	}
 	return nil, nil
 }
@@ -164,16 +122,16 @@ func TestPlugins(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	r := &fakeRunner{plugins: `[{"id":"squad@squad"}]`}
+	r := &fakeRunner{plugins: `[]`}
 	res := Plugins(ctx, accts, store, r, "/m")
-	if len(res) != 1 || res[0].Action != PluginInstalled || len(res[0].Removed) != 1 {
+	if len(res) != 1 || res[0].Action != PluginInstalled {
 		t.Fatalf("install: %+v (%v)", res, r.calls)
 	}
-	r = &fakeRunner{plugins: `[{"id":"sprawl@sprawl"}]`}
+	r = &fakeRunner{plugins: `[{"id":"squadrn@squadrn"}]`}
 	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginUpdated || res[0].Err != nil {
 		t.Fatalf("update: %+v", res)
 	}
-	r = &fakeRunner{plugins: `[{"id":"sprawl@sprawl"}]`, fail: "plugin update"}
+	r = &fakeRunner{plugins: `[{"id":"squadrn@squadrn"}]`, fail: "plugin update"}
 	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginFailed {
 		t.Fatalf("update failure: %+v", res)
 	}
@@ -192,7 +150,7 @@ func TestRemovePlugins(t *testing.T) {
 	accts, _ := store.List()
 	r := &fakeRunner{}
 	errs := RemovePlugins(context.Background(), accts, r)
-	if errs["claude/main"] != nil || strings.Join(r.calls, ";") != "plugin uninstall sprawl@sprawl;plugin marketplace remove sprawl" {
+	if errs["claude/main"] != nil || strings.Join(r.calls, ";") != "plugin uninstall squadrn@squadrn;plugin marketplace remove squadrn" {
 		t.Fatalf("RemovePlugins = %v, calls %v", errs, r.calls)
 	}
 	r = &fakeRunner{fail: "plugin uninstall"}

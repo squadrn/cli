@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Claude Code stores each conversation at <config dir>/projects/<project folder>/<session>.jsonl,
@@ -303,7 +303,7 @@ func copyVerified(src, dst string) (err error) {
 	if err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".sprawl-*")
+	tmp, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".squadrn-*")
 	if err != nil {
 		return err
 	}

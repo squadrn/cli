@@ -72,7 +72,7 @@ func TestRequireAndError(t *testing.T) {
 		t.Fatalf("the git running the tests is too old? %v", err)
 	}
 	e := TooOldError{Have: Version{2, 30, 2}, Hint: "brew install git"}
-	if !errors.Is(e, ErrTooOld) || !strings.Contains(e.Error(), "git 2.30.2 is too old; sprawl needs git 2.31 or newer (upgrade: brew install git)") {
+	if !errors.Is(e, ErrTooOld) || !strings.Contains(e.Error(), "git 2.30.2 is too old; squadrn needs git 2.31 or newer (upgrade: brew install git)") {
 		t.Fatalf("error = %v", e)
 	}
 	t.Setenv("PATH", "")

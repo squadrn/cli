@@ -20,25 +20,25 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/release"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 func TestMain(m *testing.M) {
 	cmds := map[string]func(){
-		"sprawl": func() {
+		"squadrn": func() {
 			// Scripts sign their fake releases with their own key, never the real one.
-			buildSigners = func() string { return os.Getenv("SPRAWL_TEST_SIGNERS") }
-			// SPRAWL_TEST_TTY stands in for the controlling terminal: answers come from that file.
+			buildSigners = func() string { return os.Getenv("SQUADRN_TEST_SIGNERS") }
+			// SQUADRN_TEST_TTY stands in for the controlling terminal: answers come from that file.
 			openTTY = func() (io.Reader, io.Writer, func(), bool) {
-				f, err := os.Open(os.Getenv("SPRAWL_TEST_TTY"))
+				f, err := os.Open(os.Getenv("SQUADRN_TEST_TTY"))
 				if err != nil {
 					return nil, nil, nil, false
 				}
 				return f, os.Stderr, func() { _ = f.Close() }, true
 			}
-			if v := os.Getenv("SPRAWL_TEST_VERSION"); v != "" {
+			if v := os.Getenv("SQUADRN_TEST_VERSION"); v != "" {
 				Version = v
 			}
 			os.Exit(Run(os.Args[1:]))
@@ -93,11 +93,11 @@ func fakeClaudeMain(args []string) int {
 	case cmd == "plugin marketplace list --json":
 		cat(".markets", "[]")
 	case strings.HasPrefix(cmd, "plugin marketplace add "):
-		_ = os.WriteFile(filepath.Join(dir, ".markets"), []byte(`[{"name":"sprawl"}]`+"\n"), 0o644)
+		_ = os.WriteFile(filepath.Join(dir, ".markets"), []byte(`[{"name":"squadrn"}]`+"\n"), 0o644)
 	case cmd == "plugin list --json":
 		cat(".plugins", "[]")
 	case strings.HasPrefix(cmd, "plugin install "):
-		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"sprawl@sprawl"}]`+"\n"), 0o644)
+		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"squadrn@squadrn"}]`+"\n"), 0o644)
 	default:
 		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)
 		wd, _ := os.Getwd()
@@ -124,7 +124,7 @@ func fakeClaudeMain(args []string) int {
 	return 0
 }
 
-// fakeClaude answers the queries sprawl makes and records every other invocation in
+// fakeClaude answers the queries squadrn makes and records every other invocation in
 // $HOME/calls.log. Inside a tmux pane it stays alive like an interactive session. With
 // FAKE_HOLD=<session> it lists itself in the account's session registry (not with FAKE_NOREG
 // set), writes its pid to $HOME/held.txt and runs until interrupted.
@@ -142,9 +142,9 @@ case "$*" in
   "mcp get "*) grep -qx "$3" "$dir/.mcp" 2>/dev/null ;;
   "mcp add-json -s user "*) echo "$5" >>"$dir/.mcp" ;;
   "plugin marketplace list --json") cat "$dir/.markets" 2>/dev/null || echo '[]' ;;
-  "plugin marketplace add "*) echo '[{"name":"sprawl"}]' >"$dir/.markets" ;;
+  "plugin marketplace add "*) echo '[{"name":"squadrn"}]' >"$dir/.markets" ;;
   "plugin list --json") cat "$dir/.plugins" 2>/dev/null || echo '[]' ;;
-  "plugin install "*) echo '[{"id":"sprawl@sprawl"}]' >"$dir/.plugins" ;;
+  "plugin install "*) echo '[{"id":"squadrn@squadrn"}]' >"$dir/.plugins" ;;
   *)
     echo "cfg=$cfg args=$*"
     echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"
@@ -163,12 +163,12 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 
 // pathWithoutHome drops PATH entries under the real home dir, so tools installed for the
-// developer running the tests (e.g. a real ~/.local/bin/sprawl) cannot leak into scripts.
+// developer running the tests (e.g. a real ~/.local/bin/squadrn) cannot leak into scripts.
 func pathWithoutHome(path string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -214,7 +214,7 @@ func TestScript(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(fakeClaude), 0o755); err != nil {
 				return err
 			}
-			shim, err := filepath.Abs(filepath.Join("..", "..", "plugin", "bin", "sprawl-hook"))
+			shim, err := filepath.Abs(filepath.Join("..", "..", "plugin", "bin", "squadrn-hook"))
 			if err != nil {
 				return err
 			}
@@ -252,7 +252,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SPRAWL_MARKETPLACE", "SPRAWL_SHARED_MCP", "SPRAWL_REPO", "SPRAWL_TEST_SIGNERS", "SPRAWL_TEST_VERSION", "SPRAWL_TEST_TTY", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
 				env.Setenv(k, "")
 			}
 			return nil
@@ -309,7 +309,7 @@ func TestScript(t *testing.T) {
 				_, _ = fmt.Fprintln(ts.Stdout(), strings.Join(lines, "\n"))
 			},
 			// release DIR lays out an unpacked release in DIR without a shell: this test binary as
-			// sprawl(.exe), the plugin and the marketplace; on Windows the Windows hooks.json.
+			// squadrn(.exe), the plugin and the marketplace; on Windows the Windows hooks.json.
 			"release": func(ts *testscript.TestScript, neg bool, args []string) {
 				if neg || len(args) != 1 {
 					ts.Fatalf("usage: release dir")

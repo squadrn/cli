@@ -12,13 +12,12 @@ import (
 	"slices"
 	"strings"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 const (
-	MarketplaceName = "sprawl"
-	PluginID        = "sprawl@sprawl"
+	MarketplaceName = "squadrn"
+	PluginID        = "squadrn@squadrn"
 )
 
 // Provisioner prepares an account dir. It is idempotent: re-running repairs missing pieces.
@@ -119,7 +118,7 @@ func linkEntries(src, dst string, skip []string, r *Report) error {
 		p := filepath.Join(dst, e.Name())
 		target, ok := linkTarget(p)
 		if !ok || !within(src, target) {
-			continue // not a link sprawl made
+			continue // not a link squadrn made
 		}
 		if _, err := os.Stat(target); !errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -222,7 +221,7 @@ func carriesSecrets(raw json.RawMessage) bool {
 	return len(s.Env) > 0 || len(s.Headers) > 0
 }
 
-// InstallPlugin registers the local marketplace and installs the sprawl plugin for one config dir.
+// InstallPlugin registers the local marketplace and installs the squadrn plugin for one config dir.
 // It reports whether anything was installed; with no marketplace it does nothing.
 func (p Provisioner) InstallPlugin(ctx context.Context, configDir string) (bool, error) {
 	if p.Marketplace == "" {
@@ -248,44 +247,6 @@ func (p Provisioner) InstallPlugin(ctx context.Context, configDir string) (bool,
 		return false, err
 	}
 	return true, nil
-}
-
-// LegacyPluginIDs are the plugins previous product names installed (<name>@<name>).
-func LegacyPluginIDs() []string {
-	ids := make([]string, len(config.PreviousNames))
-	for i, n := range config.PreviousNames {
-		ids[i] = n + "@" + n
-	}
-	return ids
-}
-
-// RemoveLegacyPlugins uninstalls plugins and marketplaces of previous product names and
-// returns the plugin ids it removed.
-func (p Provisioner) RemoveLegacyPlugins(ctx context.Context, configDir string) ([]string, error) {
-	plugins, err := listNames(ctx, p.Runner, configDir, "id", "plugin", "list", "--json")
-	if err != nil {
-		return nil, err
-	}
-	markets, err := listNames(ctx, p.Runner, configDir, "name", "plugin", "marketplace", "list", "--json")
-	if err != nil {
-		return nil, err
-	}
-	var removed []string
-	for _, n := range config.PreviousNames {
-		id := n + "@" + n
-		if plugins[id] {
-			if _, err := p.Runner.Output(ctx, configDir, "plugin", "uninstall", id); err != nil {
-				return removed, err
-			}
-			removed = append(removed, id)
-		}
-		if markets[n] {
-			if _, err := p.Runner.Output(ctx, configDir, "plugin", "marketplace", "remove", n); err != nil {
-				return removed, err
-			}
-		}
-	}
-	return removed, nil
 }
 
 // UpdatePlugin refreshes the marketplace and plugin after the files on disk changed.

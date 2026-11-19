@@ -1,4 +1,4 @@
-// Package provider describes the agent CLIs sprawl drives. What differs between providers is
+// Package provider describes the agent CLIs squadrn drives. What differs between providers is
 // data in Spec; what needs code (running the CLI, reading its login) is behind Agent, which each
 // provider's own package implements (internal/provider/claude).
 package provider
@@ -10,11 +10,11 @@ type Caps struct {
 	Worktree bool
 	// SessionTransfer: conversations can be copied between accounts and resumed (swap).
 	SessionTransfer bool
-	// Plugins: the sprawl plugin (git push guard, notifications) can be installed.
+	// Plugins: the squadrn plugin (git push guard, notifications) can be installed.
 	Plugins bool
 	// SharedMCP: user-scope MCP servers can be copied from the main account.
 	SharedMCP bool
-	// UsageReport: the CLI reports usage limits to sprawl (status line, limit hook).
+	// UsageReport: the CLI reports usage limits to squadrn (status line, limit hook).
 	UsageReport bool
 }
 
@@ -38,7 +38,7 @@ type Spec struct {
 	SharedPerEntry map[string][]string
 	// WorktreeDir is where the CLI creates worktrees, relative to the repository root.
 	WorktreeDir string
-	// Subcommands of the agent CLI: `sprawl <account> <subcommand>` passes them through, and
+	// Subcommands of the agent CLI: `squadrn <account> <subcommand>` passes them through, and
 	// they cannot be account names.
 	Subcommands []string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
@@ -58,7 +58,7 @@ type AuthStatus struct {
 }
 
 // ExitStatus is returned by Agent.Exec on platforms where the session runs as a child process
-// (Windows): the agent CLI exited with Code, which sprawl passes on as its own exit status.
+// (Windows): the agent CLI exited with Code, which squadrn passes on as its own exit status.
 type ExitStatus struct{ Code int }
 
 func (e ExitStatus) Error() string { return "exit status " + itoa(e.Code) }
@@ -94,7 +94,7 @@ type Runner interface {
 // Agent drives one provider's CLI.
 type Agent interface {
 	Runner
-	// Exec runs an interactive session in place of sprawl: on Unix it replaces the process; on
+	// Exec runs an interactive session in place of squadrn: on Unix it replaces the process; on
 	// Windows it runs as a child and returns ExitStatus when the session ends.
 	Exec(configDir string, args []string) error
 	Auth(ctx context.Context, configDir string) (AuthStatus, error)

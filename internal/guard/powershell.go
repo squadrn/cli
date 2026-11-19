@@ -138,7 +138,7 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 	case name == "gh":
 		e.gh(args)
 	case e.names[name]:
-		e.sprawl(args)
+		e.self(args)
 	case psEnvWrite(name, words[1:]):
 		e.flag(Ask, "changing GIT_* environment variables can disable the git-level guard")
 	case psFileWriter(name):

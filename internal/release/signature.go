@@ -15,8 +15,8 @@ import (
 )
 
 // SignatureNamespace binds release signatures to their purpose: a key used here cannot have its
-// signatures replayed from another context (ssh-keygen -Y sign -n sprawl-release).
-const SignatureNamespace = "sprawl-release"
+// signatures replayed from another context (ssh-keygen -Y sign -n squadrn-release).
+const SignatureNamespace = "squadrn-release"
 
 // SignatureName is the detached signature of ChecksumsName published with every release.
 const SignatureName = ChecksumsName + ".sig"

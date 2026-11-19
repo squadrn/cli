@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/config"
+	"github.com/squadrn/cli/internal/config"
 )
 
 type repos struct {
-	root, feat, main, prod, squad, remotePush, matching, upstream, alias string
+	root, feat, main, prod, remotePush, matching, upstream, alias string
 }
 
 func isolateGit(t testing.TB) {
@@ -49,7 +49,6 @@ func newRepos(t testing.TB) repos {
 	r.feat = mk("feat", "feat-x")
 	r.main = mk("on-main", "main")
 	r.prod = mk("prod", "feat-x", RepoConfigKey, "production, staging")
-	r.squad = mk("squad", "feat-x", "squad.protectedBranches", "staging")
 	r.remotePush = mk("remote-push", "feat-x", "remote.origin.push", "HEAD:refs/heads/main")
 	r.matching = mk("matching", "feat-x", "push.default", "matching")
 	r.upstream = mk("upstream", "feat-x", "push.default", "upstream", "branch.feat-x.remote", "origin", "branch.feat-x.merge", "refs/heads/main")
@@ -77,9 +76,9 @@ func newGuard(r repos) Guard {
 		Protected: []string{"main", "master", "develop", "release/*"}, Git: GitCLI{}, Home: r.root, GitHooks: true,
 		Names: []string{"ai"},
 		Dirs: config.Dirs{
-			Config: filepath.Join(r.root, ".config", "sprawl"),
-			Data:   filepath.Join(r.root, ".local", "share", "sprawl"),
-			State:  filepath.Join(r.root, ".local", "state", "sprawl"),
+			Config: filepath.Join(r.root, ".config", "squadrn"),
+			Data:   filepath.Join(r.root, ".local", "share", "squadrn"),
+			State:  filepath.Join(r.root, ".local", "state", "squadrn"),
 		},
 	}
 }
@@ -239,8 +238,7 @@ var decideCases = []decideCase{
 	{Deny, "prod", `git push origin production`},
 	{Deny, "prod", `git push origin staging`},
 	{Deny, "prod", `git push origin main`},
-	{Deny, "squad", `git push origin staging`},
-	{Deny, "feat", `git config sprawl.protectedBranches none && git push origin main`},
+	{Deny, "feat", `git config squadrn.protectedBranches none && git push origin main`},
 
 	// Allowed: feature branches, tags, review refs and commands that only mention push.
 	{Allow, "feat", `git push`},
@@ -303,23 +301,23 @@ var decideCases = []decideCase{
 	{Allow, "feat", `git config get core.editor`},
 	{Allow, "feat", `GIT_TRACE=1 git status`},
 	// G3: agents cannot lower the guard's policy.
-	{Deny, "feat", `sprawl config set protected_branches none`},
-	{Deny, "feat", `sra config set git_hooks false`},
+	{Deny, "feat", `squadrn config set protected_branches none`},
+	{Deny, "feat", `sqd config set git_hooks false`},
 	{Deny, "feat", `~/.local/bin/ai config set protected_branches x`},
-	{Deny, "feat", `env FOO=1 sprawl config set --force protected_branches x`},
-	{Ask, "feat", `sprawl config "$OP" protected_branches x`},
-	{Allow, "feat", `sprawl config get protected_branches`},
-	{Allow, "feat", `sprawl config set update_channel beta`},
-	{Deny, "feat", `echo 'protected_branches = ["x"]' > ~/.config/sprawl/config.toml`},
-	{Deny, "feat", `echo x >> "$HOME/.config/sprawl/config.toml"`},
-	{Deny, "feat", `tee -a ~/.config/sprawl/config.toml <<< x`},
-	{Deny, "feat", `sed -i '' 's/main//' ~/.config/sprawl/config.toml`},
-	{Deny, "feat", `cp /tmp/c.toml ~/.config/sprawl/config.toml`},
-	{Deny, "feat", `mv ~/.config/sprawl /tmp/x`},
-	{Deny, "feat", `cd ~/.config/sprawl && printf x > config.toml`},
-	{Ask, "feat", `echo x > ~/.local/state/sprawl/guard.log`},
-	{Ask, "feat", `cp x ~/.local/share/sprawl/plugin/hooks/hooks.json`},
-	{Allow, "feat", `cp ~/.config/sprawl/config.toml /tmp/backup.toml`},
+	{Deny, "feat", `env FOO=1 squadrn config set --force protected_branches x`},
+	{Ask, "feat", `squadrn config "$OP" protected_branches x`},
+	{Allow, "feat", `squadrn config get protected_branches`},
+	{Allow, "feat", `squadrn config set update_channel beta`},
+	{Deny, "feat", `echo 'protected_branches = ["x"]' > ~/.config/squadrn/config.toml`},
+	{Deny, "feat", `echo x >> "$HOME/.config/squadrn/config.toml"`},
+	{Deny, "feat", `tee -a ~/.config/squadrn/config.toml <<< x`},
+	{Deny, "feat", `sed -i '' 's/main//' ~/.config/squadrn/config.toml`},
+	{Deny, "feat", `cp /tmp/c.toml ~/.config/squadrn/config.toml`},
+	{Deny, "feat", `mv ~/.config/squadrn /tmp/x`},
+	{Deny, "feat", `cd ~/.config/squadrn && printf x > config.toml`},
+	{Ask, "feat", `echo x > ~/.local/state/squadrn/guard.log`},
+	{Ask, "feat", `cp x ~/.local/share/squadrn/plugin/hooks/hooks.json`},
+	{Allow, "feat", `cp ~/.config/squadrn/config.toml /tmp/backup.toml`},
 	// G4: programs that run other commands.
 	{Deny, "feat", `trap 'git push -f' EXIT`},
 	{Allow, "feat", `trap - EXIT`},
@@ -349,10 +347,10 @@ var decideCases = []decideCase{
 	{Ask, "feat", `env -u GIT_DIR make`},
 	{Ask, "feat", `GIT_TEMPLATE_DIR=/x git init`},
 	{Ask, "feat", `GIT_CONFIG_NOSYSTEM=1 npm test`},
-	{Deny, "feat", `chmod -x ~/.local/share/sprawl/git-hooks/pre-push`},
-	{Deny, "feat", `rm -rf ~/.local/share/sprawl/git-hooks`},
-	{Deny, "feat", `rm -rf ~/.local/share/sprawl`},
-	{Deny, "feat", `truncate -s0 ~/.local/share/sprawl/git-hooks/pre-push`},
+	{Deny, "feat", `chmod -x ~/.local/share/squadrn/git-hooks/pre-push`},
+	{Deny, "feat", `rm -rf ~/.local/share/squadrn/git-hooks`},
+	{Deny, "feat", `rm -rf ~/.local/share/squadrn`},
+	{Deny, "feat", `truncate -s0 ~/.local/share/squadrn/git-hooks/pre-push`},
 	// G6: GitHub CLI writes to branches.
 	{Deny, "feat", `gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=abc -F force=true`},
 	{Deny, "feat", `gh api repos/o/r/git/refs -f ref=refs/heads/main -f sha=x`},
@@ -432,7 +430,7 @@ var decideCases = []decideCase{
 
 func decideDirs(r repos) map[string]string {
 	return map[string]string{
-		"feat": r.feat, "main": r.main, "prod": r.prod, "squad": r.squad, "remote-push": r.remotePush,
+		"feat": r.feat, "main": r.main, "prod": r.prod, "remote-push": r.remotePush,
 		"matching": r.matching, "upstream": r.upstream, "alias": r.alias,
 	}
 }
@@ -691,7 +689,7 @@ func TestLogRecord(t *testing.T) {
 	if b, _ := os.ReadFile(target); len(b) != 0 {
 		t.Error("log followed a symlink")
 	}
-	if got := DefaultLogPath("/h"); !strings.HasSuffix(filepath.ToSlash(got), "/sprawl/guard.log") {
+	if got := DefaultLogPath("/h"); !strings.HasSuffix(filepath.ToSlash(got), "/squadrn/guard.log") {
 		t.Errorf("DefaultLogPath = %q", got)
 	}
 }
@@ -839,16 +837,16 @@ func TestDecideEdgeForms(t *testing.T) {
 		{Ask, `source`},
 		{Allow, `busybox`},
 		{Ask, `git-cmd`},
-		// Writes to sprawl's files.
-		{Deny, `dd if=x of=~/.config/sprawl/config.toml`},
-		{Deny, `install -t ~/.local/share/sprawl/git-hooks x`},
-		{Deny, `cp --target-directory=~/.config/sprawl x`},
-		{Deny, `ln -sf /tmp/x ~/.config/sprawl/config.toml`},
-		{Allow, `sed 's/a/b/' ~/.config/sprawl/config.toml`},
-		{Deny, `rm "$D/sprawl/git-hooks/pre-push"`},
-		{Ask, `rm "$D/.local/share/sprawl/x"`},
+		// Writes to squadrn's files.
+		{Deny, `dd if=x of=~/.config/squadrn/config.toml`},
+		{Deny, `install -t ~/.local/share/squadrn/git-hooks x`},
+		{Deny, `cp --target-directory=~/.config/squadrn x`},
+		{Deny, `ln -sf /tmp/x ~/.config/squadrn/config.toml`},
+		{Allow, `sed 's/a/b/' ~/.config/squadrn/config.toml`},
+		{Deny, `rm "$D/squadrn/git-hooks/pre-push"`},
+		{Ask, `rm "$D/.local/share/squadrn/x"`},
 		{Allow, `rm "$D/x"`},
-		{Allow, `sprawl protected_branches`},
+		{Allow, `squadrn protected_branches`},
 		// --git-dir, --work-tree, GIT_DIR and refspec mapping.
 		{Allow, `git --git-dir`},
 		{Ask, `git --work-tree "$W" push`},

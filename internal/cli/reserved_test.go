@@ -5,13 +5,13 @@ import (
 	"io"
 	"testing"
 
-	"sprawling-agents/internal/account"
+	"github.com/squadrn/cli/internal/account"
 )
 
 // Every top-level command and alias must be a reserved account name: otherwise an account of
-// that name would shadow it (`sprawl <word> ...` routes to the subcommand first).
+// that name would shadow it (`squadrn <word> ...` routes to the subcommand first).
 func TestRootCommandsAreReservedAccountNames(t *testing.T) {
-	a := &app{cmd: "sprawl", stdin: eofReader{}, stdout: io.Discard, stderr: io.Discard}
+	a := &app{cmd: "squadrn", stdin: eofReader{}, stdout: io.Discard, stderr: io.Discard}
 	root := a.rootCmd()
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()

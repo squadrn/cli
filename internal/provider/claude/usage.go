@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/usage"
+	"github.com/squadrn/cli/internal/usage"
 )
 
 // Status line input (documented: code.claude.com/docs/en/statusline). rate_limits is present

@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Without Developer Mode (or admin rights) Windows refuses symbolic links. link then falls back
@@ -27,7 +27,7 @@ import (
 var symlink = os.Symlink
 
 // copiesFile records the shared files that are copies: name -> sha256 at copy time.
-const copiesFile = ".sprawl-copies.json"
+const copiesFile = ".squadrn-copies.json"
 
 func link(src, dst string) error {
 	err := symlink(src, dst)
@@ -44,7 +44,7 @@ func link(src, dst string) error {
 	return copyShared(src, dst)
 }
 
-// linksTo reports whether dst is sprawl's link to src: a symbolic link or junction pointing at
+// linksTo reports whether dst is squadrn's link to src: a symbolic link or junction pointing at
 // it, a hard link to it, or a recorded copy that nobody has edited.
 func linksTo(dst, src string) bool {
 	if target, err := os.Readlink(dst); err == nil {

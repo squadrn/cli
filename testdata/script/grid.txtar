@@ -1,62 +1,62 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 exec git init -q -b main repo
 exec git -C repo commit -q --allow-empty -m init
-mkdir home/.claude-personal home/.config/sprawl
+mkdir home/.claude-personal home/.config/squadrn
 cp empty home/.claude/.loggedin
 cp empty home/.claude-personal/.loggedin
 
 # One pane per agent, each with its own account.
-exec sprawl grid repo feat-a personal:fix-b
+exec squadrn grid repo feat-a personal:fix-b
 stdout 'claude/main +→ feat-a'
 stdout 'claude/personal +→ fix-b'
-exec tmux list-panes -s -t sprawl-repo -F '#{@sprawl_acct}:#{@sprawl_name}'
+exec tmux list-panes -s -t squadrn-repo -F '#{@squadrn_acct}:#{@squadrn_name}'
 stdout '^claude/main:feat-a$'
 stdout '^claude/personal:fix-b$'
 
-# Panes run `sprawl -a <account> wt <name>` from the repo root.
+# Panes run `squadrn -a <account> wt <name>` from the repo root.
 waitfor home/calls.log 'cfg=<unset> pwd=.*/repo args=--worktree feat-a'
 waitfor home/calls.log 'cfg=.*/home/.claude-personal pwd=.*/repo args=--worktree fix-b'
 
 # Re-running adds new agents and skips running ones.
-exec sprawl grid repo feat-a main:chore-c
-stderr '"feat-a" is already running in sprawl-repo; skipped'
+exec squadrn grid repo feat-a main:chore-c
+stderr '"feat-a" is already running in squadrn-repo; skipped'
 stdout 'claude/main +→ chore-c'
-exec sh -c 'tmux list-panes -s -t sprawl-repo | wc -l'
+exec sh -c 'tmux list-panes -s -t squadrn-repo | wc -l'
 stdout '^ *3$'
 
-exec sprawl ps
+exec squadrn ps
 stdout '^SESSION +ACCOUNT +WORKTREE +PROCESS$'
-stdout '^sprawl-repo +claude/main +feat-a '
-stdout '^sprawl-repo +claude/personal +fix-b '
-stdout '^sprawl-repo +claude/main +chore-c '
+stdout '^squadrn-repo +claude/main +feat-a '
+stdout '^squadrn-repo +claude/personal +fix-b '
+stdout '^squadrn-repo +claude/main +chore-c '
 
-exec sprawl ps --json
+exec squadrn ps --json
 stdout '"Name": "fix-b"'
-exec sprawl grid ls
+exec squadrn grid ls
 stdout '^SESSION +REPO +PANES +ATTACHED$'
-stdout '^sprawl-repo +.*/repo +3 +false$'
-exec sprawl grid ls --json
+stdout '^squadrn-repo +.*/repo +3 +false$'
+exec squadrn grid ls --json
 stdout '"Repo": ".*/repo"'
-exitcode 2 sprawl grid stop repo
+exitcode 2 squadrn grid stop repo
 exec git -C repo worktree add -q -b worktree-feat-a .claude/worktrees/feat-a
 cd repo
-exec sprawl wt ls
+exec squadrn wt ls
 stdout '^feat-a +worktree-feat-a +clean +claude/main$'
 cd $WORK
-exitcode 1 sprawl account rename personal p2
-exec sprawl grid stop repo --yes
-stdout 'stopped sprawl-repo'
-exitcode 1 sprawl grid attach repo
-! exec sprawl grid attach repo
+exitcode 1 squadrn account rename personal p2
+exec squadrn grid stop repo --yes
+stdout 'stopped squadrn-repo'
+exitcode 1 squadrn grid attach repo
+! exec squadrn grid attach repo
 stderr 'no grid is running for'
-exec sprawl grid ls
+exec squadrn grid ls
 stdout '^no running grids$'
-exec sprawl ps --json
+exec squadrn ps --json
 stdout '^\[\]$'
 
 # --spread round-robins over logged-in accounts only.
 mkdir home/.claude-idle
-exec sprawl grid repo feat-1 feat-2 feat-3 --spread
+exec squadrn grid repo feat-1 feat-2 feat-3 --spread
 stdout 'claude/main +→ feat-1'
 stdout 'claude/personal +→ feat-2'
 stdout 'claude/main +→ feat-3'
@@ -64,13 +64,13 @@ stdout 'claude/main +→ feat-3'
 
 # The default account comes from -a or from the account named before the subcommand.
 exec tmux kill-server
-exec sprawl personal grid repo feat-x
+exec squadrn personal grid repo feat-x
 stdout 'claude/personal +→ feat-x'
-exec sprawl grid repo feat-y -a claude/personal
+exec squadrn grid repo feat-y -a claude/personal
 stdout 'claude/personal +→ feat-y'
 exec tmux kill-server
 
-exec sprawl ps
+exec squadrn ps
 stdout '^no running grids$'
 
 # Two repositories with the same directory name get separate grids; sessions are found by tag,
@@ -78,38 +78,38 @@ stdout '^no running grids$'
 mkdir other
 exec git init -q -b main other/repo
 exec git -C other/repo commit -q --allow-empty -m init
-exec sprawl grid repo feat-a
-exec sprawl grid other/repo feat-b
+exec squadrn grid repo feat-a
+exec squadrn grid other/repo feat-b
 exec tmux list-sessions -F '#{session_name}'
-stdout '^sprawl-repo$'
-stdout '^sprawl-repo-2$'
-cp ai.toml home/.config/sprawl/config.toml
-exec sprawl grid repo feat-c
+stdout '^squadrn-repo$'
+stdout '^squadrn-repo-2$'
+cp ai.toml home/.config/squadrn/config.toml
+exec squadrn grid repo feat-c
 stdout 'claude/main +→ feat-c'
-exec tmux list-panes -s -t sprawl-repo -F '#{@sprawl_name}'
+exec tmux list-panes -s -t squadrn-repo -F '#{@squadrn_name}'
 stdout '^feat-c$'
 ! exec tmux has-session -t ai-repo
 exec tmux kill-server
 
 # Errors: duplicates and bad names are usage errors; unknown accounts and non-repos fail.
-exitcode 2 sprawl grid repo feat-z feat-z
-exitcode 2 sprawl grid repo
-exitcode 2 sprawl grid repo Bad_Name
-exitcode 1 sprawl grid repo ghost:feat-y
-exitcode 1 sprawl grid nowhere feat-a
+exitcode 2 squadrn grid repo feat-z feat-z
+exitcode 2 squadrn grid repo
+exitcode 2 squadrn grid repo Bad_Name
+exitcode 1 squadrn grid repo ghost:feat-y
+exitcode 1 squadrn grid nowhere feat-a
 
 # Two grid runs at once never start the same worktree twice.
 exec git init -q -b main repo2
 exec git -C repo2 commit -q --allow-empty -m init
-exec sprawl grid repo2 feat-x &
-exec sprawl grid repo2 feat-x &
+exec squadrn grid repo2 feat-x &
+exec squadrn grid repo2 feat-x &
 wait
 exec sh -c 'tmux list-panes -s -t ai-repo2 | wc -l'
 stdout '^ *1$'
-! exists repo2/.git/sprawl-grid.lock
+! exists repo2/.git/squadrn-grid.lock
 
 -- empty --
 -- ai.toml --
 command = "ai"
--- home/.claude-personal/.sprawl-account --
--- home/.claude-idle/.sprawl-account --
+-- home/.claude-personal/.squadrn-account --
+-- home/.claude-idle/.squadrn-account --

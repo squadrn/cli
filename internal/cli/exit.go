@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/grid"
-	"sprawling-agents/internal/install"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/release"
-	"sprawling-agents/internal/ui"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/grid"
+	"github.com/squadrn/cli/internal/install"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/cli/internal/ui"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 // Exit codes: 0 ok, 1 runtime error (or "no" at a prompt), 2 usage or invalid input,
@@ -36,7 +36,7 @@ var (
 	errAborted = errors.New("aborted")
 )
 
-// childExit carries the exit status of a program sprawl ran in the foreground.
+// childExit carries the exit status of a program squadrn ran in the foreground.
 type childExit struct{ code int }
 
 func (e childExit) Error() string { return fmt.Sprintf("exit status %d", e.code) }

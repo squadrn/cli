@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/account"
+	"github.com/squadrn/cli/internal/account"
 )
 
 func TestBannerAndPickerNeedATerminalNotColors(t *testing.T) {
@@ -17,7 +17,7 @@ func TestBannerAndPickerNeedATerminalNotColors(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stderr bytes.Buffer
-	a := &app{cmd: "sprawl", store: account.Store{Home: home}, stderr: &stderr, ttyErr: true}
+	a := &app{cmd: "squadrn", store: account.Store{Home: home}, stderr: &stderr, ttyErr: true}
 	acct, err := a.store.Get(account.Main)
 	if err != nil {
 		t.Fatal(err)

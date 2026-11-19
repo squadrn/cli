@@ -1,4 +1,4 @@
-module sprawling-agents
+module github.com/squadrn/cli
 
 go 1.27.4
 

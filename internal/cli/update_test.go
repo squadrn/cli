@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/release"
 )
 
 func TestVerifyRelease(t *testing.T) {
@@ -28,7 +28,7 @@ func TestVerifyRelease(t *testing.T) {
 		t.Fatalf("%v\n%s", err, out)
 	}
 	pub, _ := os.ReadFile(key + ".pub")
-	asset := "sprawl_1.0.0_linux_amd64.tar.gz"
+	asset := "squadrn_1.0.0_linux_amd64.tar.gz"
 	write := func(name, body string) {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
@@ -46,7 +46,7 @@ func TestVerifyRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	a := &app{cmd: "sprawl", stdout: &stdout, stderr: &stderr, signers: string(pub)}
+	a := &app{cmd: "squadrn", stdout: &stdout, stderr: &stderr, signers: string(pub)}
 	ctx := context.Background()
 	if err := a.verifyRelease(ctx, fakeGH, dir, asset, "me/rel"); err != nil {
 		t.Fatalf("signed release: %v", err)

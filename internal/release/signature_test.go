@@ -44,7 +44,7 @@ func TestVerifySignature(t *testing.T) {
 	key, pub := sshKey(t, dir, "k")
 	_, otherPub := sshKey(t, dir, "other")
 	msg := filepath.Join(dir, "checksums.txt")
-	if err := os.WriteFile(msg, []byte("abc  sprawl_1.0.0_linux_amd64.tar.gz\n"), 0o600); err != nil {
+	if err := os.WriteFile(msg, []byte("abc  squadrn_1.0.0_linux_amd64.tar.gz\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(msg)
@@ -82,10 +82,10 @@ func TestVerifySignature(t *testing.T) {
 		t.Fatal(err)
 	}
 	allowed := filepath.Join(dir, "allowed")
-	if err := os.WriteFile(allowed, []byte("sprawl "+pub), 0o600); err != nil {
+	if err := os.WriteFile(allowed, []byte("squadrn "+pub), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("ssh-keygen", "-Y", "verify", "-f", allowed, "-I", "sprawl", "-n", SignatureNamespace, "-s", msg+".sig")
+	cmd := exec.Command("ssh-keygen", "-Y", "verify", "-f", allowed, "-I", "squadrn", "-n", SignatureNamespace, "-s", msg+".sig")
 	cmd.Stdin = strings.NewReader(string(body))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("ssh-keygen -Y verify: %v\n%s", err, out)

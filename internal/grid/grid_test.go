@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 func TestAssign(t *testing.T) {
@@ -71,13 +71,13 @@ func TestSessionName(t *testing.T) {
 }
 
 func TestShellQuoteRoundTrips(t *testing.T) {
-	argv := []string{"/path with space/sprawl", "-a", "it's", "--resume", `$(rm -rf ~)`, ""}
+	argv := []string{"/path with space/squadrn", "-a", "it's", "--resume", `$(rm -rf ~)`, ""}
 	script := "for a in " + ShellQuote(argv...) + "; do printf '[%s]\n' \"$a\"; done"
 	got, err := exec.Command("sh", "-c", script).Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "[/path with space/sprawl]\n[-a]\n[it's]\n[--resume]\n[$(rm -rf ~)]\n[]\n"
+	want := "[/path with space/squadrn]\n[-a]\n[it's]\n[--resume]\n[$(rm -rf ~)]\n[]\n"
 	if string(got) != want {
 		t.Fatalf("shell saw:\n%s", got)
 	}
@@ -101,15 +101,15 @@ func TestStartCreatesTaggedSessionInOneCall(t *testing.T) {
 		}
 		return "", nil
 	}}
-	s, err := Tmux{Run: f.run}.Start(context.Background(), "sra", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-a"}, "cmd")
-	if err != nil || s != "sra-app" {
+	s, err := Tmux{Run: f.run}.Start(context.Background(), "sqd", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-a"}, "cmd")
+	if err != nil || s != "sqd-app" {
 		t.Fatalf("Start = %q, %v", s, err)
 	}
 	if len(f.calls) != 2 {
 		t.Fatalf("calls = %v", f.calls)
 	}
 	joined := strings.Join(f.calls[1], " ")
-	for _, want := range []string{"new-session -d -s sra-app", "; set -t sra-app @sprawl_repo /r/app", "@sprawl_acct claude/p", "@sprawl_name feat-a"} {
+	for _, want := range []string{"new-session -d -s sqd-app", "; set -t sqd-app @squadrn_repo /r/app", "@squadrn_acct claude/p", "@squadrn_name feat-a"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("batch %q lacks %q", joined, want)
 		}
@@ -125,20 +125,20 @@ func TestStartJoinsSessionCreatedConcurrently(t *testing.T) {
 			if listed == 1 {
 				return "", nil
 			}
-			return "sra-app|/r/app|0", nil
+			return "sqd-app|/r/app|0", nil
 		case "new-session":
-			return "", errors.New("tmux new-session: exit status 1: duplicate session: sra-app")
+			return "", errors.New("tmux new-session: exit status 1: duplicate session: sqd-app")
 		case "split-window":
 			return "%7", nil
 		}
 		return "", nil
 	}}
-	s, err := Tmux{Run: f.run}.Start(context.Background(), "sra", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-b"}, "cmd")
-	if err != nil || s != "sra-app" {
+	s, err := Tmux{Run: f.run}.Start(context.Background(), "sqd", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-b"}, "cmd")
+	if err != nil || s != "sqd-app" {
 		t.Fatalf("Start = %q, %v (calls %v)", s, err, f.calls)
 	}
 	last := strings.Join(f.calls[len(f.calls)-1], " ")
-	if !strings.HasPrefix(last, "split-window") || !strings.Contains(last, "; set -p @sprawl_name feat-b") || !strings.Contains(last, "select-layout") {
+	if !strings.HasPrefix(last, "split-window") || !strings.Contains(last, "; set -p @squadrn_name feat-b") || !strings.Contains(last, "select-layout") {
 		t.Fatalf("pane not created and tagged in one batch: %q", last)
 	}
 }
@@ -147,16 +147,16 @@ func TestStartPicksNextNameForOtherRepo(t *testing.T) {
 	f := &fakeTmux{replies: func(args []string) (string, error) {
 		switch args[0] {
 		case "list-sessions":
-			return "sra-app|/other/app|0", nil
+			return "sqd-app|/other/app|0", nil
 		case "new-session":
-			if args[3] == "sra-app" {
-				return "", errors.New("duplicate session: sra-app")
+			if args[3] == "sqd-app" {
+				return "", errors.New("duplicate session: sqd-app")
 			}
 		}
 		return "", nil
 	}}
-	s, err := Tmux{Run: f.run}.Start(context.Background(), "sra", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "x"}, "cmd")
-	if err != nil || s != "sra-app-2" {
+	s, err := Tmux{Run: f.run}.Start(context.Background(), "sqd", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "x"}, "cmd")
+	if err != nil || s != "sqd-app-2" {
 		t.Fatalf("Start = %q, %v", s, err)
 	}
 }
@@ -165,26 +165,26 @@ func TestSessionsAndPanes(t *testing.T) {
 	f := &fakeTmux{replies: func(args []string) (string, error) {
 		switch args[0] {
 		case "list-sessions":
-			return "plain||0\nsra-app|/r/app|1\nodd\\|name|/r/a\\|b\\ c|0", nil
+			return "plain||0\nsqd-app|/r/app|1\nodd\\|name|/r/a\\|b\\ c|0", nil
 		case "list-panes":
 			if args[1] == "-a" {
-				return "plain\nsra-app\nsra-app\nsra-app\nodd\\|name", nil
+				return "plain\nsqd-app\nsqd-app\nsqd-app\nodd\\|name", nil
 			}
-			return "%1|sra-app|claude/main|feat-a|claude\n%2|sra-app|||zsh", nil
+			return "%1|sqd-app|claude/main|feat-a|claude\n%2|sqd-app|||zsh", nil
 		}
 		return "", errors.New("unexpected")
 	}}
 	tm := Tmux{Run: f.run}
 	ss, err := tm.Sessions(context.Background())
-	if err != nil || len(ss) != 2 || ss[0] != (Session{Name: "sra-app", Repo: "/r/app", Panes: 3, Attached: true}) ||
+	if err != nil || len(ss) != 2 || ss[0] != (Session{Name: "sqd-app", Repo: "/r/app", Panes: 3, Attached: true}) ||
 		ss[1] != (Session{Name: "odd|name", Repo: "/r/a|b c", Panes: 1}) {
 		t.Fatalf("Sessions = %+v, %v", ss, err)
 	}
-	ps, err := tm.Panes(context.Background(), "sra-app")
+	ps, err := tm.Panes(context.Background(), "sqd-app")
 	if err != nil || len(ps) != 1 || ps[0].Name != "feat-a" {
 		t.Fatalf("Panes = %+v, %v", ps, err)
 	}
-	if err := tm.Kill(context.Background(), "sra-app"); err == nil {
+	if err := tm.Kill(context.Background(), "sqd-app"); err == nil {
 		t.Fatal("Kill error not returned")
 	}
 	none := Tmux{Run: func(context.Context, ...string) (string, error) { return "", ErrNoServer }}

@@ -9,18 +9,18 @@ exec git -C repo worktree add -q -b worktree-fix-dirty .claude/worktrees/fix-dir
 cp empty repo/.claude/worktrees/fix-dirty/x
 exec git -C repo worktree add -q -b other ../outside
 exec git -C repo worktree add -q -b worktree-feat-busy .claude/worktrees/feat-busy
-mkdir repo/.claude/worktrees/feat-busy/.sprawl-inuse repo/.claude/worktrees/feat-merged/build
-cp inuse.json repo/.claude/worktrees/feat-busy/.sprawl-inuse/1.json
+mkdir repo/.claude/worktrees/feat-busy/.squadrn-inuse repo/.claude/worktrees/feat-merged/build
+cp inuse.json repo/.claude/worktrees/feat-busy/.squadrn-inuse/1.json
 exec git -C repo worktree add -q -b worktree-feat-hidden .claude/worktrees/feat-hidden
 exec git -C repo config status.showUntrackedFiles no
 cp empty repo/.claude/worktrees/feat-hidden/untracked.txt
 exec git -C repo worktree add -q -b keep-me .claude/worktrees/feat-foreign
-exec sh -c 'printf "build/\n.sprawl-inuse/\n" >> repo/.git/info/exclude'
+exec sh -c 'printf "build/\n.squadrn-inuse/\n" >> repo/.git/info/exclude'
 cp empty repo/.claude/worktrees/feat-merged/build/out.o
 
 # Dry run classifies and removes nothing; worktrees outside .claude/worktrees are ignored.
 cd repo
-exec sprawl gc
+exec squadrn gc
 stdout '^base: main$'
 stdout 'remove +feat-merged +merged or no commits \(with 1 ignored path\(s\)\)'
 stdout 'keep +feat-busy +in use \(pid 1, claude/main\)'
@@ -32,7 +32,7 @@ stdout 'keep +fix-dirty +uncommitted changes'
 stdout 'dry run; re-run with --yes to remove'
 exists .claude/worktrees/feat-merged
 
-exec sprawl gc --yes
+exec squadrn gc --yes
 stdout 'removed 2 worktree\(s\)'
 ! exists .claude/worktrees/feat-merged
 exists .claude/worktrees/feat-busy
@@ -47,17 +47,17 @@ exec git branch --list worktree-feat-merged
 
 # From inside a worktree, gc still works on the main checkout.
 cd .claude/worktrees/feat-open
-exec sprawl gc
+exec squadrn gc
 stdout 'keep +feat-open'
 
-exec sprawl gc --json
+exec squadrn gc --json
 stdout '"action": "keep"'
 stdout '"name": "feat-open"'
 stdout '"ignored": 0'
 
 # --json --yes reports what was removed, as JSON only.
 exec git -C $WORK/repo worktree add -q -b worktree-feat-two .claude/worktrees/feat-two
-exec sprawl gc --json --yes
+exec squadrn gc --json --yes
 stdout '"base": "main"'
 stdout '"removed": \[\n +"feat-two"\n +\]'
 stdout '"errors": \[\]'
@@ -66,42 +66,42 @@ stdout '"errors": \[\]'
 
 # wt ls and wt rm.
 cd $WORK/repo
-exec sprawl wt ls
+exec squadrn wt ls
 stdout '^feat-open +worktree-feat-open +clean +-$'
 stdout '^fix-dirty +worktree-fix-dirty +modified +-$'
-exec sprawl wt ls --json
+exec squadrn wt ls --json
 stdout '"dirty": true'
-! exec sprawl wt rm fix-dirty
+! exec squadrn wt rm fix-dirty
 exists .claude/worktrees/fix-dirty
-exec sprawl wt rm fix-dirty --force --yes
+exec squadrn wt rm fix-dirty --force --yes
 ! exists .claude/worktrees/fix-dirty
 
 # A worktree a session uses is kept unless --force.
-! exec sprawl wt rm feat-busy
+! exec squadrn wt rm feat-busy
 stderr 'feat-busy is in use by pid 1 \(claude/main\); stop it first \(or use --force\)'
-exec sprawl wt rm feat-busy --force --yes
+exec squadrn wt rm feat-busy --force --yes
 ! exists .claude/worktrees/feat-busy
 
 # --force removes a modified worktree but keeps its unmerged branch; --force-branch deletes it.
-exitcode 2 sprawl wt rm feat-open --force-branch
-exec sprawl wt rm feat-open
+exitcode 2 squadrn wt rm feat-open --force-branch
+exec squadrn wt rm feat-open
 stdout 'removed worktree feat-open'
 stderr 'kept branch worktree-feat-open'
 stderr 'delete it with --force-branch'
 exec git branch -D worktree-feat-open
 exec git worktree add -q -b worktree-feat-gone .claude/worktrees/feat-gone
 exec git -C .claude/worktrees/feat-gone commit -q --allow-empty -m wip
-exec sprawl wt rm feat-gone --force-branch --yes
+exec squadrn wt rm feat-gone --force-branch --yes
 stdout 'removed worktree feat-gone'
 exec git branch --list worktree-feat-gone
 ! stdout .
-exitcode 1 sprawl wt rm nope
-exitcode 2 sprawl wt rm Bad_Name
+exitcode 1 squadrn wt rm nope
+exitcode 2 squadrn wt rm Bad_Name
 
 cd $WORK
-exitcode 1 sprawl gc
+exitcode 1 squadrn gc
 cd repo
-exitcode 2 sprawl gc extra
+exitcode 2 squadrn gc extra
 
 -- empty --
 -- inuse.json --

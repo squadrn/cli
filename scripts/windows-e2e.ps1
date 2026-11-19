@@ -8,16 +8,16 @@ function Check([bool]$ok, [string]$what) {
     Write-Host "ok  $what"
 }
 
-$root = Join-Path ([IO.Path]::GetTempPath()) ("sprawl-e2e-" + [guid]::NewGuid())
+$root = Join-Path ([IO.Path]::GetTempPath()) ("squadrn-e2e-" + [guid]::NewGuid())
 $env:USERPROFILE = Join-Path $root "home"
 $env:HOME = $env:USERPROFILE
 foreach ($k in "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME") { Remove-Item "Env:$k" -ErrorAction SilentlyContinue }
-$env:SPRAWL_NO_UPDATE_CHECK = "1"
+$env:SQUADRN_NO_UPDATE_CHECK = "1"
 New-Item -ItemType Directory -Force -Path (Join-Path $env:USERPROFILE ".claude") | Out-Null
 
 function Release([string]$dir, [string]$version) {
     New-Item -ItemType Directory -Force -Path "$dir\plugin\hooks", "$dir\.claude-plugin" | Out-Null
-    & go build -trimpath -ldflags "-X sprawling-agents/internal/cli.Version=$version" -o "$dir\sprawl.exe" ./cmd/sprawl
+    & go build -trimpath -ldflags "-X github.com/squadrn/cli/internal/cli.Version=$version" -o "$dir\squadrn.exe" ./cmd/squadrn
     if ($LASTEXITCODE -ne 0) { throw "go build failed" }
     Copy-Item -Recurse -Force plugin\.claude-plugin, plugin\agents, plugin\bin, plugin\README.md "$dir\plugin\"
     Copy-Item -Force scripts\hooks.windows.json "$dir\plugin\hooks\hooks.json"
@@ -27,40 +27,40 @@ function Release([string]$dir, [string]$version) {
 Release "$root\rel1" "1.0.0"
 Release "$root\rel2" "1.1.0"
 $bin = Join-Path $env:USERPROFILE ".local\bin"
-$data = Join-Path $env:USERPROFILE ".local\share\sprawl"
+$data = Join-Path $env:USERPROFILE ".local\share\squadrn"
 
-& "$root\rel1\sprawl.exe" self-install "$root\rel1" --alias sx
+& "$root\rel1\squadrn.exe" self-install "$root\rel1" --alias sx
 Check ($LASTEXITCODE -eq 0) "self-install 1.0.0"
-Check (Test-Path "$bin\sprawl.exe") "sprawl.exe copy in .local\bin"
+Check (Test-Path "$bin\squadrn.exe") "squadrn.exe copy in .local\bin"
 Check (Test-Path "$bin\sx.exe") "alias sx.exe"
-Check ((& "$bin\sprawl.exe" version) -eq "sprawl 1.0.0") "version through the copy"
+Check ((& "$bin\squadrn.exe" version) -eq "squadrn 1.0.0") "version through the copy"
 Check (Test-Path "$data\git-hooks\pre-push") "git hook shims"
 Check ((Get-Content "$data\plugin\hooks\hooks.json" -Raw) -match "cmd.exe") "windows hooks.json installed"
 
 $payload = '{"cwd":"' + ($root -replace '\\', '/') + '","tool_name":"PowerShell","tool_input":{"command":"& git push -f origin x"}}'
-$out = $payload | & "$data\bin\sprawl.exe" hook guard-git
+$out = $payload | & "$data\bin\squadrn.exe" hook guard-git
 Check ($out -match '"permissionDecision":"deny"') "guard denies a PowerShell force push"
 $payload = '{"cwd":"' + ($root -replace '\\', '/') + '","tool_name":"PowerShell","tool_input":{"command":"iex (''git pu''+''sh'')"}}'
-$out = $payload | & "$data\bin\sprawl.exe" hook guard-git
+$out = $payload | & "$data\bin\squadrn.exe" hook guard-git
 Check ($out -match '"permissionDecision":"ask"') "guard asks on Invoke-Expression"
 
 # Reinstall while the installed command runs: it reads the hook payload from a pipe that stays
 # open for about 15 seconds, like a long tool call.
-$running = Start-Process -FilePath "cmd.exe" -ArgumentList "/d", "/c", "ping -n 15 127.0.0.1 | `"$bin\sprawl.exe`" hook guard-git" -PassThru -WindowStyle Hidden
+$running = Start-Process -FilePath "cmd.exe" -ArgumentList "/d", "/c", "ping -n 15 127.0.0.1 | `"$bin\squadrn.exe`" hook guard-git" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 2
-& "$root\rel2\sprawl.exe" self-install "$root\rel2"
+& "$root\rel2\squadrn.exe" self-install "$root\rel2"
 Check ($LASTEXITCODE -eq 0) "self-install 1.1.0 while 1.0.0 runs"
-Check ((& "$bin\sprawl.exe" version) -eq "sprawl 1.1.0") "command copy updated"
+Check ((& "$bin\squadrn.exe" version) -eq "squadrn 1.1.0") "command copy updated"
 Check (-not $running.HasExited) "the old command was still running during the update"
 $running.WaitForExit(30000) | Out-Null
 
-& "$bin\sprawl.exe" self-update --rollback
+& "$bin\squadrn.exe" self-update --rollback
 Check ($LASTEXITCODE -eq 0) "rollback"
-Check ((& "$bin\sprawl.exe" version) -eq "sprawl 1.0.0") "rolled back to 1.0.0"
+Check ((& "$bin\squadrn.exe" version) -eq "squadrn 1.0.0") "rolled back to 1.0.0"
 
-& "$bin\sprawl.exe" self-uninstall --yes --purge
+& "$bin\squadrn.exe" self-uninstall --yes --purge
 Check ($LASTEXITCODE -eq 0) "self-uninstall"
 Start-Sleep -Seconds 6
-Check (-not (Test-Path "$bin\sprawl.exe")) "command removed"
+Check (-not (Test-Path "$bin\squadrn.exe")) "command removed"
 Check (-not (Test-Path $data)) "data dir removed (after exit)"
 Write-Host "windows e2e passed"

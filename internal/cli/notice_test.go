@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/update"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/update"
 )
 
 func TestUpdateNotice(t *testing.T) {
-	t.Setenv("SPRAWL_NO_UPDATE_CHECK", "")
+	t.Setenv("SQUADRN_NO_UPDATE_CHECK", "")
 	t.Setenv("CI", "")
 	oldRepo, oldVersion := Repo, Version
 	Repo, Version = "me/rel", "1.0.0"
@@ -21,7 +21,7 @@ func TestUpdateNotice(t *testing.T) {
 	var stderr bytes.Buffer
 	started := 0
 	a := &app{
-		cmd: "sprawl", store: account.Store{Home: t.TempDir()}, stderr: &stderr,
+		cmd: "squadrn", store: account.Store{Home: t.TempDir()}, stderr: &stderr,
 		interactive: true, colorErr: true, ttyErr: true, now: func() time.Time { return now },
 		backgroundCheck: func() { started++ },
 	}
@@ -33,7 +33,7 @@ func TestUpdateNotice(t *testing.T) {
 	}
 	update.Save(a.updateStatePath(), update.State{CheckedAt: now, Latest: "v1.1.0", Channel: update.Stable})
 	a.updateNotice(route{})
-	if !strings.Contains(stderr.String(), "sprawl v1.1.0 is available") || !strings.Contains(stderr.String(), "you have v1.0.0") {
+	if !strings.Contains(stderr.String(), "squadrn v1.1.0 is available") || !strings.Contains(stderr.String(), "you have v1.0.0") {
 		t.Fatalf("notice: %q", stderr.String())
 	}
 	// Shown at most every noticeEvery.
@@ -53,9 +53,9 @@ func TestUpdateNotice(t *testing.T) {
 	for _, r := range []route{{sub: "self-update"}, {sub: "completion"}, {sub: "ps", args: []string{"--json"}}} {
 		a.updateNotice(r)
 	}
-	t.Setenv("SPRAWL_NO_UPDATE_CHECK", "1")
+	t.Setenv("SQUADRN_NO_UPDATE_CHECK", "1")
 	a.updateNotice(route{})
-	t.Setenv("SPRAWL_NO_UPDATE_CHECK", "")
+	t.Setenv("SQUADRN_NO_UPDATE_CHECK", "")
 	off := false
 	a.cfg.UpdateCheck = &off
 	a.updateNotice(route{})

@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // The status line is configured in settings.json (documented):
@@ -31,7 +31,7 @@ func StatusLineCommand(path string) (string, bool, error) {
 		Type    string `json:"type"`
 		Command string `json:"command"`
 	}
-	// A status line that is not a command object is not one sprawl can wrap: treat it as none.
+	// A status line that is not a command object is not one squadrn can wrap: treat it as none.
 	_ = json.Unmarshal(raw, &sl)
 	return sl.Command, sl.Command != "", nil
 }

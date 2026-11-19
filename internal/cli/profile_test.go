@@ -3,8 +3,8 @@ package cli
 import "testing"
 
 func TestWithoutProfileLines(t *testing.T) {
-	c := `C:\Users\o'neil\.local\share\sprawl\completion.ps1`
-	if got := profileLine(c); got != `if (Test-Path 'C:\Users\o''neil\.local\share\sprawl\completion.ps1') { . 'C:\Users\o''neil\.local\share\sprawl\completion.ps1' }` {
+	c := `C:\Users\o'neil\.local\share\squadrn\completion.ps1`
+	if got := profileLine(c); got != `if (Test-Path 'C:\Users\o''neil\.local\share\squadrn\completion.ps1') { . 'C:\Users\o''neil\.local\share\squadrn\completion.ps1' }` {
 		t.Fatalf("profileLine = %s", got)
 	}
 	in := "Import-Module posh-git\r\n" + `. "` + c + `"` + "\r\n" + profileLine(c) + "\n" +

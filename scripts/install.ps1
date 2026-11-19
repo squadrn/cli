@@ -1,13 +1,13 @@
-# Installs sprawl on Windows from its releases repository (binaries only). Requires gh (logged in
+# Installs squadrn on Windows from its releases repository (binaries only). Requires gh (logged in
 # with read access to that repository) and Git for Windows 2.31 or newer.
 #
-#   & ([scriptblock]::Create((gh release download TAG -R __SPRAWL_REPO__ -p install.ps1 -O - | Out-String)))
-#   & ([scriptblock]::Create((gh release download TAG -R __SPRAWL_REPO__ -p install.ps1 -O - | Out-String))) -Name ai -Alias sx
+#   & ([scriptblock]::Create((gh release download TAG -R __SQUADRN_REPO__ -p install.ps1 -O - | Out-String)))
+#   & ([scriptblock]::Create((gh release download TAG -R __SQUADRN_REPO__ -p install.ps1 -O - | Out-String))) -Name ai -Alias sx
 #
 # It installs the release it was downloaded from (TAG). Parameters mirror install.sh: -Name
 # (command name), -Alias (comma separated; '' for none), -Version vX.Y.Z (another release),
 # -Force (accept a name another program uses), -Repo OWNER/NAME, and -AddToProfile (load tab
-# completion from your PowerShell profile). Without -Name and -Alias, sprawl asks for the names.
+# completion from your PowerShell profile). Without -Name and -Alias, squadrn asks for the names.
 # Errors are reported without closing the PowerShell session that ran the script.
 # Keep this file ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 param(
@@ -16,7 +16,7 @@ param(
     [string]$Version = "",
     [switch]$Force,
     [switch]$AddToProfile,
-    [string]$Repo = "__SPRAWL_REPO__"
+    [string]$Repo = "__SQUADRN_REPO__"
 )
 
 function Invoke-Native {
@@ -41,7 +41,7 @@ function Add-Completion {
     }
     if ((Test-Path $profilePath) -and ((Get-Content $profilePath -Raw) -like "*$Completion*")) { return }
     if (-not $AddToProfile -and -not $env:CI -and [Environment]::UserInteractive -and $Host.UI.RawUI) {
-        $answer = Read-Host "Load sprawl tab completion from your PowerShell profile? [Y/n]"
+        $answer = Read-Host "Load squadrn tab completion from your PowerShell profile? [Y/n]"
         $AddToProfile = ($answer -eq "" -or $answer -match "^[Yy]")
     }
     if (-not $AddToProfile) {
@@ -54,7 +54,7 @@ function Add-Completion {
         Add-Content -Path $profilePath -Value $Line
     } catch {
         Write-Host "warning: cannot write $profilePath ($($_.Exception.Message))" -ForegroundColor Yellow
-        Write-Host "sprawl is installed; for tab completion add this line to your profile yourself:  $Line"
+        Write-Host "squadrn is installed; for tab completion add this line to your profile yourself:  $Line"
         return
     }
     Write-Host "tab completion added to $profilePath"
@@ -63,7 +63,7 @@ function Add-Completion {
     }
 }
 
-function Install-Sprawl {
+function Install-Squadrn {
     param([string]$Name, [AllowNull()][string]$Alias, [bool]$AliasGiven, [string]$Version, [bool]$Force, [bool]$AddToProfile, [string]$Repo)
     # Both are local to this function: nothing leaks into the session that ran the script.
     $ErrorActionPreference = "Stop"
@@ -71,10 +71,10 @@ function Install-Sprawl {
 
     # Public keys allowed to sign releases (ssh-ed25519 lines); empty in unreleased builds.
     $signers = @'
-__SPRAWL_SIGNERS__
+__SQUADRN_SIGNERS__
 '@
     # The release this script was published with; a placeholder in a source checkout.
-    $releaseTag = "__SPRAWL_VERSION__"
+    $releaseTag = "__SQUADRN_VERSION__"
 
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh is required: https://cli.github.com (then: gh auth login)" }
     $git = Get-Command git -ErrorAction SilentlyContinue
@@ -82,7 +82,7 @@ __SPRAWL_SIGNERS__
     $gitVersion = (Invoke-Native git @("version") | Out-String).Trim() -replace '^git version ', ''
     if ($gitVersion -notmatch '^(\d+)\.(\d+)') { throw "cannot read the git version ($gitVersion)" }
     if ([int]$Matches[1] -lt 2 -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -lt 31)) {
-        throw "git $gitVersion is too old; sprawl needs git 2.31 or newer (upgrade: winget install --id Git.Git -e)"
+        throw "git $gitVersion is too old; squadrn needs git 2.31 or newer (upgrade: winget install --id Git.Git -e)"
     }
     switch ($env:PROCESSOR_ARCHITECTURE) {
         "AMD64" { $arch = "amd64" }
@@ -95,8 +95,8 @@ __SPRAWL_SIGNERS__
         $Version = (Invoke-Native gh @("release", "view", "--repo", $Repo, "--json", "tagName", "--jq", ".tagName") | Out-String).Trim()
         if ($LASTEXITCODE -ne 0 -or -not $Version) { throw "cannot read releases of $Repo; check gh auth status and your access" }
     }
-    $asset = "sprawl_$($Version.TrimStart('v'))_windows_$arch.zip"
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("sprawl-install-" + [guid]::NewGuid())
+    $asset = "squadrn_$($Version.TrimStart('v'))_windows_$arch.zip"
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("squadrn-install-" + [guid]::NewGuid())
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
         $keys = @($signers -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -like "ssh-ed25519 *" })
@@ -132,9 +132,9 @@ __SPRAWL_SIGNERS__
             }
             if (-not $sshKeygen) { throw "no ssh-keygen that can verify signatures (install Git for Windows); refusing to install" }
             $allowed = Join-Path $tmp "allowed_signers"
-            [IO.File]::WriteAllLines($allowed, [string[]]@($keys | ForEach-Object { "sprawl $_" }))
+            [IO.File]::WriteAllLines($allowed, [string[]]@($keys | ForEach-Object { "squadrn $_" }))
             # Feed the exact bytes of checksums.txt on stdin.
-            $p = Start-Process -FilePath $sshKeygen -ArgumentList @("-Y", "verify", "-f", "`"$allowed`"", "-I", "sprawl", "-n", "sprawl-release", "-s", "`"$sums.sig`"") `
+            $p = Start-Process -FilePath $sshKeygen -ArgumentList @("-Y", "verify", "-f", "`"$allowed`"", "-I", "squadrn", "-n", "squadrn-release", "-s", "`"$sums.sig`"") `
                 -RedirectStandardInput $sums -RedirectStandardOutput (Join-Path $tmp "verify.out") -RedirectStandardError (Join-Path $tmp "verify.err") `
                 -NoNewWindow -Wait -PassThru
             if ($p.ExitCode -ne 0) { throw "the release signature is not valid; refusing to install" }
@@ -177,18 +177,18 @@ __SPRAWL_SIGNERS__
         if ($Name) { $installArgs += @("--command", $Name) }
         if ($AliasGiven) { $installArgs += "--alias=$Alias" }
         if ($Force) { $installArgs += "--force" }
-        # sprawl asks for the names itself (on the console) unless they were given.
+        # squadrn asks for the names itself (on the console) unless they were given.
         if (-not $Name -and -not $AliasGiven -and -not $env:CI -and [Environment]::UserInteractive) { $installArgs += "--interactive" }
-        Invoke-Native (Join-Path $release "sprawl.exe") $installArgs
-        if ($LASTEXITCODE -ne 0) { throw "sprawl self-install failed" }
+        Invoke-Native (Join-Path $release "squadrn.exe") $installArgs
+        if ($LASTEXITCODE -ne 0) { throw "squadrn self-install failed" }
 
-        # sprawl's data dir, as sprawl resolves it: an absolute XDG_DATA_HOME wins.
+        # squadrn's data dir, as squadrn resolves it: an absolute XDG_DATA_HOME wins.
         $dataHome = Join-Path $env:USERPROFILE ".local\share"
         if ($env:XDG_DATA_HOME -and $env:XDG_DATA_HOME -match '^([A-Za-z]:[\\/]|\\\\)') { $dataHome = $env:XDG_DATA_HOME }
-        $completion = Join-Path $dataHome "sprawl\completion.ps1"
+        $completion = Join-Path $dataHome "squadrn\completion.ps1"
         $quoted = "'" + ($completion -replace "'", "''") + "'"
         $line = "if (Test-Path $quoted) { . $quoted }"
-        # sprawl is installed by now: the profile step only ever costs completion, never the install.
+        # squadrn is installed by now: the profile step only ever costs completion, never the install.
         try { Add-Completion -Completion $completion -Line $line -AddToProfile $AddToProfile }
         catch {
             Write-Host "warning: tab completion not set up ($($_.Exception.Message))" -ForegroundColor Yellow
@@ -200,7 +200,7 @@ __SPRAWL_SIGNERS__
 }
 
 try {
-    Install-Sprawl -Name $Name -Alias $Alias -AliasGiven ($PSBoundParameters -and $PSBoundParameters.ContainsKey("Alias")) -Version $Version `
+    Install-Squadrn -Name $Name -Alias $Alias -AliasGiven ($PSBoundParameters -and $PSBoundParameters.ContainsKey("Alias")) -Version $Version `
         -Force $Force.IsPresent -AddToProfile $AddToProfile.IsPresent -Repo $Repo
 } catch {
     Write-Host "install.ps1: $($_.Exception.Message)" -ForegroundColor Red

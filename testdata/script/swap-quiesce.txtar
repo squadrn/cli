@@ -9,38 +9,38 @@ jsonexpand s1.jsonl home/.claude-work/projects/-repo/11111111-1111-4111-8111-111
 # A session of work holds the conversation in repo.
 cd repo
 env FAKE_HOLD=11111111-1111-4111-8111-111111111111
-exec sprawl work &
+exec squadrn work &
 waitfor $WORK/home/held.txt '^[0-9]+$'
 env FAKE_HOLD=
 
 # It is found from Claude Code's registry; without a terminal --yes is needed.
-exitcode 2 sprawl swap --to personal
-! exec sprawl swap --to personal
+exitcode 2 squadrn swap --to personal
+! exec squadrn swap --to personal
 stderr 'Stop the claude/work session \(pid [0-9]+\) that holds the conversation; re-run with --yes'
 ! exists $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
 
 # --session names it too; -y stops it, then the conversation moves.
-exec sprawl swap --session 11111111-1111-4111-8111-111111111111 --to personal -y
+exec squadrn swap --session 11111111-1111-4111-8111-111111111111 --to personal -y
 stdout '^swap: claude/work → claude/personal'
 exists $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
 [!windows] grep '^stopped [0-9]+$' $WORK/home/calls.log
 [!windows] wait
 
-# A session sprawl started that the registry does not list is found from the in-use records
-# (Unix only: on Windows sprawl is the session's parent and terminating it would orphan claude).
+# A session squadrn started that the registry does not list is found from the in-use records
+# (Unix only: on Windows squadrn is the session's parent and terminating it would orphan claude).
 [!windows] rm $WORK/home/held.txt
 [!windows] env FAKE_HOLD=11111111-1111-4111-8111-111111111111 FAKE_NOREG=1
-[!windows] exec sprawl personal &
+[!windows] exec squadrn personal &
 [!windows] waitfor $WORK/home/held.txt '^[0-9]+$'
 env FAKE_HOLD= FAKE_NOREG=
 [!windows] ! exists $WORK/home/.claude-personal/sessions
-[!windows] exec sprawl swap --session 11111111-1111-4111-8111-111111111111 --to work -y
+[!windows] exec squadrn swap --session 11111111-1111-4111-8111-111111111111 --to work -y
 [!windows] stdout '^swap: claude/personal → claude/work'
 [!windows] grep -count=2 '^stopped [0-9]+$' $WORK/home/calls.log
 [!windows] wait
 
 -- empty --
--- home/.claude-work/.sprawl-account --
--- home/.claude-personal/.sprawl-account --
+-- home/.claude-work/.squadrn-account --
+-- home/.claude-personal/.squadrn-account --
 -- s1.jsonl --
 {"type":"user","cwd":"$WORK/repo","sessionId":"11111111-1111-4111-8111-111111111111"}

@@ -209,7 +209,7 @@ func TestCleanOld(t *testing.T) {
 	CleanOld(dir, []string{"tool.exe"})
 	for _, n := range []string{"keep", "other.exe.old-1", "other.exe.new-1", "tool.exe.new-3"} {
 		if !IsFile(filepath.Join(dir, n)) {
-			t.Fatalf("CleanOld removed %s, which sprawl does not own or is in flight", n)
+			t.Fatalf("CleanOld removed %s, which squadrn does not own or is in flight", n)
 		}
 	}
 	if runtime.GOOS == "windows" && (IsFile(filepath.Join(dir, "tool.exe.old-1")) || IsFile(filepath.Join(dir, "tool.exe.new-2"))) {

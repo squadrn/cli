@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
+	"github.com/squadrn/cli/internal/account"
 )
 
 func (a *app) accountCmd() *cobra.Command {

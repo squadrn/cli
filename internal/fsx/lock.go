@@ -18,7 +18,7 @@ type LockedError struct {
 }
 
 func (e LockedError) Error() string {
-	return fmt.Sprintf("another sprawl process (pid %d) holds %s", e.PID, e.Path)
+	return fmt.Sprintf("another squadrn process (pid %d) holds %s", e.PID, e.Path)
 }
 
 // unreadableGrace is how long a lock file without a readable pid is trusted: its owner may be

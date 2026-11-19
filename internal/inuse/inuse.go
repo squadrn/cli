@@ -1,8 +1,8 @@
-// Package inuse records which sessions sprawl started are running in a directory (a worktree,
+// Package inuse records which sessions squadrn started are running in a directory (a worktree,
 // an account's config dir), so commands that delete or move it can refuse while one runs.
 //
-// Each session writes <dir>/.sprawl-inuse/<pid>.json. On Unix sprawl replaces itself with the
-// agent CLI, so the recorded pid is the session's own process; on Windows sprawl stays its
+// Each session writes <dir>/.squadrn-inuse/<pid>.json. On Unix squadrn replaces itself with the
+// agent CLI, so the recorded pid is the session's own process; on Windows squadrn stays its
 // parent until it exits. An entry counts while its pid is alive and, when known, still has the
 // recorded start time (pids are reused); other entries are stale and removed when read.
 package inuse
@@ -19,11 +19,12 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Dir is the registry directory inside a used directory. It is a fixed identifier.
-const Dir = ".sprawl-inuse"
+const Dir = "." + config.Slug + "-inuse"
 
 // Entry is one running session.
 type Entry struct {
@@ -32,15 +33,15 @@ type Entry struct {
 	Started string `json:"started,omitempty"`
 	// Account is the account label the session runs as, e.g. claude/personal.
 	Account string `json:"account,omitempty"`
-	// Exe is the sprawl binary that started the session.
+	// Exe is the squadrn binary that started the session.
 	Exe string `json:"exe,omitempty"`
 	// Worktree names the agent worktree the session works in when it is recorded in the
 	// repository root because the worktree did not exist yet (wt <name> creates it).
 	Worktree string `json:"worktree,omitempty"`
 }
 
-func entryPath(dir string, pid int) string {
-	return filepath.Join(dir, Dir, strconv.Itoa(pid)+".json")
+func entryPath(dir, reg string, pid int) string {
+	return filepath.Join(dir, reg, strconv.Itoa(pid)+".json")
 }
 
 // Acquire records the current process in dir, dropping stale entries first. PID, Started and
@@ -59,12 +60,12 @@ func Acquire(dir string, e Entry) error {
 	if err := os.MkdirAll(filepath.Join(dir, Dir), 0o700); err != nil {
 		return err
 	}
-	return fsx.WriteBytes(entryPath(dir, e.PID), b, 0o600)
+	return fsx.WriteBytes(entryPath(dir, Dir, e.PID), b, 0o600)
 }
 
 // Release removes the current process's entry from dir, and the registry dir once empty.
 func Release(dir string) error {
-	err := os.Remove(entryPath(dir, os.Getpid()))
+	err := os.Remove(entryPath(dir, Dir, os.Getpid()))
 	if errors.Is(err, fs.ErrNotExist) {
 		err = nil
 	}
@@ -74,7 +75,13 @@ func Release(dir string) error {
 
 // Active returns the live entries of dir, sorted by pid. Stale entries are deleted.
 func Active(dir string) []Entry {
-	reg := filepath.Join(dir, Dir)
+	out := active(filepath.Join(dir, Dir))
+	sort.Slice(out, func(i, j int) bool { return out[i].PID < out[j].PID })
+	return out
+}
+
+// active reads the live entries of one registry dir, deleting stale ones and the dir once empty.
+func active(reg string) []Entry {
 	files, err := os.ReadDir(reg)
 	if err != nil {
 		return nil
@@ -101,7 +108,6 @@ func Active(dir string) []Entry {
 	if len(out) == 0 {
 		_ = os.Remove(reg)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].PID < out[j].PID })
 	return out
 }
 

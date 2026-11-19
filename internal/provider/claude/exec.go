@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 const configDirEnv = "CLAUDE_CONFIG_DIR"
@@ -91,7 +91,7 @@ func (CLI) WorktreeArgs(name string) []string { return []string{"--worktree", na
 
 func (CLI) ResumeArgs(session string) []string { return []string{"--resume", session} }
 
-// Exec runs an interactive claude session in place of sprawl (platform: run).
+// Exec runs an interactive claude session in place of squadrn (platform: run).
 func (c CLI) Exec(configDir string, args []string) error {
 	argv := append([]string{"claude"}, args...)
 	if err := run(c.Bin, argv, c.env(configDir)); err != nil {

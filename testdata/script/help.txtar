@@ -1,13 +1,13 @@
-exec sprawl version
-stdout '^sprawl dev$'
-exitcode 2 sprawl version extra
+exec squadrn version
+stdout '^squadrn dev$'
+exitcode 2 squadrn version extra
 
-exec sprawl --version
-stdout '^sprawl dev$'
-exec sprawl version --json
+exec squadrn --version
+stdout '^squadrn dev$'
+exec squadrn version --json
 stdout '"version": "dev"'
 
-exec sprawl --help
+exec squadrn --help
 stdout 'runs coding agents \(today: Claude Code\) as one of several accounts'
 stdout '^Agents:$'
 stdout '^  wt +Run the agent in worktree'
@@ -16,41 +16,41 @@ stdout '^Accounts:$'
 stdout '^  account +Manage agent accounts'
 stdout '^Setup:$'
 stdout '^  doctor +Check the install'
-stdout '^  self-update +Update sprawl'
+stdout '^  self-update +Update squadrn'
 stdout '^  completion +'
-stdout 'sprawl personal -- "fix the bug"'
+stdout 'squadrn personal -- "fix the bug"'
 ! stdout 'self-install'
 ! stdout '^  hook '
 
-exec sprawl account --help
+exec squadrn account --help
 stdout 'ls +List accounts'
 stdout 'logout +Sign an account out'
 stdout 'rename +Rename an account'
 stdout 'rm +Log an account out'
 
 # Typos are usage errors with suggestions, never prompts for the agent.
-exitcode 2 sprawl acount ls
-! exec sprawl acount ls
+exitcode 2 squadrn acount ls
+! exec squadrn acount ls
 stderr 'unknown command or account "acount" \(did you mean account\?\)'
-stderr 'sprawl -- "acount"'
-exitcode 2 sprawl account lss
-! exec sprawl account lss
+stderr 'squadrn -- "acount"'
+exitcode 2 squadrn account lss
+! exec squadrn account lss
 stderr 'unknown account command "lss" \(did you mean ls\?\)'
 
 # Completion scripts for every supported shell.
-exec sprawl completion zsh
-stdout '#compdef sprawl'
-exec sprawl completion bash
-stdout 'bash completion V2 for sprawl'
-exec sprawl completion fish
-stdout 'complete -c sprawl'
-exec sprawl __complete ''
+exec squadrn completion zsh
+stdout '#compdef squadrn'
+exec squadrn completion bash
+stdout 'bash completion V2 for squadrn'
+exec squadrn completion fish
+stdout 'complete -c squadrn'
+exec squadrn __complete ''
 stdout '^account'
 stdout '^claude/main'
 
 # A bad config file is reported, not ignored.
-! exec sprawl account add work
+! exec squadrn account add work
 stderr 'unknown key "shared_mpc"'
 
--- home/.config/sprawl/config.toml --
+-- home/.config/squadrn/config.toml --
 shared_mpc = ["typo"]

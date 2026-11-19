@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // Facts is what the guard needs to know about one repository, read once per decision.
@@ -113,24 +113,12 @@ func (c *factsCache) get(ctx context.Context, dir string) (Facts, error) {
 // RepoConfigKey lets a repository add protected branches without committing a file.
 const RepoConfigKey = config.Slug + ".protectedBranches"
 
-// repoConfigKeys are RepoConfigKey and the same key under previous product names, lower-cased
-// as git config --list prints them.
-func repoConfigKeys() []string {
-	keys := []string{strings.ToLower(RepoConfigKey)}
-	for _, n := range config.PreviousNames {
-		keys = append(keys, n+".protectedbranches")
-	}
-	return keys
-}
-
 // protectedSet combines the user's list with branches a repository adds. A repository can only
-// add: an agent writing `git config sprawl.protectedBranches none` must not unprotect main.
+// add: an agent writing `git config squadrn.protectedBranches none` must not unprotect main.
 func protectedSet(user []string, f Facts) branchMatcher {
 	globs := append([]string(nil), user...)
-	for _, k := range repoConfigKeys() {
-		for _, v := range f.Config[k] {
-			globs = append(globs, splitList(v)...)
-		}
+	for _, v := range f.Config[strings.ToLower(RepoConfigKey)] {
+		globs = append(globs, splitList(v)...)
 	}
 	return newBranchMatcher(globs)
 }

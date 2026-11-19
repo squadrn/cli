@@ -3,69 +3,69 @@
 # After an intended change: go test ./internal/cli -run TestScript/golden -update, then review.
 
 # Help of every command.
-exec sprawl --help
+exec squadrn --help
 cmp stdout help-root.txt
-exec sprawl account --help
+exec squadrn account --help
 cmp stdout help-account.txt
-exec sprawl account ls --help
+exec squadrn account ls --help
 cmp stdout help-account-ls.txt
-exec sprawl account add --help
+exec squadrn account add --help
 cmp stdout help-account-add.txt
-exec sprawl account login --help
+exec squadrn account login --help
 cmp stdout help-account-login.txt
-exec sprawl account logout --help
+exec squadrn account logout --help
 cmp stdout help-account-logout.txt
-exec sprawl account rename --help
+exec squadrn account rename --help
 cmp stdout help-account-rename.txt
-exec sprawl account rm --help
+exec squadrn account rm --help
 cmp stdout help-account-rm.txt
-exec sprawl usage --help
+exec squadrn usage --help
 cmp stdout help-usage.txt
-exec sprawl wt --help
+exec squadrn wt --help
 cmp stdout help-wt.txt
-exec sprawl wt ls --help
+exec squadrn wt ls --help
 cmp stdout help-wt-ls.txt
-exec sprawl wt rm --help
+exec squadrn wt rm --help
 cmp stdout help-wt-rm.txt
-exec sprawl grid --help
+exec squadrn grid --help
 cmp stdout help-grid.txt
-exec sprawl grid ls --help
+exec squadrn grid ls --help
 cmp stdout help-grid-ls.txt
-exec sprawl grid attach --help
+exec squadrn grid attach --help
 cmp stdout help-grid-attach.txt
-exec sprawl grid stop --help
+exec squadrn grid stop --help
 cmp stdout help-grid-stop.txt
-exec sprawl ps --help
+exec squadrn ps --help
 cmp stdout help-ps.txt
-exec sprawl swap --help
+exec squadrn swap --help
 cmp stdout help-swap.txt
-exec sprawl gc --help
+exec squadrn gc --help
 cmp stdout help-gc.txt
-exec sprawl deps --help
+exec squadrn deps --help
 cmp stdout help-deps.txt
-exec sprawl doctor --help
+exec squadrn doctor --help
 cmp stdout help-doctor.txt
-exec sprawl config --help
+exec squadrn config --help
 cmp stdout help-config.txt
-exec sprawl config get --help
+exec squadrn config get --help
 cmp stdout help-config-get.txt
-exec sprawl config set --help
+exec squadrn config set --help
 cmp stdout help-config-set.txt
-exec sprawl self-update --help
+exec squadrn self-update --help
 cmp stdout help-self-update.txt
-exec sprawl self-uninstall --help
+exec squadrn self-uninstall --help
 cmp stdout help-self-uninstall.txt
-exec sprawl version --help
+exec squadrn version --help
 cmp stdout help-version.txt
-exec sprawl completion --help
+exec squadrn completion --help
 cmp stdout help-completion.txt
 
 # Shell completion scripts.
-exec sprawl completion bash
+exec squadrn completion bash
 cmp stdout completion-bash.txt
-exec sprawl completion zsh
+exec squadrn completion zsh
 cmp stdout completion-zsh.txt
-exec sprawl completion fish
+exec squadrn completion fish
 cmp stdout completion-fish.txt
 
 # Plugin hook configuration (Unix keeps it byte for byte; only the matcher may change).
@@ -73,31 +73,31 @@ cmp $REPO_ROOT/plugin/hooks/hooks.json hooks.json
 
 # Install layout after self-install.
 mkdir rel home/.local/bin
-exec sh -c 'cp "$(command -v sprawl)" rel/sprawl && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
-exec sprawl self-install rel
-tree home/.local/share/sprawl
+exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+exec squadrn self-install rel
+tree home/.local/share/squadrn
 cmp stdout layout-data.txt
 tree home/.local/bin
 cmp stdout layout-bin.txt
-tree home/.config/sprawl
+tree home/.config/squadrn
 cmp stdout layout-config.txt
 
 -- help-root.txt --
-sprawl runs coding agents (today: Claude Code) as one of several accounts on this machine.
+squadrn runs coding agents (today: Claude Code) as one of several accounts on this machine.
 
 Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.
 
 Usage:
-  sprawl [<account>] [<command> | agent args... | -- prompt] [flags]
-  sprawl [command]
+  squadrn [<account>] [<command> | agent args... | -- prompt] [flags]
+  squadrn [command]
 
 Examples:
-  sprawl                          pick an account interactively
-  sprawl personal                 run as claude/personal (also: -a personal, claude/personal)
-  sprawl personal -p "hi"         agent flags go to the agent CLI
-  sprawl personal -- "fix the bug"  a prompt goes after --
-  sprawl account add work         create claude/work, then: sprawl account login work
-  sprawl grid ~/repo feat-a personal:fix-b
+  squadrn                          pick an account interactively
+  squadrn personal                 run as claude/personal (also: -a personal, claude/personal)
+  squadrn personal -p "hi"         agent flags go to the agent CLI
+  squadrn personal -- "fix the bug"  a prompt goes after --
+  squadrn account add work         create claude/work, then: squadrn account login work
+  squadrn grid ~/repo feat-a personal:fix-b
 
 Agents:
   deps           Install dependencies in a worktree (package manager from its lockfile)
@@ -116,23 +116,23 @@ Setup:
   config         Show settings; get or set one (command and aliases relink ~/.local/bin)
   doctor         Check the install, the push guard, hooks and every account
   help           Help about any command
-  self-uninstall Remove sprawl: plugin from every account, command links, completions, installed files
-  self-update    Update sprawl and its plugin in every account (--check: only look, --rollback: undo)
-  version        Print the sprawl version
+  self-uninstall Remove squadrn: plugin from every account, command links, completions, installed files
+  self-update    Update squadrn and its plugin in every account (--check: only look, --rollback: undo)
+  version        Print the squadrn version
 
 Flags:
   -a, --account string   account to run as (provider/name or name)
   -C, --dir string       run as if started in this directory
-  -h, --help             help for sprawl
+  -h, --help             help for squadrn
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "sprawl [command] --help" for more information about a command.
+Use "squadrn [command] --help" for more information about a command.
 -- help-account.txt --
 Manage agent accounts (default: ls)
 
 Usage:
-  sprawl account [flags]
-  sprawl account [command]
+  squadrn account [flags]
+  squadrn account [command]
 
 Available Commands:
   add         Create or repair an account (shared links, allowlisted MCP, plugin)
@@ -152,12 +152,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "sprawl account [command] --help" for more information about a command.
+Use "squadrn account [command] --help" for more information about a command.
 -- help-account-ls.txt --
 List accounts with login status
 
 Usage:
-  sprawl account ls [flags]
+  squadrn account ls [flags]
 
 Flags:
   -h, --help   help for ls
@@ -171,11 +171,11 @@ Global Flags:
 Create or repair an account (shared links, allowlisted MCP, plugin)
 
 Usage:
-  sprawl account add [<provider>/]<name> [flags]
+  squadrn account add [<provider>/]<name> [flags]
 
 Examples:
-  sprawl account add work
-  sprawl account add claude/work
+  squadrn account add work
+  squadrn account add claude/work
 
 Flags:
   -h, --help       help for add
@@ -190,7 +190,7 @@ Global Flags:
 Sign an account in
 
 Usage:
-  sprawl account login <account> [flags]
+  squadrn account login <account> [flags]
 
 Flags:
   -h, --help   help for login
@@ -203,7 +203,7 @@ Global Flags:
 Sign an account out (keeps its dir)
 
 Usage:
-  sprawl account logout <account> [flags]
+  squadrn account logout <account> [flags]
 
 Flags:
   -h, --help   help for logout
@@ -216,7 +216,7 @@ Global Flags:
 Rename an account (logs it out first; log in again afterwards)
 
 Usage:
-  sprawl account rename <account> <new-name> [flags]
+  squadrn account rename <account> <new-name> [flags]
 
 Flags:
   -f, --force   rename even if a session seems to use the account
@@ -230,7 +230,7 @@ Global Flags:
 Log an account out and move its dir to the trash
 
 Usage:
-  sprawl account rm <account> [flags]
+  squadrn account rm <account> [flags]
 
 Flags:
   -f, --force   remove even if a session seems to use the account
@@ -246,16 +246,16 @@ Show what the status line last reported about each account's usage limits (5-hou
 7-day windows), when it last hit a limit, and the best account to continue with in this repository.
 
 Usage is recorded by the status line, so it needs a one-time setup per settings file:
-sprawl usage --setup wraps the status line command (your own one keeps running and showing).
+squadrn usage --setup wraps the status line command (your own one keeps running and showing).
 
 Usage:
-  sprawl usage [<account>] [flags]
+  squadrn usage [<account>] [flags]
 
 Examples:
-  sprawl usage                 all accounts
-  sprawl usage work            details of claude/work
-  sprawl usage --setup --all   record usage for every account
-  sprawl usage --setup --undo  restore the previous status line
+  squadrn usage                 all accounts
+  squadrn usage work            details of claude/work
+  squadrn usage --setup --all   record usage for every account
+  squadrn usage --setup --undo  restore the previous status line
 
 Flags:
       --all       with --setup: every account
@@ -275,14 +275,14 @@ Global Flags:
 Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
 
 Usage:
-  sprawl wt <name> [flags]
-  sprawl wt [command]
+  squadrn wt <name> [flags]
+  squadrn wt [command]
 
 Examples:
-  sprawl wt feat-login             as main
-  sprawl personal wt fix-otp        as claude/personal
-  sprawl wt ls                      list worktrees
-  sprawl wt rm feat-login           remove one
+  squadrn wt feat-login             as main
+  squadrn personal wt fix-otp        as claude/personal
+  squadrn wt ls                      list worktrees
+  squadrn wt rm feat-login           remove one
 
 Available Commands:
   ls          List the agent worktrees of this repository
@@ -296,12 +296,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "sprawl wt [command] --help" for more information about a command.
+Use "squadrn wt [command] --help" for more information about a command.
 -- help-wt-ls.txt --
 List the agent worktrees of this repository
 
 Usage:
-  sprawl wt ls [flags]
+  squadrn wt ls [flags]
 
 Flags:
   -h, --help   help for ls
@@ -315,7 +315,7 @@ Global Flags:
 Remove a worktree and its branch if merged (--force: even if modified; --force-branch: even if unmerged)
 
 Usage:
-  sprawl wt rm <name> [flags]
+  squadrn wt rm <name> [flags]
 
 Flags:
   -f, --force          also remove a modified worktree (or one containing submodules, or in use)
@@ -331,14 +331,14 @@ Global Flags:
 tmux grid for <repo>, one agent per pane in its own worktree; re-running adds panes
 
 Usage:
-  sprawl grid <repo> [<account>:]<name>... [flags]
-  sprawl grid [command]
+  squadrn grid <repo> [<account>:]<name>... [flags]
+  squadrn grid [command]
 
 Examples:
-  sprawl grid ~/repo feat-a personal:fix-b          per-agent account (default: main or -a)
-  sprawl grid ~/repo feat-a claude/personal:fix-b   account as provider/name
-  sprawl grid ~/repo feat-1 feat-2 --spread         round-robin over logged-in accounts
-  sprawl grid ls | attach [repo] | stop [repo]
+  squadrn grid ~/repo feat-a personal:fix-b          per-agent account (default: main or -a)
+  squadrn grid ~/repo feat-a claude/personal:fix-b   account as provider/name
+  squadrn grid ~/repo feat-1 feat-2 --spread         round-robin over logged-in accounts
+  squadrn grid ls | attach [repo] | stop [repo]
 
 Available Commands:
   attach      Attach to the grid of a repository (default: this one)
@@ -354,12 +354,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "sprawl grid [command] --help" for more information about a command.
+Use "squadrn grid [command] --help" for more information about a command.
 -- help-grid-ls.txt --
 List running grids
 
 Usage:
-  sprawl grid ls [flags]
+  squadrn grid ls [flags]
 
 Flags:
   -h, --help   help for ls
@@ -373,7 +373,7 @@ Global Flags:
 Attach to the grid of a repository (default: this one)
 
 Usage:
-  sprawl grid attach [repo] [flags]
+  squadrn grid attach [repo] [flags]
 
 Flags:
   -h, --help   help for attach
@@ -386,7 +386,7 @@ Global Flags:
 Stop the grid of a repository and every agent in it (worktrees are kept)
 
 Usage:
-  sprawl grid stop [repo] [flags]
+  squadrn grid stop [repo] [flags]
 
 Flags:
   -h, --help   help for stop
@@ -400,7 +400,7 @@ Global Flags:
 List running agents: session, account, worktree
 
 Usage:
-  sprawl ps [flags]
+  squadrn ps [flags]
 
 Flags:
   -h, --help   help for ps
@@ -423,13 +423,13 @@ already holds the conversation and it went on there, the swap is refused unless 
 The legacy form <worktree> <account> moves the latest conversation of that worktree.
 
 Usage:
-  sprawl swap [<worktree> <account>] [flags]
+  squadrn swap [<worktree> <account>] [flags]
 
 Examples:
-  sprawl swap                            the conversation that just hit its limit here
-  sprawl swap --to personal              the same, to claude/personal
-  sprawl swap feat-a personal            latest conversation of worktree feat-a
-  sprawl swap --session <id> --to work
+  squadrn swap                            the conversation that just hit its limit here
+  squadrn swap --to personal              the same, to claude/personal
+  squadrn swap feat-a personal            latest conversation of worktree feat-a
+  squadrn swap --session <id> --to work
 
 Flags:
       --force            overwrite the target's copy when it differs
@@ -446,7 +446,7 @@ Global Flags:
 Remove clean worktrees that are merged or empty (dry run without --yes)
 
 Usage:
-  sprawl gc [flags]
+  squadrn gc [flags]
 
 Flags:
   -f, --force   let git remove clean worktrees it refuses (those containing submodules)
@@ -462,7 +462,7 @@ Global Flags:
 Install dependencies in a worktree (package manager from its lockfile)
 
 Usage:
-  sprawl deps <name> [flags]
+  squadrn deps <name> [flags]
 
 Flags:
   -h, --help   help for deps
@@ -475,7 +475,7 @@ Global Flags:
 Check the install, the push guard, hooks and every account
 
 Usage:
-  sprawl doctor [flags]
+  squadrn doctor [flags]
 
 Flags:
   -h, --help   help for doctor
@@ -489,14 +489,14 @@ Global Flags:
 Show settings; get or set one (command and aliases relink ~/.local/bin)
 
 Usage:
-  sprawl config [flags]
-  sprawl config [command]
+  squadrn config [flags]
+  squadrn config [command]
 
 Examples:
-  sprawl config
-  sprawl config get protected_branches
-  sprawl config set protected_branches main,release/*
-  sprawl config set command ai
+  squadrn config
+  squadrn config get protected_branches
+  squadrn config set protected_branches main,release/*
+  squadrn config set command ai
 
 Available Commands:
   get         Print one setting
@@ -511,12 +511,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "sprawl config [command] --help" for more information about a command.
+Use "squadrn config [command] --help" for more information about a command.
 -- help-config-get.txt --
 Print one setting
 
 Usage:
-  sprawl config get <key> [flags]
+  squadrn config get <key> [flags]
 
 Flags:
   -h, --help   help for get
@@ -530,7 +530,7 @@ Global Flags:
 Change one setting (lists are comma separated; "" clears a list, or restores the default protected_branches)
 
 Usage:
-  sprawl config set <key> <value> [flags]
+  squadrn config set <key> <value> [flags]
 
 Flags:
       --force   use a command name even if another program on PATH has it
@@ -541,15 +541,15 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-self-update.txt --
-Update sprawl and its plugin in every account (--check: only look, --rollback: undo)
+Update squadrn and its plugin in every account (--check: only look, --rollback: undo)
 
 Usage:
-  sprawl self-update [flags]
+  squadrn self-update [flags]
 
 Examples:
-  sprawl self-update --check       what is new
-  sprawl self-update               install the newest release of your channel
-  sprawl self-update --rollback    go back to the release installed before
+  squadrn self-update --check       what is new
+  squadrn self-update               install the newest release of your channel
+  squadrn self-update --rollback    go back to the release installed before
 
 Flags:
       --allow-downgrade   install a release older than the running one
@@ -565,12 +565,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-self-uninstall.txt --
-Remove sprawl from this machine. Accounts, their logins and conversations are kept.
+Remove squadrn from this machine. Accounts, their logins and conversations are kept.
 --purge also removes the config, the guard log and caches. Running agent sessions keep going;
 restart them afterwards.
 
 Usage:
-  sprawl self-uninstall [flags]
+  squadrn self-uninstall [flags]
 
 Flags:
   -h, --help    help for self-uninstall
@@ -582,10 +582,10 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-version.txt --
-Print the sprawl version
+Print the squadrn version
 
 Usage:
-  sprawl version [flags]
+  squadrn version [flags]
 
 Flags:
   -h, --help   help for version
@@ -596,11 +596,11 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-completion.txt --
-Generate the autocompletion script for sprawl for the specified shell.
+Generate the autocompletion script for squadrn for the specified shell.
 See each sub-command's help for details on how to use the generated script.
 
 Usage:
-  sprawl completion [command]
+  squadrn completion [command]
 
 Available Commands:
   bash        Generate the autocompletion script for bash
@@ -616,11 +616,11 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "sprawl completion [command] --help" for more information about a command.
+Use "squadrn completion [command] --help" for more information about a command.
 -- completion-bash.txt --
-# bash completion V2 for sprawl                               -*- shell-script -*-
+# bash completion V2 for squadrn                              -*- shell-script -*-
 
-__sprawl_debug()
+__squadrn_debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE-} ]]; then
         echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
@@ -629,41 +629,41 @@ __sprawl_debug()
 
 # Macs have bash3 for which the bash-completion package doesn't include
 # _init_completion. This is a minimal version of that function.
-__sprawl_init_completion()
+__squadrn_init_completion()
 {
     COMPREPLY=()
     _get_comp_words_by_ref "$@" cur prev words cword
 }
 
-# This function calls the sprawl program to obtain the completion
+# This function calls the squadrn program to obtain the completion
 # results and the directive.  It fills the 'out' and 'directive' vars.
-__sprawl_get_completion_results() {
+__squadrn_get_completion_results() {
     local requestComp lastParam lastChar args
 
     # Prepare the command to request completions for the program.
-    # Calling ${words[0]} instead of directly sprawl allows handling aliases
+    # Calling ${words[0]} instead of directly squadrn allows handling aliases
     args=("${words[@]:1}")
     requestComp="${words[0]} __complete ${args[*]}"
 
     lastParam=${words[$((${#words[@]}-1))]}
     lastChar=${lastParam:$((${#lastParam}-1)):1}
-    __sprawl_debug "lastParam ${lastParam}, lastChar ${lastChar}"
+    __squadrn_debug "lastParam ${lastParam}, lastChar ${lastChar}"
 
     if [[ -z ${cur} && ${lastChar} != = ]]; then
         # If the last parameter is complete (there is a space following it)
         # We add an extra empty parameter so we can indicate this to the go method.
-        __sprawl_debug "Adding extra empty parameter"
+        __squadrn_debug "Adding extra empty parameter"
         requestComp="${requestComp} ''"
     fi
 
-    # When completing a flag with an = (e.g., sprawl -n=<TAB>)
+    # When completing a flag with an = (e.g., squadrn -n=<TAB>)
     # bash focuses on the part after the =, so we need to remove
     # the flag part from $cur
     if [[ ${cur} == -*=* ]]; then
         cur="${cur#*=}"
     fi
 
-    __sprawl_debug "Calling ${requestComp}"
+    __squadrn_debug "Calling ${requestComp}"
     # Use eval to handle any environment variables and such
     out=$(eval "${requestComp}" 2>/dev/null)
 
@@ -675,11 +675,11 @@ __sprawl_get_completion_results() {
         # There is not directive specified
         directive=0
     fi
-    __sprawl_debug "The completion directive is: ${directive}"
-    __sprawl_debug "The completions are: ${out}"
+    __squadrn_debug "The completion directive is: ${directive}"
+    __squadrn_debug "The completions are: ${out}"
 }
 
-__sprawl_process_completion_results() {
+__squadrn_process_completion_results() {
     local shellCompDirectiveError=1
     local shellCompDirectiveNoSpace=2
     local shellCompDirectiveNoFileComp=4
@@ -689,36 +689,36 @@ __sprawl_process_completion_results() {
 
     if (((directive & shellCompDirectiveError) != 0)); then
         # Error code.  No completion.
-        __sprawl_debug "Received error from custom completion go code"
+        __squadrn_debug "Received error from custom completion go code"
         return
     else
         if (((directive & shellCompDirectiveNoSpace) != 0)); then
             if [[ $(type -t compopt) == builtin ]]; then
-                __sprawl_debug "Activating no space"
+                __squadrn_debug "Activating no space"
                 compopt -o nospace
             else
-                __sprawl_debug "No space directive not supported in this version of bash"
+                __squadrn_debug "No space directive not supported in this version of bash"
             fi
         fi
         if (((directive & shellCompDirectiveKeepOrder) != 0)); then
             if [[ $(type -t compopt) == builtin ]]; then
                 # no sort isn't supported for bash less than < 4.4
                 if [[ ${BASH_VERSINFO[0]} -lt 4 || ( ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 4 ) ]]; then
-                    __sprawl_debug "No sort directive not supported in this version of bash"
+                    __squadrn_debug "No sort directive not supported in this version of bash"
                 else
-                    __sprawl_debug "Activating keep order"
+                    __squadrn_debug "Activating keep order"
                     compopt -o nosort
                 fi
             else
-                __sprawl_debug "No sort directive not supported in this version of bash"
+                __squadrn_debug "No sort directive not supported in this version of bash"
             fi
         fi
         if (((directive & shellCompDirectiveNoFileComp) != 0)); then
             if [[ $(type -t compopt) == builtin ]]; then
-                __sprawl_debug "Activating no file completion"
+                __squadrn_debug "Activating no file completion"
                 compopt +o default
             else
-                __sprawl_debug "No file completion directive not supported in this version of bash"
+                __squadrn_debug "No file completion directive not supported in this version of bash"
             fi
         fi
     fi
@@ -726,7 +726,7 @@ __sprawl_process_completion_results() {
     # Separate activeHelp from normal completions
     local completions=()
     local activeHelp=()
-    __sprawl_extract_activeHelp
+    __squadrn_extract_activeHelp
 
     if (((directive & shellCompDirectiveFilterFileExt) != 0)); then
         # File extension filtering
@@ -739,7 +739,7 @@ __sprawl_process_completion_results() {
         done
 
         filteringCmd="_filedir $fullFilter"
-        __sprawl_debug "File filtering command: $filteringCmd"
+        __squadrn_debug "File filtering command: $filteringCmd"
         $filteringCmd
     elif (((directive & shellCompDirectiveFilterDirs) != 0)); then
         # File completion for directories only
@@ -747,24 +747,24 @@ __sprawl_process_completion_results() {
         local subdir
         subdir=${completions[0]}
         if [[ -n $subdir ]]; then
-            __sprawl_debug "Listing directories in $subdir"
+            __squadrn_debug "Listing directories in $subdir"
             pushd "$subdir" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1 || return
         else
-            __sprawl_debug "Listing directories in ."
+            __squadrn_debug "Listing directories in ."
             _filedir -d
         fi
     else
-        __sprawl_handle_completion_types
+        __squadrn_handle_completion_types
     fi
 
-    __sprawl_handle_special_char "$cur" :
-    __sprawl_handle_special_char "$cur" =
+    __squadrn_handle_special_char "$cur" :
+    __squadrn_handle_special_char "$cur" =
 
     # Print the activeHelp statements before we finish
-    __sprawl_handle_activeHelp
+    __squadrn_handle_activeHelp
 }
 
-__sprawl_handle_activeHelp() {
+__squadrn_handle_activeHelp() {
     # Print the activeHelp statements
     if ((${#activeHelp[*]} != 0)); then
         if [ -z $COMP_TYPE ]; then
@@ -772,7 +772,7 @@ __sprawl_handle_activeHelp() {
             printf "\n";
             printf "%s\n" "${activeHelp[@]}"
             printf "\n"
-            __sprawl_reprint_commandLine
+            __squadrn_reprint_commandLine
             return
         fi
 
@@ -789,7 +789,7 @@ __sprawl_handle_activeHelp() {
                 # To find out, we actually trigger the file completion ourselves;
                 # the call to _filedir will fill COMPREPLY if files match.
                 if (((directive & shellCompDirectiveNoFileComp) == 0)); then
-                    __sprawl_debug "Listing files"
+                    __squadrn_debug "Listing files"
                     _filedir
                 fi
             fi
@@ -803,7 +803,7 @@ __sprawl_handle_activeHelp() {
                 # When there are no completion choices at all, we need
                 # to re-print the command-line since the shell will
                 # not be doing it itself.
-                __sprawl_reprint_commandLine
+                __squadrn_reprint_commandLine
             fi
         elif [ $COMP_TYPE -eq 37 ] || [ $COMP_TYPE -eq 42 ]; then
             # For completion type: menu-complete/menu-complete-backward and insert-completions
@@ -812,12 +812,12 @@ __sprawl_handle_activeHelp() {
             printf "\n"
             printf "%s\n" "${activeHelp[@]}"
 
-            __sprawl_reprint_commandLine
+            __squadrn_reprint_commandLine
         fi
     fi
 }
 
-__sprawl_reprint_commandLine() {
+__squadrn_reprint_commandLine() {
     # The prompt format is only available from bash 4.4.
     # We test if it is available before using it.
     if (x=${PS1@P}) 2> /dev/null; then
@@ -831,7 +831,7 @@ __sprawl_reprint_commandLine() {
 
 # Separate activeHelp lines from real completions.
 # Fills the $activeHelp and $completions arrays.
-__sprawl_extract_activeHelp() {
+__squadrn_extract_activeHelp() {
     local activeHelpMarker="_activeHelp_ "
     local endIndex=${#activeHelpMarker}
 
@@ -840,7 +840,7 @@ __sprawl_extract_activeHelp() {
 
         if [[ ${comp:0:endIndex} == $activeHelpMarker ]]; then
             comp=${comp:endIndex}
-            __sprawl_debug "ActiveHelp found: $comp"
+            __squadrn_debug "ActiveHelp found: $comp"
             if [[ -n $comp ]]; then
                 activeHelp+=("$comp")
             fi
@@ -851,8 +851,8 @@ __sprawl_extract_activeHelp() {
     done <<<"${out}"
 }
 
-__sprawl_handle_completion_types() {
-    __sprawl_debug "__sprawl_handle_completion_types: COMP_TYPE is $COMP_TYPE"
+__squadrn_handle_completion_types() {
+    __squadrn_debug "__squadrn_handle_completion_types: COMP_TYPE is $COMP_TYPE"
 
     case $COMP_TYPE in
     37|42)
@@ -879,12 +879,12 @@ __sprawl_handle_completion_types() {
 
     *)
         # Type: complete (normal completion)
-        __sprawl_handle_standard_completion_case
+        __squadrn_handle_standard_completion_case
         ;;
     esac
 }
 
-__sprawl_handle_standard_completion_case() {
+__squadrn_handle_standard_completion_case() {
     local tab=$'\t'
 
     # If there are no completions, we don't need to do anything
@@ -940,16 +940,16 @@ __sprawl_handle_standard_completion_case() {
 
     # If there is a single completion left, remove the description text and escape any special characters
     if ((${#COMPREPLY[*]} == 1)); then
-        __sprawl_debug "COMPREPLY[0]: ${COMPREPLY[0]}"
+        __squadrn_debug "COMPREPLY[0]: ${COMPREPLY[0]}"
         COMPREPLY[0]=$(printf "%q" "${COMPREPLY[0]%%$tab*}")
-        __sprawl_debug "Removed description from single completion, which is now: ${COMPREPLY[0]}"
+        __squadrn_debug "Removed description from single completion, which is now: ${COMPREPLY[0]}"
     else
         # Format the descriptions
-        __sprawl_format_comp_descriptions $longest
+        __squadrn_format_comp_descriptions $longest
     fi
 }
 
-__sprawl_handle_special_char()
+__squadrn_handle_special_char()
 {
     local comp="$1"
     local char=$2
@@ -962,7 +962,7 @@ __sprawl_handle_special_char()
     fi
 }
 
-__sprawl_format_comp_descriptions()
+__squadrn_format_comp_descriptions()
 {
     local tab=$'\t'
     local comp desc maxdesclength
@@ -973,7 +973,7 @@ __sprawl_format_comp_descriptions()
         comp=${COMPREPLY[ci]}
         # Properly format the description string which follows a tab character if there is one
         if [[ "$comp" == *$tab* ]]; then
-            __sprawl_debug "Original comp: $comp"
+            __squadrn_debug "Original comp: $comp"
             desc=${comp#*$tab}
             comp=${comp%%$tab*}
 
@@ -1003,12 +1003,12 @@ __sprawl_format_comp_descriptions()
                 comp+="  ($desc)"
             fi
             COMPREPLY[ci]=$comp
-            __sprawl_debug "Final comp: $comp"
+            __squadrn_debug "Final comp: $comp"
         fi
     done
 }
 
-__start_sprawl()
+__start_squadrn()
 {
     local cur prev words cword split
 
@@ -1019,38 +1019,38 @@ __start_sprawl()
     if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -n =: || return
     else
-        __sprawl_init_completion -n =: || return
+        __squadrn_init_completion -n =: || return
     fi
 
-    __sprawl_debug
-    __sprawl_debug "========= starting completion logic =========="
-    __sprawl_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
+    __squadrn_debug
+    __squadrn_debug "========= starting completion logic =========="
+    __squadrn_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
 
     # The user could have moved the cursor backwards on the command-line.
     # We need to trigger completion from the $cword location, so we need
     # to truncate the command-line ($words) up to the $cword location.
     words=("${words[@]:0:$cword+1}")
-    __sprawl_debug "Truncated words[*]: ${words[*]},"
+    __squadrn_debug "Truncated words[*]: ${words[*]},"
 
     local out directive
-    __sprawl_get_completion_results
-    __sprawl_process_completion_results
+    __squadrn_get_completion_results
+    __squadrn_process_completion_results
 }
 
 if [[ $(type -t compopt) = "builtin" ]]; then
-    complete -o default -F __start_sprawl sprawl
+    complete -o default -F __start_squadrn squadrn
 else
-    complete -o default -o nospace -F __start_sprawl sprawl
+    complete -o default -o nospace -F __start_squadrn squadrn
 fi
 
 # ex: ts=4 sw=4 et filetype=sh
 -- completion-zsh.txt --
-#compdef sprawl
-compdef _sprawl sprawl
+#compdef squadrn
+compdef _squadrn squadrn
 
-# zsh completion for sprawl                               -*- shell-script -*-
+# zsh completion for squadrn                              -*- shell-script -*-
 
-__sprawl_debug()
+__squadrn_debug()
 {
     local file="$BASH_COMP_DEBUG_FILE"
     if [[ -n ${file} ]]; then
@@ -1058,7 +1058,7 @@ __sprawl_debug()
     fi
 }
 
-_sprawl()
+_squadrn()
 {
     local shellCompDirectiveError=1
     local shellCompDirectiveNoSpace=2
@@ -1070,21 +1070,21 @@ _sprawl()
     local lastParam lastChar flagPrefix requestComp out directive comp lastComp noSpace keepOrder
     local -a completions
 
-    __sprawl_debug "\n========= starting completion logic =========="
-    __sprawl_debug "CURRENT: ${CURRENT}, words[*]: ${words[*]}"
+    __squadrn_debug "\n========= starting completion logic =========="
+    __squadrn_debug "CURRENT: ${CURRENT}, words[*]: ${words[*]}"
 
     # The user could have moved the cursor backwards on the command-line.
     # We need to trigger completion from the $CURRENT location, so we need
     # to truncate the command-line ($words) up to the $CURRENT location.
     # (We cannot use $CURSOR as its value does not work when a command is an alias.)
     words=("${=words[1,CURRENT]}")
-    __sprawl_debug "Truncated words[*]: ${words[*]},"
+    __squadrn_debug "Truncated words[*]: ${words[*]},"
 
     lastParam=${words[-1]}
     lastChar=${lastParam[-1]}
-    __sprawl_debug "lastParam: ${lastParam}, lastChar: ${lastChar}"
+    __squadrn_debug "lastParam: ${lastParam}, lastChar: ${lastChar}"
 
-    # For zsh, when completing a flag with an = (e.g., sprawl -n=<TAB>)
+    # For zsh, when completing a flag with an = (e.g., squadrn -n=<TAB>)
     # completions must be prefixed with the flag
     setopt local_options BASH_REMATCH
     if [[ "${lastParam}" =~ '-.*=' ]]; then
@@ -1097,22 +1097,22 @@ _sprawl()
     if [ "${lastChar}" = "" ]; then
         # If the last parameter is complete (there is a space following it)
         # We add an extra empty parameter so we can indicate this to the go completion code.
-        __sprawl_debug "Adding extra empty parameter"
+        __squadrn_debug "Adding extra empty parameter"
         requestComp="${requestComp} \"\""
     fi
 
-    __sprawl_debug "About to call: eval ${requestComp}"
+    __squadrn_debug "About to call: eval ${requestComp}"
 
     # Use eval to handle any environment variables and such
     out=$(eval ${requestComp} 2>/dev/null)
-    __sprawl_debug "completion output: ${out}"
+    __squadrn_debug "completion output: ${out}"
 
     # Extract the directive integer following a : from the last line
     local lastLine
     while IFS='\n' read -r line; do
         lastLine=${line}
     done < <(printf "%s\n" "${out[@]}")
-    __sprawl_debug "last line: ${lastLine}"
+    __squadrn_debug "last line: ${lastLine}"
 
     if [ "${lastLine[1]}" = : ]; then
         directive=${lastLine[2,-1]}
@@ -1122,16 +1122,16 @@ _sprawl()
         out=${out[1,-$suffix]}
     else
         # There is no directive specified.  Leave $out as is.
-        __sprawl_debug "No directive found.  Setting do default"
+        __squadrn_debug "No directive found.  Setting do default"
         directive=0
     fi
 
-    __sprawl_debug "directive: ${directive}"
-    __sprawl_debug "completions: ${out}"
-    __sprawl_debug "flagPrefix: ${flagPrefix}"
+    __squadrn_debug "directive: ${directive}"
+    __squadrn_debug "completions: ${out}"
+    __squadrn_debug "flagPrefix: ${flagPrefix}"
 
     if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
-        __sprawl_debug "Completion received error. Ignoring completions."
+        __squadrn_debug "Completion received error. Ignoring completions."
         return
     fi
 
@@ -1142,11 +1142,11 @@ _sprawl()
     while IFS='\n' read -r comp; do
         # Check if this is an activeHelp statement (i.e., prefixed with $activeHelpMarker)
         if [ "${comp[1,$endIndex]}" = "$activeHelpMarker" ];then
-            __sprawl_debug "ActiveHelp found: $comp"
+            __squadrn_debug "ActiveHelp found: $comp"
             comp="${comp[$startIndex,-1]}"
             if [ -n "$comp" ]; then
                 compadd -x "${comp}"
-                __sprawl_debug "ActiveHelp will need delimiter"
+                __squadrn_debug "ActiveHelp will need delimiter"
                 hasActiveHelp=1
             fi
 
@@ -1163,7 +1163,7 @@ _sprawl()
             local tab="$(printf '\t')"
             comp=${comp//$tab/:}
 
-            __sprawl_debug "Adding completion: ${comp}"
+            __squadrn_debug "Adding completion: ${comp}"
             completions+=${comp}
             lastComp=$comp
         fi
@@ -1174,19 +1174,19 @@ _sprawl()
     # - file completion will be performed (so there will be choices after the activeHelp)
     if [ $hasActiveHelp -eq 1 ]; then
         if [ ${#completions} -ne 0 ] || [ $((directive & shellCompDirectiveNoFileComp)) -eq 0 ]; then
-            __sprawl_debug "Adding activeHelp delimiter"
+            __squadrn_debug "Adding activeHelp delimiter"
             compadd -x "--"
             hasActiveHelp=0
         fi
     fi
 
     if [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ]; then
-        __sprawl_debug "Activating nospace."
+        __squadrn_debug "Activating nospace."
         noSpace="-S ''"
     fi
 
     if [ $((directive & shellCompDirectiveKeepOrder)) -ne 0 ]; then
-        __sprawl_debug "Activating keep order."
+        __squadrn_debug "Activating keep order."
         keepOrder="-V"
     fi
 
@@ -1203,17 +1203,17 @@ _sprawl()
         done
         filteringCmd+=" ${flagPrefix}"
 
-        __sprawl_debug "File filtering command: $filteringCmd"
+        __squadrn_debug "File filtering command: $filteringCmd"
         _arguments '*:filename:'"$filteringCmd"
     elif [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
         # File completion for directories only
         local subdir
         subdir="${completions[1]}"
         if [ -n "$subdir" ]; then
-            __sprawl_debug "Listing directories in $subdir"
+            __squadrn_debug "Listing directories in $subdir"
             pushd "${subdir}" >/dev/null 2>&1
         else
-            __sprawl_debug "Listing directories in ."
+            __squadrn_debug "Listing directories in ."
         fi
 
         local result
@@ -1224,17 +1224,17 @@ _sprawl()
         fi
         return $result
     else
-        __sprawl_debug "Calling _describe"
+        __squadrn_debug "Calling _describe"
         if eval _describe $keepOrder "completions" completions $flagPrefix $noSpace; then
-            __sprawl_debug "_describe found some completions"
+            __squadrn_debug "_describe found some completions"
 
             # Return the success of having called _describe
             return 0
         else
-            __sprawl_debug "_describe did not find completions."
-            __sprawl_debug "Checking if we should do file completion."
+            __squadrn_debug "_describe did not find completions."
+            __squadrn_debug "Checking if we should do file completion."
             if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
-                __sprawl_debug "deactivating file completion"
+                __squadrn_debug "deactivating file completion"
 
                 # We must return an error code here to let zsh know that there were no
                 # completions found by _describe; this is what will trigger other
@@ -1243,7 +1243,7 @@ _sprawl()
                 return 1
             else
                 # Perform file completion
-                __sprawl_debug "Activating file completion"
+                __squadrn_debug "Activating file completion"
 
                 # We must return the result of this command, so it must be the
                 # last command, or else we must store its result to return it.
@@ -1254,34 +1254,34 @@ _sprawl()
 }
 
 # don't run the completion function when being source-ed or eval-ed
-if [ "$funcstack[1]" = "_sprawl" ]; then
-    _sprawl
+if [ "$funcstack[1]" = "_squadrn" ]; then
+    _squadrn
 fi
 -- completion-fish.txt --
-# fish completion for sprawl                               -*- shell-script -*-
+# fish completion for squadrn                              -*- shell-script -*-
 
-function __sprawl_debug
+function __squadrn_debug
     set -l file "$BASH_COMP_DEBUG_FILE"
     if test -n "$file"
         echo "$argv" >> $file
     end
 end
 
-function __sprawl_perform_completion
-    __sprawl_debug "Starting __sprawl_perform_completion"
+function __squadrn_perform_completion
+    __squadrn_debug "Starting __squadrn_perform_completion"
 
     # Extract all args except the last one
     set -l args (commandline -opc)
     # Extract the last arg and escape it in case it is a space
     set -l lastArg (string escape -- (commandline -ct))
 
-    __sprawl_debug "args: $args"
-    __sprawl_debug "last arg: $lastArg"
+    __squadrn_debug "args: $args"
+    __squadrn_debug "last arg: $lastArg"
 
     # Disable ActiveHelp which is not supported for fish shell
-    set -l requestComp "SPRAWL_ACTIVE_HELP=0 $args[1] __complete $args[2..-1] $lastArg"
+    set -l requestComp "SQUADRN_ACTIVE_HELP=0 $args[1] __complete $args[2..-1] $lastArg"
 
-    __sprawl_debug "Calling $requestComp"
+    __squadrn_debug "Calling $requestComp"
     set -l results (eval $requestComp 2> /dev/null)
 
     # Some programs may output extra empty lines after the directive.
@@ -1304,9 +1304,9 @@ function __sprawl_perform_completion
     # completions must be prefixed with the flag
     set -l flagPrefix (string match -r -- '-.*=' "$lastArg")
 
-    __sprawl_debug "Comps: $comps"
-    __sprawl_debug "DirectiveLine: $directiveLine"
-    __sprawl_debug "flagPrefix: $flagPrefix"
+    __squadrn_debug "Comps: $comps"
+    __squadrn_debug "DirectiveLine: $directiveLine"
+    __squadrn_debug "flagPrefix: $flagPrefix"
 
     for comp in $comps
         printf "%s%s\n" "$flagPrefix" "$comp"
@@ -1315,84 +1315,84 @@ function __sprawl_perform_completion
     printf "%s\n" "$directiveLine"
 end
 
-# this function limits calls to __sprawl_perform_completion, by caching the result behind $__sprawl_perform_completion_once_result
-function __sprawl_perform_completion_once
-    __sprawl_debug "Starting __sprawl_perform_completion_once"
+# this function limits calls to __squadrn_perform_completion, by caching the result behind $__squadrn_perform_completion_once_result
+function __squadrn_perform_completion_once
+    __squadrn_debug "Starting __squadrn_perform_completion_once"
 
-    if test -n "$__sprawl_perform_completion_once_result"
-        __sprawl_debug "Seems like a valid result already exists, skipping __sprawl_perform_completion"
+    if test -n "$__squadrn_perform_completion_once_result"
+        __squadrn_debug "Seems like a valid result already exists, skipping __squadrn_perform_completion"
         return 0
     end
 
-    set --global __sprawl_perform_completion_once_result (__sprawl_perform_completion)
-    if test -z "$__sprawl_perform_completion_once_result"
-        __sprawl_debug "No completions, probably due to a failure"
+    set --global __squadrn_perform_completion_once_result (__squadrn_perform_completion)
+    if test -z "$__squadrn_perform_completion_once_result"
+        __squadrn_debug "No completions, probably due to a failure"
         return 1
     end
 
-    __sprawl_debug "Performed completions and set __sprawl_perform_completion_once_result"
+    __squadrn_debug "Performed completions and set __squadrn_perform_completion_once_result"
     return 0
 end
 
-# this function is used to clear the $__sprawl_perform_completion_once_result variable after completions are run
-function __sprawl_clear_perform_completion_once_result
-    __sprawl_debug ""
-    __sprawl_debug "========= clearing previously set __sprawl_perform_completion_once_result variable =========="
-    set --erase __sprawl_perform_completion_once_result
-    __sprawl_debug "Successfully erased the variable __sprawl_perform_completion_once_result"
+# this function is used to clear the $__squadrn_perform_completion_once_result variable after completions are run
+function __squadrn_clear_perform_completion_once_result
+    __squadrn_debug ""
+    __squadrn_debug "========= clearing previously set __squadrn_perform_completion_once_result variable =========="
+    set --erase __squadrn_perform_completion_once_result
+    __squadrn_debug "Successfully erased the variable __squadrn_perform_completion_once_result"
 end
 
-function __sprawl_requires_order_preservation
-    __sprawl_debug ""
-    __sprawl_debug "========= checking if order preservation is required =========="
+function __squadrn_requires_order_preservation
+    __squadrn_debug ""
+    __squadrn_debug "========= checking if order preservation is required =========="
 
-    __sprawl_perform_completion_once
-    if test -z "$__sprawl_perform_completion_once_result"
-        __sprawl_debug "Error determining if order preservation is required"
+    __squadrn_perform_completion_once
+    if test -z "$__squadrn_perform_completion_once_result"
+        __squadrn_debug "Error determining if order preservation is required"
         return 1
     end
 
-    set -l directive (string sub --start 2 $__sprawl_perform_completion_once_result[-1])
-    __sprawl_debug "Directive is: $directive"
+    set -l directive (string sub --start 2 $__squadrn_perform_completion_once_result[-1])
+    __squadrn_debug "Directive is: $directive"
 
     set -l shellCompDirectiveKeepOrder 32
     set -l keeporder (math (math --scale 0 $directive / $shellCompDirectiveKeepOrder) % 2)
-    __sprawl_debug "Keeporder is: $keeporder"
+    __squadrn_debug "Keeporder is: $keeporder"
 
     if test $keeporder -ne 0
-        __sprawl_debug "This does require order preservation"
+        __squadrn_debug "This does require order preservation"
         return 0
     end
 
-    __sprawl_debug "This doesn't require order preservation"
+    __squadrn_debug "This doesn't require order preservation"
     return 1
 end
 
 
 # This function does two things:
-# - Obtain the completions and store them in the global __sprawl_comp_results
+# - Obtain the completions and store them in the global __squadrn_comp_results
 # - Return false if file completion should be performed
-function __sprawl_prepare_completions
-    __sprawl_debug ""
-    __sprawl_debug "========= starting completion logic =========="
+function __squadrn_prepare_completions
+    __squadrn_debug ""
+    __squadrn_debug "========= starting completion logic =========="
 
     # Start fresh
-    set --erase __sprawl_comp_results
+    set --erase __squadrn_comp_results
 
-    __sprawl_perform_completion_once
-    __sprawl_debug "Completion results: $__sprawl_perform_completion_once_result"
+    __squadrn_perform_completion_once
+    __squadrn_debug "Completion results: $__squadrn_perform_completion_once_result"
 
-    if test -z "$__sprawl_perform_completion_once_result"
-        __sprawl_debug "No completion, probably due to a failure"
+    if test -z "$__squadrn_perform_completion_once_result"
+        __squadrn_debug "No completion, probably due to a failure"
         # Might as well do file completion, in case it helps
         return 1
     end
 
-    set -l directive (string sub --start 2 $__sprawl_perform_completion_once_result[-1])
-    set --global __sprawl_comp_results $__sprawl_perform_completion_once_result[1..-2]
+    set -l directive (string sub --start 2 $__squadrn_perform_completion_once_result[-1])
+    set --global __squadrn_comp_results $__squadrn_perform_completion_once_result[1..-2]
 
-    __sprawl_debug "Completions are: $__sprawl_comp_results"
-    __sprawl_debug "Directive is: $directive"
+    __squadrn_debug "Completions are: $__squadrn_comp_results"
+    __squadrn_debug "Directive is: $directive"
 
     set -l shellCompDirectiveError 1
     set -l shellCompDirectiveNoSpace 2
@@ -1406,7 +1406,7 @@ function __sprawl_prepare_completions
 
     set -l compErr (math (math --scale 0 $directive / $shellCompDirectiveError) % 2)
     if test $compErr -eq 1
-        __sprawl_debug "Received error directive: aborting."
+        __squadrn_debug "Received error directive: aborting."
         # Might as well do file completion, in case it helps
         return 1
     end
@@ -1414,7 +1414,7 @@ function __sprawl_prepare_completions
     set -l filefilter (math (math --scale 0 $directive / $shellCompDirectiveFilterFileExt) % 2)
     set -l dirfilter (math (math --scale 0 $directive / $shellCompDirectiveFilterDirs) % 2)
     if test $filefilter -eq 1; or test $dirfilter -eq 1
-        __sprawl_debug "File extension filtering or directory filtering not supported"
+        __squadrn_debug "File extension filtering or directory filtering not supported"
         # Do full file completion instead
         return 1
     end
@@ -1422,7 +1422,7 @@ function __sprawl_prepare_completions
     set -l nospace (math (math --scale 0 $directive / $shellCompDirectiveNoSpace) % 2)
     set -l nofiles (math (math --scale 0 $directive / $shellCompDirectiveNoFileComp) % 2)
 
-    __sprawl_debug "nospace: $nospace, nofiles: $nofiles"
+    __squadrn_debug "nospace: $nospace, nofiles: $nofiles"
 
     # If we want to prevent a space, or if file completion is NOT disabled,
     # we need to count the number of valid completions.
@@ -1431,22 +1431,22 @@ function __sprawl_prepare_completions
     # criteria than the prefix.
     if test $nospace -ne 0; or test $nofiles -eq 0
         set -l prefix (commandline -t | string escape --style=regex)
-        __sprawl_debug "prefix: $prefix"
+        __squadrn_debug "prefix: $prefix"
 
-        set -l completions (string match -r -- "^$prefix.*" $__sprawl_comp_results)
-        set --global __sprawl_comp_results $completions
-        __sprawl_debug "Filtered completions are: $__sprawl_comp_results"
+        set -l completions (string match -r -- "^$prefix.*" $__squadrn_comp_results)
+        set --global __squadrn_comp_results $completions
+        __squadrn_debug "Filtered completions are: $__squadrn_comp_results"
 
         # Important not to quote the variable for count to work
-        set -l numComps (count $__sprawl_comp_results)
-        __sprawl_debug "numComps: $numComps"
+        set -l numComps (count $__squadrn_comp_results)
+        __squadrn_debug "numComps: $numComps"
 
         if test $numComps -eq 1; and test $nospace -ne 0
             # We must first split on \t to get rid of the descriptions to be
             # able to check what the actual completion will be.
             # We don't need descriptions anyway since there is only a single
             # real completion which the shell will expand immediately.
-            set -l split (string split --max 1 \t $__sprawl_comp_results[1])
+            set -l split (string split --max 1 \t $__squadrn_comp_results[1])
 
             # Fish won't add a space if the completion ends with any
             # of the following characters: @=/:.,
@@ -1454,16 +1454,16 @@ function __sprawl_prepare_completions
             if not string match -r -q "[@=/:.,]" -- "$lastChar"
                 # In other cases, to support the "nospace" directive we trick the shell
                 # by outputting an extra, longer completion.
-                __sprawl_debug "Adding second completion to perform nospace directive"
-                set --global __sprawl_comp_results $split[1] $split[1].
-                __sprawl_debug "Completions are now: $__sprawl_comp_results"
+                __squadrn_debug "Adding second completion to perform nospace directive"
+                set --global __squadrn_comp_results $split[1] $split[1].
+                __squadrn_debug "Completions are now: $__squadrn_comp_results"
             end
         end
 
         if test $numComps -eq 0; and test $nofiles -eq 0
             # To be consistent with bash and zsh, we only trigger file
             # completion when there are no other completions
-            __sprawl_debug "Requesting file completion"
+            __squadrn_debug "Requesting file completion"
             return 1
         end
     end
@@ -1475,41 +1475,41 @@ end
 # so we can properly delete any completions provided by another script.
 # Only do this if the program can be found, or else fish may print some errors; besides,
 # the existing completions will only be loaded if the program can be found.
-if type -q "sprawl"
+if type -q "squadrn"
     # The space after the program name is essential to trigger completion for the program
     # and not completion of the program name itself.
     # Also, we use '> /dev/null 2>&1' since '&>' is not supported in older versions of fish.
-    complete --do-complete "sprawl " > /dev/null 2>&1
+    complete --do-complete "squadrn " > /dev/null 2>&1
 end
 
 # Remove any pre-existing completions for the program since we will be handling all of them.
-complete -c sprawl -e
+complete -c squadrn -e
 
-# this will get called after the two calls below and clear the $__sprawl_perform_completion_once_result global
-complete -c sprawl -n '__sprawl_clear_perform_completion_once_result'
-# The call to __sprawl_prepare_completions will setup __sprawl_comp_results
+# this will get called after the two calls below and clear the $__squadrn_perform_completion_once_result global
+complete -c squadrn -n '__squadrn_clear_perform_completion_once_result'
+# The call to __squadrn_prepare_completions will setup __squadrn_comp_results
 # which provides the program's completion choices.
 # If this doesn't require order preservation, we don't use the -k flag
-complete -c sprawl -n 'not __sprawl_requires_order_preservation && __sprawl_prepare_completions' -f -a '$__sprawl_comp_results'
+complete -c squadrn -n 'not __squadrn_requires_order_preservation && __squadrn_prepare_completions' -f -a '$__squadrn_comp_results'
 # otherwise we use the -k flag
-complete -k -c sprawl -n '__sprawl_requires_order_preservation && __sprawl_prepare_completions' -f -a '$__sprawl_comp_results'
+complete -k -c squadrn -n '__squadrn_requires_order_preservation && __squadrn_prepare_completions' -f -a '$__squadrn_comp_results'
 -- hooks.json --
 {
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
-        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" guard-git", "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" guard-git", "timeout": 5 }]
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Cần input'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Cần input'", "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Xong việc'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Xong việc'", "async": true }] }
     ],
     "StopFailure": [
-      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" limit", "async": true }] }
+      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" limit", "async": true }] }
     ]
   }
 }
@@ -1518,7 +1518,7 @@ complete -k -c sprawl -n '__sprawl_requires_order_preservation && __sprawl_prepa
 .claude-plugin/marketplace.json file -rw-r--r--
 VERSION file -rw-r--r--
 bin dir -rwx------
-bin/sprawl file -rwxr-xr-x
+bin/squadrn file -rwxr-xr-x
 git-hooks dir -rwxr-xr-x
 git-hooks/applypatch-msg file -rwxr-xr-x
 git-hooks/commit-msg file -rwxr-xr-x
@@ -1545,11 +1545,11 @@ plugin/agents dir -rwxr-xr-x
 plugin/agents/locator.md file -rw-r--r--
 plugin/agents/reviewer.md file -rw-r--r--
 plugin/bin dir -rwxr-xr-x
-plugin/bin/sprawl-hook file -rwxr-xr-x
+plugin/bin/squadrn-hook file -rwxr-xr-x
 plugin/hooks dir -rwxr-xr-x
 plugin/hooks/hooks.json file -rw-r--r--
 -- layout-bin.txt --
-sprawl link -> $WORK/home/.local/share/sprawl/bin/sprawl
-sra link -> $WORK/home/.local/share/sprawl/bin/sprawl
+sqd link -> $WORK/home/.local/share/squadrn/bin/squadrn
+squadrn link -> $WORK/home/.local/share/squadrn/bin/squadrn
 -- layout-config.txt --
 config.toml file -rw-r--r--

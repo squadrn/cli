@@ -23,7 +23,7 @@ $results["ssh_keygen_git_for_windows"] = Test-Path (Join-Path $gitRoot "usr\bin\
 $results["ssh_keygen_builtin"] = Test-Path (Join-Path $env:SystemRoot "System32\OpenSSH\ssh-keygen.exe")
 
 # S6/S12: symlink as this user, junction.
-$scratch = Join-Path $env:TEMP ("sprawl spike " + [guid]::NewGuid().ToString("N").Substring(0, 8))
+$scratch = Join-Path $env:TEMP ("squadrn spike " + [guid]::NewGuid().ToString("N").Substring(0, 8))
 New-Item -ItemType Directory -Force -Path "$scratch\target" | Out-Null
 try {
     New-Item -ItemType SymbolicLink -Path "$scratch\symlink" -Target "$scratch\target" -ErrorAction Stop | Out-Null
@@ -35,7 +35,7 @@ try {
 cmd.exe /d /c "mklink /J `"$scratch\junction`" `"$scratch\target`"" | Out-Null
 $results["junction"] = Test-Path "$scratch\junction"
 
-# S1/S2/S13: a project whose hooks record their input. Exec form through cmd.exe, as sprawl's
+# S1/S2/S13: a project whose hooks record their input. Exec form through cmd.exe, as squadrn's
 # Windows hooks.json does; `more` copies stdin to a file.
 $project = Join-Path $scratch "a b\project"
 $log = Join-Path $scratch "log"

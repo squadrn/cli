@@ -4,17 +4,17 @@ import (
 	"os"
 	"strings"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // profileLine is the line install.ps1 adds to a PowerShell profile to load completion. It
-// checks the file first, so the profile keeps working after sprawl is uninstalled.
+// checks the file first, so the profile keeps working after squadrn is uninstalled.
 func profileLine(completion string) string {
 	q := "'" + strings.ReplaceAll(completion, "'", "''") + "'"
 	return "if (Test-Path " + q + ") { . " + q + " }"
 }
 
-// withoutProfileLines removes sprawl's completion lines for completion from a profile script:
+// withoutProfileLines removes squadrn's completion lines for completion from a profile script:
 // the current guarded form and the unguarded one earlier installers wrote. Other lines stay
 // byte for byte.
 func withoutProfileLines(content, completion string) (string, bool) {
@@ -32,7 +32,7 @@ func withoutProfileLines(content, completion string) (string, bool) {
 	return strings.Join(kept, ""), removed
 }
 
-// removeProfileLines takes sprawl's completion lines out of the user's PowerShell profiles.
+// removeProfileLines takes squadrn's completion lines out of the user's PowerShell profiles.
 func (a *app) removeProfileLines() {
 	for _, p := range powerShellProfiles() {
 		b, err := os.ReadFile(p)
@@ -44,7 +44,7 @@ func (a *app) removeProfileLines() {
 			continue
 		}
 		if err := fsx.WriteBytes(p, []byte(content), 0o644); err != nil {
-			a.warnf("could not remove sprawl's completion line from %s: %v", p, err)
+			a.warnf("could not remove squadrn's completion line from %s: %v", p, err)
 			continue
 		}
 		a.out("  removed completion from %s\n", a.tilde(p))

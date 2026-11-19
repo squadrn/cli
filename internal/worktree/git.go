@@ -15,9 +15,9 @@ import (
 	"slices"
 	"strings"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 var ErrInvalidName = errors.New("invalid worktree name")
@@ -129,7 +129,7 @@ func Toplevel(ctx context.Context, dir string) string {
 }
 
 // Exclude adds pattern to the repository's info/exclude (shared by all its worktrees) unless
-// it is already there, so git never reports the files sprawl keeps in a worktree.
+// it is already there, so git never reports the files squadrn keeps in a worktree.
 func Exclude(ctx context.Context, dir, pattern string) error {
 	path, err := git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude")
 	if err != nil {
@@ -218,7 +218,7 @@ func Dirty(ctx context.Context, path string) (bool, error) {
 }
 
 // Ignored counts the ignored paths in a worktree (an ignored directory counts once). Removing
-// the worktree deletes them; sprawl's own registry is not counted.
+// the worktree deletes them; squadrn's own registry is not counted.
 func Ignored(ctx context.Context, path string) (int, error) {
 	status, err := git(ctx, path, "status", "--porcelain", "--untracked-files=normal", "--ignored")
 	if err != nil {

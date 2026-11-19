@@ -9,11 +9,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/doctor"
-	"sprawling-agents/internal/gitver"
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/update"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/doctor"
+	"github.com/squadrn/cli/internal/gitver"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/update"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 func (a *app) doctorCmd() *cobra.Command {

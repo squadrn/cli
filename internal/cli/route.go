@@ -8,9 +8,9 @@ import (
 
 // route is how one invocation is dispatched:
 //
-//	sprawl                                    pick an account interactively
-//	sprawl [globals] [<account>] <subcommand> ...
-//	sprawl [globals] [<account>] [agent flags | agent subcommand | -- args...]
+//	squadrn                                    pick an account interactively
+//	squadrn [globals] [<account>] <subcommand> ...
+//	squadrn [globals] [<account>] [agent flags | agent subcommand | -- args...]
 //
 // globals: -a/--account <account>, -C/--dir <dir>, --no-color, before or right after the account. Subcommands win over account names; a
 // word that is neither (nor an agent subcommand) is a usage error, so a typo never starts an
@@ -19,7 +19,7 @@ type route struct {
 	account string // raw account input; "" means main
 	dir     string // -C
 	noColor bool
-	sub     string // sprawl subcommand; "" runs the agent CLI with args
+	sub     string // squadrn subcommand; "" runs the agent CLI with args
 	args    []string
 	pick    bool
 }
@@ -50,7 +50,7 @@ func parseRoute(args []string, t routeTable) (route, error) {
 	}
 	if r.account == "" && t.isAccount(rest[0]) {
 		r.account = rest[0]
-		// Globals may also follow the account (sprawl personal -C ~/repo wt x); after them come
+		// Globals may also follow the account (squadrn personal -C ~/repo wt x); after them come
 		// the subcommand or the agent's own arguments.
 		if rest, err = r.globals(rest[1:], true); err != nil {
 			return r, err
@@ -66,7 +66,7 @@ func parseRoute(args []string, t routeTable) (route, error) {
 	return r, unknownWord(rest[0], t)
 }
 
-// globals consumes sprawl's global flags at the start of args and returns the rest. After the
+// globals consumes squadrn's global flags at the start of args and returns the rest. After the
 // account name (afterAccount), naming an account again is an error.
 func (r *route) globals(args []string, afterAccount bool) ([]string, error) {
 	rest := args

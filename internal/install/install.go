@@ -10,13 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/release"
 )
 
 var (
@@ -24,27 +23,16 @@ var (
 	ErrDuplicateName = errors.New("command name given twice")
 )
 
-// LoadConfig returns the config as written. Without one (fresh is true) it adopts the settings
-// of a previous product's config, but not its command names: those belonged to the old product.
-func LoadConfig(path string, legacy []string) (cfg config.Config, migratedFrom string, fresh bool, err error) {
-	if _, err := os.Stat(path); err == nil {
-		c, err := config.Read(path)
-		return c, "", false, err
-	}
-	for _, lp := range legacy {
-		if _, err := os.Stat(lp); errors.Is(err, fs.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return config.Config{}, "", false, err
+// LoadConfig returns the config as written; fresh is true when there is none yet.
+func LoadConfig(path string) (cfg config.Config, fresh bool, err error) {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return config.Config{}, true, nil
 		}
-		old, err := config.Read(lp)
-		if err != nil {
-			return config.Config{}, "", false, err
-		}
-		c := config.Config{SharedMCP: old.SharedMCP, ProtectedBranches: old.ProtectedBranches, DefaultProvider: old.DefaultProvider, GitHooks: old.GitHooks}
-		return c, lp, true, nil
+		return config.Config{}, false, err
 	}
-	return config.Config{}, "", true, nil
+	c, err := config.Read(path)
+	return c, false, err
 }
 
 // Names is the set of names a config installs (accepted earlier, maybe forced).
@@ -101,7 +89,7 @@ func (n NameCheck) Valid(name string) error {
 }
 
 // Clash returns the path of another program that already answers to name, "" when none does
-// (or the name was accepted before, or it is sprawl itself).
+// (or the name was accepted before, or it is squadrn itself).
 func (n NameCheck) Clash(name string) string {
 	lookPath := n.LookPath
 	if lookPath == nil {
@@ -123,51 +111,7 @@ func (n NameCheck) isSelf(path string) bool {
 	return false
 }
 
-// Moved is one directory of a previous product moved into the backup dir.
-type Moved struct {
-	Name   string // previous product name
-	Backup string // where its files went
-}
-
-// MigrateLegacy moves the install, config and state dirs of previous product names into a
-// backup under the state dir (their guard logs into legacy-logs/) and drops their caches.
-func MigrateLegacy(home string, now time.Time) ([]Moved, []error) {
-	var moved []Moved
-	var errs []error
-	state := config.DirsFor(home, config.Slug).State
-	for _, name := range config.PreviousNames {
-		old := config.DirsFor(home, name)
-		if log := filepath.Join(old.State, "guard.log"); fsx.IsFile(log) {
-			if err := os.MkdirAll(filepath.Join(state, "legacy-logs"), 0o700); err == nil {
-				_ = os.Rename(log, filepath.Join(state, "legacy-logs", name+"-guard.log"))
-			}
-		}
-		_ = os.RemoveAll(old.Cache)
-		backup := filepath.Join(state, "legacy-"+name+"-"+now.Format("20060102-150405"))
-		any := false
-		for _, dir := range []string{old.Data, old.State, old.Config} {
-			if !fsx.IsDir(dir) {
-				continue
-			}
-			if err := os.MkdirAll(backup, 0o700); err != nil {
-				errs = append(errs, err)
-				break
-			}
-			dst := filepath.Join(backup, filepath.Base(filepath.Dir(dir))+"-"+filepath.Base(dir))
-			if err := os.Rename(dir, dst); err != nil {
-				errs = append(errs, fmt.Errorf("move %s: %w", dir, err))
-				continue
-			}
-			any = true
-		}
-		if any {
-			moved = append(moved, Moved{Name: name, Backup: backup})
-		}
-	}
-	return moved, errs
-}
-
-// PluginAction is what happened to the sprawl plugin in one account.
+// PluginAction is what happened to the squadrn plugin in one account.
 type PluginAction string
 
 const (
@@ -179,7 +123,6 @@ const (
 type PluginResult struct {
 	Account account.Account
 	Action  PluginAction
-	Removed []string // plugins of previous product names that were uninstalled
 	Err     error
 }
 
@@ -192,13 +135,6 @@ func Plugins(ctx context.Context, accts []account.Account, store account.Store, 
 			continue
 		}
 		res := PluginResult{Account: acct}
-		removed, err := p.RemoveLegacyPlugins(ctx, acct.ConfigDir())
-		res.Removed = removed
-		if err != nil {
-			res.Action, res.Err = PluginFailed, fmt.Errorf("remove old plugins: %w", err)
-			out = append(out, res)
-			continue
-		}
 		installed, err := p.InstallPlugin(ctx, acct.ConfigDir())
 		switch {
 		case err != nil:
@@ -216,7 +152,7 @@ func Plugins(ctx context.Context, accts []account.Account, store account.Store, 
 	return out
 }
 
-// RemovePlugins uninstalls the sprawl plugin and its marketplace from every account whose
+// RemovePlugins uninstalls the squadrn plugin and its marketplace from every account whose
 // provider supports plugins. Errors are per account; a missing plugin is not an error.
 func RemovePlugins(ctx context.Context, accts []account.Account, r provider.Runner) map[string]error {
 	errs := map[string]error{}

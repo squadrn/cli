@@ -9,14 +9,14 @@ chmod 755 bin/pnpm
 
 # The first lockfile in priority order picks the package manager; it runs inside the worktree.
 cd repo
-exec sprawl deps feat-a
+exec squadrn deps feat-a
 stdout '^pnpm install --frozen-lockfile --prefer-offline in .*/feat-a$'
 
-exitcode 1 sprawl deps feat-b
-! exec sprawl deps feat-b
+exitcode 1 squadrn deps feat-b
+! exec squadrn deps feat-b
 stderr 'no supported lockfile'
-exitcode 1 sprawl deps feat-none
-exitcode 2 sprawl deps Bad
+exitcode 1 squadrn deps feat-none
+exitcode 2 squadrn deps Bad
 
 -- lock --
 -- fakepm --

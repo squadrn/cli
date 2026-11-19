@@ -1,5 +1,5 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
-# With sprawl on PATH, the plugin shim delegates to `sprawl hook`.
+# With squadrn on PATH, the plugin shim delegates to `squadrn hook`.
 stdin force.json
 exec $SHIM guard-git
 stdout '"permissionDecision":"deny"'
@@ -7,20 +7,20 @@ stdout 'force push is not allowed'
 
 # The installed binary is found at its fixed path even when PATH lacks it (hooks often run with
 # a minimal PATH) and whatever command name the user chose.
-mkdir home/.local/share/sprawl/bin
-exec sh -c 'ln -s "$(command -v sprawl)" home/.local/share/sprawl/bin/sprawl'
+mkdir home/.local/share/squadrn/bin
+exec sh -c 'ln -s "$(command -v squadrn)" home/.local/share/squadrn/bin/squadrn'
 env PATH=/usr/bin:/bin
 stdin force.json
 exec $SHIM guard-git
 stdout 'force push is not allowed'
 
-# Without sprawl anywhere the shim denies pushes, asks about other git commands and stays out of
+# Without squadrn anywhere the shim denies pushes, asks about other git commands and stays out of
 # the way otherwise.
-rm home/.local/share/sprawl/bin/sprawl
+rm home/.local/share/squadrn/bin/squadrn
 stdin force.json
 exec $SHIM guard-git
 stdout '"permissionDecision":"deny"'
-stdout 'sprawl is not installed, so git push is blocked'
+stdout 'squadrn is not installed, so git push is blocked'
 stdin obfuscated.json
 exec $SHIM guard-git
 stdout '"permissionDecision":"deny"'

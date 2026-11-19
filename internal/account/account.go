@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 const Main = "main"
@@ -31,8 +31,8 @@ var (
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,23}$`)
 
-// Commands are sprawl's top-level subcommands. They, and every provider CLI's subcommands, cannot
-// be account names: `sprawl <word> ...` would be ambiguous.
+// Commands are squadrn's top-level subcommands. They, and every provider CLI's subcommands, cannot
+// be account names: `squadrn <word> ...` would be ambiguous.
 var Commands = []string{
 	"account", "completion", "config", "deps", "doctor", "gc", "grid", "help", "hook", "ps",
 	"self-install", "self-uninstall", "self-update", "swap", "usage", "version", "wt",
@@ -91,7 +91,7 @@ func ValidateName(name string) error {
 		return fmt.Errorf("%w %q (expected %s)", ErrInvalidName, name, namePattern)
 	}
 	if reserved(name) {
-		return fmt.Errorf("%w %q: it is a sprawl or provider subcommand", ErrReserved, name)
+		return fmt.Errorf("%w %q: it is a squadrn or provider subcommand", ErrReserved, name)
 	}
 	return nil
 }
@@ -108,14 +108,14 @@ type Store struct {
 	DefaultProvider string
 	// Providers overrides the registry (tests); nil means provider.All().
 	Providers []provider.Spec
-	// HasPlugin reports whether the sprawl plugin is installed in a config dir. Dirs sprawl
+	// HasPlugin reports whether the squadrn plugin is installed in a config dir. Dirs squadrn
 	// provisioned before it wrote Marker are recognised by it; nil adopts nothing.
 	HasPlugin func(spec provider.Spec, dir string) bool
 }
 
-// Marker marks a config dir as an account sprawl manages. Other tools use the same naming
+// Marker marks a config dir as an account squadrn manages. Other tools use the same naming
 // (~/.claude-<x>), so a matching dir alone is not an account. Main accounts need none.
-const Marker = ".sprawl-account"
+const Marker = "." + config.Slug + "-account"
 
 func (s Store) providers() []provider.Spec {
 	if s.Providers != nil {
@@ -160,7 +160,7 @@ func (s Store) account(spec provider.Spec, name string) Account {
 }
 
 // exists: the default provider's main always exists; another main needs its dir; every other
-// account needs its dir with Marker (written now for dirs sprawl provisioned before markers).
+// account needs its dir with Marker (written now for dirs squadrn provisioned before markers).
 func (s Store) exists(a Account) bool {
 	switch {
 	case a.IsMain():
@@ -175,16 +175,16 @@ func (s Store) exists(a Account) bool {
 	return false
 }
 
-// Mark records a's dir as managed by sprawl.
+// Mark records a's dir as managed by squadrn.
 func Mark(a Account) error {
 	if a.IsMain() {
 		return nil
 	}
-	return fsx.WriteBytes(filepath.Join(a.Dir, Marker), []byte("This directory is an account managed by Sprawling Agents.\n"), 0o600)
+	return fsx.WriteBytes(filepath.Join(a.Dir, Marker), []byte("This directory is an account managed by Squadrn.\n"), 0o600)
 }
 
-// ErrUnmanaged means a dir is named like an account but sprawl did not create it.
-var ErrUnmanaged = errors.New("not a sprawl account")
+// ErrUnmanaged means a dir is named like an account but squadrn did not create it.
+var ErrUnmanaged = errors.New("not a squadrn account")
 
 // Unmanaged lists dirs named like accounts (~/.claude-<name>) that are not accounts: created by
 // another tool, or by hand. Adopt turns one into an account.
@@ -266,7 +266,7 @@ func (s Store) Get(input string) (Account, error) {
 	}
 }
 
-// Exists reports whether input names an existing account; used to route `sprawl <account> ...`.
+// Exists reports whether input names an existing account; used to route `squadrn <account> ...`.
 func (s Store) Exists(input string) bool {
 	_, err := s.Get(input)
 	return err == nil

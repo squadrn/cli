@@ -29,8 +29,7 @@ formatters:
     - goimports
   settings:
     gofumpt:
-      # The module path has no dot until the repo is published; without this, gofumpt treats sprawling-agents/... as stdlib.
-      module-path: sprawling-agents
+      module-path: github.com/squadrn/cli
     goimports:
       local-prefixes:
-        - sprawling-agents
+        - github.com/squadrn/cli

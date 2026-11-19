@@ -12,15 +12,15 @@ import (
 	"strings"
 	"syscall"
 
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // Sessions and panes are identified by tmux user options, never by their names, so renaming
 // the command (and with it new session names) never orphans a running grid.
 const (
-	optRepo    = "@sprawl_repo" // session: repository root the grid belongs to
-	optAccount = "@sprawl_acct" // pane: account label, e.g. claude/personal
-	optName    = "@sprawl_name" // pane: worktree name
+	optRepo    = "@squadrn_repo" // session: repository root the grid belongs to
+	optAccount = "@squadrn_acct" // pane: account label, e.g. claude/personal
+	optName    = "@squadrn_name" // pane: worktree name
 	// fieldSep separates -F fields. Not a tab: tmux < 3.5 rewrites tabs in output to '_'.
 	// Fields that may contain it (paths, session names, commands) are printed with the q:
 	// modifier, which escapes it with a backslash; splitFields undoes that.
@@ -166,7 +166,7 @@ func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
 	return sessions, nil
 }
 
-// Panes lists sprawl agent panes, of one session or ("") of every session.
+// Panes lists squadrn agent panes, of one session or ("") of every session.
 func (t Tmux) Panes(ctx context.Context, session string) ([]Pane, error) {
 	format := strings.Join([]string{"#{pane_id}", q("session_name"), q(optAccount), q(optName), q("pane_current_command")}, fieldSep)
 	args := []string{"list-panes", "-F", format}
@@ -210,7 +210,7 @@ func tagNewPane(a Agent) [][]string {
 
 // Start opens a pane running command in dir for root's grid and returns the session it is in.
 // Without a grid session for root it creates one named after prefix (cols×rows); when another
-// sprawl creates the same session at the same time, the pane joins that one instead.
+// squadrn creates the same session at the same time, the pane joins that one instead.
 func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows int, a Agent, command string) (string, error) {
 	for attempt := 0; attempt < 20; attempt++ {
 		session, err := t.FindSession(ctx, root)

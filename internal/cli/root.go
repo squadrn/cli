@@ -1,4 +1,4 @@
-// Package cli wires sprawl commands to the domain packages. It owns argument parsing and output;
+// Package cli wires squadrn commands to the domain packages. It owns argument parsing and output;
 // the domain packages return values and typed errors and never print.
 package cli
 
@@ -18,14 +18,14 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/githook"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/provider/claude"
-	"sprawling-agents/internal/release"
-	"sprawling-agents/internal/ui"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/githook"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/provider/claude"
+	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/cli/internal/ui"
 )
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
@@ -37,7 +37,7 @@ var buildSigners = func() string {
 	return ""
 }
 
-// Version is set at build time with -ldflags "-X sprawling-agents/internal/cli.Version=…".
+// Version is set at build time with -ldflags "-X github.com/squadrn/cli/internal/cli.Version=…".
 var Version = "dev"
 
 const (
@@ -48,12 +48,12 @@ const (
 
 type app struct {
 	root *cobra.Command
-	// cmd is the name sprawl is installed under (config `command`), used in every message.
+	// cmd is the name squadrn is installed under (config `command`), used in every message.
 	cmd string
 	// cfg is the loaded config; cfgErr is reported by commands that depend on it.
 	cfg    config.Config
 	cfgErr error
-	// account is the account named before the subcommand (sprawl personal grid …); "" means main.
+	// account is the account named before the subcommand (squadrn personal grid …); "" means main.
 	account     string
 	store       account.Store
 	layout      release.Layout
@@ -80,7 +80,7 @@ type app struct {
 	gitChecked bool
 }
 
-// Run executes sprawl with args (program name excluded) and returns the process exit code.
+// Run executes squadrn with args (program name excluded) and returns the process exit code.
 func Run(args []string) int {
 	// Hooks run on every tool call and git hook: dispatch them before anything that can fail.
 	if len(args) > 0 && args[0] == "hook" {
@@ -165,17 +165,12 @@ func newStore(cfg config.Config, cfgErr error) (account.Store, error) {
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
 	}
-	// Accounts provisioned before account markers carry sprawl's plugin (or a previous name's).
+	// Accounts provisioned before account markers carry squadrn's plugin.
 	store.HasPlugin = func(spec provider.Spec, dir string) bool {
 		if spec.ID != provider.Claude.ID {
 			return false
 		}
-		for _, id := range append([]string{account.PluginID}, account.LegacyPluginIDs()...) {
-			if claude.HasPlugin(dir, id) {
-				return true
-			}
-		}
-		return false
+		return claude.HasPlugin(dir, account.PluginID)
 	}
 	return store, nil
 }
@@ -361,13 +356,13 @@ func (a *app) versionCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the sprawl version",
+		Short: "Print the squadrn version",
 		Args:  noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			if asJSON {
 				return a.printJSON(map[string]string{"version": Version})
 			}
-			a.out("sprawl %s\n", Version)
+			a.out("squadrn %s\n", Version)
 			return nil
 		},
 	}
@@ -391,7 +386,7 @@ func (a *app) agent(spec provider.Spec) (provider.Agent, error) {
 	return cl, nil
 }
 
-// sessionEnv points core.hooksPath at the git-level guard for sessions sprawl starts. An invalid
+// sessionEnv points core.hooksPath at the git-level guard for sessions squadrn starts. An invalid
 // config keeps it on: the guard fails closed (as the hooks do).
 func (a *app) sessionEnv() []string {
 	if a.cfgErr == nil && !a.cfg.GitHooksEnabled() {
@@ -586,10 +581,10 @@ func (a *app) addInteractively() error {
 	return a.session(ag, acct, ag.LoginArgs())
 }
 
-// marketplaceDir locates the local sprawl plugin marketplace: $SPRAWL_MARKETPLACE, else the
+// marketplaceDir locates the local squadrn plugin marketplace: $SQUADRN_MARKETPLACE, else the
 // installed release dir. "" means no plugin is available to install.
 func (a *app) marketplaceDir() string {
-	if dir := os.Getenv("SPRAWL_MARKETPLACE"); dir != "" {
+	if dir := os.Getenv("SQUADRN_MARKETPLACE"); dir != "" {
 		if _, err := os.Stat(filepath.Join(dir, ".claude-plugin", "marketplace.json")); err == nil {
 			return dir
 		}

@@ -6,8 +6,8 @@ cp claude.json home/.claude.json
 cp empty home/.claude/.loggedin
 
 # add provisions links, allowlisted MCP (never entries carrying env) and the plugin.
-env SPRAWL_MARKETPLACE=$WORK/market
-exec sprawl account add claude/work
+env SQUADRN_MARKETPLACE=$WORK/market
+exec squadrn account add claude/work
 stdout '^account claude/work → ~/.claude-work$'
 stdout 'linked ~/.claude-work/settings.json'
 stdout 'linked ~/.claude-work/skills/find-skills'
@@ -15,115 +15,115 @@ stdout 'linked ~/.claude-work/skills/find-skills'
 stdout 'mcp added codegraph'
 stdout 'mcp skipped secret'
 stdout 'mcp missing absent'
-stdout 'plugin installed sprawl@sprawl'
-stdout 'next: sprawl account login claude/work'
+stdout 'plugin installed squadrn@squadrn'
+stdout 'next: squadrn account login claude/work'
 exists home/.claude-work/agents
 ! exists home/.claude-work/skills/synced
 
 # add is idempotent: a second run changes nothing.
-exec sprawl account add work
+exec squadrn account add work
 ! stdout 'linked|mcp added|plugin installed'
 
 # Removing a shared item from main removes the link instead of leaving it dangling.
 rm home/.claude/agents
-exec sprawl account add work
+exec squadrn account add work
 stdout 'removed stale link ~/.claude-work/agents'
 ! exists home/.claude-work/agents
 
 # ls shows main first and login state.
 cp empty home/.claude-work/.loggedin
-exec sprawl account ls
+exec squadrn account ls
 stdout '^ACCOUNT +LOGIN +EMAIL +DIR$'
 stdout '^claude/main +yes +me@.claude +~/.claude$'
 stdout '^claude/work +yes +me@.claude-work +~/.claude-work$'
-exec sprawl account
+exec squadrn account
 stdout '^claude/work '
 
-exec sprawl account ls --json
+exec squadrn account ls --json
 stdout '"account": "claude/work"'
 stdout '"logged_in": true'
-exec sprawl account --json
+exec squadrn account --json
 stdout '"account": "claude/main"'
 
-# Dirs named like accounts but not made by sprawl are not accounts; adopt makes them one.
-mkdir home/.claude-squad
-exec sprawl account ls
-stdout '^unmanaged: ~/.claude-squad \(sprawl account adopt claude/squad\)$'
-! stdout '^claude/squad '
-exitcode 2 sprawl squad
-! exec sprawl account add squad
-stderr 'exists but is not a sprawl account'
-exitcode 2 sprawl account adopt squad
-exec sprawl account adopt squad --yes
-stdout 'adopted claude/squad'
-exists home/.claude-squad/.sprawl-account
-exec sprawl account adopt squad
+# Dirs named like accounts but not made by squadrn are not accounts; adopt makes them one.
+mkdir home/.claude-tool
+exec squadrn account ls
+stdout '^unmanaged: ~/.claude-tool \(squadrn account adopt claude/tool\)$'
+! stdout '^claude/tool '
+exitcode 2 squadrn tool
+! exec squadrn account add tool
+stderr 'exists but is not a squadrn account'
+exitcode 2 squadrn account adopt tool
+exec squadrn account adopt tool --yes
+stdout 'adopted claude/tool'
+exists home/.claude-tool/.squadrn-account
+exec squadrn account adopt tool
 stdout 'already an account'
-exitcode 1 sprawl account adopt ghost --yes
-exec sprawl account ls
+exitcode 1 squadrn account adopt ghost --yes
+exec squadrn account ls
 ! stdout unmanaged
 
 # A session refreshes per-skill links and warns about a shared item replaced by a file.
 mkdir home/.claude/skills/new-skill
 rm home/.claude/skills/find-skills
-exec sprawl work
+exec squadrn work
 exists home/.claude-work/skills/new-skill
 ! exists home/.claude-work/skills/find-skills
 rm home/.claude-work/settings.json
 cp settings.json home/.claude-work/settings.json
-exec sprawl work
+exec squadrn work
 stderr 'warning: ~/.claude-work/settings.json was replaced in claude/work, so it no longer follows the main account'
 rm home/.claude-work/settings.json
-exec sprawl account add work
+exec squadrn account add work
 stdout 'linked ~/.claude-work/settings.json'
 
 # A session in progress blocks rename and rm unless --force.
-mkdir home/.claude-work/.sprawl-inuse
-cp inuse.json home/.claude-work/.sprawl-inuse/1.json
-! exec sprawl account rename work job
+mkdir home/.claude-work/.squadrn-inuse
+cp inuse.json home/.claude-work/.squadrn-inuse/1.json
+! exec squadrn account rename work job
 stderr 'claude/work is in use by pid 1 \(claude/work\); stop it first \(or use --force\)'
-! exec sprawl account rm work --yes
+! exec squadrn account rm work --yes
 stderr 'in use by pid 1'
-rm home/.claude-work/.sprawl-inuse/1.json
+rm home/.claude-work/.squadrn-inuse/1.json
 
 # logout keeps the dir; rename logs out first, moves it and rewrites the plugin registry's paths.
-exec sprawl account logout work
+exec squadrn account logout work
 stdout 'logged out claude/work'
 ! exists home/.claude-work/.loggedin
 exists home/.claude-work
 mkdir home/.claude-work/plugins
 exec sh -c 'printf "{\"installPath\":\"%s/.claude-work/plugins/cache/x\"}" "$HOME" > home/.claude-work/plugins/installed_plugins.json'
 cp empty home/.claude-work/.loggedin
-exec sprawl account rename work job
+exec squadrn account rename work job
 stdout 'renamed claude/work → claude/job \(~/.claude-job\), logged out'
-stdout 'next: sprawl account login claude/job'
+stdout 'next: squadrn account login claude/job'
 ! exists home/.claude-work
 ! exists home/.claude-job/.loggedin
 grep '.claude-job/plugins/cache/x' home/.claude-job/plugins/installed_plugins.json
-exitcode 2 sprawl account rename job grid
-exitcode 2 sprawl account rename main x2
-exitcode 1 sprawl account rename ghost x3
-exec sprawl account rename job work
+exitcode 2 squadrn account rename job grid
+exitcode 2 squadrn account rename main x2
+exitcode 1 squadrn account rename ghost x3
+exec squadrn account rename job work
 
 # Validation: invalid and reserved names are usage errors (2).
-exitcode 2 sprawl account add Bad
-exitcode 2 sprawl account add mcp
-exitcode 2 sprawl account add main
-exitcode 2 sprawl account add
-exitcode 2 sprawl account frob
-exitcode 2 sprawl account ls extra
+exitcode 2 squadrn account add Bad
+exitcode 2 squadrn account add mcp
+exitcode 2 squadrn account add main
+exitcode 2 squadrn account add
+exitcode 2 squadrn account frob
+exitcode 2 squadrn account ls extra
 
 # rm without a terminal needs --yes; main can never be removed.
-exitcode 2 sprawl account rm work
-exitcode 2 sprawl account rm main --yes
-exec sprawl account rm claude/work --yes
+exitcode 2 squadrn account rm work
+exitcode 2 squadrn account rm main --yes
+exec squadrn account rm claude/work --yes
 stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
 ! exists home/.claude-work
 exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
 stdout '^\[Trash Info\]$'
 stdout '^Path=/.*/home/.claude-work$'
 stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
-exitcode 1 sprawl account rm work --yes
+exitcode 1 squadrn account rm work --yes
 
 -- empty --
 -- settings.json --
@@ -132,9 +132,9 @@ exitcode 1 sprawl account rm work --yes
 {"mcpServers":{
   "codegraph":{"command":"codegraph","args":["serve","--mcp"]},
   "secret":{"command":"x","env":{"TOKEN":"t"}}}}
--- home/.config/sprawl/config.toml --
+-- home/.config/squadrn/config.toml --
 shared_mcp = ["codegraph", "secret", "absent"]
 -- market/.claude-plugin/marketplace.json --
-{"name":"sprawl","plugins":[]}
+{"name":"squadrn","plugins":[]}
 -- inuse.json --
 {"pid":1,"account":"claude/work"}

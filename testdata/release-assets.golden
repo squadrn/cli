@@ -1,4 +1,4 @@
-sprawl_VERSION_darwin_amd64.tar.gz
+squadrn_VERSION_darwin_amd64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
   README.md
@@ -6,10 +6,10 @@ sprawl_VERSION_darwin_amd64.tar.gz
   plugin/README.md
   plugin/agents/locator.md
   plugin/agents/reviewer.md
-  plugin/bin/sprawl-hook
+  plugin/bin/squadrn-hook
   plugin/hooks/hooks.json
-  sprawl
-sprawl_VERSION_darwin_arm64.tar.gz
+  squadrn
+squadrn_VERSION_darwin_arm64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
   README.md
@@ -17,10 +17,10 @@ sprawl_VERSION_darwin_arm64.tar.gz
   plugin/README.md
   plugin/agents/locator.md
   plugin/agents/reviewer.md
-  plugin/bin/sprawl-hook
+  plugin/bin/squadrn-hook
   plugin/hooks/hooks.json
-  sprawl
-sprawl_VERSION_linux_amd64.tar.gz
+  squadrn
+squadrn_VERSION_linux_amd64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
   README.md
@@ -28,10 +28,10 @@ sprawl_VERSION_linux_amd64.tar.gz
   plugin/README.md
   plugin/agents/locator.md
   plugin/agents/reviewer.md
-  plugin/bin/sprawl-hook
+  plugin/bin/squadrn-hook
   plugin/hooks/hooks.json
-  sprawl
-sprawl_VERSION_linux_arm64.tar.gz
+  squadrn
+squadrn_VERSION_linux_arm64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
   README.md
@@ -39,10 +39,10 @@ sprawl_VERSION_linux_arm64.tar.gz
   plugin/README.md
   plugin/agents/locator.md
   plugin/agents/reviewer.md
-  plugin/bin/sprawl-hook
+  plugin/bin/squadrn-hook
   plugin/hooks/hooks.json
-  sprawl
-sprawl_VERSION_windows_amd64.zip
+  squadrn
+squadrn_VERSION_windows_amd64.zip
   .claude-plugin/marketplace.json
   LICENSE
   README.md
@@ -50,10 +50,10 @@ sprawl_VERSION_windows_amd64.zip
   plugin/README.md
   plugin/agents/locator.md
   plugin/agents/reviewer.md
-  plugin/bin/sprawl-hook
+  plugin/bin/squadrn-hook
   plugin/hooks/hooks.json
-  sprawl.exe
-sprawl_VERSION_windows_arm64.zip
+  squadrn.exe
+squadrn_VERSION_windows_arm64.zip
   .claude-plugin/marketplace.json
   LICENSE
   README.md
@@ -61,6 +61,6 @@ sprawl_VERSION_windows_arm64.zip
   plugin/README.md
   plugin/agents/locator.md
   plugin/agents/reviewer.md
-  plugin/bin/sprawl-hook
+  plugin/bin/squadrn-hook
   plugin/hooks/hooks.json
-  sprawl.exe
+  squadrn.exe

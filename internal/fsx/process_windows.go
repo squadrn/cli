@@ -11,7 +11,7 @@ import (
 // stillActive is the exit code GetExitCodeProcess reports for a running process.
 const stillActive = 259
 
-// processAlive reports whether pid runs. A process sprawl may not open is treated as running.
+// processAlive reports whether pid runs. A process squadrn may not open is treated as running.
 func processAlive(pid int) bool {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if err != nil {

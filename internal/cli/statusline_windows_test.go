@@ -10,9 +10,9 @@ func TestStatusLineWordWindows(t *testing.T) {
 		in, want string
 		ok       bool
 	}{
-		{`C:\Users\Jane Doe\.local\share\sprawl\bin\sprawl.exe`, "~/.local/share/sprawl/bin/sprawl.exe", true},
-		{`D:\tools\sprawl.exe`, "D:/tools/sprawl.exe", true},
-		{`D:\my tools\sprawl.exe`, "", false},
+		{`C:\Users\Jane Doe\.local\share\squadrn\bin\squadrn.exe`, "~/.local/share/squadrn/bin/squadrn.exe", true},
+		{`D:\tools\squadrn.exe`, "D:/tools/squadrn.exe", true},
+		{`D:\my tools\squadrn.exe`, "", false},
 		{"powershell -NoProfile -File C:/sl.ps1", "'powershell -NoProfile -File C:/sl.ps1'", true},
 		{"echo it's", "", false},
 	}

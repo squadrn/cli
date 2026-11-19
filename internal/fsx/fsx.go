@@ -197,7 +197,7 @@ func SameFile(a, b string) bool {
 func ReplaceExecutable(src, dst string) error { return replaceExecutable(src, dst) }
 
 // CleanOld removes executables that ReplaceExecutable moved aside in dir once they no longer
-// run (Windows); a no-op elsewhere. Only leftovers of names (file names such as sprawl.exe) are
+// run (Windows); a no-op elsewhere. Only leftovers of names (file names such as squadrn.exe) are
 // touched: dir may be a bin dir other programs share.
 func CleanOld(dir string, names []string) { cleanOld(dir, names, time.Now()) }
 

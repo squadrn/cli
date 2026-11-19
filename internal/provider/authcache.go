@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Target is one account to query: Key identifies it in the cache (the account label, since

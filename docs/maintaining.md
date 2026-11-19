@@ -9,7 +9,7 @@ is lost. Design: [ADR 0007](adr/0007-private-distribution.md).
 |---|---|---|---|
 | `SPRAWL_RELEASES_REPO` | variable, source repo | `hoangthaininh/sprawl-releases` | — |
 | `SPRAWL_RELEASES_TOKEN` | secret, source repo | fine-grained token, *Contents: read and write* on the releases repository only, named `sprawl-releases-publish` | on the date chosen when it was created — [renew](#renew-the-release-token) |
-| `SPRAWL_SIGNING_KEY` | secret, source repo | private ed25519 key that signs `checksums.txt` | never; backups below — [if lost](#signing-key-lost) |
+| `SQUADRN_SIGNING_KEY` | secret, source repo | private ed25519 key that signs `checksums.txt` | never; backups below — [if lost](#signing-key-lost) |
 | signing key backup | your password manager (and `pass` if installed) | copy of the private key | keep it there; GitHub cannot show a secret again |
 | `internal/release/signers.pub` | source repo | public keys every build trusts | — |
 
@@ -60,12 +60,12 @@ standard (non-admin) user with Defender on:
 
 - `install.ps1` in Windows PowerShell 5.1 and PowerShell 7, run as documented (script block, no
   `-Version`); a tampered `checksums.txt` is refused; a failure leaves the PowerShell window open
-- a new terminal finds `sprawl`; `sprawl doctor` is green
-- `sprawl account add`/`login`, run as an account, ctrl-c in a session returns to the prompt
-- `sprawl wt`, `sprawl gc`
+- a new terminal finds `squadrn`; `squadrn doctor` is green
+- `squadrn account add`/`login`, run as an account, ctrl-c in a session returns to the prompt
+- `squadrn wt`, `squadrn gc`
 - push to `main` from the Bash tool, the PowerShell tool and the plain terminal of a session:
   denied or asked each time
-- `sprawl self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
+- `squadrn self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
 - colours and the account picker in Windows Terminal and the classic console
 - `scripts/windows-spike.ps1` once per Claude Code major version (hook and tool behaviour)
 
@@ -85,7 +85,7 @@ If the release workflow fails before publishing, fix it (and delete a leftover d
 1. https://github.com/settings/personal-access-tokens → `sprawl-releases-publish` →
    *Regenerate token* (or create a new one: resource owner `hoangthaininh`, only
    `sprawl-releases`, *Contents: read and write*).
-2. Copy it, then: `pbpaste | gh secret set SPRAWL_RELEASES_TOKEN --repo hoangthaininh/sprawling-agents`
+2. Copy it, then: `pbpaste | gh secret set SPRAWL_RELEASES_TOKEN --repo squadrn/cli`
 3. Copy something else to clear the clipboard.
 4. *Actions → maintenance → Run workflow* to confirm.
 
@@ -101,20 +101,20 @@ Keep a **spare key** so that never happens. Its public key is trusted by every b
 next release on; CI keeps signing with the current key.
 
 ```sh
-scripts/release-key.sh hoangthaininh/sprawling-agents --spare --backup ~/sprawl-spare-signing-key
+scripts/release-key.sh squadrn/cli --spare --backup ~/squadrn-spare-signing-key
 # move the file into your password manager, delete it, commit signers.pub, release
 ```
 
 ### Signing key lost
 
 - **Spare key exists** (in `signers.pub` of the release users run):
-  `gh secret set SPRAWL_SIGNING_KEY --repo hoangthaininh/sprawling-agents < spare-key-file`, then
+  `gh secret set SQUADRN_SIGNING_KEY --repo squadrn/cli < spare-key-file`, then
   create a new spare.
-- **No spare:** `scripts/release-key.sh hoangthaininh/sprawling-agents --backup FILE`, remove the
+- **No spare:** `scripts/release-key.sh squadrn/cli --backup FILE`, remove the
   old public key from `signers.pub`, release, and ask users to reinstall once with `install.sh`.
 
 ### Rotate (key suspected leaked)
 
 1. Create the new key as a spare (above), release once — still signed with the old key.
-2. Put the new key into `SPRAWL_SIGNING_KEY`, remove the old public key from `signers.pub`,
+2. Put the new key into `SQUADRN_SIGNING_KEY`, remove the old public key from `signers.pub`,
    release again.

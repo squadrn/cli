@@ -13,11 +13,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/provider/claude"
-	"sprawling-agents/internal/usage"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/provider/claude"
+	"github.com/squadrn/cli/internal/usage"
 )
 
 const watchEvery = 5 * time.Second
@@ -365,7 +365,7 @@ func settingsPath(acct account.Account) string {
 	return filepath.Join(acct.Dir, acct.Spec.Settings)
 }
 
-// usageTracking: the account's status line already runs sprawl's recorder.
+// usageTracking: the account's status line already runs squadrn's recorder.
 func (a *app) usageTracking(acct account.Account) bool {
 	if !acct.Spec.Caps.UsageReport {
 		return false

@@ -4,7 +4,7 @@ Status: accepted (v2.0.0)
 
 ## Context
 
-Sprawling Agents (formerly squad, ccx) is shared only with invited people. Access must be revocable, installs must not need a Go
+Squadrn is shared only with invited people. Access must be revocable, installs must not need a Go
 toolchain, and downloads must be verifiable.
 
 ## Decision
@@ -22,5 +22,5 @@ A private Homebrew tap was rejected: every user would have to configure a token.
 ## Consequences
 
 - One-line install for invited users; no toolchain, no extra secrets.
-- Repository slug is a build-time value (`-X sprawling-agents/internal/cli.Repo`), set by the release workflow.
+- Repository slug is a build-time value (`-X github.com/squadrn/cli/internal/cli.Repo`), set by the release workflow.
 - Plugin updates require a version change in `plugin.json`; installs stamp the release version.

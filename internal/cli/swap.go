@@ -12,15 +12,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/grid"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/provider/claude"
-	"sprawling-agents/internal/ui"
-	"sprawling-agents/internal/usage"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/grid"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/provider/claude"
+	"github.com/squadrn/cli/internal/ui"
+	"github.com/squadrn/cli/internal/usage"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 // stopWait is how long a stopped session gets to exit before the next step.
@@ -395,7 +395,7 @@ type holder struct {
 }
 
 // holders are the processes that may be writing the conversation: Claude Code sessions listing
-// it in their registry, and sessions sprawl started as from in its directory (recorded both
+// it in their registry, and sessions squadrn started as from in its directory (recorded both
 // there and in from's config dir) unless the registry shows they hold another conversation.
 func (a *app) holders(src swapSource, from account.Account, accts []account.Account, dirs []string) []holder {
 	var out []holder
@@ -430,7 +430,7 @@ func (a *app) holders(src swapSource, from account.Account, accts []account.Acco
 func (a *app) quiesce(hs []holder, yes bool) error {
 	for _, h := range hs {
 		if !inuse.Live(h.pid, h.started) {
-			continue // ended with another holder (Windows: sprawl and its claude child)
+			continue // ended with another holder (Windows: squadrn and its claude child)
 		}
 		if err := a.confirm(yes, "Stop the %s that holds the conversation", h.desc); err != nil {
 			return err

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/release"
 )
 
 // Interval between background checks; failures retry after the same interval.
@@ -90,8 +90,8 @@ func Available(current string, s State, channel string) (string, bool) {
 	return s.Latest, ok && c > 0
 }
 
-// Disabled reports whether checks are turned off by the environment: SPRAWL_NO_UPDATE_CHECK, or
+// Disabled reports whether checks are turned off by the environment: SQUADRN_NO_UPDATE_CHECK, or
 // running under CI.
 func Disabled(getenv func(string) string) bool {
-	return getenv("SPRAWL_NO_UPDATE_CHECK") != "" || getenv("CI") != ""
+	return getenv("SQUADRN_NO_UPDATE_CHECK") != "" || getenv("CI") != ""
 }

@@ -1,4 +1,4 @@
-# Sprawling Agents — agent instructions
+# Squadrn — agent instructions
 
 These instructions apply to every coding agent working in this repository (Claude Code, Codex,
 Gemini, …). `CLAUDE.md` only imports this file.
@@ -8,7 +8,7 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 
 ## Commands
 
-- `make build` — `bin/sprawl`
+- `make build` — `bin/squadrn`
 - `make lint` — golangci-lint, shellcheck, actionlint
 - `make race` — all tests with the race detector (needs `tmux` and `git`)
 - `make check` — lint, race, coverage gates, plugin validation; run before finishing
@@ -23,9 +23,9 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 - External programs run through `internal/proc` (a deadline kills the whole process tree); files
   are written through `internal/fsx` (atomic).
 - The guard fails closed: layer 1 asks, layer 2 denies, when anything is uncertain (ADR 0006).
-- Fixed identifiers never follow the user's command name: config/data/state dirs, `SPRAWL_*`,
-  plugin `sprawl@sprawl`, git key `sprawl.protectedBranches`, tmux options `@sprawl_*`. User-facing
-  text does (`app.cmd`).
+- Fixed identifiers never follow the user's command name: config/data/state dirs, `SQUADRN_*`,
+  plugin `squadrn@squadrn`, git key `squadrn.protectedBranches`, tmux options `@squadrn_*`.
+  User-facing text does (`app.cmd`).
 - Behaviour changes need a test: unit tests for logic, `testdata/script/*.txtar` for commands.
   Scripts run with a fake `claude`, a throwaway HOME and a private tmux server — never real accounts.
 - Coverage gates (`make cover-gates`, CI): `guard` ≥ 95% and the others listed in the Makefile.
@@ -37,7 +37,6 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 - Git 2.31 or newer (`internal/gitver`).
 - Never read or print the release signing key; `scripts/release-key.sh` and CI handle it.
   Releases, secrets and key handling: `docs/maintaining.md`.
-- Previous product names live in `config.PreviousNames`; every legacy identifier derives from it.
 
 ## Commits
 

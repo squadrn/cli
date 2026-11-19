@@ -1,34 +1,34 @@
 #!/bin/sh
-# Installs sprawl from its releases repository (binaries only, no source). Requires gh, logged in
+# Installs squadrn from its releases repository (binaries only, no source). Requires gh, logged in
 # with read access to that repository, and ssh-keygen to verify the release signature.
 #
-#   gh release download -R __SPRAWL_REPO__ -p install.sh -O - | sh
-#   gh release download -R __SPRAWL_REPO__ -p install.sh -O - | sh -s -- --name ai --alias sx
+#   gh release download -R __SQUADRN_REPO__ -p install.sh -O - | sh
+#   gh release download -R __SQUADRN_REPO__ -p install.sh -O - | sh -s -- --name ai --alias sx
 #
 # It installs the release it was downloaded from (gh downloads from the latest release unless a
 # tag is given: gh release download vX.Y.Z -R ...).
 #
 # Options (or environment):
-#   --name NAME       command name (SPRAWL_COMMAND; default: asked, else "sprawl")
-#   --alias A,B       short aliases (SPRAWL_ALIASES; default: asked, else "sra"; '' for none)
-#   --version vX.Y.Z  another release (SPRAWL_VERSION; default: this script's release)
+#   --name NAME       command name (SQUADRN_COMMAND; default: asked, else "squadrn")
+#   --alias A,B       short aliases (SQUADRN_ALIASES; default: asked, else "sqd"; '' for none)
+#   --version vX.Y.Z  another release (SQUADRN_VERSION; default: this script's release)
 #   --repo OWNER/NAME the repository to install from (default: the one this script came from)
 #   --force           accept a name that another program on PATH already uses
 set -eu
 
-repo=__SPRAWL_REPO__
+repo=__SQUADRN_REPO__
 # The release this script was published with; a placeholder in a source checkout.
-release_tag=__SPRAWL_VERSION__
+release_tag=__SQUADRN_VERSION__
 # Public keys allowed to sign releases (ssh-ed25519 lines); empty in unreleased builds.
 signers=$(
   cat <<'SIGNERS'
-__SPRAWL_SIGNERS__
+__SQUADRN_SIGNERS__
 SIGNERS
 )
-name=${SPRAWL_COMMAND:-}
-aliases=${SPRAWL_ALIASES-}
-alias_set=${SPRAWL_ALIASES+yes}
-tag=${SPRAWL_VERSION:-}
+name=${SQUADRN_COMMAND:-}
+aliases=${SQUADRN_ALIASES-}
+alias_set=${SQUADRN_ALIASES+yes}
+tag=${SQUADRN_VERSION:-}
 force=""
 
 die() { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
@@ -46,12 +46,12 @@ done
 
 command -v gh >/dev/null || die "gh is required: https://cli.github.com (then: gh auth login)"
 command -v git >/dev/null || die "git is required"
-# sprawl needs Git 2.31 or newer (gitver.Min); sprawl doctor prints the upgrade command.
+# squadrn needs Git 2.31 or newer (gitver.Min); squadrn doctor prints the upgrade command.
 git_version=$(git version | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
 git_major=${git_version% *}
 git_minor=${git_version#* }
 if [ -z "$git_version" ] || [ "$git_major" -lt 2 ] || { [ "$git_major" -eq 2 ] && [ "$git_minor" -lt 31 ]; }; then
-  die "$(git version) is too old; sprawl needs git 2.31 or newer (macOS: brew install git; Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt install git; Debian: sudo apt install -t <codename>-backports git)"
+  die "$(git version) is too old; squadrn needs git 2.31 or newer (macOS: brew install git; Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt install git; Debian: sudo apt install -t <codename>-backports git)"
 fi
 command -v tar >/dev/null || die "tar is required"
 
@@ -59,7 +59,7 @@ case $(uname -s) in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
   MINGW* | MSYS* | CYGWIN*) die "this is Windows: use install.ps1 in PowerShell instead: & ([scriptblock]::Create((gh release download TAG -R $repo -p install.ps1 -O - | Out-String)))" ;;
-  *) die "unsupported OS $(uname -s); sprawl supports macOS and Linux" ;;
+  *) die "unsupported OS $(uname -s); squadrn supports macOS and Linux" ;;
 esac
 case $(uname -m) in
   x86_64 | amd64) arch=amd64 ;;
@@ -72,7 +72,7 @@ if [ -z "$tag" ]; then
   tag=$(gh release view --repo "$repo" --json tagName --jq .tagName) ||
     die "cannot read releases of $repo; check gh auth status and your access to the repo"
 fi
-asset="sprawl_${tag#v}_${os}_${arch}.tar.gz"
+asset="squadrn_${tag#v}_${os}_${arch}.tar.gz"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -85,8 +85,8 @@ if [ -n "$signed" ]; then
   gh release download "$tag" --repo "$repo" --pattern checksums.txt.sig --dir "$tmp" 2>/dev/null ||
     die "release $tag has no signature (checksums.txt.sig); refusing to install"
   gh release download "$tag" --repo "$repo" --pattern "$asset" --pattern checksums.txt --dir "$tmp"
-  printf '%s\n' "$signers" | grep '^ssh-ed25519 ' | sed 's/^/sprawl /' >"$tmp/allowed_signers"
-  ssh-keygen -Y verify -f "$tmp/allowed_signers" -I sprawl -n sprawl-release -s "$tmp/checksums.txt.sig" <"$tmp/checksums.txt" >/dev/null 2>&1 ||
+  printf '%s\n' "$signers" | grep '^ssh-ed25519 ' | sed 's/^/squadrn /' >"$tmp/allowed_signers"
+  ssh-keygen -Y verify -f "$tmp/allowed_signers" -I squadrn -n squadrn-release -s "$tmp/checksums.txt.sig" <"$tmp/checksums.txt" >/dev/null 2>&1 ||
     die "the release signature is not valid; refusing to install"
   echo "verified release signature"
 else
@@ -117,11 +117,11 @@ fi
 mkdir "$tmp/release"
 tar -xzf "$tmp/$asset" -C "$tmp/release"
 
-set -- "$tmp/release/sprawl" self-install "$tmp/release"
+set -- "$tmp/release/squadrn" self-install "$tmp/release"
 [ -z "$name" ] || set -- "$@" --command "$name"
 [ -z "$alias_set" ] || set -- "$@" --alias "$aliases"
 [ -z "$force" ] || set -- "$@" "$force"
-# sprawl asks for the names itself (on the terminal) unless they were given. /dev/tty can exist
+# squadrn asks for the names itself (on the terminal) unless they were given. /dev/tty can exist
 # yet fail to open (no controlling terminal: CI, ssh -T), so try opening it.
 if [ -z "$name" ] && [ -z "$alias_set" ] && (: </dev/tty >/dev/tty) 2>/dev/null; then
   set -- "$@" --interactive

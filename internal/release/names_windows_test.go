@@ -27,22 +27,22 @@ func TestLinkCommandsWindows(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	res, err := l.LinkCommands([]string{"sprawl", "sx"}, nil, now)
+	res, err := l.LinkCommands([]string{"squadrn", "sx"}, now)
 	if err != nil || len(res.Created) != 2 || len(res.BackedUp) != 1 {
 		t.Fatalf("first install: %+v, %v", res, err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(l.BinDir, "sprawl.exe")); string(b) != "v1" {
+	if b, _ := os.ReadFile(filepath.Join(l.BinDir, "squadrn.exe")); string(b) != "v1" {
 		t.Fatalf("copy = %q", b)
 	}
 	// An update replaces the copies; a dropped alias goes away.
 	if err := os.WriteFile(l.Binary(), []byte("v2"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	res, err = l.LinkCommands([]string{"sprawl"}, nil, now)
+	res, err = l.LinkCommands([]string{"squadrn"}, now)
 	if err != nil || len(res.Removed) != 1 || len(res.Created) != 0 {
 		t.Fatalf("update: %+v, %v", res, err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(l.BinDir, "sprawl.exe")); string(b) != "v2" {
+	if b, _ := os.ReadFile(filepath.Join(l.BinDir, "squadrn.exe")); string(b) != "v2" {
 		t.Fatalf("updated copy = %q", b)
 	}
 	removed, err := l.Unlink()
@@ -66,24 +66,24 @@ func TestReplaceRunningCommand(t *testing.T) {
 	if err := os.WriteFile(l.Binary(), b, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.LinkCommands([]string{"sprawl"}, nil, time.Now()); err != nil {
+	if _, err := l.LinkCommands([]string{"squadrn"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	running := exec.Command(filepath.Join(l.BinDir, "sprawl.exe"), "-n", "30", "127.0.0.1")
+	running := exec.Command(filepath.Join(l.BinDir, "squadrn.exe"), "-n", "30", "127.0.0.1")
 	if err := running.Start(); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = running.Process.Kill(); _ = running.Wait() }()
-	if _, err := l.LinkCommands([]string{"sprawl"}, nil, time.Now()); err != nil {
+	if _, err := l.LinkCommands([]string{"squadrn"}, time.Now()); err != nil {
 		t.Fatalf("replacing a running copy: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(l.BinDir, "sprawl.exe")); err != nil {
+	if _, err := os.Stat(filepath.Join(l.BinDir, "squadrn.exe")); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCheckInstallDir(t *testing.T) {
-	for dir, ok := range map[string]bool{`C:\Users\me\.local\share\sprawl`: true, `C:\a%b\sprawl`: false, `C:\R&D\sprawl`: false, `C:\x^y`: false, `C:\hi!`: false} {
+	for dir, ok := range map[string]bool{`C:\Users\me\.local\share\squadrn`: true, `C:\a%b\squadrn`: false, `C:\R&D\squadrn`: false, `C:\x^y`: false, `C:\hi!`: false} {
 		if err := CheckInstallDir(dir); (err == nil) != ok {
 			t.Errorf("CheckInstallDir(%s) = %v", dir, err)
 		}

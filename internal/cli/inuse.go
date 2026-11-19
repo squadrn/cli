@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 // markInUse records the session about to start in the account's config dir and in the worktree
@@ -58,7 +58,7 @@ func (a *app) sessionDesc(e inuse.Entry) string {
 }
 
 // checkAccountFree refuses to move an account dir while a grid pane runs as the account or,
-// unless force, another session sprawl started still uses it.
+// unless force, another session squadrn started still uses it.
 func (a *app) checkAccountFree(acct account.Account, force bool) error {
 	if p := a.anyPane(acct.Label()); p != "" {
 		return fmt.Errorf("%s is running in tmux pane %s; stop it first", acct.Label(), p)

@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/githook"
-	"sprawling-agents/internal/gitver"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/githook"
+	"github.com/squadrn/cli/internal/gitver"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/release"
 )
 
 type fakeAgent struct {
@@ -64,10 +64,10 @@ func env(t *testing.T, ag provider.Agent, agentErr error) Env {
 	return Env{
 		Store:    account.Store{Home: home},
 		Agent:    func(provider.Spec) (provider.Agent, error) { return ag, agentErr },
-		Layout:   release.Layout{DataDir: filepath.Join(home, ".local/share/sprawl"), BinDir: filepath.Join(home, ".local/bin")},
+		Layout:   release.Layout{DataDir: filepath.Join(home, ".local/share/squadrn"), BinDir: filepath.Join(home, ".local/bin")},
 		LookPath: func(string) (string, error) { return "", errors.New("missing") },
-		Names:    []string{"sprawl"},
-		Command:  "sprawl",
+		Names:    []string{"squadrn"},
+		Command:  "squadrn",
 		Timeout:  5 * time.Second,
 	}
 }
@@ -89,7 +89,7 @@ func fakeInstall(t *testing.T, e Env, decision string) {
 	script := "#!/bin/sh\ncat >/dev/null\n[ \"$1\" = guard-git ] && printf '{\"hookSpecificOutput\":{\"permissionDecision\":\"%s\"}}\\n' " + decision + "\n"
 	for p, b := range map[string][]byte{
 		filepath.Join(root, "hooks", "hooks.json"): hooks,
-		filepath.Join(root, "bin", "sprawl-hook"):  []byte(script),
+		filepath.Join(root, "bin", "squadrn-hook"): []byte(script),
 		e.Layout.Binary():                          []byte("bin"),
 	} {
 		if err := os.WriteFile(p, b, 0o755); err != nil {
@@ -128,7 +128,7 @@ func TestGuardLayers(t *testing.T) {
 
 func TestHookProbe(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("the Windows hooks.json runs sprawl.exe through cmd.exe; covered by the windows e2e script")
+		t.Skip("the Windows hooks.json runs squadrn.exe through cmd.exe; covered by the windows e2e script")
 	}
 	e := env(t, fakeAgent{}, nil)
 	fakeInstall(t, e, "deny")
@@ -143,7 +143,7 @@ func TestHookProbe(t *testing.T) {
 	for body, want := range map[string]string{
 		`{`:                           "invalid",
 		`{"hooks":{"PreToolUse":[]}}`: "no guard-git",
-		`{"hooks":{"PreToolUse":[{"hooks":[{"command":"sh","args":["-c","${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook guard-git"]}]}]}}`: "",
+		`{"hooks":{"PreToolUse":[{"hooks":[{"command":"sh","args":["-c","${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook guard-git"]}]}]}}`: "",
 	} {
 		if err := os.WriteFile(hooks, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -227,14 +227,14 @@ func TestDenyRules(t *testing.T) {
 	e := env(t, fakeAgent{}, nil)
 	e.Layout.DataDir = config.DirsFor(e.Store.Home, config.Slug).Data
 	settings := filepath.Join(e.Store.Home, ".claude", "settings.json")
-	if c, _ := find(e.settings(), "edit sprawl"); c.Status != Warn || !strings.Contains(c.Fix, `"Edit(~/.local/share/sprawl/**)"`) {
+	if c, _ := find(e.settings(), "edit squadrn"); c.Status != Warn || !strings.Contains(c.Fix, `"Edit(~/.local/share/squadrn/**)"`) {
 		t.Fatalf("no settings: %+v", c)
 	}
-	body := `{"permissions":{"deny":["Edit(~/.local/share/sprawl/**)","Write(~/.local/share/sprawl/**)","Edit(~/.config/sprawl/**)","Write(~/.config/sprawl/**)"]}}`
+	body := `{"permissions":{"deny":["Edit(~/.local/share/squadrn/**)","Write(~/.local/share/squadrn/**)","Edit(~/.config/squadrn/**)","Write(~/.config/squadrn/**)"]}}`
 	if err := os.WriteFile(settings, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := find(e.settings(), "cannot edit sprawl"); c.Status != OK {
+	if c, _ := find(e.settings(), "cannot edit squadrn"); c.Status != OK {
 		t.Fatalf("with rules: %+v", c)
 	}
 	if err := os.WriteFile(settings, []byte("{"), 0o600); err != nil {
@@ -246,7 +246,7 @@ func TestDenyRules(t *testing.T) {
 }
 
 func TestAccountChecks(t *testing.T) {
-	e := env(t, fakeAgent{loggedIn: true, plugins: `[{"id":"sprawl@sprawl","enabled":false}]`}, nil)
+	e := env(t, fakeAgent{loggedIn: true, plugins: `[{"id":"squadrn@squadrn","enabled":false}]`}, nil)
 	dir := filepath.Join(e.Store.Home, ".claude-work")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -258,7 +258,7 @@ func TestAccountChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	checks := e.accounts(context.Background())
-	if c, _ := find(checks, "plugin disabled"); c.Status != Fail || c.Fix != "claude plugin enable sprawl@sprawl" {
+	if c, _ := find(checks, "plugin disabled"); c.Status != Fail || c.Fix != "claude plugin enable squadrn@squadrn" {
 		t.Errorf("disabled plugin: %+v", c)
 	}
 	if c, _ := find(checks, "readable by other users"); runtime.GOOS != "windows" && (c.Status != Warn || c.Fix != "chmod 700 ~/.claude-work") {
@@ -296,7 +296,7 @@ func TestRunWithEverythingMissing(t *testing.T) {
 	var checks []Check
 	e.Latest, e.Version = "v1.2.0", "1.0.0"
 	checks = Run(context.Background(), e)
-	for _, want := range []string{"sprawl v1.2.0 is available (you have v1.0.0)", "cannot verify release signatures", "claude not on PATH", "sprawl not on PATH", "git missing", "plugin files not installed", "no settings.json", "logged in as me@x", "sprawl plugin not installed"} {
+	for _, want := range []string{"squadrn v1.2.0 is available (you have v1.0.0)", "cannot verify release signatures", "claude not on PATH", "squadrn not on PATH", "git missing", "plugin files not installed", "no settings.json", "logged in as me@x", "squadrn plugin not installed"} {
 		if _, ok := find(checks, want); !ok {
 			t.Errorf("missing check %q", want)
 		}
@@ -312,7 +312,7 @@ func TestGitCheck(t *testing.T) {
 	e.Git = func(context.Context) (gitver.Version, error) {
 		return gitver.Version{Major: 2, Minor: 30, Patch: 2}, nil
 	}
-	if c := e.gitCheck(context.Background()); c.Status != Fail || !strings.Contains(c.Name, "git 2.30.2 is too old (sprawl needs 2.31 or newer)") || c.Fix != "brew install git" {
+	if c := e.gitCheck(context.Background()); c.Status != Fail || !strings.Contains(c.Name, "git 2.30.2 is too old (squadrn needs 2.31 or newer)") || c.Fix != "brew install git" {
 		t.Errorf("too old: %+v", c)
 	}
 	e.Git = func(context.Context) (gitver.Version, error) { return gitver.Version{Major: 2, Minor: 47}, nil }
@@ -340,7 +340,7 @@ func TestPathFixNamesTheDirectory(t *testing.T) {
 func TestConfigAndInstalledRelease(t *testing.T) {
 	e := env(t, fakeAgent{}, nil)
 	e.ConfigErr = errors.New("config x: unknown key")
-	if c, _ := find(e.install(), "config invalid: config x: unknown key"); c.Status != Fail || !strings.Contains(c.Fix, "sprawl doctor") {
+	if c, _ := find(e.install(), "config invalid: config x: unknown key"); c.Status != Fail || !strings.Contains(c.Fix, "squadrn doctor") {
 		t.Fatalf("config check: %+v", c)
 	}
 	e.ConfigErr = nil
@@ -361,7 +361,7 @@ func TestConfigAndInstalledRelease(t *testing.T) {
 		}
 	}
 	e.Self, e.Version = bin, "1.2.0"
-	if c, _ := find(e.install(), "installed release is incomplete"); c.Status != Fail || c.Fix != "sprawl self-update" {
+	if c, _ := find(e.install(), "installed release is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
 		t.Fatalf("mismatch: %+v", c)
 	}
 	e.Version = "v1.1.0"
@@ -399,9 +399,9 @@ func TestVersions(t *testing.T) {
 
 func TestUsageTrackingLine(t *testing.T) {
 	e := env(t, fakeAgent{loggedIn: true}, nil)
-	e.Command = "sra"
+	e.Command = "sqd"
 	e.Usage = func(account.Account) bool { return false }
-	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (sra usage --setup claude/main)"); !ok || c.Status != OK {
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (sqd usage --setup claude/main)"); !ok || c.Status != OK {
 		t.Errorf("off: %+v", c)
 	}
 	e.Usage = func(account.Account) bool { return true }

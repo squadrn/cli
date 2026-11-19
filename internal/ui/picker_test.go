@@ -159,12 +159,12 @@ func (r *slowReader) Read(p []byte) (int, error) {
 
 func TestPick(t *testing.T) {
 	var out bytes.Buffer
-	i, err := Pick("sprawl ›", items(), &slowReader{chunks: []string{"pers", down, up, enter}}, &out, false)
+	i, err := Pick("squadrn ›", items(), &slowReader{chunks: []string{"pers", down, up, enter}}, &out, false)
 	if err != nil || i != 1 {
 		t.Fatalf("Pick = %d, %v", i, err)
 	}
 	s := out.String()
-	if !strings.Contains(s, "sprawl › pers") || !strings.Contains(s, "\033[3F") || !strings.HasSuffix(s, "\r\033[J\033[?25h") {
+	if !strings.Contains(s, "squadrn › pers") || !strings.Contains(s, "\033[3F") || !strings.HasSuffix(s, "\r\033[J\033[?25h") {
 		t.Fatalf("screen output:\n%q", s)
 	}
 	if _, err := Pick("›", items(), &slowReader{chunks: []string{"x"}}, &out, false); !errors.Is(err, ErrCancelled) {

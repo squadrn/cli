@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"sprawling-agents/internal/install"
+	"github.com/squadrn/cli/internal/install"
 )
 
 // namePrompt asks for the command name and aliases at install time (self-install --interactive).
@@ -49,7 +49,7 @@ func (p *namePrompt) accept(name string, forced map[string]bool) bool {
 	return true
 }
 
-// run asks for both names; Enter keeps the default (the current names, else sprawl and sra).
+// run asks for both names; Enter keeps the default (the current names, else squadrn and sqd).
 // Without more input (EOF) the defaults are returned as they are, for the install to check.
 func (p *namePrompt) run(command string, aliases []string) (string, []string, map[string]bool) {
 	forced := map[string]bool{}
@@ -107,8 +107,8 @@ func (p *namePrompt) aliases(answer, command string, forced map[string]bool) ([]
 	return list, true
 }
 
-// renameSummary describes a change of command names: "command: ai → sprawl (removed: ai, sx,
-// added: sprawl, sra)"; "" when nothing changed.
+// renameSummary describes a change of command names: "command: ai → squadrn (removed: ai, sx,
+// added: squadrn, sqd)"; "" when nothing changed.
 func renameSummary(oldCmd string, oldAliases []string, newCmd string, newAliases []string) string {
 	before := append([]string{oldCmd}, oldAliases...)
 	after := append([]string{newCmd}, newAliases...)

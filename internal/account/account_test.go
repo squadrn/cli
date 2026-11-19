@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 func newStore(t *testing.T, accounts ...string) Store {
@@ -24,7 +24,7 @@ func newStore(t *testing.T, accounts ...string) Store {
 	return Store{Home: home}
 }
 
-// mkAccount creates an account dir as sprawl provisions it (with Marker).
+// mkAccount creates an account dir as squadrn provisions it (with Marker).
 func mkAccount(t *testing.T, dir string) {
 	t.Helper()
 	must(t, os.MkdirAll(dir, 0o755))
@@ -38,7 +38,7 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// codex is a stand-in second provider for resolution tests; it is not registered in sprawl.
+// codex is a stand-in second provider for resolution tests; it is not registered in squadrn.
 var codex = provider.Spec{ID: "codex", Binary: "codex", MainDir: ".codex", DirPrefix: ".codex-", ConfigEnv: "CODEX_HOME"}
 
 func twoProviders(s Store) Store {
@@ -207,9 +207,9 @@ func (f *fakeClaude) Output(_ context.Context, configDir string, args ...string)
 	case call == "plugin list --json":
 		return []byte(f.plugins), nil
 	case strings.HasPrefix(call, "plugin marketplace add"):
-		f.markets = `[{"name":"sprawl"}]`
+		f.markets = `[{"name":"squadrn"}]`
 	case strings.HasPrefix(call, "plugin install"):
-		f.plugins = `[{"id":"sprawl@sprawl"}]`
+		f.plugins = `[{"id":"squadrn@squadrn"}]`
 	}
 	return nil, nil
 }
@@ -327,7 +327,7 @@ func TestProvisionRemovesLinksToItemsMainNoLongerHas(t *testing.T) {
 		t.Error("stale agents link kept")
 	}
 	if _, err := os.Lstat(foreign); err != nil {
-		t.Error("a link sprawl does not manage must be left alone")
+		t.Error("a link squadrn does not manage must be left alone")
 	}
 }
 
@@ -353,53 +353,26 @@ func TestProvisionWithoutMarketplaceSkipsPlugin(t *testing.T) {
 	}
 }
 
-func TestRemoveLegacyPlugins(t *testing.T) {
-	_, a, f, p := provisionFixture(t)
-	f.plugins = `[{"id":"squad@squad"},{"id":"ccx@ccx"},{"id":"other@x"}]` // ccx is no longer a previous name
-	f.markets = `[{"name":"squad"},{"name":"ccx"},{"name":"other"}]`
-	removed, err := p.RemoveLegacyPlugins(context.Background(), a.ConfigDir())
-	if err != nil || !slices.Equal(removed, []string{"squad@squad"}) {
-		t.Fatalf("RemoveLegacyPlugins = %v, %v", removed, err)
-	}
-	var mutations []string
-	for _, c := range f.calls {
-		if strings.Contains(c, "uninstall") || strings.Contains(c, "remove") {
-			mutations = append(mutations, strings.SplitN(c, "|", 2)[1])
-		}
-	}
-	want := []string{"plugin uninstall squad@squad", "plugin marketplace remove squad"}
-	if !slices.Equal(mutations, want) {
-		t.Errorf("mutations = %v", mutations)
-	}
-	f.plugins, f.markets = `[]`, `[]`
-	if removed, _ := p.RemoveLegacyPlugins(context.Background(), a.ConfigDir()); len(removed) != 0 {
-		t.Error("nothing to remove must report nothing")
-	}
-	if !slices.Equal(LegacyPluginIDs(), []string{"squad@squad"}) {
-		t.Errorf("LegacyPluginIDs = %v", LegacyPluginIDs())
-	}
-}
-
 func TestMarkerAdoptAndMigration(t *testing.T) {
 	s := newStore(t, "mine")
-	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-squad"), 0o755)) // another tool's dir
+	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-tool"), 0o755)) // another tool's dir
 	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-legacy"), 0o755))
-	if s.Exists("squad") || s.Exists("legacy") {
+	if s.Exists("tool") || s.Exists("legacy") {
 		t.Fatal("a dir without the marker is an account")
 	}
 	un, err := s.Unmanaged()
 	must(t, err)
-	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "squad" {
+	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "tool" {
 		t.Fatalf("Unmanaged = %+v", un)
 	}
-	// Dirs provisioned before markers carry the sprawl plugin: adopted on sight.
+	// Dirs provisioned before markers carry the squadrn plugin: adopted on sight.
 	s.HasPlugin = func(_ provider.Spec, dir string) bool { return filepath.Base(dir) == ".claude-legacy" }
 	got, err := s.List()
 	must(t, err)
 	if len(got) != 3 || got[1].Name != "legacy" || !isFile(filepath.Join(s.Home, ".claude-legacy", Marker)) {
 		t.Fatalf("List = %+v", got)
 	}
-	a, err := s.Adopt("squad")
+	a, err := s.Adopt("tool")
 	must(t, err)
 	if !s.Managed(a) {
 		t.Fatal("adopted dir is not an account")
