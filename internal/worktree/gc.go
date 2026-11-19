@@ -109,7 +109,7 @@ func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (rem
 			errs = append(errs, fmt.Errorf("%s: %w by pid %d", c.Path, ErrInUse, used[0].PID))
 			continue
 		}
-		err := r.Remove(ctx, c.Worktree, force, c.Action == RemoveSquashed)
+		_, err := r.Remove(ctx, c.Worktree, force, c.Action == RemoveSquashed)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -129,7 +129,15 @@ var (
 	ErrUnmerged = errors.New("branch not fully merged")
 	// ErrInUse means a session squadrn started still runs in the worktree.
 	ErrInUse = errors.New("worktree in use")
+	// ErrNotFound means no agent worktree has the name.
+	ErrNotFound = errors.New("worktree not found")
+	// ErrDirty means a worktree has uncommitted changes or untracked files.
+	ErrDirty = errors.New("has uncommitted changes or untracked files")
 )
+
+// AgentBranch is the branch the agent CLI creates for worktree name. squadrn only ever deletes
+// branches named like this.
+func AgentBranch(name string) string { return branchPrefix + name }
 
 // Find returns the agent worktree name.
 func (r Repo) Find(ctx context.Context, name string) (Worktree, error) {
@@ -142,35 +150,89 @@ func (r Repo) Find(ctx context.Context, name string) (Worktree, error) {
 			return w, nil
 		}
 	}
-	return Worktree{}, fmt.Errorf("worktree not found: %s", r.Dir(name))
+	return Worktree{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 }
 
-// Remove removes agent worktree w. Without forceTree a dirty worktree is refused; without
-// forceBranch the branch is only deleted when merged (it is kept otherwise, reported as
-// ErrUnmerged).
-func (r Repo) Remove(ctx context.Context, w Worktree, forceTree, forceBranch bool) error {
+// BranchExists reports whether the local branch exists.
+func (r Repo) BranchExists(ctx context.Context, branch string) bool {
+	_, err := git(ctx, r.Root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
+	return err == nil
+}
+
+// Unmerged reports whether `git branch -d` would refuse branch: it has commits outside its
+// upstream, or outside HEAD when it has none.
+func (r Repo) Unmerged(ctx context.Context, branch string) (bool, error) {
+	target := "HEAD"
+	if up, err := git(ctx, r.Root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", branch+"@{upstream}"); err == nil && up != "" {
+		target = up
+	}
+	_, err := git(ctx, r.Root, "merge-base", "--is-ancestor", "refs/heads/"+branch, target)
+	if err == nil {
+		return false, nil
+	}
+	if proc.ExitCode(err) == 1 {
+		return true, nil
+	}
+	return false, fmt.Errorf("cannot tell whether %s is merged: %s", branch, gitReason(err))
+}
+
+// DeleteBranch deletes the agent branch of worktree name, merged or not; it is used once the
+// worktree itself is gone.
+func (r Repo) DeleteBranch(ctx context.Context, name string) error {
+	if _, err := git(ctx, r.Root, "branch", "-D", AgentBranch(name)); err != nil {
+		return fmt.Errorf("cannot delete branch %s: %s", AgentBranch(name), gitReason(err))
+	}
+	return nil
+}
+
+// Remove removes agent worktree w and returns the branch it deleted ("" when none). Without
+// forceTree a dirty worktree is refused; without forceBranch the branch is only deleted when
+// merged (it is kept otherwise, reported as ErrUnmerged).
+func (r Repo) Remove(ctx context.Context, w Worktree, forceTree, forceBranch bool) (string, error) {
+	name, _ := r.Name(w)
 	args := []string{"worktree", "remove", w.Path}
 	if forceTree {
 		args = []string{"worktree", "remove", "--force", w.Path}
 	} else if dirty, err := Dirty(ctx, w.Path); err != nil || dirty {
 		// git's own check honours status.showUntrackedFiles=no and would delete untracked files.
-		return fmt.Errorf("%s has uncommitted changes or untracked files (or its status is unavailable)", w.Path)
+		return "", fmt.Errorf("%s %w (or its status is unavailable)", name, ErrDirty)
 	}
 	if _, err := git(ctx, r.Root, args...); err != nil {
-		return err
+		return "", fmt.Errorf("git cannot remove worktree %s: %s", name, gitReason(err))
 	}
-	name, _ := r.Name(w)
-	if w.Branch == "" || w.Branch != branchPrefix+name {
-		return nil // not a branch the agent CLI made for this worktree: never delete it
+	if w.Branch == "" || w.Branch != AgentBranch(name) {
+		return "", nil // not a branch the agent CLI made for this worktree: never delete it
 	}
 	flag := "-d"
 	if forceBranch {
 		flag = "-D" // not an ancestor of base, but its PR is merged (or the user forced it)
 	}
 	if _, err := git(ctx, r.Root, "branch", flag, w.Branch); err != nil {
-		return fmt.Errorf("%w: kept branch %s (%w)", ErrUnmerged, w.Branch, err)
+		return "", fmt.Errorf("%w: kept branch %s", ErrUnmerged, w.Branch)
 	}
-	return nil
+	return w.Branch, nil
+}
+
+// gitReason is the first line git printed for a failure, without its "fatal:"/"error:" prefix
+// and hints.
+func gitReason(err error) string {
+	msg := err.Error()
+	if _, after, ok := strings.Cut(msg, "exit status "); ok {
+		if _, rest, ok := strings.Cut(after, ": "); ok {
+			msg = rest
+		}
+	}
+	for _, line := range strings.Split(msg, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "hint:") {
+			continue
+		}
+		for _, p := range []string{"fatal: ", "error: "} {
+			line = strings.TrimPrefix(line, p)
+		}
+		return line
+	}
+	return msg
 }
 
 // Fetch refreshes origin so merge checks see the latest default branch. No origin is fine.

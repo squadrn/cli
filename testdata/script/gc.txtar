@@ -74,30 +74,53 @@ stdout '^fix-dirty +worktree-fix-dirty +modified +-$'
 exec squadrn wt ls --json
 stdout '"dirty": true'
 ! exec squadrn wt rm fix-dirty
+stderr '^srn: fix-dirty has uncommitted changes or untracked files .*remove it anyway with --force$'
+! stderr '/'
 exists .claude/worktrees/fix-dirty
 exec squadrn wt rm fix-dirty --force --yes
 ! exists .claude/worktrees/fix-dirty
 
-# A worktree a session uses is kept unless --force.
+# A worktree a session uses is kept unless --force, which says why it asks.
 ! exec squadrn wt rm feat-busy
 stderr 'feat-busy is in use by pid 1 \(claude/main\); stop it first \(or use --force\)'
+exitcode 2 squadrn wt rm feat-busy --force
+! exec squadrn wt rm feat-busy --force
+stderr 'remove feat-busy \(in use by pid 1 \(claude/main\)\); re-run with --yes'
+! stderr 'uncommitted'
 exec squadrn wt rm feat-busy --force --yes
 ! exists .claude/worktrees/feat-busy
 
-# --force removes a modified worktree but keeps its unmerged branch; --force-branch deletes it.
+# An unmerged branch is refused before anything is removed; --force-branch removes both.
+! exec squadrn wt rm feat-open
+stderr 'feat-open has commits that are not merged \(branch worktree-feat-open\); .*--force-branch'
+exists .claude/worktrees/feat-open
 exitcode 2 squadrn wt rm feat-open --force-branch
-exec squadrn wt rm feat-open
+! exec squadrn wt rm feat-open --force-branch
+stderr 'remove feat-open \(unmerged commits on worktree-feat-open\)'
+exec squadrn wt rm feat-open --force-branch --yes
 stdout 'removed worktree feat-open'
-stderr 'kept branch worktree-feat-open'
-stderr 'delete it with --force-branch'
-exec git branch -D worktree-feat-open
-exec git worktree add -q -b worktree-feat-gone .claude/worktrees/feat-gone
-exec git -C .claude/worktrees/feat-gone commit -q --allow-empty -m wip
-exec squadrn wt rm feat-gone --force-branch --yes
-stdout 'removed worktree feat-gone'
-exec git branch --list worktree-feat-gone
+stdout 'deleted branch worktree-feat-open'
+! exists .claude/worktrees/feat-open
+exec git branch --list worktree-feat-open
 ! stdout .
+
+# A branch left without its worktree is deleted with --force-branch.
+exec git branch worktree-feat-orphan
+! exec squadrn wt rm feat-orphan
+stderr 'worktree feat-orphan is gone, but its branch worktree-feat-orphan is left; delete it with --force-branch'
+exec squadrn wt rm feat-orphan --force-branch -y
+stdout '^deleted branch worktree-feat-orphan$'
+exec git branch --list worktree-feat-orphan
+! stdout .
+
+# A merged branch goes with its worktree.
+exec git worktree add -q -b worktree-feat-merged2 .claude/worktrees/feat-merged2
+exec squadrn wt rm feat-merged2
+stdout 'removed worktree feat-merged2'
+stdout 'deleted branch worktree-feat-merged2'
 exitcode 1 squadrn wt rm nope
+! exec squadrn wt rm nope
+stderr '^srn: worktree not found: nope$'
 exitcode 2 squadrn wt rm Bad_Name
 
 cd $WORK

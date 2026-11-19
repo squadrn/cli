@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -148,5 +149,40 @@ func removeNamed(t *testing.T, repo Repo, name string, forceTree, forceBranch bo
 	if err != nil {
 		return err
 	}
-	return repo.Remove(context.Background(), w, forceTree, forceBranch)
+	_, err = repo.Remove(context.Background(), w, forceTree, forceBranch)
+	return err
+}
+
+func TestUnmergedAndOrphanBranch(t *testing.T) {
+	ctx := context.Background()
+	root := newRepoWithOrigin(t)
+	repo := Repo{Root: root, Subdir: ".claude/worktrees"}
+	run(t, root, "branch", AgentBranch("merged"))
+	run(t, root, "worktree", "add", "-q", "-b", AgentBranch("open"), ".claude/worktrees/open")
+	run(t, repo.Dir("open"), "commit", "-q", "--allow-empty", "-m", "work")
+	if u, err := repo.Unmerged(ctx, AgentBranch("merged")); err != nil || u {
+		t.Fatalf("merged branch: unmerged=%v, %v", u, err)
+	}
+	if u, err := repo.Unmerged(ctx, AgentBranch("open")); err != nil || !u {
+		t.Fatalf("open branch: unmerged=%v, %v", u, err)
+	}
+	if _, err := repo.Unmerged(ctx, "no-such-branch"); err == nil {
+		t.Fatal("a missing branch has no merge state")
+	}
+	if _, err := repo.Find(ctx, "merged"); !errors.Is(err, ErrNotFound) || err.Error() != "worktree not found: merged" {
+		t.Fatalf("Find = %v", err)
+	}
+	if !repo.BranchExists(ctx, AgentBranch("merged")) || repo.BranchExists(ctx, AgentBranch("nope")) {
+		t.Fatal("BranchExists")
+	}
+	if err := repo.DeleteBranch(ctx, "merged"); err != nil || repo.BranchExists(ctx, AgentBranch("merged")) {
+		t.Fatalf("DeleteBranch: %v", err)
+	}
+	if err := repo.DeleteBranch(ctx, "merged"); err == nil || strings.Contains(err.Error(), "fatal:") || strings.Contains(err.Error(), "exit status") {
+		t.Fatalf("a missing branch: %v", err)
+	}
+	w, _ := repo.Find(ctx, "open")
+	if b, err := repo.Remove(ctx, w, false, true); err != nil || b != AgentBranch("open") {
+		t.Fatalf("Remove = %q, %v", b, err)
+	}
 }

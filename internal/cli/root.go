@@ -314,12 +314,20 @@ func (a *app) printJSON(v any) error {
 
 // confirm asks a yes/no question on the terminal. yes skips it; without a terminal the command
 // must be re-run with --yes. "no" (or anything but y/yes) aborts with exit 1.
+// lowerFirst turns a question ("Remove x") into the start of an error message ("remove x").
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
+}
+
 func (a *app) confirm(yes bool, format string, args ...any) error {
 	if yes {
 		return nil
 	}
 	if !a.interactive {
-		return usagef("%s; re-run with --yes to confirm", fmt.Sprintf(format, args...))
+		return usagef("%s; re-run with --yes to confirm", lowerFirst(fmt.Sprintf(format, args...)))
 	}
 	a.errf("%s? [y/N] ", fmt.Sprintf(format, args...))
 	line, err := bufio.NewReader(a.stdin).ReadString('\n')

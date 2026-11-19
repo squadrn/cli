@@ -16,7 +16,7 @@ env FAKE_HOLD=
 # It is found from Claude Code's registry; without a terminal --yes is needed.
 exitcode 2 squadrn swap --to personal
 ! exec squadrn swap --to personal
-stderr 'Stop the claude/work session \(pid [0-9]+\) that holds the conversation; re-run with --yes'
+stderr 'stop the claude/work session \(pid [0-9]+\) that holds the conversation; re-run with --yes'
 ! exists $WORK/home/.claude-personal/projects/-repo/11111111-1111-4111-8111-111111111111.jsonl
 
 # --session names it too; -y stops it, then the conversation moves.
