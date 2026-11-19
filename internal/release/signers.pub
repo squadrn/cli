@@ -1,3 +1,3 @@
 # Release signing keys (public): one "ssh-ed25519 <key> <comment>" per line.
 # Generate the key pair with scripts/release-key.sh; it adds the public key here.
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINgBPutB3ZX8it5Z1YYRA2QPhwVwRuGOnxDDu12OaF65 sprawl-release-20261118
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINgBPutB3ZX8it5Z1YYRA2QPhwVwRuGOnxDDu12OaF65 squadrn-release-20261118

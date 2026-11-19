@@ -1,7 +1,7 @@
 name: maintenance
 
-# Monthly check of what releases depend on. A failed run makes GitHub email the owner, so an
-# expiring token or a signing key that no longer matches is noticed before a release needs it.
+# Monthly check of what releases depend on. A failed run makes GitHub email the owner, so a
+# signing key that no longer matches is noticed before a release needs it.
 on:
   schedule:
     - cron: "0 3 1 * *" # 03:00 UTC on the 1st of every month
@@ -11,32 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  release-secrets:
+  signing-key:
     runs-on: ubuntu-latest
-    env:
-      RELEASES_REPO: ${{ vars.SPRAWL_RELEASES_REPO }}
-      WARN_DAYS: 21
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: SPRAWL_RELEASES_TOKEN can reach the releases repository and is not about to expire
-        env:
-          GH_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
-        run: |
-          [ -n "$GH_TOKEN" ] || { echo "::error::secret SPRAWL_RELEASES_TOKEN is not set (docs/maintaining.md)"; exit 1; }
-          headers=$(gh api -i "repos/$RELEASES_REPO" 2>&1) || { echo "::error::SPRAWL_RELEASES_TOKEN cannot read $RELEASES_REPO: expired or revoked (docs/maintaining.md)"; exit 1; }
-          expiry=$(printf '%s\n' "$headers" | tr -d '\r' | sed -n 's/^github-authentication-token-expiration: //Ip' | head -n 1)
-          if [ -z "$expiry" ]; then
-            echo "token has no expiry date"
-            exit 0
-          fi
-          days=$(( ($(date -d "$expiry" +%s) - $(date +%s)) / 86400 ))
-          echo "SPRAWL_RELEASES_TOKEN expires $expiry ($days days)"
-          if [ "$days" -lt "$WARN_DAYS" ]; then
-            echo "::error::SPRAWL_RELEASES_TOKEN expires in $days days; renew it (docs/maintaining.md)"
-            exit 1
-          fi
       - name: SQUADRN_SIGNING_KEY matches a key in signers.pub
         env:
           SQUADRN_SIGNING_KEY: ${{ secrets.SQUADRN_SIGNING_KEY }}

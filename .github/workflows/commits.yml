@@ -1,0 +1,38 @@
+name: commits
+
+# Every change, docs-only ones included: commit messages follow Conventional Commits and carry no
+# AI attribution (AGENTS.md).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commits-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Commit messages (Conventional Commits, no AI attribution)
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD_SHA"
+          elif [ -n "$BEFORE" ] && ! printf '%s' "$BEFORE" | grep -q '^0*$' && git cat-file -e "$BEFORE" 2>/dev/null; then
+            range="$BEFORE..$HEAD_SHA"
+          else
+            range="$HEAD_SHA" # first push or force push: the whole history
+          fi
+          scripts/commitlint.sh --range "$range"
