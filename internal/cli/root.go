@@ -596,11 +596,11 @@ func (a *app) marketplaceDir() string {
 	return a.layout.Marketplace()
 }
 
-func (a *app) provision(acct account.Account, r provider.Runner) error {
+func (a *app) provision(acct account.Account, ag provider.Agent) error {
 	if a.cfgErr != nil {
 		return a.cfgErr
 	}
-	p := account.Provisioner{Store: a.store, Runner: r, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
+	p := account.Provisioner{Store: a.store, Agent: ag, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
 	rep, err := p.Provision(context.Background(), acct)
 	a.out("account %s → %s\n", acct.Label(), a.tilde(acct.Dir))
 	for _, l := range rep.Linked {
@@ -622,7 +622,7 @@ func (a *app) provision(acct account.Account, r provider.Runner) error {
 		a.out("  mcp missing %s (not configured in main)\n", m)
 	}
 	if rep.PluginInstalled {
-		a.out("  plugin installed %s\n", account.PluginID)
+		a.out("  plugin installed %s\n", acct.Spec.Plugin)
 	}
 	return err
 }

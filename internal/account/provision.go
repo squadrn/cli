@@ -10,24 +10,18 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
-const (
-	MarketplaceName = "squadrn"
-	PluginID        = "squadrn@squadrn"
-)
-
 // Provisioner prepares an account dir. It is idempotent: re-running repairs missing pieces.
 type Provisioner struct {
-	Store  Store
-	Runner provider.Runner
+	Store Store
+	Agent provider.Agent
 	// SharedMCP is the allowlist of user-scope MCP servers copied from main.
 	SharedMCP []string
-	// Marketplace is a local dir holding .claude-plugin/marketplace.json; "" skips the plugin.
+	// Marketplace is the local dir holding the squadrn plugin marketplace; "" skips the plugin.
 	Marketplace string
 }
 
@@ -64,7 +58,10 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 	if !a.Spec.Caps.Plugins {
 		return r, nil
 	}
-	installed, err := p.InstallPlugin(ctx, a.ConfigDir())
+	if p.Marketplace == "" {
+		return r, nil
+	}
+	installed, err := p.Agent.InstallPlugin(ctx, a.ConfigDir(), p.Marketplace)
 	if err != nil {
 		return r, err
 	}
@@ -170,7 +167,7 @@ func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
 		return err
 	}
 	for _, name := range p.SharedMCP {
-		if _, err := p.Runner.Output(ctx, a.ConfigDir(), "mcp", "get", name); err == nil {
+		if p.Agent.HasMCP(ctx, a.ConfigDir(), name) {
 			continue
 		}
 		raw, ok := servers[name]
@@ -180,7 +177,7 @@ func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
 		case carriesSecrets(raw):
 			r.MCPSkipped = append(r.MCPSkipped, name)
 		default:
-			if _, err := p.Runner.Output(ctx, a.ConfigDir(), "mcp", "add-json", "-s", "user", name, string(raw)); err != nil {
+			if err := p.Agent.AddMCP(ctx, a.ConfigDir(), name, raw); err != nil {
 				return err
 			}
 			r.MCPAdded = append(r.MCPAdded, name)
@@ -214,62 +211,6 @@ func carriesSecrets(raw json.RawMessage) bool {
 		return true
 	}
 	return len(s.Env) > 0 || len(s.Headers) > 0
-}
-
-// InstallPlugin registers the local marketplace and installs the squadrn plugin for one config dir.
-// It reports whether anything was installed; with no marketplace it does nothing.
-func (p Provisioner) InstallPlugin(ctx context.Context, configDir string) (bool, error) {
-	if p.Marketplace == "" {
-		return false, nil
-	}
-	markets, err := listNames(ctx, p.Runner, configDir, "name", "plugin", "marketplace", "list", "--json")
-	if err != nil {
-		return false, err
-	}
-	if !markets[MarketplaceName] {
-		if _, err := p.Runner.Output(ctx, configDir, "plugin", "marketplace", "add", p.Marketplace); err != nil {
-			return false, err
-		}
-	}
-	plugins, err := listNames(ctx, p.Runner, configDir, "id", "plugin", "list", "--json")
-	if err != nil {
-		return false, err
-	}
-	if plugins[PluginID] {
-		return false, nil
-	}
-	if _, err := p.Runner.Output(ctx, configDir, "plugin", "install", PluginID, "--scope", "user"); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// UpdatePlugin refreshes the marketplace and plugin after the files on disk changed.
-func (p Provisioner) UpdatePlugin(ctx context.Context, configDir string) error {
-	if _, err := p.Runner.Output(ctx, configDir, "plugin", "marketplace", "update", MarketplaceName); err != nil {
-		return err
-	}
-	_, err := p.Runner.Output(ctx, configDir, "plugin", "update", PluginID)
-	return err
-}
-
-// listNames runs a claude `... --json` listing and returns the set of values of field.
-func listNames(ctx context.Context, c provider.Runner, configDir, field string, args ...string) (map[string]bool, error) {
-	out, err := c.Output(ctx, configDir, args...)
-	if err != nil {
-		return nil, err
-	}
-	var items []map[string]any
-	if err := json.Unmarshal(out, &items); err != nil {
-		return nil, fmt.Errorf("parse claude %s: %w", strings.Join(args, " "), err)
-	}
-	set := make(map[string]bool, len(items))
-	for _, it := range items {
-		if v, ok := it[field].(string); ok {
-			set[v] = true
-		}
-	}
-	return set, nil
 }
 
 // Refresh is what RefreshShared found that the user should know about.

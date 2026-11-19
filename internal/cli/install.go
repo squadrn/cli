@@ -203,7 +203,7 @@ func (a *app) installPlugins() {
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		for _, r := range install.Plugins(ctx, same, a.store, ag, a.layout.DataDir) {
+		for _, r := range install.Plugins(ctx, same, ag, a.layout.DataDir) {
 			if r.Action == install.PluginFailed {
 				a.errf("  %s: plugin update failed: %v\n", r.Account.Label(), r.Err)
 				continue

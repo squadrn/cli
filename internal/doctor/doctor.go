@@ -544,28 +544,20 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 }
 
 func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g string) Check {
-	b, err := ag.Output(ctx, a.ConfigDir(), "plugin", "list", "--json")
-	if err != nil {
+	installed, enabled, err := ag.PluginState(ctx, a.ConfigDir())
+	switch {
+	case err != nil:
 		return bad(g, Warn, "cannot list plugins", "")
-	}
-	var plugins []struct {
-		ID      string `json:"id"`
-		Enabled bool   `json:"enabled"`
-	}
-	_ = json.Unmarshal(b, &plugins)
-	status := bad(g, Fail, "squadrn plugin not installed (no git push guard)", e.Command+" account add "+a.Label())
-	if a.IsMain() {
-		status.Fix = reinstallHint
-	}
-	for _, p := range plugins {
-		if p.ID == account.PluginID {
-			status = ok(g, "squadrn plugin enabled")
-			if !p.Enabled {
-				status = bad(g, Fail, "squadrn plugin disabled (no git push guard)", a.Spec.Binary+" plugin enable "+account.PluginID)
-			}
+	case !installed:
+		fix := e.Command + " account add " + a.Label()
+		if a.IsMain() {
+			fix = reinstallHint
 		}
+		return bad(g, Fail, "squadrn plugin not installed (no git push guard)", fix)
+	case !enabled:
+		return bad(g, Fail, "squadrn plugin disabled (no git push guard)", a.Spec.Binary+" "+strings.Join(ag.EnablePluginArgs(), " "))
 	}
-	return status
+	return ok(g, "squadrn plugin enabled")
 }
 
 func (e Env) links(a account.Account, g string) []Check {

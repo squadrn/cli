@@ -45,6 +45,8 @@ type Spec struct {
 	// Subcommands of the agent CLI: `squadrn <account> <subcommand>` passes them through, and
 	// they cannot be account names.
 	Subcommands []string
+	// Plugin is the squadrn plugin's ID in the CLI.
+	Plugin string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
 	InstallHint  string
 	NativeMarker string
@@ -91,6 +93,18 @@ type Agent interface {
 	LogoutArgs() []string
 	WorktreeArgs(name string) []string
 	ResumeArgs(session string) []string
+
+	// The squadrn plugin (Caps.Plugins), installed from the local marketplace dir. InstallPlugin
+	// reports whether it installed it (false: it was there already).
+	InstallPlugin(ctx context.Context, configDir, marketplace string) (bool, error)
+	UpdatePlugin(ctx context.Context, configDir string) error
+	RemovePlugin(ctx context.Context, configDir string) error
+	PluginState(ctx context.Context, configDir string) (installed, enabled bool, err error)
+	EnablePluginArgs() []string
+
+	// User-scope MCP servers (Caps.SharedMCP); config is a server's JSON definition.
+	HasMCP(ctx context.Context, configDir, name string) bool
+	AddMCP(ctx context.Context, configDir, name string, config []byte) error
 }
 
 var Claude = Spec{
@@ -110,6 +124,7 @@ var Claude = Spec{
 		"agents", "attach", "auth", "auto-mode", "doctor", "gateway", "import", "install", "logs", "mcp",
 		"migrate-installer", "plugin", "plugins", "purge", "respawn", "setup-token", "update",
 	},
+	Plugin:       "squadrn@squadrn",
 	InstallHint:  "curl -fsSL https://claude.ai/install.sh | bash",
 	NativeMarker: "/.local/share/claude/versions/",
 	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},
