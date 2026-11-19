@@ -184,7 +184,7 @@ func (a *app) wtRmCmd() *cobra.Command {
 				return err
 			}
 			ignored, _ := worktree.Ignored(ctx, w.Path)
-			err = repo.RemoveOne(ctx, name, force, forceBranch)
+			err = repo.Remove(ctx, w, force, forceBranch)
 			if err != nil && !errors.Is(err, worktree.ErrUnmerged) {
 				return err
 			}
@@ -199,6 +199,14 @@ func (a *app) wtRmCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "also delete the branch when it is not merged")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation with --force or --force-branch")
 	return cmd
+}
+
+// gcReason says why gc keeps or removes a worktree.
+func (a *app) gcReason(c worktree.Candidate) string {
+	if len(c.InUse) > 0 {
+		return "in use by " + a.sessionDesc(c.InUse[0])
+	}
+	return c.Reason
 }
 
 // ignoredNote tells that ignored files (build output, dependencies) went with a worktree.
@@ -244,7 +252,7 @@ func (a *app) gcCmd() *cobra.Command {
 				rows := make([]gcRow, len(cands))
 				for i, c := range cands {
 					name, _ := repo.Name(c.Worktree)
-					rows[i] = gcRow{Name: name, Branch: c.Branch, Action: c.Action, Reason: c.Reason, Ignored: c.Ignored}
+					rows[i] = gcRow{Name: name, Branch: c.Branch, Action: c.Action, Reason: a.gcReason(c), Ignored: c.Ignored}
 				}
 				return a.printJSON(map[string]any{"base": base, "worktrees": rows})
 			}
@@ -272,7 +280,7 @@ func (a *app) gcCmd() *cobra.Command {
 			a.out("base: %s\n", base)
 			for _, c := range cands {
 				name, _ := repo.Name(c.Worktree)
-				a.out("  %-16s %-32s %s%s\n", c.Action, name, c.Reason, ignoredNote(c.Ignored))
+				a.out("  %-16s %-32s %s%s\n", c.Action, name, a.gcReason(c), ignoredNote(c.Ignored))
 			}
 			if !yes {
 				a.out("dry run; re-run with --yes to remove\n")

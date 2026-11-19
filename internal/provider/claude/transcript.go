@@ -84,20 +84,14 @@ func FindSession(configDirs []string, id string) (Session, error) {
 	if !ValidSessionID(id) {
 		return Session{}, fmt.Errorf("%q: %w", id, ErrBadSessionID)
 	}
-	var best Session
-	found := false
-	for i, dir := range configDirs {
+	s, err := latest(configDirs, func(dir string) []string {
 		files, _ := filepath.Glob(filepath.Join(dir, "projects", "*", id+".jsonl"))
-		for _, f := range files {
-			if s, ok := sessionAt(f, i); ok && (!found || s.ModTime.After(best.ModTime)) {
-				best, found = s, true
-			}
-		}
+		return files
+	})
+	if err != nil {
+		return Session{}, fmt.Errorf("session %s: %w", id, err)
 	}
-	if !found {
-		return Session{}, fmt.Errorf("session %s: %w", id, ErrNoSession)
-	}
-	return best, nil
+	return s, nil
 }
 
 // LatestSession returns the most recently written conversation in project folder key across

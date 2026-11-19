@@ -177,7 +177,7 @@ func TestGCKeepsInUseAndForeignBranches(t *testing.T) {
 	for _, c := range cands {
 		got[filepath.Base(c.Path)] = c
 	}
-	if c := got["feat-used"]; c.Action != Keep || !strings.Contains(c.Reason, "in use (pid") || !strings.Contains(c.Reason, "claude/x") {
+	if c := got["feat-used"]; c.Action != Keep || len(c.InUse) != 1 || c.InUse[0].Account != "claude/x" {
 		t.Fatalf("feat-used = %+v", c)
 	}
 	if c := got["feat-pending"]; c.Action != Keep || !strings.HasPrefix(c.Reason, "in use") {
@@ -208,8 +208,7 @@ func TestGCKeepsInUseAndForeignBranches(t *testing.T) {
 	_ = inuse.Release(root)
 }
 
-func TestRemoveOneForceFlagsAreSeparate(t *testing.T) {
-	ctx := context.Background()
+func TestRemoveForceFlagsAreSeparate(t *testing.T) {
 	root := newRepoWithOrigin(t)
 	repo := Repo{Root: root, Subdir: ".claude/worktrees"}
 	run(t, root, "worktree", "add", "-q", "-b", "worktree-feat-a", ".claude/worktrees/feat-a")
@@ -217,7 +216,7 @@ func TestRemoveOneForceFlagsAreSeparate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo.Dir("feat-a"), "x"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RemoveOne(ctx, "feat-a", true, false); !errors.Is(err, ErrUnmerged) {
+	if err := removeNamed(t, repo, "feat-a", true, false); !errors.Is(err, ErrUnmerged) {
 		t.Fatalf("--force without --force-branch: %v", err)
 	}
 	if err := exec.Command("git", "-C", root, "rev-parse", "--verify", "-q", "refs/heads/worktree-feat-a").Run(); err != nil {

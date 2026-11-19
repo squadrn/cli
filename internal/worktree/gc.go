@@ -23,6 +23,8 @@ type Candidate struct {
 	Worktree
 	Action Action
 	Reason string
+	// InUse lists the sessions running in the worktree; such a worktree is kept.
+	InUse []inuse.Entry
 	// Ignored counts ignored paths (build output, node_modules) that removal deletes.
 	Ignored int
 }
@@ -47,15 +49,6 @@ func (r Repo) InUse(w Worktree) []inuse.Entry {
 	return out
 }
 
-func describe(entries []inuse.Entry) string {
-	e := entries[0]
-	s := fmt.Sprintf("in use (pid %d", e.PID)
-	if e.Account != "" {
-		s += ", " + e.Account
-	}
-	return s + ")"
-}
-
 // SquashMerged reports whether branch was merged through a PR (squash or rebase merges leave
 // no ancestry for git to see). nil disables the check.
 type SquashMerged func(ctx context.Context, branch string) bool
@@ -70,8 +63,8 @@ func (r Repo) Classify(ctx context.Context, base string, squashed SquashMerged) 
 	out := make([]Candidate, 0, len(agents))
 	for _, wt := range agents {
 		c := Candidate{Worktree: wt, Action: Keep}
-		if used := r.InUse(wt); len(used) > 0 {
-			c.Reason = describe(used)
+		if c.InUse = r.InUse(wt); len(c.InUse) > 0 {
+			c.Reason = "in use"
 			out = append(out, c)
 			continue
 		}
@@ -112,10 +105,10 @@ func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (rem
 			continue
 		}
 		if used := r.InUse(c.Worktree); len(used) > 0 {
-			errs = append(errs, fmt.Errorf("%s: %w: %s", c.Path, ErrInUse, describe(used)))
+			errs = append(errs, fmt.Errorf("%s: %w by pid %d", c.Path, ErrInUse, used[0].PID))
 			continue
 		}
-		if err := r.remove(ctx, c.Worktree, force, c.Action == RemoveSquashed); err != nil {
+		if err := r.Remove(ctx, c.Worktree, force, c.Action == RemoveSquashed); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -148,18 +141,10 @@ func (r Repo) Find(ctx context.Context, name string) (Worktree, error) {
 	return Worktree{}, fmt.Errorf("worktree not found: %s", r.Dir(name))
 }
 
-// RemoveOne removes the agent worktree name. Without forceTree git refuses a dirty worktree;
-// without forceBranch the branch is only deleted when merged (it is kept otherwise, reported as
+// Remove removes agent worktree w. Without forceTree a dirty worktree is refused; without
+// forceBranch the branch is only deleted when merged (it is kept otherwise, reported as
 // ErrUnmerged).
-func (r Repo) RemoveOne(ctx context.Context, name string, forceTree, forceBranch bool) error {
-	w, err := r.Find(ctx, name)
-	if err != nil {
-		return err
-	}
-	return r.remove(ctx, w, forceTree, forceBranch)
-}
-
-func (r Repo) remove(ctx context.Context, w Worktree, forceTree, forceBranch bool) error {
+func (r Repo) Remove(ctx context.Context, w Worktree, forceTree, forceBranch bool) error {
 	args := []string{"worktree", "remove", w.Path}
 	if forceTree {
 		args = []string{"worktree", "remove", "--force", w.Path}
