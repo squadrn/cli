@@ -165,13 +165,6 @@ func newStore(cfg config.Config, cfgErr error) (account.Store, error) {
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
 	}
-	// Accounts provisioned before account markers carry squadrn's plugin.
-	store.HasPlugin = func(spec provider.Spec, dir string) bool {
-		if spec.ID != provider.Claude.ID {
-			return false
-		}
-		return claude.HasPlugin(dir, account.PluginID)
-	}
 	return store, nil
 }
 
