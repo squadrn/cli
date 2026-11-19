@@ -1,6 +1,6 @@
-# 0010 — Product name Squadrn (`squadrn`, alias `srn`)
+# 0010 — Product name Squadrn (command `srn`, alias `squadrn`)
 
-Status: accepted (v1.0.0)
+Status: accepted (v1.0.0); default command amended (v1.0.0-rc.2)
 
 ## Context
 
@@ -15,7 +15,14 @@ provider-neutral, since Squadrn drives several agent CLIs.
 - Checked before choosing: the `squadrn` organizations on GitHub and npm are ours; no command
   `squadrn` or `srn` in Homebrew, Debian or on a default macOS/Linux PATH.
 - Accepted risk: the spelling invites the typo "squadron". The command is what people type, and
-  the default alias `srn` sidesteps it.
+  the default command `srn` sidesteps it.
+- Default command `srn`, alias `squadrn` (amended in v1.0.0-rc.2; v1.0.0-rc.1 installed `squadrn`
+  with the alias `srn`). The command is typed all day, so the default is the short name. The full
+  name stays as the alias: it is what people find in the docs and search for, and the name to fall
+  back to where `srn` is taken. `srn` is less unique: the npm package `srn` installs a command of
+  that name. The installer's name check handles it, as for any name: a different program on PATH
+  under a chosen name is refused (or confirmed at the terminal, or forced with `--force`), so the
+  user picks another name instead of shadowing it.
 
 Fixed identifiers (they never follow the user's command name, ADR 0004):
 
@@ -23,7 +30,7 @@ Fixed identifiers (they never follow the user's command name, ADR 0004):
 |---|---|
 | Repository, Go module | `github.com/squadrn/squadrn` |
 | Binary, `cmd/` dir | `squadrn` (`squadrn.exe`) |
-| Default command, alias | `squadrn`, `srn` |
+| Default command, alias | `srn`, `squadrn` (installs keep the names they were given) |
 | Config/data/state/cache dirs | `~/.config/squadrn`, `~/.local/share/squadrn`, `~/.local/state/squadrn`, `~/.cache/squadrn` |
 | Environment variables | `SQUADRN_*` |
 | Plugin, marketplace, hook shim | `squadrn@squadrn`, `squadrn-hook` |

@@ -42,7 +42,7 @@ also stops its grandchildren.
 
 ## Key flows
 
-**Routing.** `squadrn [globals] [<account>] <command|agent args|-- prompt>`. Subcommands win over
+**Routing.** `srn [globals] [<account>] <command|agent args|-- prompt>`. Subcommands win over
 account names, agent subcommands (`Spec.Subcommands`) pass through, anything else is a usage error
 with suggestions. `hook …` is dispatched before config, store or cobra, so it cannot fail open.
 
@@ -84,7 +84,7 @@ the `rate_limits` it receives (`provider/claude`), finds the account from `CLAUD
 merges the observation into `~/.local/state/squadrn/usage/<provider>-<name>.json` (`usage.Store`)
 and passes the wrapped command's output through. The plugin's `StopFailure` hook (matcher
 `rate_limit`) runs `squadrn hook limit`, which records the limit with a reset estimate and sends a
-desktop notification. `squadrn usage` reads the store, derives each account's state
+desktop notification. `srn usage` reads the store, derives each account's state
 (`usage.Effective`) and ranks the accounts a conversation could move to (`usage.Rank`), the same
 ranking `swap` offers ([ADR 0009](adr/0009-usage-and-session-handoff.md)).
 

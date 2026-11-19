@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-rc.2
+
+- **Breaking:** the default command is now `srn`, with `squadrn` as its alias (was `squadrn` with
+  the alias `srn`); the installers and `self-install --interactive` offer the new defaults. Existing
+  installs keep their configured names; to switch, run `squadrn config set command srn` (an alias
+  promoted to command swaps places with it), then `srn config set aliases squadrn`.
+
 ## 1.0.0-rc.1
 
 First public release of Squadrn: run Claude Code as several of your own accounts, in parallel git
