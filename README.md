@@ -239,7 +239,6 @@ squadrn grid ~/repo feat-1 feat-2 feat-3 --spread        # spread over logged-in
 squadrn grid ~/repo personal:chore-c                     # add a pane to the running grid
 squadrn grid ls | attach [repo] | stop [repo]            # manage running grids
 squadrn ps [--json]                                      # which agent runs as which account
-squadrn swap [--to personal]                             # continue the conversation on another account
 squadrn deps feat-a                                      # install dependencies (exit status passes through)
 squadrn gc [--json]                                      # merged/empty worktrees; --yes removes them
 squadrn gc --yes --force                                 # also those git refuses (submodules)
@@ -327,13 +326,6 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 `0` ok · `1` error, or "no" at a confirmation · `2` usage or invalid input · `130` cancelled
 (ctrl-c, esc) · `deps` passes the package manager's status through. Commands with `--json` print
 machine-readable output on stdout.
-
-## Releasing (maintainer)
-
-Releases are published in this repository by the `release` workflow when a `vX.Y.Z` tag is
-pushed (ADR 0007): GoReleaser with the workflow's own token, signed with `SQUADRN_SIGNING_KEY`.
-Steps and key handling: [docs/maintaining.md](docs/maintaining.md). A monthly `maintenance`
-workflow checks that the signing secret still matches `signers.pub`.
 
 ## Development
 
