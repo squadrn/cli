@@ -41,6 +41,9 @@ func TestMain(m *testing.M) {
 			if v := os.Getenv("SQUADRN_TEST_VERSION"); v != "" {
 				Version = v
 			}
+			if v := os.Getenv("SQUADRN_TEST_API"); v != "" {
+				githubAPI = v
+			}
 			os.Exit(Run(os.Args[1:]))
 		},
 	}
@@ -163,7 +166,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 
@@ -234,6 +237,9 @@ func TestScript(t *testing.T) {
 				_ = kill.Run()
 				_ = os.RemoveAll(sock)
 			})
+			api := fakeGitHub(env.WorkDir)
+			env.Defer(api.Close)
+			env.Setenv("SQUADRN_TEST_API", api.URL)
 			env.Setenv("SHIM", shim)
 			env.Setenv("REPO_ROOT", filepath.Dir(filepath.Dir(filepath.Dir(shim))))
 			env.Setenv("HOME", home)
@@ -252,7 +258,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "GH_TOKEN", "GITHUB_TOKEN", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
 				env.Setenv(k, "")
 			}
 			return nil

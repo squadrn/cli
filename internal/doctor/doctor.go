@@ -171,8 +171,10 @@ func (e Env) install() []Check {
 		name   string
 		status Status
 		why    string
-	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", Warn, "needed by self-update, gc PR detection and the branch protection check"}} {
+	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", OK, "optional: PR detection in gc, the branch protection check, build provenance"}} {
 		switch _, err := e.LookPath(t.name); {
+		case err != nil && t.status == OK:
+			out = append(out, ok(g, t.name+" not installed ("+t.why+")"))
 		case err != nil:
 			out = append(out, bad(g, t.status, t.name+" missing ("+t.why+")", "install "+t.name))
 		case t.name == "git":

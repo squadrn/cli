@@ -76,12 +76,15 @@ exitcode 2 squadrn self-update
 ! exec squadrn self-update
 stderr 'no release repository configured; pass --repo owner/name'
 
-# A published release, served by a fake gh: archive for this platform plus checksums.
+# A published release, served by a fake GitHub API ($SQUADRN_TEST_API): archive for this
+# platform plus checksums. No gh needed; a fake one only answers attestation and auth queries.
 env SQUADRN_REPO=me/squadrn
 env COPYFILE_DISABLE=1
 exec sh -c 'os=$(uname -s | tr A-Z a-z); case $(uname -m) in x86_64|amd64) arch=amd64;; *) arch=arm64;; esac; mkdir -p pub && tar -czf "pub/squadrn_9.9.9_${os}_${arch}.tar.gz" -C rel . && cd pub && (sha256sum * 2>/dev/null || shasum -a 256 *) > checksums.txt'
 cp fakegh bin/gh
 chmod 755 bin/gh
+mkdir api
+cp releases.json api/releases.json
 
 # The build trusts a key, and the release is signed with it.
 exec ssh-keygen -q -t ed25519 -N '' -C test -f relkey
@@ -119,8 +122,28 @@ exec squadrn config set update_channel stable
 exitcode 2 squadrn config set update_channel nightly
 exitcode 2 squadrn self-update --rollback --check
 
+# A token raises the API rate limit: GH_TOKEN wins, else gh's login. Downloads carry none.
+env GH_TOKEN=tok123
+exec squadrn self-update --repo me/squadrn --check
+grep 'releases auth=Bearer tok123' api/requests.log
+env GH_TOKEN=
+rm api/requests.log
+exec squadrn self-update --repo me/squadrn --check
+grep 'releases auth=Bearer from-gh' api/requests.log
+
+# Rate limits and unknown repositories are named.
+cp empty api/ratelimited
+! exec squadrn self-update --repo me/squadrn --check
+stderr 'GitHub API rate limit reached \(set GH_TOKEN or GITHUB_TOKEN to raise it\)'
+rm api/ratelimited
+mv api/releases.json api/releases.off
+! exec squadrn self-update --repo me/other --check
+stderr 'cannot list releases of me/other: me/other not found, or it is not a public repository'
+mv api/releases.off api/releases.json
+
 exec squadrn self-update --repo me/squadrn
 stdout 'verified release signature'
+grep '/api-asset/checksums.txt auth=Bearer from-gh' api/requests.log
 ! stderr 'attestation'
 stdout 'installed squadrn v9.9.9 → ~/.local/share/squadrn/bin/squadrn'
 stdout 'claude/main: plugin updated'
@@ -217,25 +240,15 @@ env SQUADRN_TEST_VERSION=
 -- fakegh --
 #!/bin/sh
 case "$1 $2" in
-  "release list") echo '[{"tagName":"v10.0.0-rc.1","isPrerelease":true,"isDraft":false},{"tagName":"v9.9.9","isPrerelease":false,"isDraft":false},{"tagName":"v8.0.0","isPrerelease":false,"isDraft":false}]' ;;
-  "release view")
-    case "$3" in v9.9.9|v10.0.0-rc.1|v8.0.0) ;; *) echo "release not found" >&2; exit 1 ;; esac
-    printf '## 9.9.9\n- faster grids\n' ;;
-  "release download")
-    shift 3
-    pats=""
-    while [ $# -gt 0 ]; do
-      case "$1" in
-        --pattern) pats="$pats $2"; shift 2 ;;
-        --dir) dest=$2; shift 2 ;;
-        *) shift ;;
-      esac
-    done
-    for p in $pats; do
-      [ -e "$WORK/pub/$p" ] || { echo "no assets match the file pattern" >&2; exit 1; }
-      cp "$WORK/pub/$p" "$dest/" || exit 1
-    done ;;
+  "auth token") echo from-gh ;;
   "attestation verify") echo "Error: no attestations found for subject" >&2; exit 1 ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
+-- releases.json --
+[
+  {"tag_name":"v10.0.0-rc.1","prerelease":true,"draft":false,"body":"## 10.0.0-rc.1\n- next"},
+  {"tag_name":"v9.9.9","prerelease":false,"draft":false,"body":"## 9.9.9\n- faster grids"},
+  {"tag_name":"v8.0.0","prerelease":false,"draft":false,"body":"## 8.0.0"}
+]
+-- empty --
 -- home/.claude-personal/.squadrn-account --
