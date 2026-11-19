@@ -87,7 +87,7 @@ tree home/.config/squadrn
 cmp stdout layout-config.txt
 
 -- help-root.txt --
-srn runs coding agents (today: Claude Code) as one of several accounts on this machine.
+Squadrn runs coding agents (today: Claude Code) as one of several accounts on this machine.
 
 Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.
 

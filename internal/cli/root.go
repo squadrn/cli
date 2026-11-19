@@ -202,9 +202,9 @@ func (a *app) rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   c + " [<account>] [<command> | agent args... | -- prompt]",
 		Short: "Run coding agents across multiple accounts and parallel worktrees",
-		Long: fmt.Sprintf(`%[1]s runs coding agents (today: Claude Code) as one of several accounts on this machine.
+		Long: `Squadrn runs coding agents (today: Claude Code) as one of several accounts on this machine.
 
-Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.`, c),
+Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.`,
 		Example: fmt.Sprintf(`  %[1]s                                  pick an account interactively
   %[1]s personal                         run as claude/personal (also: -a personal, claude/personal)
   %[1]s personal -p "hi"                 agent flags go to the agent CLI
