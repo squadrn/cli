@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // Handoff is one conversation moved between accounts.

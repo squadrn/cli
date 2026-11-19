@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,26 +16,46 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/doctor"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/gitver"
-	"github.com/squadrn/cli/internal/install"
-	"github.com/squadrn/cli/internal/proc"
-	"github.com/squadrn/cli/internal/release"
-	"github.com/squadrn/cli/internal/update"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/doctor"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/gitver"
+	"github.com/squadrn/squadrn/internal/install"
+	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn/internal/update"
 )
 
 // Repo is the GitHub repository releases come from, set at build time with
-// -ldflags "-X github.com/squadrn/cli/internal/cli.Repo=owner/squadrning-agents". Only the --repo flag
+// -ldflags "-X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn". Only the --repo flag
 // overrides it: an environment variable could be planted to redirect updates.
 var Repo = ""
 
-const ghTimeout = 5 * time.Minute
+// githubAPI is where releases are looked up; tests point it at a fake server.
+var githubAPI = update.DefaultAPI
 
-func gh(ctx context.Context, bin string, args ...string) (string, error) {
-	out, err := proc.Output(ctx, proc.Options{}, bin, args...)
-	return strings.TrimSpace(string(out)), err
+const updateTimeout = 5 * time.Minute
+
+// maxDownload bounds one downloaded release file.
+const maxDownload = 256 << 20
+
+// github is the release source. A token (GH_TOKEN, GITHUB_TOKEN, else gh's login when gh is
+// installed) only raises the API rate limit; releases are public.
+func (a *app) github(ctx context.Context) update.GitHub {
+	token := os.Getenv("GH_TOKEN")
+	if token == "" {
+		token = os.Getenv("GITHUB_TOKEN")
+	}
+	if token == "" {
+		if bin, err := exec.LookPath("gh"); err == nil {
+			tctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			if out, err := proc.Output(tctx, proc.Options{}, bin, "auth", "token"); err == nil {
+				token = strings.TrimSpace(string(out))
+			}
+			cancel()
+		}
+	}
+	return update.GitHub{API: githubAPI, Token: token}
 }
 
 func (a *app) selfUpdateCmd() *cobra.Command {
@@ -81,27 +100,6 @@ func (a *app) updateStatePath() string {
 	return filepath.Join(config.DirsFor(a.store.Home, config.Slug).Cache, "update.json")
 }
 
-// releases lists the published releases of repo.
-func releases(ctx context.Context, ghBin, repo string) ([]update.Release, error) {
-	out, err := gh(ctx, ghBin, "release", "list", "--repo", repo, "--limit", "50", "--json", "tagName,isPrerelease,isDraft")
-	if err != nil {
-		return nil, err
-	}
-	var list []struct {
-		TagName      string `json:"tagName"`
-		IsPrerelease bool   `json:"isPrerelease"`
-		IsDraft      bool   `json:"isDraft"`
-	}
-	if err := json.Unmarshal([]byte(out), &list); err != nil {
-		return nil, fmt.Errorf("parse release list: %w", err)
-	}
-	rels := make([]update.Release, len(list))
-	for i, r := range list {
-		rels[i] = update.Release{Tag: r.TagName, Prerelease: r.IsPrerelease, Draft: r.IsDraft}
-	}
-	return rels, nil
-}
-
 func (a *app) selfUpdate(o updateOptions) error {
 	repo := o.repo
 	if repo == "" {
@@ -114,29 +112,22 @@ func (a *app) selfUpdate(o updateOptions) error {
 		}
 		return usagef("no release repository configured; pass --repo owner/name")
 	}
-	ghBin, err := exec.LookPath("gh")
-	if err != nil {
-		if o.background {
-			update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel, Err: "gh is not installed"})
-			return nil
-		}
-		return fmt.Errorf("gh is required, logged in with access to %s", repo)
-	}
-	timeout := ghTimeout
+	timeout := updateTimeout
 	if o.background {
 		timeout = 30 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	gh := a.github(ctx)
 	tag := normalizeTag(o.tag)
 	if tag == "" {
-		rels, err := releases(ctx, ghBin, repo)
+		rels, err := gh.Releases(ctx, repo)
 		if err != nil {
 			if o.background {
 				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel, Err: err.Error()})
 				return nil
 			}
-			return fmt.Errorf("cannot list releases of %s: %s", repo, ghFailure(err, repo, ""))
+			return fmt.Errorf("cannot list releases of %s: %s", repo, releaseFailure(err, repo, ""))
 		}
 		if tag = update.Newest(rels, channel); tag == "" {
 			if o.background {
@@ -147,11 +138,13 @@ func (a *app) selfUpdate(o updateOptions) error {
 		}
 		prev := update.Load(a.updateStatePath())
 		update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Latest: tag, Channel: channel, NotifiedAt: prev.NotifiedAt})
-	} else if _, err := gh(ctx, ghBin, "release", "view", tag, "--repo", repo, "--json", "tagName"); err != nil {
-		return fmt.Errorf("cannot install %s: %s", tag, ghFailure(err, repo, tag))
 	}
 	if o.background {
 		return nil
+	}
+	rel, err := gh.Release(ctx, repo, tag)
+	if err != nil {
+		return fmt.Errorf("cannot install %s: %s", tag, releaseFailure(err, repo, tag))
 	}
 	if !o.asJSON {
 		a.warnOutsideLayout()
@@ -161,7 +154,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 	upToDate := tag == current || (comparable && cmp == 0)
 	repair := upToDate && a.needsRepair(tag)
 	if o.check {
-		return a.reportCheck(ctx, ghBin, repo, tag, current, channel, upToDate, repair, o.asJSON)
+		return a.reportCheck(rel.Body, tag, current, channel, upToDate, repair, o.asJSON)
 	}
 	switch {
 	case upToDate && !repair:
@@ -181,20 +174,24 @@ func (a *app) selfUpdate(o updateOptions) error {
 	// The signature comes first and on its own: a release without one is refused with a clear
 	// reason, before the archive is downloaded.
 	if a.signers != "" {
-		if _, err := gh(ctx, ghBin, "release", "download", tag, "--repo", repo, "--pattern", release.SignatureName, "--dir", tmp); err != nil {
-			if missingAsset(err) {
-				return fmt.Errorf("release %s has no signature (%s); refusing to install it", tag, release.SignatureName)
-			}
-			return fmt.Errorf("download the signature of %s: %s", tag, ghFailure(err, repo, tag))
+		sig, ok := rel.Asset(release.SignatureName)
+		if !ok {
+			return fmt.Errorf("release %s has no signature (%s); refusing to install it", tag, release.SignatureName)
+		}
+		if err := gh.Download(ctx, sig, filepath.Join(tmp, release.SignatureName), maxDownload); err != nil {
+			return fmt.Errorf("download the signature of %s: %s", tag, releaseFailure(err, repo, tag))
 		}
 	}
-	if _, err := gh(ctx, ghBin, "release", "download", tag, "--repo", repo, "--pattern", asset, "--pattern", release.ChecksumsName, "--dir", tmp); err != nil {
-		if missingAsset(err) {
+	for _, name := range []string{asset, release.ChecksumsName} {
+		file, ok := rel.Asset(name)
+		if !ok {
 			return fmt.Errorf("release %s has no %s or %s (no build for %s/%s?)", tag, asset, release.ChecksumsName, runtime.GOOS, runtime.GOARCH)
 		}
-		return fmt.Errorf("download %s: %s", tag, ghFailure(err, repo, tag))
+		if err := gh.Download(ctx, file, filepath.Join(tmp, name), maxDownload); err != nil {
+			return fmt.Errorf("download %s: %s", name, releaseFailure(err, repo, tag))
+		}
 	}
-	if err := a.verifyRelease(ctx, ghBin, tmp, asset, repo); err != nil {
+	if err := a.verifyRelease(ctx, tmp, asset, repo); err != nil {
 		return err
 	}
 	src := filepath.Join(tmp, "release")
@@ -205,16 +202,14 @@ func (a *app) selfUpdate(o updateOptions) error {
 }
 
 // reportCheck prints what self-update --check found.
-func (a *app) reportCheck(ctx context.Context, ghBin, repo, tag, current, channel string, upToDate, repair, asJSON bool) error {
+func (a *app) reportCheck(body, tag, current, channel string, upToDate, repair, asJSON bool) error {
 	available := !upToDate
 	if c, ok := release.Compare(tag, current); ok && c < 0 {
 		available = false
 	}
 	notes := ""
 	if available {
-		if n, err := gh(ctx, ghBin, "release", "view", tag, "--repo", repo, "--json", "body", "--jq", ".body"); err == nil {
-			notes = strings.TrimSpace(n)
-		}
+		notes = strings.TrimSpace(body)
 	}
 	if asJSON {
 		return a.printJSON(map[string]any{"current": current, "latest": tag, "channel": channel, "available": available, "repair": repair, "notes": notes})
@@ -275,35 +270,20 @@ func normalizeTag(tag string) string {
 	return tag
 }
 
-// missingAsset reports gh's answer for a download pattern that matches no asset.
-func missingAsset(err error) bool {
-	return strings.Contains(err.Error(), "no assets match")
-}
-
-// ghFailure turns a gh error into what the user can act on: a missing release, a login or
-// access problem, or the network.
-func ghFailure(err error, repo, tag string) string {
-	msg := err.Error()
-	low := strings.ToLower(msg)
+// releaseFailure turns a release lookup error into what the user can act on.
+func releaseFailure(err error, repo, tag string) string {
 	switch {
-	case tag != "" && (strings.Contains(low, "release not found") || strings.Contains(low, "http 404") || strings.Contains(low, "not found")):
-		return fmt.Sprintf("release %s not found in %s (see: gh release list -R %s)", tag, repo, repo)
-	case strings.Contains(low, "http 404") || strings.Contains(low, "could not resolve to a repository"):
-		return fmt.Sprintf("%s not found, or your GitHub account has no access to it", repo)
-	case strings.Contains(low, "http 401") || strings.Contains(low, "gh auth login") || strings.Contains(low, "authentication"):
-		return "gh is not logged in (run: gh auth login): " + msg
-	case strings.Contains(low, "http 403"):
-		return fmt.Sprintf("no access to %s (ask its owner for read access, or check gh auth status): %s", repo, msg)
-	case strings.Contains(low, "dial tcp") || strings.Contains(low, "no such host") || strings.Contains(low, "timeout") ||
-		strings.Contains(low, "connection") || strings.Contains(low, "network"):
-		return "network error, try again later: " + msg
+	case errors.Is(err, update.ErrNotFound) && tag != "":
+		return fmt.Sprintf("release %s not found in %s (see: https://github.com/%s/releases)", tag, repo, repo)
+	case errors.Is(err, update.ErrNotFound):
+		return fmt.Sprintf("%s not found, or it is not a public repository", repo)
 	}
-	return msg
+	return err.Error()
 }
 
 // verifyRelease checks, in order: the signature of checksums.txt against the keys built into
 // this binary, the archive's checksum, and GitHub build provenance where it exists.
-func (a *app) verifyRelease(ctx context.Context, ghBin, dir, asset, repo string) error {
+func (a *app) verifyRelease(ctx context.Context, dir, asset, repo string) error {
 	sums, err := os.ReadFile(filepath.Join(dir, release.ChecksumsName))
 	if err != nil {
 		return err
@@ -323,7 +303,7 @@ func (a *app) verifyRelease(ctx context.Context, ghBin, dir, asset, repo string)
 	if err := release.VerifyChecksum(filepath.Join(dir, release.ChecksumsName), archive); err != nil {
 		return err
 	}
-	return a.verifyAttestation(ctx, ghBin, archive, repo)
+	return a.verifyAttestation(ctx, archive, repo)
 }
 
 // releaseNotes indents the first max lines of a release body.
@@ -348,17 +328,22 @@ func (a *app) rollback() error {
 	return a.installRelease(prev, version, nameChoice{})
 }
 
-// verifyAttestation checks the build provenance GitHub attached to the archive. Private
-// repositories on plans without artifact attestations have none; the signature covers them.
-func (a *app) verifyAttestation(ctx context.Context, ghBin, archive, repo string) error {
+// verifyAttestation checks the build provenance GitHub attached to the archive, as an extra
+// when gh is installed; the signature is what installs rely on.
+func (a *app) verifyAttestation(ctx context.Context, archive, repo string) error {
+	bin, _ := exec.LookPath("gh")
+	if bin == "" {
+		return nil
+	}
 	owner, _, _ := strings.Cut(repo, "/")
-	_, err := gh(ctx, ghBin, "attestation", "verify", archive, "--owner", owner)
+	out, err := proc.Output(ctx, proc.Options{}, bin, "attestation", "verify", archive, "--owner", owner)
 	if err == nil {
 		a.out("verified build provenance of %s\n", filepath.Base(archive))
 		return nil
 	}
-	msg := err.Error()
-	if strings.Contains(msg, "no attestations found") || strings.Contains(msg, "unknown command") || strings.Contains(msg, "HTTP 404") || strings.Contains(msg, "HTTP 403") {
+	msg := err.Error() + " " + string(out)
+	if strings.Contains(msg, "no attestations found") || strings.Contains(msg, "unknown command") || strings.Contains(msg, "HTTP 404") ||
+		strings.Contains(msg, "HTTP 403") || strings.Contains(msg, "gh auth login") || strings.Contains(msg, "not logged") {
 		if a.signers == "" {
 			a.warnf("%s has no build attestation; verified by checksum only", filepath.Base(archive))
 		}

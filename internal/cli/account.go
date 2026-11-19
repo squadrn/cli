@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/squadrn/internal/account"
 )
 
 func (a *app) accountCmd() *cobra.Command {

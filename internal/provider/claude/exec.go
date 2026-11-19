@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/squadrn/cli/internal/proc"
-	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 const configDirEnv = "CLAUDE_CONFIG_DIR"

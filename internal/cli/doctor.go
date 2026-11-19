@@ -9,11 +9,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/doctor"
-	"github.com/squadrn/cli/internal/gitver"
-	"github.com/squadrn/cli/internal/proc"
-	"github.com/squadrn/cli/internal/update"
-	"github.com/squadrn/cli/internal/worktree"
+	"github.com/squadrn/squadrn/internal/doctor"
+	"github.com/squadrn/squadrn/internal/gitver"
+	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/update"
+	"github.com/squadrn/squadrn/internal/worktree"
 )
 
 func (a *app) doctorCmd() *cobra.Command {

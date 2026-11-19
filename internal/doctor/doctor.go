@@ -16,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/githook"
-	"github.com/squadrn/cli/internal/gitver"
-	"github.com/squadrn/cli/internal/proc"
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/githook"
+	"github.com/squadrn/squadrn/internal/gitver"
+	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/release"
 )
 
 type Status int
@@ -171,8 +171,10 @@ func (e Env) install() []Check {
 		name   string
 		status Status
 		why    string
-	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", Warn, "needed by self-update, gc PR detection and the branch protection check"}} {
+	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", OK, "optional: PR detection in gc, the branch protection check, build provenance"}} {
 		switch _, err := e.LookPath(t.name); {
+		case err != nil && t.status == OK:
+			out = append(out, ok(g, t.name+" not installed ("+t.why+")"))
 		case err != nil:
 			out = append(out, bad(g, t.status, t.name+" missing ("+t.why+")", "install "+t.name))
 		case t.name == "git":

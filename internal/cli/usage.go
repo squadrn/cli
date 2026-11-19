@@ -13,11 +13,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/provider/claude"
-	"github.com/squadrn/cli/internal/usage"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider/claude"
+	"github.com/squadrn/squadrn/internal/usage"
 )
 
 const watchEvery = 5 * time.Second

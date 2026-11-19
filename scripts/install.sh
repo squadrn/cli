@@ -1,12 +1,12 @@
 #!/bin/sh
-# Installs squadrn from its releases repository (binaries only, no source). Requires gh, logged in
-# with read access to that repository, and ssh-keygen to verify the release signature.
+# Installs squadrn from its GitHub releases. Needs curl or wget, tar, git 2.31 or newer, and
+# ssh-keygen to verify the release signature. No GitHub account or gh needed.
 #
-#   gh release download -R __SQUADRN_REPO__ -p install.sh -O - | sh
-#   gh release download -R __SQUADRN_REPO__ -p install.sh -O - | sh -s -- --name ai --alias sx
+#   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --name ai --alias sx
 #
-# It installs the release it was downloaded from (gh downloads from the latest release unless a
-# tag is given: gh release download vX.Y.Z -R ...).
+# It installs the release it was downloaded from (latest/download is the newest stable release;
+# releases/download/vX.Y.Z/install.sh is that release).
 #
 # Options (or environment):
 #   --name NAME       command name (SQUADRN_COMMAND; default: asked, else "squadrn")
@@ -14,9 +14,12 @@
 #   --version vX.Y.Z  another release (SQUADRN_VERSION; default: this script's release)
 #   --repo OWNER/NAME the repository to install from (default: the one this script came from)
 #   --force           accept a name that another program on PATH already uses
+# SQUADRN_INSTALL_BASE replaces https://github.com/OWNER/NAME/releases/download (a mirror, or a
+# local directory holding <tag>/<files> for tests); signatures are verified all the same.
 set -eu
 
 repo=__SQUADRN_REPO__
+case $repo in */*) ;; *) repo=squadrn/squadrn ;; esac
 # The release this script was published with; a placeholder in a source checkout.
 release_tag=__SQUADRN_VERSION__
 # Public keys allowed to sign releases (ssh-ed25519 lines); empty in unreleased builds.
@@ -44,7 +47,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-command -v gh >/dev/null || die "gh is required: https://cli.github.com (then: gh auth login)"
+if command -v curl >/dev/null; then
+  fetch() { curl -fsSL --retry 2 --connect-timeout 20 -o "$2" "$1"; }
+elif command -v wget >/dev/null; then
+  fetch() { wget -q -T 60 -O "$2" "$1"; }
+else
+  die "curl or wget is required"
+fi
 command -v git >/dev/null || die "git is required"
 # squadrn needs Git 2.31 or newer (gitver.Min); squadrn doctor prints the upgrade command.
 git_version=$(git version | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
@@ -58,7 +67,7 @@ command -v tar >/dev/null || die "tar is required"
 case $(uname -s) in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
-  MINGW* | MSYS* | CYGWIN*) die "this is Windows: use install.ps1 in PowerShell instead: & ([scriptblock]::Create((gh release download TAG -R $repo -p install.ps1 -O - | Out-String)))" ;;
+  MINGW* | MSYS* | CYGWIN*) die "this is Windows: in PowerShell run: irm https://github.com/$repo/releases/latest/download/install.ps1 | iex" ;;
   *) die "unsupported OS $(uname -s); squadrn supports macOS and Linux" ;;
 esac
 case $(uname -m) in
@@ -68,32 +77,42 @@ case $(uname -m) in
 esac
 
 case $release_tag in v[0-9]*) [ -n "$tag" ] || tag=$release_tag ;; esac
-if [ -z "$tag" ]; then
-  tag=$(gh release view --repo "$repo" --json tagName --jq .tagName) ||
-    die "cannot read releases of $repo; check gh auth status and your access to the repo"
-fi
-asset="squadrn_${tag#v}_${os}_${arch}.tar.gz"
-
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 trap 'rm -rf "$tmp"; exit 130' INT TERM
+if [ -z "$tag" ]; then
+  fetch "https://api.github.com/repos/$repo/releases/latest" "$tmp/latest.json" ||
+    die "cannot look up the latest release of $repo (network, or GitHub API rate limit)"
+  tag=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' "$tmp/latest.json" | head -n 1)
+  [ -n "$tag" ] || die "cannot read the latest release of $repo"
+fi
+asset="squadrn_${tag#v}_${os}_${arch}.tar.gz"
+base=${SQUADRN_INSTALL_BASE:-https://github.com/$repo/releases/download}
+# get FILE: one file of the release into $tmp; a local base directory is copied from.
+get() {
+  case $base in
+    /*) cp "$base/$tag/$1" "$tmp/$1" 2>/dev/null ;;
+    *) fetch "$base/$tag/$1" "$tmp/$1" ;;
+  esac
+}
 signed=""
 if printf '%s\n' "$signers" | grep -q '^ssh-ed25519 '; then signed=yes; fi
 if [ -n "$signed" ]; then
   command -v ssh-keygen >/dev/null || die "ssh-keygen is required to verify the release signature"
   # The signature first and on its own, so a release without one is refused with a clear reason.
-  gh release download "$tag" --repo "$repo" --pattern checksums.txt.sig --dir "$tmp" 2>/dev/null ||
-    die "release $tag has no signature (checksums.txt.sig); refusing to install"
-  gh release download "$tag" --repo "$repo" --pattern "$asset" --pattern checksums.txt --dir "$tmp"
+  get checksums.txt.sig ||
+    die "cannot download the signature of $tag (checksums.txt.sig): no such release, no signature, or no network; refusing to install"
+  get checksums.txt || die "cannot download checksums.txt of $tag"
   printf '%s\n' "$signers" | grep '^ssh-ed25519 ' | sed 's/^/squadrn /' >"$tmp/allowed_signers"
   ssh-keygen -Y verify -f "$tmp/allowed_signers" -I squadrn -n squadrn-release -s "$tmp/checksums.txt.sig" <"$tmp/checksums.txt" >/dev/null 2>&1 ||
     die "the release signature is not valid; refusing to install"
   echo "verified release signature"
 else
-  gh release download "$tag" --repo "$repo" --pattern "$asset" --pattern checksums.txt --dir "$tmp"
+  get checksums.txt || die "cannot download checksums.txt of $tag (no such release, or no network)"
   echo "note: this installer has no signing key; verifying by checksum only" >&2
 fi
 
+get "$asset" || die "cannot download $asset (no build for $os/$arch in $tag?)"
 expected=$(awk -v f="$asset" '$2 == f { print $1 }' "$tmp/checksums.txt")
 [ -n "$expected" ] || die "checksums.txt has no entry for $asset"
 if command -v sha256sum >/dev/null; then
@@ -103,15 +122,17 @@ else
 fi
 [ "$actual" = "$expected" ] || die "checksum mismatch for $asset"
 
-# Build provenance, where GitHub provides it (public repositories, Enterprise Cloud). Signed
-# releases do not depend on it.
-if out=$(gh attestation verify "$tmp/$asset" --owner "${repo%%/*}" 2>&1); then
-  printf 'verified build provenance of %s\n' "$asset"
-else
-  case "$out" in
-    *"no attestations found"* | *"unknown command"* | *"HTTP 404"* | *"HTTP 403"*) [ -n "$signed" ] || printf 'note: %s has no build attestation\n' "$asset" >&2 ;;
-    *) die "build provenance check failed for $asset: $out" ;;
-  esac
+# Build provenance as an extra when gh is installed and logged in; the signature is what the
+# install relies on.
+if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+  if out=$(gh attestation verify "$tmp/$asset" --repo "$repo" 2>&1); then
+    printf 'verified build provenance of %s\n' "$asset"
+  else
+    case "$out" in
+      *"no attestations found"* | *"unknown command"* | *"HTTP 404"*) ;;
+      *) die "build provenance check failed for $asset: $out" ;;
+    esac
+  fi
 fi
 
 mkdir "$tmp/release"

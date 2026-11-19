@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/release"
 )
 
 // Interval between background checks; failures retry after the same interval.

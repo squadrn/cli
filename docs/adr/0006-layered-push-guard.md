@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (1.0.0).
+Accepted (v1.0.0).
 
 ## Context
 

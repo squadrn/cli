@@ -1,63 +1,48 @@
-# 0010 — Name: Squadrn (`squadrn`, alias `sqd`)
+# 0010 — Product name Squadrn (`squadrn`, alias `sqd`)
 
-Status: accepted (v2.0.0); supersedes the name in 0005 — the structure from 0004 stays
+Status: accepted (v1.0.0)
 
 ## Context
 
-The project moves to a public home, `github.com/squadrn/cli`, and needs a name it can own there.
-"Sprawling Agents" (0005) had an accepted risk that became real: `2youg1/sprawling-agents` uses the
-same name, and a "Sprawl CLI" already exists in the coding-agent space, so `sprawl` reads as
-someone else's tool in searches, package registries and conversation.
+The project lives in a public repository and needs a name it can own there: in searches, package
+registries and conversation, and on the PATH of the people who install it. The name should be
+provider-neutral, since Squadrn drives several agent CLIs.
 
 ## Decision
 
-- Product name **Squadrn**, pronounced "squadron": a squad of agents flying in formation. It keeps
-  the lineage of squad (0004) without its collisions (`claude-squad`, `github/squad`).
+- Product name **Squadrn**, pronounced "squadron": a group of agents flying in formation, each
+  under its own account and worktree.
 - Checked before choosing: the `squadrn` organisations on GitHub and npm are ours; no command
   `squadrn` or `sqd` in Homebrew, Debian/Ubuntu or on a default macOS/Linux PATH.
 - Accepted risk: the spelling invites the typo "squadron". The command is what people type, and
   the default alias `sqd` sidesteps it.
 
-| Thing | Before (sprawl) | Now |
-|---|---|---|
-| Product name | Sprawling Agents | Squadrn |
-| Go module | `sprawling-agents` | `github.com/squadrn/cli` |
-| Binary, `cmd/` dir | `sprawl` | `squadrn` (`squadrn.exe`) |
-| Default command, alias | `sprawl`, `sra` | `squadrn`, `sqd` |
-| Slug: config/data/state/cache dirs | `~/.config/sprawl` … | `~/.config/squadrn` … |
-| Environment variables | `SPRAWL_*` | `SQUADRN_*` |
-| Plugin, marketplace, hook shim | `sprawl@sprawl`, `sprawl-hook` | `squadrn@squadrn`, `squadrn-hook` |
-| Repository git key | `sprawl.protectedBranches` | `squadrn.protectedBranches` |
-| tmux options | `@sprawl_*` | `@squadrn_*` |
-| Markers | `.sprawl-account`, `.sprawl-inuse`, `.sprawl-copies.json` | `.squadrn-account`, `.squadrn-inuse`, `.squadrn-copies.json` |
-| Release assets | `sprawl_<ver>_<os>_<arch>.*` | `squadrn_<ver>_<os>_<arch>.*` |
-| Signature namespace | `sprawl-release` | `squadrn-release` (same key, `signers.pub` unchanged) |
-| Signing key secret | `SPRAWL_SIGNING_KEY` | `SQUADRN_SIGNING_KEY` |
+Fixed identifiers (they never follow the user's command name, ADR 0004):
 
-`SPRAWL_RELEASES_*` (releases repository settings) stay until the separate releases repository
-goes away with the move to the public repository.
+| Thing | Value |
+|---|---|
+| Repository, Go module | `github.com/squadrn/squadrn` |
+| Binary, `cmd/` dir | `squadrn` (`squadrn.exe`) |
+| Default command, alias | `squadrn`, `sqd` |
+| Config/data/state/cache dirs | `~/.config/squadrn`, `~/.local/share/squadrn`, `~/.local/state/squadrn`, `~/.cache/squadrn` |
+| Environment variables | `SQUADRN_*` |
+| Plugin, marketplace, hook shim | `squadrn@squadrn`, `squadrn-hook` |
+| Repository git key | `squadrn.protectedBranches` |
+| tmux options | `@squadrn_*` |
+| Markers | `.squadrn-account`, `.squadrn-inuse`, `.squadrn-copies.json` |
+| Release assets | `squadrn_<ver>_<os>_<arch>.*` |
+| Signature namespace | `squadrn-release` |
+| Signing key secret | `SQUADRN_SIGNING_KEY` |
 
-## Previous names: no compatibility
+## Module path
 
-Squadrn is a clean break. It neither migrates nor honours anything of sprawl or squad: no old
-config, dirs, plugins, command links, markers, tmux options, environment variables, git keys or
-release signatures, and the code carries no list of previous names. Compatibility code is
-security-relevant (the guard would have to keep trusting old keys and paths) for a user base
-small enough to reinstall once.
-
-Coming from sprawl:
-
-1. `sprawl self-uninstall --purge` removes the old tool, its plugin in every account and its
-   files.
-2. Install Squadrn fresh with the installer.
-3. Repositories that set `git config sprawl.protectedBranches` must set
-   `git config squadrn.protectedBranches` instead: that protection is **not carried over**.
-
-The release workflow's upgrade test skips predecessors without `squadrn_*` assets: an earlier
-release cannot update itself to Squadrn.
+The module path is `github.com/squadrn/squadrn`, matching the repository. The repository was
+first published as `github.com/squadrn/cli`, and versions of that module path are recorded for
+good in the Go checksum database (sum.golang.org). Reusing it would tie new code to tags that no
+longer exist, so the repository and the module were renamed together and those tags removed.
 
 ## Consequences
 
-- Version 2.0.0: the command, paths, environment variables and plugin id change, and nothing is
-  migrated.
-- Code, docs and help say Squadrn; the old names appear only in ADR history and the changelog.
+- Code, docs and help say Squadrn; user-facing text uses the command name the user chose.
+- The name and the identifiers above are a contract with installed copies: changing one later
+  needs a new ADR and a migration plan.

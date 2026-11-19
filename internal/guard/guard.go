@@ -11,7 +11,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/squadrn/internal/config"
 )
 
 type Verdict int

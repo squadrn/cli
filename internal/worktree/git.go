@@ -15,9 +15,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/inuse"
-	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 var ErrInvalidName = errors.New("invalid worktree name")

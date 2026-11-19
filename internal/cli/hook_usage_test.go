@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/squadrn/internal/account"
 )
 
 // A legacy account (plugin installed, no marker) is recognised by hooks as by commands.

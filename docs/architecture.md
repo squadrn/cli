@@ -8,7 +8,7 @@
                  └──┬────────┬─────────┬───────┬────────┬───────┬────────┬────────┬──────────┘
                  account  provider    grid  worktree  guard  githook  install  doctor  update
                     │    (+/claude)    │       │        │       │     release     │
-                ~/.claude* claude CLI tmux    git   mvdan/sh   git     gh, tar.gz
+                ~/.claude* claude CLI tmux    git   mvdan/sh   git    HTTPS, tar.gz
                           shared: proc (process groups, deadlines) · fsx (atomic files) · config
 ```
 
@@ -82,7 +82,8 @@ or deny (layer 2).
 
 **Update.** At a terminal, `cli.updateNotice` reads `~/.cache/squadrn/update.json`, prints one line
 when a newer release is known (at most every 6 h), and when a check is due (24 h) starts a detached
-`self-update --background` that lists releases with `gh` and writes the cache. `self-update`
+`self-update --background` that lists releases through the GitHub REST API (`update.GitHub`) and
+writes the cache. `self-update`
 downloads the archive, `checksums.txt` and its signature, verifies the signature against the
 embedded keys, then the checksum, snapshots the installed release to `previous/`, and installs
 (ADR 0007).

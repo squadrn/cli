@@ -1,5 +1,5 @@
 #!/bin/sh
-# Renders build/install.sh and build/install.ps1 for a release: the releases repository, the
+# Renders build/install.sh and build/install.ps1 for a release: the repository (squadrn/squadrn), the
 # release tag (the installers' default version) and the signing keys are written into them, so
 # the installers install their own release and trust exactly what this build trusts.
 #   scripts/render-install.sh OWNER/REPO TAG [SIGNERS_FILE]   (default: internal/release/signers.pub)

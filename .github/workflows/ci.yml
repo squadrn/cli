@@ -1,29 +1,34 @@
 name: ci
 
+# Docs-only changes skip these jobs; commit messages are checked by commits.yml on every change.
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**", "LICENSE", "NOTICE", ".github/ISSUE_TEMPLATE/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**", "LICENSE", "NOTICE", ".github/ISSUE_TEMPLATE/**"]
   workflow_call:
 
 permissions:
   contents: read
 
+# A newer push to a branch or PR cancels the older run; a release (workflow_call from a tag)
+# always runs to the end.
 concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15
       - name: shellcheck
@@ -42,41 +47,19 @@ jobs:
           if ($issues) { exit 1 }
       - name: vet and lint for Windows
         run: GOOS=windows go vet ./...
-      - uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         env:
           GOOS: windows
         with:
           version: v2.15
 
-  commits:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Commit messages (Conventional Commits, no AI attribution)
-        env:
-          BEFORE: ${{ github.event.before }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          if [ -n "$BASE" ]; then
-            range="$BASE..$HEAD_SHA"
-          elif [ -n "$BEFORE" ] && ! printf '%s' "$BEFORE" | grep -q '^0*$' && git cat-file -e "$BEFORE" 2>/dev/null; then
-            range="$BEFORE..$HEAD_SHA"
-          else
-            range="$HEAD_SHA" # first push or force push: the whole history
-          fi
-          scripts/commitlint.sh --range "$range"
-
   vuln:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       - name: govulncheck
@@ -89,10 +72,10 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       - name: Install tmux
@@ -107,10 +90,10 @@ jobs:
   git-floor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       - run: CGO_ENABLED=0 go build -o squadrn ./cmd/squadrn
@@ -131,10 +114,10 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       # Defender scanning every test binary makes Windows tests slow and flaky.
@@ -149,14 +132,14 @@ jobs:
       - name: Install, update, rollback and uninstall on Windows
         shell: pwsh
         run: ./scripts/windows-e2e.ps1
-      # The documented script block against a release built here and served by a fake gh.
+      # The documented commands against a release built here, from a local release directory.
       - name: install.ps1 as documented, in Windows PowerShell 5.1 and PowerShell 7
         shell: bash
         run: |
           fixture="$RUNNER_TEMP/ps1-fixture"
           mkdir -p "$fixture"
           ssh-keygen -q -t ed25519 -N '' -C test -f "$fixture/key"
-          sh scripts/render-install.sh test/squadrn-releases v1.2.0-rc.99 "$fixture/key.pub"
+          sh scripts/render-install.sh squadrn/squadrn v1.2.0-rc.99 "$fixture/key.pub"
           pwsh -NoProfile -File scripts/windows-install-e2e.ps1 -Fixture "$(cygpath -w "$fixture")" -Tag v1.2.0-rc.99
       - name: install.ps1 parses in Windows PowerShell 5.1 and PowerShell 7
         run: |
@@ -166,26 +149,20 @@ jobs:
   release-config:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           version: v2.20.2
           args: check
-        env:
-          SPRAWL_RELEASES_OWNER: check
-          SPRAWL_RELEASES_NAME: check
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       # Archive names and contents are a contract with installed copies (ADR 0008).
       - name: Release archives match testdata/release-assets.golden
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           version: v2.20.2
           args: release --snapshot --clean --skip=publish,sign,sbom
-        env:
-          SPRAWL_RELEASES_OWNER: check
-          SPRAWL_RELEASES_NAME: check
       - run: scripts/release-assets.sh dist | diff -u testdata/release-assets.golden -

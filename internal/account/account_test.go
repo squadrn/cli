@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 func newStore(t *testing.T, accounts ...string) Store {
@@ -51,7 +51,7 @@ func TestParseRef(t *testing.T) {
 		"personal":        {"", "personal"},
 		"claude/personal": {"claude", "personal"},
 		"codex/work":      {"codex", "work"},
-		"ccx-personal":    {"", "ccx-personal"},
+		"acme-personal":   {"", "acme-personal"},
 	} {
 		if p, n := parseRef(in); p != want[0] || n != want[1] {
 			t.Errorf("parseRef(%q) = %q, %q", in, p, n)
@@ -61,7 +61,7 @@ func TestParseRef(t *testing.T) {
 
 func TestValidateName(t *testing.T) {
 	for name, want := range map[string]error{
-		"main": nil, "comacpro-2": nil, "ab": nil,
+		"main": nil, "acme-2": nil, "ab": nil,
 		"a": ErrInvalidName, "Personal": ErrInvalidName, "2fa": ErrInvalidName, "a_b": ErrInvalidName,
 		strings.Repeat("a", 25): ErrInvalidName,
 		"mcp":                   ErrReserved, "wt": ErrReserved, "self-update": ErrReserved, "config": ErrReserved,
@@ -126,7 +126,7 @@ func TestGetAcrossProviders(t *testing.T) {
 func TestExistsRoutesOnlyRealAccounts(t *testing.T) {
 	s := newStore(t, "personal")
 	for in, want := range map[string]bool{
-		"personal": true, "claude/personal": true, "ccx-personal": false, "main": true,
+		"personal": true, "claude/personal": true, "acme-personal": false, "main": true,
 		"fix": false, "mcp": false, "--help": false, "codex/personal": false,
 	} {
 		if got := s.Exists(in); got != want {

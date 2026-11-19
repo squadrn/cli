@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/inuse"
-	"github.com/squadrn/cli/internal/worktree"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/worktree"
 )
 
 // markInUse records the session about to start in the account's config dir and in the worktree

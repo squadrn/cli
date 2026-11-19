@@ -11,11 +11,11 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/release"
 )
 
 var (

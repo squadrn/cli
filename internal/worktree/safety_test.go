@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/squadrn/internal/inuse"
 )
 
 func revParse(t *testing.T, dir, rev string) string {

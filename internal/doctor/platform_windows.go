@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 // executable: Windows has no execute bit; the extension decides (PATHEXT).

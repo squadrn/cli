@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/squadrn/cli/internal/install"
+	"github.com/squadrn/squadrn/internal/install"
 )
 
 // namePrompt asks for the command name and aliases at install time (self-install --interactive).

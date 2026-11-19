@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/update"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/update"
 )
 
 func TestUpdateNotice(t *testing.T) {

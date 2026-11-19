@@ -1,6 +1,7 @@
 squadrn_VERSION_darwin_amd64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
+  NOTICE
   README.md
   plugin/.claude-plugin/plugin.json
   plugin/README.md
@@ -12,6 +13,7 @@ squadrn_VERSION_darwin_amd64.tar.gz
 squadrn_VERSION_darwin_arm64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
+  NOTICE
   README.md
   plugin/.claude-plugin/plugin.json
   plugin/README.md
@@ -23,6 +25,7 @@ squadrn_VERSION_darwin_arm64.tar.gz
 squadrn_VERSION_linux_amd64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
+  NOTICE
   README.md
   plugin/.claude-plugin/plugin.json
   plugin/README.md
@@ -34,6 +37,7 @@ squadrn_VERSION_linux_amd64.tar.gz
 squadrn_VERSION_linux_arm64.tar.gz
   .claude-plugin/marketplace.json
   LICENSE
+  NOTICE
   README.md
   plugin/.claude-plugin/plugin.json
   plugin/README.md
@@ -45,6 +49,7 @@ squadrn_VERSION_linux_arm64.tar.gz
 squadrn_VERSION_windows_amd64.zip
   .claude-plugin/marketplace.json
   LICENSE
+  NOTICE
   README.md
   plugin/.claude-plugin/plugin.json
   plugin/README.md
@@ -56,6 +61,7 @@ squadrn_VERSION_windows_amd64.zip
 squadrn_VERSION_windows_arm64.zip
   .claude-plugin/marketplace.json
   LICENSE
+  NOTICE
   README.md
   plugin/.claude-plugin/plugin.json
   plugin/README.md

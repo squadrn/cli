@@ -12,15 +12,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/grid"
-	"github.com/squadrn/cli/internal/inuse"
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/provider/claude"
-	"github.com/squadrn/cli/internal/ui"
-	"github.com/squadrn/cli/internal/usage"
-	"github.com/squadrn/cli/internal/worktree"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/grid"
+	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider/claude"
+	"github.com/squadrn/squadrn/internal/ui"
+	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn/internal/worktree"
 )
 
 // stopWait is how long a stopped session gets to exit before the next step.

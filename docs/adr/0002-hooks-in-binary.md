@@ -1,6 +1,6 @@
 # 0002 — Hooks run inside the squadrn binary, behind a fail-closed shim
 
-Status: accepted (v2.0.0)
+Status: accepted (v1.0.0)
 
 ## Context
 

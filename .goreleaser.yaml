@@ -1,11 +1,10 @@
 version: 2
 project_name: squadrn
 
-# Releases are published to a separate repository holding binaries only (ADR 0007):
-# SPRAWL_RELEASES_OWNER/SPRAWL_RELEASES_NAME. Users get read access to it, never to the source.
+# Releases are published in this public repository, squadrn/squadrn (ADR 0007).
 before:
   hooks:
-    - sh scripts/render-install.sh {{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }} {{ .Tag }}
+    - sh scripts/render-install.sh squadrn/squadrn {{ .Tag }}
 
 builds:
   - id: unix
@@ -18,7 +17,7 @@ builds:
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X github.com/squadrn/cli/internal/cli.Version={{ .Version }} -X github.com/squadrn/cli/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+      - -s -w -X github.com/squadrn/squadrn/internal/cli.Version={{ .Version }} -X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn
 
   - id: windows
     main: ./cmd/squadrn
@@ -30,7 +29,7 @@ builds:
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X github.com/squadrn/cli/internal/cli.Version={{ .Version }} -X github.com/squadrn/cli/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+      - -s -w -X github.com/squadrn/squadrn/internal/cli.Version={{ .Version }} -X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn
 archives:
   - id: unix
     ids: [unix]
@@ -53,6 +52,8 @@ archives:
       - src: README.md
         info: *fileinfo
       - src: LICENSE
+        info: *fileinfo
+      - src: NOTICE
         info: *fileinfo
       # Same basename as the root README; without an explicit dst it is dropped.
       - src: plugin/README.md
@@ -87,6 +88,8 @@ archives:
         info: *wininfo
       - src: LICENSE
         info: *wininfo
+      - src: NOTICE
+        info: *wininfo
 
 sboms:
   - artifacts: archive
@@ -110,8 +113,8 @@ signs:
 
 release:
   github:
-    owner: "{{ .Env.SPRAWL_RELEASES_OWNER }}"
-    name: "{{ .Env.SPRAWL_RELEASES_NAME }}"
+    owner: squadrn
+    name: cli
   # Tags with a pre-release suffix (v1.2.0-rc.1) reach the beta channel only.
   prerelease: auto
   # A draft until the release workflow's upgrade jobs pass; its publish job makes it visible.

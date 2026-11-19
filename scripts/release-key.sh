@@ -1,8 +1,8 @@
 #!/bin/sh
 # Creates the release signing key (ed25519, SSH signature format). Run it once, yourself:
 #
-#   scripts/release-key.sh OWNER/cli [--backup FILE]
-#   scripts/release-key.sh OWNER/cli --spare --backup FILE
+#   scripts/release-key.sh squadrn/squadrn [--backup FILE]
+#   scripts/release-key.sh squadrn/squadrn --spare --backup FILE
 #
 # --spare creates a standby key: its public key is trusted by every build from the next release
 # on, but CI keeps signing with the current key. If the current key is ever lost, put the spare
