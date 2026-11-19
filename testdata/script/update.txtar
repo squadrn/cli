@@ -69,11 +69,11 @@ exec squadrn config set command taken --force
 stdout 'linked ~/.local/bin/taken'
 exitcode 2 squadrn self-install rel --command dev2 --alias dev2
 
-# self-update needs a repository, given by flag only (an environment variable is ignored).
+# self-update uses the public repository unless --repo names another (an environment variable is
+# ignored).
 env SQUADRN_REPO=me/squadrn
-exitcode 2 squadrn self-update
-! exec squadrn self-update
-stderr 'no release repository configured; pass --repo owner/name'
+! exec squadrn self-update --check
+stderr 'cannot list releases of squadrn/squadrn'
 
 # A published release, served by a fake GitHub API ($SQUADRN_TEST_API): archive for this
 # platform plus checksums. No gh needed; a fake one only answers auth queries.
@@ -91,7 +91,7 @@ envfile SQUADRN_TEST_SIGNERS relkey.pub
 exec ssh-keygen -Y sign -q -f relkey -n squadrn-release pub/checksums.txt
 
 exec squadrn self-update --repo me/squadrn --check
-stdout '^update available: vdev → v9.9.9$'
+stdout '^update available: dev → v9.9.9$'
 stdout '^  - faster grids$'
 stdout 'install it with: taken self-update'
 exists home/.cache/squadrn/update.json
@@ -99,7 +99,7 @@ grep '"latest":"v9.9.9"' home/.cache/squadrn/update.json
 
 # --check --json for scripts; a cached result is tied to its channel.
 exec squadrn self-update --repo me/squadrn --check --json
-stdout '"current": "vdev"'
+stdout '"current": "dev"'
 stdout '"latest": "v9.9.9"'
 stdout '"channel": "stable"'
 stdout '"available": true'
@@ -107,16 +107,29 @@ stdout '"notes": "## 9.9.9\\n- faster grids"'
 grep '"channel":"stable"' home/.cache/squadrn/update.json
 exitcode 2 squadrn self-update --json
 
+# No release on the channel yet: --check says so instead of failing.
+cp api/releases.json all-releases.json
+cp rc-only.json api/releases.json
+exec squadrn self-update --repo me/squadrn --check --json
+stdout '"available": false'
+stdout '"latest": ""'
+stdout '"current": "dev"'
+exec squadrn self-update --repo me/squadrn --check
+stdout '^me/squadrn has no stable release yet; you have dev$'
+! exec squadrn self-update --repo me/squadrn
+stderr 'me/squadrn has no stable release yet'
+cp all-releases.json api/releases.json
+
 # A tag without its v, and one that does not exist.
 exec squadrn self-update --repo me/squadrn --check --tag 9.9.9
-stdout '^update available: vdev → v9.9.9$'
+stdout '^update available: dev → v9.9.9$'
 ! exec squadrn self-update --repo me/squadrn --tag v7.7.7
 stderr 'cannot install v7.7.7: release v7.7.7 not found in me/squadrn'
 
 # The beta channel also sees pre-releases.
 exec squadrn config set update_channel beta
 exec squadrn self-update --repo me/squadrn --check
-stdout '^update available: vdev → v10.0.0-rc.1$'
+stdout '^update available: dev → v10.0.0-rc.1$'
 exec squadrn config set update_channel stable
 exitcode 2 squadrn config set update_channel nightly
 exitcode 2 squadrn self-update --rollback --check
@@ -158,10 +171,10 @@ stderr 'warning: this is .*\(dev\), not the installed copy ~/.local/share/squadr
 
 # --rollback reinstalls the release from before; doing it again goes forward again.
 exec squadrn self-update --rollback
-stdout 'rolling back v9.9.9 → vdev'
+stdout 'rolling back v9.9.9 → dev'
 grep '^dev$' home/.local/share/squadrn/VERSION
 exec squadrn self-update --rollback
-stdout 'rolling back vdev → v9.9.9'
+stdout 'rolling back dev → v9.9.9'
 grep '^9.9.9$' home/.local/share/squadrn/VERSION
 
 # Same version, but an install that stopped half way: self-update repairs it instead of saying
@@ -264,3 +277,5 @@ esac
 -- home/.claude-personal/.squadrn-account --
 -- stale-inuse.json --
 {"pid":999999,"started":"never"}
+-- rc-only.json --
+[{"tag_name": "v10.0.0-rc.1", "prerelease": true, "body": "rc"}]

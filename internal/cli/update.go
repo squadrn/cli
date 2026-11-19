@@ -20,10 +20,13 @@ import (
 	"github.com/squadrn/squadrn/internal/update"
 )
 
-// Repo is the GitHub repository releases come from, set at build time with
-// -ldflags "-X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn". Only the --repo flag
+// DefaultRepo is the public repository releases are published in (ADR 0007).
+const DefaultRepo = "squadrn/squadrn"
+
+// Repo is the GitHub repository releases come from: DefaultRepo, or what the build sets with
+// -ldflags "-X github.com/squadrn/squadrn/internal/cli.Repo=owner/name". Only the --repo flag
 // overrides it: an environment variable could be planted to redirect updates.
-var Repo = ""
+var Repo = DefaultRepo
 
 // githubAPI is where releases are looked up; tests point it at a fake server.
 var githubAPI = update.DefaultAPI
@@ -127,8 +130,14 @@ func (a *app) selfUpdate(o updateOptions) error {
 			return fmt.Errorf("cannot list releases of %s: %s", repo, releaseFailure(err, repo, ""))
 		}
 		if tag = update.Newest(rels, channel); tag == "" {
-			if o.background {
+			switch {
+			case o.background:
 				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel})
+				return nil
+			case o.check && o.asJSON:
+				return a.printJSON(map[string]any{"current": release.Tag(Version), "latest": "", "channel": channel, "available": false, "repair": false, "notes": ""})
+			case o.check:
+				a.out("%s has no %s release yet; you have %s\n", repo, channel, release.Tag(Version))
 				return nil
 			}
 			return fmt.Errorf("%s has no %s release yet", repo, channel)
@@ -299,6 +308,6 @@ func (a *app) rollback() error {
 	if !fsx.IsFile(filepath.Join(prev, release.BinaryName)) || version == "" {
 		return errors.New("no previous release to roll back to")
 	}
-	a.out("rolling back v%s → v%s\n", strings.TrimPrefix(a.layout.Version(), "v"), version)
+	a.out("rolling back %s → %s\n", release.Tag(a.layout.Version()), release.Tag(version))
 	return a.installRelease(prev, version, nameChoice{})
 }
