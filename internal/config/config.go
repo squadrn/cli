@@ -162,6 +162,18 @@ func EnvOverrides() map[string]string {
 }
 
 // Read parses one config file as written, without defaults or environment overrides.
+// ReadOrEmpty is Read that also reports whether there is no config file yet (fresh).
+func ReadOrEmpty(path string) (cfg Config, fresh bool, err error) {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return Config{}, true, nil
+		}
+		return Config{}, false, err
+	}
+	cfg, err = Read(path)
+	return cfg, false, err
+}
+
 func Read(path string) (Config, error) {
 	var c Config
 	md, err := toml.DecodeFile(path, &c)

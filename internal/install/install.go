@@ -6,8 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -22,18 +20,6 @@ var (
 	ErrNameTaken     = errors.New("command name is taken")
 	ErrDuplicateName = errors.New("command name given twice")
 )
-
-// LoadConfig returns the config as written; fresh is true when there is none yet.
-func LoadConfig(path string) (cfg config.Config, fresh bool, err error) {
-	if _, err := os.Stat(path); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return config.Config{}, true, nil
-		}
-		return config.Config{}, false, err
-	}
-	c, err := config.Read(path)
-	return c, false, err
-}
 
 // Names is the set of names a config installs (accepted earlier, maybe forced).
 func Names(cfg config.Config) map[string]bool {

@@ -372,7 +372,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	if err != nil {
 		return err
 	}
-	cfg, fresh, err := install.LoadConfig(cfgPath)
+	cfg, fresh, err := config.ReadOrEmpty(cfgPath)
 	if err != nil {
 		return err
 	}
@@ -670,9 +670,6 @@ func (a *app) configCmd() *cobra.Command {
 				return err
 			}
 			cfg, err := config.Read(path)
-			if errors.Is(err, os.ErrNotExist) {
-				cfg, err = config.Config{}, nil
-			}
 			if err != nil {
 				return err
 			}
