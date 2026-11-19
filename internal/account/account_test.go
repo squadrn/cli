@@ -168,13 +168,22 @@ func TestMoveToTrash(t *testing.T) {
 	a, _ := s.Get("old")
 	dst, err := s.MoveToTrash(a, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
 	must(t, err)
-	if want := filepath.Join(s.Home, "data", "Trash", "files", ".claude-old-20260102-030405"); dst != want {
-		t.Errorf("dst = %q", dst)
+	if runtime.GOOS == "darwin" {
+		if want := filepath.Join(s.Home, ".Trash", ".claude-old-20260102-030405"); dst != want {
+			t.Errorf("dst = %q, want %q", dst, want)
+		}
+	} else {
+		if want := filepath.Join(s.Home, "data", "Trash", "files", ".claude-old-20260102-030405"); dst != want {
+			t.Errorf("dst = %q", dst)
+		}
+		info, err := os.ReadFile(filepath.Join(s.Home, "data", "Trash", "info", ".claude-old-20260102-030405.trashinfo"))
+		must(t, err)
+		if want := "[Trash Info]\nPath=" + filepath.ToSlash(a.Dir) + "\nDeletionDate=2026-01-02T03:04:05\n"; runtime.GOOS != "windows" && string(info) != want {
+			t.Errorf("trashinfo = %q, want %q", info, want)
+		}
 	}
-	info, err := os.ReadFile(filepath.Join(s.Home, "data", "Trash", "info", ".claude-old-20260102-030405.trashinfo"))
-	must(t, err)
-	if want := "[Trash Info]\nPath=" + filepath.ToSlash(a.Dir) + "\nDeletionDate=2026-01-02T03:04:05\n"; runtime.GOOS != "windows" && string(info) != want {
-		t.Errorf("trashinfo = %q, want %q", info, want)
+	if !fsx.IsDir(dst) {
+		t.Errorf("trashed dir missing: %s", dst)
 	}
 	if s.Exists("old") {
 		t.Error("account still exists after removal")

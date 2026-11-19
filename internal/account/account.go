@@ -398,12 +398,3 @@ func (s Store) Rename(a Account, newName string) (Account, error) {
 	return to, nil
 }
 
-// trashDirs returns where trashed files go and, for the freedesktop trash, where their
-// .trashinfo files go ("" on macOS).
-func trashDirs(home string) (files, info string) {
-	if mac := filepath.Join(home, ".Trash"); fsx.IsDir(mac) {
-		return mac, ""
-	}
-	base := config.DirsFor(home, "Trash").Data
-	return filepath.Join(base, "files"), filepath.Join(base, "info")
-}

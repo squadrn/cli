@@ -144,7 +144,7 @@ srn account ls [--json]
 srn account logout work
 srn account adopt other          # make an existing ~/.claude-other an account (asks; --yes)
 srn account rename work job      # logs work out first; log in again as job
-srn account rm work              # logs out and moves the dir to the trash
+srn account rm work              # logs out and moves the dir to the trash (macOS ~/.Trash)
 ```
 
 A word that is neither a squadrn command, an account nor an agent subcommand is a usage error with

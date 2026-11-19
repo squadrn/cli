@@ -139,13 +139,15 @@ exitcode 2 squadrn account ls extra
 exitcode 2 squadrn account rm work
 exitcode 2 squadrn account rm main --yes
 exec squadrn account rm claude/work --yes
-stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
+[darwin] stdout 'removed account claude/work \(moved to ~/.Trash/.claude-work-'
+[!darwin] stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
 ! exists home/.claude-work
 ! exists home/.local/state/squadrn/usage/claude-work.json
-exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
-stdout '^\[Trash Info\]$'
-stdout '^Path=/.*/home/.claude-work$'
-stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
+[darwin] exec sh -c 'ls -d home/.Trash/.claude-work-*'
+[!darwin] exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
+[!darwin] stdout '^\[Trash Info\]$'
+[!darwin] stdout '^Path=/.*/home/.claude-work$'
+[!darwin] stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
 exitcode 1 squadrn account rm work --yes
 
 -- empty --
