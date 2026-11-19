@@ -163,7 +163,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 			}
 		}
 	}
-	ranked, next := usage.Rank(cands, rep.From, now)
+	ranked, next := usage.Best(cands, rep.From, now)
 	if len(ranked) > 0 {
 		rep.Best = ranked[0].Account
 	}
@@ -242,7 +242,7 @@ func (a *app) usageTable(rep usageReport) {
 func (a *app) untracked(rep usageReport) string {
 	var out []string
 	for _, r := range rep.Accounts {
-		if !r.Tracking && r.State != usage.NA {
+		if !r.Tracking && r.State != usage.NA && r.State != usage.LoggedOut {
 			out = append(out, r.Account)
 		}
 	}

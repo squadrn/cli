@@ -21,6 +21,13 @@ stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
 stdout '^claude/main +max +acme +- +- +- +- +nodata +-$'
 stdout '^claude/work +- +acme +- +- +- +- +nodata +-$'
 stdout 'not tracked: claude/main, claude/work \(run: srn usage setup\)'
+# A logged-out account is not listed as untracked.
+rm home/.claude-work/.loggedin
+exec squadrn usage --refresh
+stdout '^claude/work .*loggedout'
+stdout 'not tracked: claude/main \(run: srn usage setup\)'
+cp empty home/.claude-work/.loggedin
+exec squadrn usage --refresh
 
 # Setup asks first; without a terminal it needs --yes.
 exitcode 2 squadrn usage setup

@@ -185,8 +185,10 @@ Usage is only known for claude.ai subscriptions (Pro, Max, …), after a session
 only as fresh as the last status line update. States: `ok`, `high` (5h ≥ 80% or 7d ≥ 90%),
 `limited`, `reset` (a limit or high window has reset since), `stale` (older than 6 hours),
 `nodata`, `metered` (API billing), `loggedout`, `na` (provider does not report usage). The footer
-names the best account for the current repository: the same provider, not limited, then lowest 5h
-and 7d use. Records live in `~/.local/state/squadrn/usage/` (private).
+names the best account for the current repository, the current account included: the same
+provider, not limited, known headroom (`ok`, `reset`) before `nodata`/`stale`, then lowest 5h and
+7d use. Reset times show the weekday when they are not today (`Thu 15:45`). Logged-out accounts are
+not listed as untracked. Records live in `~/.local/state/squadrn/usage/` (private).
 
 ## Swap
 
