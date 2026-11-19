@@ -58,7 +58,7 @@ Usage is recorded by the status line, so it needs a one-time setup per settings 
 	}
 	f := cmd.Flags()
 	f.BoolVar(&asJSON, "json", false, "print JSON")
-	f.BoolVar(&refresh, "refresh", false, "query login status, plan and organisation again")
+	f.BoolVar(&refresh, "refresh", false, "query login status, plan and organization again")
 	f.BoolVar(&watch, "watch", false, "redraw every 5 seconds")
 	cmd.AddCommand(a.usageSetupCmd())
 	return cmd

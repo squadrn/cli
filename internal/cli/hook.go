@@ -156,7 +156,7 @@ func (h hookEnv) guardGit() {
 	defer cancel()
 	raw, err := h.readInput()
 	if err != nil {
-		d = guard.Decision{Verdict: guard.Ask, Reason: "guard could not read the hook input"}
+		d = guard.Decision{Verdict: guard.Ask, Reason: "guard cannot read the hook input"}
 		return
 	}
 	var in hookInput
@@ -170,7 +170,7 @@ func (h hookEnv) guardGit() {
 	}
 	g, cfgErr := hookGuard("")
 	if g.Git == nil {
-		d = guard.Decision{Verdict: guard.Ask, Reason: "guard could not locate the home directory"}
+		d = guard.Decision{Verdict: guard.Ask, Reason: "guard cannot locate the home directory"}
 		return
 	}
 	switch in.ToolName {

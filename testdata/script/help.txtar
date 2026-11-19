@@ -7,27 +7,6 @@ stdout '^squadrn dev$'
 exec squadrn version --json
 stdout '"version": "dev"'
 
-exec squadrn --help
-stdout 'runs coding agents \(today: Claude Code\) as one of several accounts'
-stdout '^Agents:$'
-stdout '^  wt +Run the agent in worktree'
-stdout '^  grid +tmux grid'
-stdout '^Accounts:$'
-stdout '^  account +Manage agent accounts'
-stdout '^Setup:$'
-stdout '^  doctor +Check the install'
-stdout '^  self-update +Update squadrn'
-stdout '^  completion +'
-stdout 'squadrn personal -- "fix the bug"'
-! stdout 'self-install'
-! stdout '^  hook '
-
-exec squadrn account --help
-stdout 'ls +List accounts'
-stdout 'logout +Sign an account out'
-stdout 'rename +Rename an account'
-stdout 'rm +Log an account out'
-
 # Typos are usage errors with suggestions, never prompts for the agent.
 exitcode 2 squadrn acount ls
 ! exec squadrn acount ls

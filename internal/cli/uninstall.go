@@ -83,11 +83,18 @@ func (a *app) uninstall(purge bool) error {
 	}
 	later = append(later, a.layout.Leftovers(names)...)
 	if len(later) > 0 {
-		if err := removeAfterExit(later); err != nil {
-			a.warnf("could not remove %s: %v", strings.Join(later, ", "), err)
+		switch deferred, err := removeAfterExit(later); {
+		case err != nil:
+			a.warnf("cannot remove %s: %v", strings.Join(later, ", "), err)
+		case deferred:
+			for _, p := range later {
+				a.out("  %s will be removed when squadrn exits\n", a.tilde(p))
+			}
 		}
 	}
-	a.out("  removed %s\n", a.tilde(a.layout.DataDir))
+	if !fsx.IsDir(a.layout.DataDir) {
+		a.out("  removed %s\n", a.tilde(a.layout.DataDir))
+	}
 	if purge {
 		dirs := config.DirsFor(a.store.Home, config.Slug)
 		for _, d := range []string{dirs.Config, dirs.State, dirs.Cache} {

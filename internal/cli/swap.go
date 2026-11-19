@@ -129,7 +129,7 @@ func (a *app) swap(o swapOptions) error {
 	}
 	st := a.statuses([]account.Account{from, *to}, true)
 	if st[1].Err == nil && !st[1].Status.LoggedIn {
-		return fmt.Errorf("%s is not logged in; run: %s account login %s", to.Label(), a.cmd, to.Name)
+		return fmt.Errorf("%s is not logged in; run: %s account login %s", to.Label(), a.cmd, to.Label())
 	}
 	if from.Label() != to.Label() {
 		fromOrg, toOrg := st[0].Status.OrgName, st[1].Status.OrgName
@@ -161,7 +161,7 @@ func (a *app) swap(o swapOptions) error {
 		}
 		h := usage.Handoff{At: a.now(), Session: src.session.ID, From: from.Label(), To: to.Label(), Cwd: src.cwd}
 		if err := a.ledger().Append(h); err != nil {
-			a.warnf("could not record the handoff: %v", err)
+			a.warnf("cannot record the handoff: %v", err)
 		}
 	}
 	what := "swap"

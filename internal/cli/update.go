@@ -56,7 +56,10 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 	var o updateOptions
 	cmd := &cobra.Command{
 		Use:   "self-update",
-		Short: "Update squadrn and its plugin in every account (--check: only look, --rollback: undo)",
+		Short: "Update squadrn and its plugin in every account",
+		Long: `Update squadrn and its plugin in every account to the newest release of your channel.
+--check only looks and shows the release notes; --rollback goes back to the release installed
+before.`,
 		Example: fmt.Sprintf(`  %[1]s self-update --check       what is new
   %[1]s self-update               install the newest release of your channel
   %[1]s self-update --rollback    go back to the release installed before`, a.cmd),
@@ -155,7 +158,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 		a.out("squadrn %s is up to date (%s channel)\n", current, channel)
 		return nil
 	case repair:
-		a.out("the installed copy of %s is incomplete (VERSION %q); reinstalling it\n", current, a.layout.Version())
+		a.out("the installed copy of %s is incomplete; reinstalling it\n", current)
 	case comparable && cmp < 0 && !o.allowDowngrade:
 		return usagef("%s is older than the installed %s; pass --allow-downgrade to install it", tag, current)
 	}

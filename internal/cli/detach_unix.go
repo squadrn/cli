@@ -15,11 +15,12 @@ func startDetached(cmd *exec.Cmd) error {
 	return cmd.Start()
 }
 
-// removeAfterExit removes paths now: Unix lets a running program's files be deleted.
-func removeAfterExit(paths []string) error {
+// removeAfterExit removes paths now: Unix lets a running program's files be deleted. deferred
+// is false.
+func removeAfterExit(paths []string) (deferred bool, err error) {
 	var errs []error
 	for _, p := range paths {
 		errs = append(errs, os.RemoveAll(p))
 	}
-	return errors.Join(errs...)
+	return false, errors.Join(errs...)
 }

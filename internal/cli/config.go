@@ -73,8 +73,10 @@ func (a *app) configCmd() *cobra.Command {
 	cmd.AddCommand(get)
 	var force bool
 	set := &cobra.Command{
-		Use:       "set <key> <value>",
-		Short:     "Change one setting (lists are comma separated; \"\" clears a list, or restores the default protected_branches)",
+		Use:   "set <key> <value>",
+		Short: "Change one setting",
+		Long: `Change one setting. Lists are comma separated; "" clears a list, or restores the default
+protected_branches. Changing command or aliases relinks them in the bin dir.`,
 		Args:      exactArgs(2),
 		ValidArgs: config.Keys,
 		RunE: func(_ *cobra.Command, args []string) error {

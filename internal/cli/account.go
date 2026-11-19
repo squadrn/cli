@@ -266,18 +266,18 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 	// named after it): sign out first so the old item does not stay behind.
 	a.cache.Forget(acct.Label())
 	if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
-		a.warnf("could not log %s out before renaming: %v", acct.Label(), err)
+		a.warnf("cannot log %s out before renaming: %v", acct.Label(), err)
 	}
 	to, err = a.store.Rename(acct, newName)
 	if err != nil {
 		return err
 	}
 	if err := usageStore(a.store.Home).Rename(acct.Provider, acct.Name, to.Name); err != nil {
-		a.warnf("could not move the usage record of %s: %v", acct.Label(), err)
+		a.warnf("cannot move the usage record of %s: %v", acct.Label(), err)
 	}
 	if r, ok := ag.(relocator); ok {
 		if err := r.Relocate(acct.Dir, to.Dir); err != nil {
-			a.warnf("could not update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
+			a.warnf("cannot update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
 		}
 	}
 	a.out("renamed %s → %s (%s), logged out\n", acct.Label(), to.Label(), a.tilde(to.Dir))
@@ -321,7 +321,7 @@ func (a *app) accountRmCmd() *cobra.Command {
 				return err
 			}
 			if err := usageStore(a.store.Home).Remove(acct.Provider, acct.Name); err != nil {
-				a.warnf("could not remove the usage record of %s: %v", acct.Label(), err)
+				a.warnf("cannot remove the usage record of %s: %v", acct.Label(), err)
 			}
 			a.out("removed account %s (moved to %s)\n", acct.Label(), a.tilde(dst))
 			return nil

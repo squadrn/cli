@@ -39,7 +39,7 @@ rm $WORK/home/.claude/.org $WORK/home/.claude-personal/.org
 rm $WORK/home/.claude-personal/.loggedin
 exitcode 1 squadrn swap --worktree feat-s --to personal
 ! exec squadrn swap --worktree feat-s --to personal
-stderr 'claude/personal is not logged in; run: squadrn account login personal'
+stderr 'claude/personal is not logged in; run: squadrn account login claude/personal'
 cp $WORK/empty $WORK/home/.claude-personal/.loggedin
 exitcode 1 squadrn swap --worktree feat-nope --to personal
 exitcode 1 squadrn swap --worktree feat-empty --to personal

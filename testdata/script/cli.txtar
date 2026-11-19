@@ -39,7 +39,7 @@ exec squadrn config
 stdout '^shared_mcp +a,b  \(from SQUADRN_SHARED_MCP\)$'
 env SQUADRN_SHARED_MCP=
 exec squadrn config set --help
-stdout 'restores the default protected_branches'
+stdout 'restores the default\nprotected_branches'
 
 # An invalid config keeps the git-level guard on for sessions and says so once.
 release rel

@@ -34,7 +34,7 @@ exec squadrn ps --json
 stdout '"Name": "fix-b"'
 exec squadrn grid ls
 stdout '^SESSION +REPO +PANES +ATTACHED$'
-stdout '^squadrn-repo +.*/repo +3 +false$'
+stdout '^squadrn-repo +.*/repo +3 +no$'
 exec squadrn grid ls --json
 stdout '"Repo": ".*/repo"'
 exitcode 2 squadrn grid stop repo
@@ -71,7 +71,7 @@ stdout 'claude/personal +→ feat-y'
 exec tmux kill-server
 
 exec squadrn ps
-stdout '^no running grids$'
+stdout '^no running agents$'
 
 # Two repositories with the same directory name get separate grids; sessions are found by tag,
 # so renaming the command later never orphans a running grid.

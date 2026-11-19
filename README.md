@@ -184,10 +184,10 @@ and 7d use. Records live in `~/.local/state/squadrn/usage/` (private).
 was started in.
 
 ```sh
-squadrn swap                          # the conversation that just hit its limit here; pick the target
-squadrn swap --to personal            # same, to claude/personal
-squadrn swap --session <id> --to work # any conversation, by session ID
-squadrn swap feat-a personal          # latest conversation of worktree feat-a (earlier form)
+squadrn swap                                  # the conversation that just hit its limit here; pick the target
+squadrn swap --to personal                    # same, to claude/personal
+squadrn swap --session <id> --to work         # any conversation, by session ID
+squadrn swap --worktree feat-a --to personal  # latest conversation of worktree feat-a
 ```
 
 Without `--session`, the conversation is the one that last hit its limit in the current directory
@@ -325,7 +325,8 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 ## Exit codes
 
 `0` ok · `1` error, or "no" at a confirmation · `2` usage or invalid input · `130` cancelled
-(ctrl-c, esc) · `deps` passes the package manager's status through. Commands with `--json` print
+(ctrl-c, esc) · running the agent (`squadrn [<account>]`, `wt`, `swap`) passes the agent's exit
+status through, as `deps` does the package manager's. Commands with `--json` print
 machine-readable output on stdout.
 
 ## Releasing (maintainer)

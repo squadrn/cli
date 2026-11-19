@@ -126,7 +126,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	if fsx.IsDir(staged) {
 		if err := fsx.MoveDir(staged, a.layout.Previous()); err != nil {
-			a.warnf("could not keep the previous release for --rollback (%v); a rollback may reinstall an older one", err)
+			a.warnf("cannot keep the previous release for --rollback (%v); a rollback may reinstall an older one", err)
 			_ = os.RemoveAll(staged)
 		}
 	}

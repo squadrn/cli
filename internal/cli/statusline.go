@@ -235,7 +235,7 @@ func (a *app) restoreStatusLines() {
 			continue
 		}
 		if err := claude.SetStatusLineCommand(g.path, old); err != nil {
-			a.warnf("could not restore the status line in %s: %v", a.tilde(g.path), err)
+			a.warnf("cannot restore the status line in %s: %v", a.tilde(g.path), err)
 			continue
 		}
 		a.out("  restored the status line in %s\n", a.tilde(fsx.Real(g.path)))

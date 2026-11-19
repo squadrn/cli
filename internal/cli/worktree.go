@@ -49,10 +49,10 @@ func (a *app) wtCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wt <name>",
 		Short: "Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)",
-		Example: fmt.Sprintf(`  %[1]s wt feat-login             as main
-  %[1]s personal wt fix-otp        as claude/personal
-  %[1]s wt ls                      list worktrees
-  %[1]s wt rm feat-login           remove one`, a.cmd),
+		Example: fmt.Sprintf(`  %[1]s wt feat-login           as main
+  %[1]s personal wt fix-otp      as claude/personal
+  %[1]s wt ls                    list worktrees
+  %[1]s wt rm feat-login         remove one`, a.cmd),
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -147,8 +147,10 @@ func (a *app) wtLsCmd() *cobra.Command {
 func (a *app) wtRmCmd() *cobra.Command {
 	var force, forceBranch, yes bool
 	cmd := &cobra.Command{
-		Use:               "rm <name>",
-		Short:             "Remove a worktree and its branch if merged (--force: even if modified; --force-branch: even if unmerged)",
+		Use:   "rm <name>",
+		Short: "Remove a worktree and its branch if merged",
+		Long: `Remove a worktree and its branch if merged. --force also removes a modified worktree,
+--force-branch also deletes an unmerged branch; both ask first (-y skips).`,
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -298,7 +300,7 @@ func (a *app) gcCmd() *cobra.Command {
 			}
 			a.out("removed %d worktree(s)\n", len(removed))
 			if len(errs) > 0 {
-				return fmt.Errorf("%d worktree(s) could not be removed", len(errs))
+				return fmt.Errorf("%d worktree(s) cannot be removed", len(errs))
 			}
 			return nil
 		},
