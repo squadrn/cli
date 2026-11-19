@@ -89,13 +89,20 @@ type Tmux struct {
 func runTmux(ctx context.Context, args ...string) (string, error) {
 	out, err := proc.Output(ctx, proc.Options{}, "tmux", args...)
 	if err != nil {
-		msg := err.Error()
-		if strings.Contains(msg, "no server running") || strings.Contains(msg, "error connecting to") {
-			return "", ErrNoServer
-		}
-		return "", err
+		return "", noServer(err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// noServer turns tmux's "no server" failures into ErrNoServer: no server running, or no socket
+// at all. Other connection failures (a socket it may not use) keep tmux's own message.
+func noServer(err error) error {
+	msg := err.Error()
+	if strings.Contains(msg, "no server running") ||
+		strings.Contains(msg, "error connecting to") && strings.Contains(msg, "No such file or directory") {
+		return ErrNoServer
+	}
+	return err
 }
 
 func (t Tmux) run(ctx context.Context, args ...string) (string, error) {

@@ -30,6 +30,8 @@ stdout '^srn-repo +claude/main +feat-a '
 stdout '^srn-repo +claude/personal +fix-b '
 stdout '^srn-repo +claude/main +chore-c '
 
+! exec squadrn grid attach repo
+stderr '^srn: grid attach needs a terminal; run it in one: tmux attach -t srn-repo$'
 exec squadrn ps --json
 stdout '"name": "fix-b"'
 stdout '"account": "claude/personal"'
