@@ -30,6 +30,8 @@ func (f *pluginCLI) Output(_ context.Context, _ string, args ...string) ([]byte,
 		f.markets = `[{"name":"squadrn"}]`
 	case strings.HasPrefix(call, "plugin install"):
 		f.plugins = `[{"id":"squadrn@squadrn","enabled":true}]`
+	case strings.HasPrefix(call, "plugin marketplace remove"):
+		f.markets = `[]`
 	}
 	return nil, nil
 }
@@ -62,9 +64,17 @@ func TestUpdateAndRemovePlugin(t *testing.T) {
 	if err := updatePlugin(ctx, f, ""); err != nil || strings.Join(f.calls, ";") != "plugin marketplace update squadrn;plugin update squadrn@squadrn" {
 		t.Errorf("update = %v (%v)", err, f.calls)
 	}
-	f = &pluginCLI{fail: "plugin uninstall"}
-	if err := removePlugin(ctx, f, ""); err == nil || strings.Join(f.calls, ";") != "plugin uninstall squadrn@squadrn;plugin marketplace remove squadrn" {
+	f = &pluginCLI{fail: "plugin uninstall", markets: `[{"name":"squadrn"}]`}
+	if err := removePlugin(ctx, f, ""); err == nil || strings.Join(f.calls, ";") != "plugin uninstall squadrn@squadrn;plugin marketplace list --json;plugin marketplace remove squadrn" {
 		t.Errorf("remove = %v (%v)", err, f.calls)
+	}
+	f = &pluginCLI{markets: `[]`}
+	if err := removePlugin(ctx, f, ""); err != nil || strings.Contains(strings.Join(f.calls, ";"), "marketplace remove") {
+		t.Errorf("no registration: %v (%v)", err, f.calls)
+	}
+	f = &pluginCLI{fail: "plugin marketplace remove", markets: `[{"name":"squadrn"}]`}
+	if err := removePlugin(ctx, f, ""); err == nil || !strings.Contains(err.Error(), "remove the squadrn marketplace") {
+		t.Errorf("a failed removal must be reported: %v", err)
 	}
 }
 

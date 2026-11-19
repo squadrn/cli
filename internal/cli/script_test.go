@@ -54,6 +54,15 @@ func TestMain(m *testing.M) {
 	testscript.Main(m, cmds)
 }
 
+// appendCall records an invocation in $HOME/calls.log like the shell fake does.
+func appendCall(cfg, cmd string) {
+	f, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), "calls.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err == nil {
+		_, _ = fmt.Fprintf(f, "cfg=%s args=%s\n", cfg, cmd)
+		_ = f.Close()
+	}
+}
+
 // fakeClaudeMain behaves exactly like the fakeClaude shell script, for Windows.
 func fakeClaudeMain(args []string) int {
 	cfg := os.Getenv("CLAUDE_CONFIG_DIR")
@@ -103,6 +112,12 @@ func fakeClaudeMain(args []string) int {
 		cat(".plugins", "[]")
 	case strings.HasPrefix(cmd, "plugin install "):
 		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"squadrn@squadrn"}]`+"\n"), 0o644)
+	case strings.HasPrefix(cmd, "plugin uninstall "):
+		_ = os.Remove(filepath.Join(dir, ".plugins"))
+		appendCall(cfg, cmd)
+	case strings.HasPrefix(cmd, "plugin marketplace remove "):
+		_ = os.Remove(filepath.Join(dir, ".markets"))
+		appendCall(cfg, cmd)
 	default:
 		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)
 		wd, _ := os.Getwd()
@@ -151,6 +166,8 @@ case "$*" in
   "plugin marketplace add "*) echo '[{"name":"squadrn"}]' >"$dir/.markets" ;;
   "plugin list --json") cat "$dir/.plugins" 2>/dev/null || echo '[]' ;;
   "plugin install "*) echo '[{"id":"squadrn@squadrn"}]' >"$dir/.plugins" ;;
+  "plugin uninstall "*) rm -f "$dir/.plugins"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
+  "plugin marketplace remove "*) rm -f "$dir/.markets"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
   *)
     echo "cfg=$cfg args=$*"
     echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"

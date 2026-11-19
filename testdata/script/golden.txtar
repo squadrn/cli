@@ -582,8 +582,9 @@ Global Flags:
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-self-uninstall.txt --
 Remove squadrn from this machine. Accounts, their logins and conversations are kept.
---purge also removes the config, the guard log and caches. Running agent sessions keep going;
-restart them afterwards.
+--purge also removes the config, the guard log and caches, and the session registries
+(.squadrn-inuse) in account dirs and in the directories squadrn recorded. Running agent sessions
+keep going; restart them afterwards.
 
 Usage:
   srn self-uninstall [flags]

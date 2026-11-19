@@ -211,6 +211,13 @@ exitcode 1 squadrn self-install nowhere
 # self-uninstall removes the plugin everywhere, the links and installed files; --purge also the
 # config, logs and caches. Accounts stay.
 exitcode 2 squadrn self-uninstall
+exists home/.claude-personal/.markets
+mkdir home/.claude-personal/.squadrn-inuse
+cp stale-inuse.json home/.claude-personal/.squadrn-inuse/999999.json
+mkdir repo/.squadrn-inuse repo/sub
+cp stale-inuse.json repo/.squadrn-inuse/999999.json
+mkdir home/.local/state/squadrn/usage
+exec sh -c 'printf "{\"cwd\":\"%s/repo/sub\"}\n" "$WORK" > home/.local/state/squadrn/usage/claude-personal.json'
 exec squadrn self-uninstall --yes --purge
 stdout 'claude/main: plugin removed'
 stdout 'claude/personal: plugin removed'
@@ -222,6 +229,11 @@ stdout 'squadrn is uninstalled'
 ! exists home/.cache/squadrn
 exists home/.claude-personal
 grep 'args=plugin uninstall squadrn@squadrn' home/calls.log
+grep 'args=plugin marketplace remove squadrn' home/calls.log
+! exists home/.claude-personal/.markets
+stdout 'removed ~/.claude-personal/.squadrn-inuse'
+! exists home/.claude-personal/.squadrn-inuse
+! exists repo/.squadrn-inuse
 
 # Installing a pre-release follows the beta channel unless a channel was chosen.
 env SQUADRN_TEST_VERSION=1.2.0-rc.3
@@ -250,3 +262,5 @@ esac
 ]
 -- empty --
 -- home/.claude-personal/.squadrn-account --
+-- stale-inuse.json --
+{"pid":999999,"started":"never"}
