@@ -57,7 +57,7 @@ func (a *app) selfInstallCmd() *cobra.Command {
 			return a.installRelease(args[0], Version, nc)
 		},
 	}
-	cmd.Flags().StringVar(&nc.command, "command", "", "command name to install under (default: configured, else squadrn)")
+	cmd.Flags().StringVar(&nc.command, "command", "", "command name to install under (default: configured, else srn)")
 	cmd.Flags().StringSliceVar(&nc.aliases, "alias", nil, "extra command names, comma separated")
 	cmd.Flags().BoolVarP(&nc.force, "force", "f", false, "install even if another program on PATH has one of the names")
 	cmd.Flags().BoolVar(&nc.interactive, "interactive", false, "ask for the command name and aliases on the terminal")

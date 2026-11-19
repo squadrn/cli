@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
 )
 
 func (a *app) accountCmd() *cobra.Command {
@@ -189,7 +190,7 @@ func (a *app) accountAdd(input string, trackUsage *bool) error {
 		return err
 	}
 	if fi, err := os.Stat(acct.Dir); err == nil && fi.IsDir() && !a.store.Managed(acct) {
-		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), a.cmd, a.cmd, acct.Label())
+		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), config.Slug, a.cmd, acct.Label())
 	}
 	ag, err := a.agent(acct.Spec)
 	if err != nil {

@@ -20,7 +20,7 @@ exec squadrn usage
 stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
 stdout '^claude/main +max +acme +- +- +- +- +nodata +-$'
 stdout '^claude/work +- +acme +- +- +- +- +nodata +-$'
-stdout 'not tracked: claude/main, claude/work \(run: squadrn usage setup\)'
+stdout 'not tracked: claude/main, claude/work \(run: srn usage setup\)'
 
 # Setup asks first; without a terminal it needs --yes.
 exitcode 2 squadrn usage setup
@@ -85,7 +85,7 @@ stdin limit.json
 exec squadrn hook limit
 grep '"limited_session": "s2"' home/.local/state/squadrn/usage/claude-work.json
 grep '"reset_estimate"' home/.local/state/squadrn/usage/claude-work.json
-grep 'claude/work hit its usage limit \(resets (Mon |Tue |Wed |Thu |Fri |Sat |Sun )?15:45\) — squadrn swap' notified.txt
+grep 'claude/work hit its usage limit \(resets (Mon |Tue |Wed |Thu |Fri |Sat |Sun )?15:45\) — srn swap' notified.txt
 stdin other-error.json
 exec squadrn hook limit
 env CLAUDE_CONFIG_DIR=

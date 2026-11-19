@@ -87,21 +87,21 @@ tree home/.config/squadrn
 cmp stdout layout-config.txt
 
 -- help-root.txt --
-squadrn runs coding agents (today: Claude Code) as one of several accounts on this machine.
+srn runs coding agents (today: Claude Code) as one of several accounts on this machine.
 
 Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.
 
 Usage:
-  squadrn [<account>] [<command> | agent args... | -- prompt] [flags]
-  squadrn [command]
+  srn [<account>] [<command> | agent args... | -- prompt] [flags]
+  srn [command]
 
 Examples:
-  squadrn                                  pick an account interactively
-  squadrn personal                         run as claude/personal (also: -a personal, claude/personal)
-  squadrn personal -p "hi"                 agent flags go to the agent CLI
-  squadrn personal -- "fix the bug"        a prompt goes after --
-  squadrn account add work                 create claude/work, then: squadrn account login work
-  squadrn grid ~/repo feat-a personal:fix-b  two agents side by side
+  srn                                  pick an account interactively
+  srn personal                         run as claude/personal (also: -a personal, claude/personal)
+  srn personal -p "hi"                 agent flags go to the agent CLI
+  srn personal -- "fix the bug"        a prompt goes after --
+  srn account add work                 create claude/work, then: srn account login work
+  srn grid ~/repo feat-a personal:fix-b  two agents side by side
 
 Agents:
   deps           Install dependencies in a worktree (package manager from its lockfile)
@@ -127,16 +127,16 @@ Setup:
 Flags:
   -a, --account string   account to run as (provider/name or name)
   -C, --dir string       run as if started in this directory
-  -h, --help             help for squadrn
+  -h, --help             help for srn
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn [command] --help" for more information about a command.
+Use "srn [command] --help" for more information about a command.
 -- help-account.txt --
 Manage agent accounts (default: ls)
 
 Usage:
-  squadrn account [flags]
-  squadrn account [command]
+  srn account [flags]
+  srn account [command]
 
 Available Commands:
   add         Create or repair an account (shared links, allowlisted MCP, plugin)
@@ -156,12 +156,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn account [command] --help" for more information about a command.
+Use "srn account [command] --help" for more information about a command.
 -- help-account-ls.txt --
 List accounts with login status
 
 Usage:
-  squadrn account ls [flags]
+  srn account ls [flags]
 
 Flags:
   -h, --help   help for ls
@@ -175,11 +175,11 @@ Global Flags:
 Create or repair an account (shared links, allowlisted MCP, plugin)
 
 Usage:
-  squadrn account add [<provider>/]<name> [flags]
+  srn account add [<provider>/]<name> [flags]
 
 Examples:
-  squadrn account add work
-  squadrn account add claude/work
+  srn account add work
+  srn account add claude/work
 
 Flags:
   -h, --help       help for add
@@ -194,7 +194,7 @@ Global Flags:
 Sign an account in
 
 Usage:
-  squadrn account login <account> [flags]
+  srn account login <account> [flags]
 
 Flags:
   -h, --help   help for login
@@ -207,7 +207,7 @@ Global Flags:
 Sign an account out (keeps its dir)
 
 Usage:
-  squadrn account logout <account> [flags]
+  srn account logout <account> [flags]
 
 Flags:
   -h, --help   help for logout
@@ -220,7 +220,7 @@ Global Flags:
 Rename an account (logs it out first; log in again afterwards)
 
 Usage:
-  squadrn account rename <account> <new-name> [flags]
+  srn account rename <account> <new-name> [flags]
 
 Flags:
   -f, --force   rename even if a session seems to use the account
@@ -235,7 +235,7 @@ Global Flags:
 Log an account out and move its dir to the trash
 
 Usage:
-  squadrn account rm <account> [flags]
+  srn account rm <account> [flags]
 
 Flags:
   -f, --force   remove even if a session seems to use the account
@@ -251,17 +251,17 @@ Show what the status line last reported about each account's usage limits (5-hou
 7-day windows), when it last hit a limit, and the best account to continue with in this repository.
 
 Usage is recorded by the status line, so it needs a one-time setup per settings file:
-squadrn usage setup wraps the status line command (your own one keeps running and showing).
+srn usage setup wraps the status line command (your own one keeps running and showing).
 
 Usage:
-  squadrn usage [<account>] [flags]
-  squadrn usage [command]
+  srn usage [<account>] [flags]
+  srn usage [command]
 
 Examples:
-  squadrn usage                 all accounts
-  squadrn usage work            details of claude/work
-  squadrn usage setup --all     record usage for every account
-  squadrn usage setup --undo    restore the previous status line
+  srn usage                 all accounts
+  srn usage work            details of claude/work
+  srn usage setup --all     record usage for every account
+  srn usage setup --undo    restore the previous status line
 
 Available Commands:
   setup       Record an account's usage through its status line
@@ -277,19 +277,19 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn usage [command] --help" for more information about a command.
+Use "srn usage [command] --help" for more information about a command.
 -- help-wt.txt --
 Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
 
 Usage:
-  squadrn wt <name> [flags]
-  squadrn wt [command]
+  srn wt <name> [flags]
+  srn wt [command]
 
 Examples:
-  squadrn wt feat-login           as main
-  squadrn personal wt fix-otp      as claude/personal
-  squadrn wt ls                    list worktrees
-  squadrn wt rm feat-login         remove one
+  srn wt feat-login           as main
+  srn personal wt fix-otp      as claude/personal
+  srn wt ls                    list worktrees
+  srn wt rm feat-login         remove one
 
 Available Commands:
   ls          List the agent worktrees of this repository
@@ -303,12 +303,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn wt [command] --help" for more information about a command.
+Use "srn wt [command] --help" for more information about a command.
 -- help-wt-ls.txt --
 List the agent worktrees of this repository
 
 Usage:
-  squadrn wt ls [flags]
+  srn wt ls [flags]
 
 Flags:
   -h, --help   help for ls
@@ -323,7 +323,7 @@ Remove a worktree and its branch if merged. --force also removes a modified work
 --force-branch also deletes an unmerged branch; both ask first (-y skips).
 
 Usage:
-  squadrn wt rm <name> [flags]
+  srn wt rm <name> [flags]
 
 Flags:
   -f, --force          also remove a modified worktree (or one containing submodules, or in use)
@@ -340,14 +340,14 @@ Run agents side by side in a tmux grid for <repo>: one pane per agent, each in i
 worktree. Running grid again for the same repository adds panes.
 
 Usage:
-  squadrn grid <repo> [<account>:]<name>... [flags]
-  squadrn grid [command]
+  srn grid <repo> [<account>:]<name>... [flags]
+  srn grid [command]
 
 Examples:
-  squadrn grid ~/repo feat-a personal:fix-b          per-agent account (default: main or -a)
-  squadrn grid ~/repo feat-a claude/personal:fix-b   account as provider/name
-  squadrn grid ~/repo feat-1 feat-2 --spread         round-robin over logged-in accounts
-  squadrn grid ls | attach [repo] | stop [repo]
+  srn grid ~/repo feat-a personal:fix-b          per-agent account (default: main or -a)
+  srn grid ~/repo feat-a claude/personal:fix-b   account as provider/name
+  srn grid ~/repo feat-1 feat-2 --spread         round-robin over logged-in accounts
+  srn grid ls | attach [repo] | stop [repo]
 
 Available Commands:
   attach      Attach to the grid of a repository (default: this one)
@@ -363,12 +363,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn grid [command] --help" for more information about a command.
+Use "srn grid [command] --help" for more information about a command.
 -- help-grid-ls.txt --
 List running grids
 
 Usage:
-  squadrn grid ls [flags]
+  srn grid ls [flags]
 
 Flags:
   -h, --help   help for ls
@@ -382,7 +382,7 @@ Global Flags:
 Attach to the grid of a repository (default: this one)
 
 Usage:
-  squadrn grid attach [repo] [flags]
+  srn grid attach [repo] [flags]
 
 Flags:
   -h, --help   help for attach
@@ -395,7 +395,7 @@ Global Flags:
 Stop the grid of a repository and every agent in it (worktrees are kept)
 
 Usage:
-  squadrn grid stop [repo] [flags]
+  srn grid stop [repo] [flags]
 
 Flags:
   -h, --help   help for stop
@@ -409,7 +409,7 @@ Global Flags:
 List running agents: session, account, worktree
 
 Usage:
-  squadrn ps [flags]
+  srn ps [flags]
 
 Flags:
   -h, --help   help for ps
@@ -432,13 +432,13 @@ already holds the conversation and it went on there, the swap is refused unless 
 --worktree <name> moves the latest conversation of that agent worktree instead.
 
 Usage:
-  squadrn swap [flags]
+  srn swap [flags]
 
 Examples:
-  squadrn swap                              the conversation that just hit its limit here
-  squadrn swap --to personal                the same, to claude/personal
-  squadrn swap --worktree feat-a --to work  latest conversation of worktree feat-a
-  squadrn swap --session <id> --to work     any conversation, by session ID
+  srn swap                              the conversation that just hit its limit here
+  srn swap --to personal                the same, to claude/personal
+  srn swap --worktree feat-a --to work  latest conversation of worktree feat-a
+  srn swap --session <id> --to work     any conversation, by session ID
 
 Flags:
   -f, --force             move it even if the target's copy went on and differs
@@ -456,7 +456,7 @@ Global Flags:
 Remove clean worktrees that are merged or empty (dry run without --yes)
 
 Usage:
-  squadrn gc [flags]
+  srn gc [flags]
 
 Flags:
   -f, --force   let git remove clean worktrees it refuses (those containing submodules)
@@ -472,7 +472,7 @@ Global Flags:
 Install dependencies in a worktree (package manager from its lockfile)
 
 Usage:
-  squadrn deps <name> [flags]
+  srn deps <name> [flags]
 
 Flags:
   -h, --help   help for deps
@@ -485,7 +485,7 @@ Global Flags:
 Check the install, the push guard, hooks and every account
 
 Usage:
-  squadrn doctor [flags]
+  srn doctor [flags]
 
 Flags:
   -h, --help   help for doctor
@@ -499,14 +499,14 @@ Global Flags:
 Show settings; get or set one (command and aliases relink ~/.local/bin)
 
 Usage:
-  squadrn config [flags]
-  squadrn config [command]
+  srn config [flags]
+  srn config [command]
 
 Examples:
-  squadrn config
-  squadrn config get protected_branches
-  squadrn config set protected_branches main,release/*
-  squadrn config set command ai
+  srn config
+  srn config get protected_branches
+  srn config set protected_branches main,release/*
+  srn config set command ai
 
 Available Commands:
   get         Print one setting
@@ -521,12 +521,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn config [command] --help" for more information about a command.
+Use "srn config [command] --help" for more information about a command.
 -- help-config-get.txt --
 Print one setting
 
 Usage:
-  squadrn config get <key> [flags]
+  srn config get <key> [flags]
 
 Flags:
   -h, --help   help for get
@@ -541,7 +541,7 @@ Change one setting. Lists are comma separated; "" clears a list, or restores the
 protected_branches. Changing command or aliases relinks them in the bin dir.
 
 Usage:
-  squadrn config set <key> <value> [flags]
+  srn config set <key> <value> [flags]
 
 Flags:
   -f, --force   use a command name even if another program on PATH has it
@@ -557,12 +557,12 @@ Update squadrn and its plugin in every account to the newest release of your cha
 before.
 
 Usage:
-  squadrn self-update [flags]
+  srn self-update [flags]
 
 Examples:
-  squadrn self-update --check       what is new
-  squadrn self-update               install the newest release of your channel
-  squadrn self-update --rollback    go back to the release installed before
+  srn self-update --check       what is new
+  srn self-update               install the newest release of your channel
+  srn self-update --rollback    go back to the release installed before
 
 Flags:
       --allow-downgrade   install a release older than the running one
@@ -583,7 +583,7 @@ Remove squadrn from this machine. Accounts, their logins and conversations are k
 restart them afterwards.
 
 Usage:
-  squadrn self-uninstall [flags]
+  srn self-uninstall [flags]
 
 Flags:
   -h, --help    help for self-uninstall
@@ -598,7 +598,7 @@ Global Flags:
 Print the squadrn version
 
 Usage:
-  squadrn version [flags]
+  srn version [flags]
 
 Flags:
   -h, --help   help for version
@@ -609,11 +609,11 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-completion.txt --
-Generate the autocompletion script for squadrn for the specified shell.
+Generate the autocompletion script for srn for the specified shell.
 See each sub-command's help for details on how to use the generated script.
 
 Usage:
-  squadrn completion [command]
+  srn completion [command]
 
 Available Commands:
   bash        Generate the autocompletion script for bash
@@ -629,11 +629,11 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 
-Use "squadrn completion [command] --help" for more information about a command.
+Use "srn completion [command] --help" for more information about a command.
 -- completion-bash.txt --
-# bash completion V2 for squadrn                              -*- shell-script -*-
+# bash completion V2 for srn                                  -*- shell-script -*-
 
-__squadrn_debug()
+__srn_debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE-} ]]; then
         echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
@@ -642,41 +642,41 @@ __squadrn_debug()
 
 # Macs have bash3 for which the bash-completion package doesn't include
 # _init_completion. This is a minimal version of that function.
-__squadrn_init_completion()
+__srn_init_completion()
 {
     COMPREPLY=()
     _get_comp_words_by_ref "$@" cur prev words cword
 }
 
-# This function calls the squadrn program to obtain the completion
+# This function calls the srn program to obtain the completion
 # results and the directive.  It fills the 'out' and 'directive' vars.
-__squadrn_get_completion_results() {
+__srn_get_completion_results() {
     local requestComp lastParam lastChar args
 
     # Prepare the command to request completions for the program.
-    # Calling ${words[0]} instead of directly squadrn allows handling aliases
+    # Calling ${words[0]} instead of directly srn allows handling aliases
     args=("${words[@]:1}")
     requestComp="${words[0]} __complete ${args[*]}"
 
     lastParam=${words[$((${#words[@]}-1))]}
     lastChar=${lastParam:$((${#lastParam}-1)):1}
-    __squadrn_debug "lastParam ${lastParam}, lastChar ${lastChar}"
+    __srn_debug "lastParam ${lastParam}, lastChar ${lastChar}"
 
     if [[ -z ${cur} && ${lastChar} != = ]]; then
         # If the last parameter is complete (there is a space following it)
         # We add an extra empty parameter so we can indicate this to the go method.
-        __squadrn_debug "Adding extra empty parameter"
+        __srn_debug "Adding extra empty parameter"
         requestComp="${requestComp} ''"
     fi
 
-    # When completing a flag with an = (e.g., squadrn -n=<TAB>)
+    # When completing a flag with an = (e.g., srn -n=<TAB>)
     # bash focuses on the part after the =, so we need to remove
     # the flag part from $cur
     if [[ ${cur} == -*=* ]]; then
         cur="${cur#*=}"
     fi
 
-    __squadrn_debug "Calling ${requestComp}"
+    __srn_debug "Calling ${requestComp}"
     # Use eval to handle any environment variables and such
     out=$(eval "${requestComp}" 2>/dev/null)
 
@@ -688,11 +688,11 @@ __squadrn_get_completion_results() {
         # There is not directive specified
         directive=0
     fi
-    __squadrn_debug "The completion directive is: ${directive}"
-    __squadrn_debug "The completions are: ${out}"
+    __srn_debug "The completion directive is: ${directive}"
+    __srn_debug "The completions are: ${out}"
 }
 
-__squadrn_process_completion_results() {
+__srn_process_completion_results() {
     local shellCompDirectiveError=1
     local shellCompDirectiveNoSpace=2
     local shellCompDirectiveNoFileComp=4
@@ -702,36 +702,36 @@ __squadrn_process_completion_results() {
 
     if (((directive & shellCompDirectiveError) != 0)); then
         # Error code.  No completion.
-        __squadrn_debug "Received error from custom completion go code"
+        __srn_debug "Received error from custom completion go code"
         return
     else
         if (((directive & shellCompDirectiveNoSpace) != 0)); then
             if [[ $(type -t compopt) == builtin ]]; then
-                __squadrn_debug "Activating no space"
+                __srn_debug "Activating no space"
                 compopt -o nospace
             else
-                __squadrn_debug "No space directive not supported in this version of bash"
+                __srn_debug "No space directive not supported in this version of bash"
             fi
         fi
         if (((directive & shellCompDirectiveKeepOrder) != 0)); then
             if [[ $(type -t compopt) == builtin ]]; then
                 # no sort isn't supported for bash less than < 4.4
                 if [[ ${BASH_VERSINFO[0]} -lt 4 || ( ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 4 ) ]]; then
-                    __squadrn_debug "No sort directive not supported in this version of bash"
+                    __srn_debug "No sort directive not supported in this version of bash"
                 else
-                    __squadrn_debug "Activating keep order"
+                    __srn_debug "Activating keep order"
                     compopt -o nosort
                 fi
             else
-                __squadrn_debug "No sort directive not supported in this version of bash"
+                __srn_debug "No sort directive not supported in this version of bash"
             fi
         fi
         if (((directive & shellCompDirectiveNoFileComp) != 0)); then
             if [[ $(type -t compopt) == builtin ]]; then
-                __squadrn_debug "Activating no file completion"
+                __srn_debug "Activating no file completion"
                 compopt +o default
             else
-                __squadrn_debug "No file completion directive not supported in this version of bash"
+                __srn_debug "No file completion directive not supported in this version of bash"
             fi
         fi
     fi
@@ -739,7 +739,7 @@ __squadrn_process_completion_results() {
     # Separate activeHelp from normal completions
     local completions=()
     local activeHelp=()
-    __squadrn_extract_activeHelp
+    __srn_extract_activeHelp
 
     if (((directive & shellCompDirectiveFilterFileExt) != 0)); then
         # File extension filtering
@@ -752,7 +752,7 @@ __squadrn_process_completion_results() {
         done
 
         filteringCmd="_filedir $fullFilter"
-        __squadrn_debug "File filtering command: $filteringCmd"
+        __srn_debug "File filtering command: $filteringCmd"
         $filteringCmd
     elif (((directive & shellCompDirectiveFilterDirs) != 0)); then
         # File completion for directories only
@@ -760,24 +760,24 @@ __squadrn_process_completion_results() {
         local subdir
         subdir=${completions[0]}
         if [[ -n $subdir ]]; then
-            __squadrn_debug "Listing directories in $subdir"
+            __srn_debug "Listing directories in $subdir"
             pushd "$subdir" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1 || return
         else
-            __squadrn_debug "Listing directories in ."
+            __srn_debug "Listing directories in ."
             _filedir -d
         fi
     else
-        __squadrn_handle_completion_types
+        __srn_handle_completion_types
     fi
 
-    __squadrn_handle_special_char "$cur" :
-    __squadrn_handle_special_char "$cur" =
+    __srn_handle_special_char "$cur" :
+    __srn_handle_special_char "$cur" =
 
     # Print the activeHelp statements before we finish
-    __squadrn_handle_activeHelp
+    __srn_handle_activeHelp
 }
 
-__squadrn_handle_activeHelp() {
+__srn_handle_activeHelp() {
     # Print the activeHelp statements
     if ((${#activeHelp[*]} != 0)); then
         if [ -z $COMP_TYPE ]; then
@@ -785,7 +785,7 @@ __squadrn_handle_activeHelp() {
             printf "\n";
             printf "%s\n" "${activeHelp[@]}"
             printf "\n"
-            __squadrn_reprint_commandLine
+            __srn_reprint_commandLine
             return
         fi
 
@@ -802,7 +802,7 @@ __squadrn_handle_activeHelp() {
                 # To find out, we actually trigger the file completion ourselves;
                 # the call to _filedir will fill COMPREPLY if files match.
                 if (((directive & shellCompDirectiveNoFileComp) == 0)); then
-                    __squadrn_debug "Listing files"
+                    __srn_debug "Listing files"
                     _filedir
                 fi
             fi
@@ -816,7 +816,7 @@ __squadrn_handle_activeHelp() {
                 # When there are no completion choices at all, we need
                 # to re-print the command-line since the shell will
                 # not be doing it itself.
-                __squadrn_reprint_commandLine
+                __srn_reprint_commandLine
             fi
         elif [ $COMP_TYPE -eq 37 ] || [ $COMP_TYPE -eq 42 ]; then
             # For completion type: menu-complete/menu-complete-backward and insert-completions
@@ -825,12 +825,12 @@ __squadrn_handle_activeHelp() {
             printf "\n"
             printf "%s\n" "${activeHelp[@]}"
 
-            __squadrn_reprint_commandLine
+            __srn_reprint_commandLine
         fi
     fi
 }
 
-__squadrn_reprint_commandLine() {
+__srn_reprint_commandLine() {
     # The prompt format is only available from bash 4.4.
     # We test if it is available before using it.
     if (x=${PS1@P}) 2> /dev/null; then
@@ -844,7 +844,7 @@ __squadrn_reprint_commandLine() {
 
 # Separate activeHelp lines from real completions.
 # Fills the $activeHelp and $completions arrays.
-__squadrn_extract_activeHelp() {
+__srn_extract_activeHelp() {
     local activeHelpMarker="_activeHelp_ "
     local endIndex=${#activeHelpMarker}
 
@@ -853,7 +853,7 @@ __squadrn_extract_activeHelp() {
 
         if [[ ${comp:0:endIndex} == $activeHelpMarker ]]; then
             comp=${comp:endIndex}
-            __squadrn_debug "ActiveHelp found: $comp"
+            __srn_debug "ActiveHelp found: $comp"
             if [[ -n $comp ]]; then
                 activeHelp+=("$comp")
             fi
@@ -864,8 +864,8 @@ __squadrn_extract_activeHelp() {
     done <<<"${out}"
 }
 
-__squadrn_handle_completion_types() {
-    __squadrn_debug "__squadrn_handle_completion_types: COMP_TYPE is $COMP_TYPE"
+__srn_handle_completion_types() {
+    __srn_debug "__srn_handle_completion_types: COMP_TYPE is $COMP_TYPE"
 
     case $COMP_TYPE in
     37|42)
@@ -892,12 +892,12 @@ __squadrn_handle_completion_types() {
 
     *)
         # Type: complete (normal completion)
-        __squadrn_handle_standard_completion_case
+        __srn_handle_standard_completion_case
         ;;
     esac
 }
 
-__squadrn_handle_standard_completion_case() {
+__srn_handle_standard_completion_case() {
     local tab=$'\t'
 
     # If there are no completions, we don't need to do anything
@@ -953,16 +953,16 @@ __squadrn_handle_standard_completion_case() {
 
     # If there is a single completion left, remove the description text and escape any special characters
     if ((${#COMPREPLY[*]} == 1)); then
-        __squadrn_debug "COMPREPLY[0]: ${COMPREPLY[0]}"
+        __srn_debug "COMPREPLY[0]: ${COMPREPLY[0]}"
         COMPREPLY[0]=$(printf "%q" "${COMPREPLY[0]%%$tab*}")
-        __squadrn_debug "Removed description from single completion, which is now: ${COMPREPLY[0]}"
+        __srn_debug "Removed description from single completion, which is now: ${COMPREPLY[0]}"
     else
         # Format the descriptions
-        __squadrn_format_comp_descriptions $longest
+        __srn_format_comp_descriptions $longest
     fi
 }
 
-__squadrn_handle_special_char()
+__srn_handle_special_char()
 {
     local comp="$1"
     local char=$2
@@ -975,7 +975,7 @@ __squadrn_handle_special_char()
     fi
 }
 
-__squadrn_format_comp_descriptions()
+__srn_format_comp_descriptions()
 {
     local tab=$'\t'
     local comp desc maxdesclength
@@ -986,7 +986,7 @@ __squadrn_format_comp_descriptions()
         comp=${COMPREPLY[ci]}
         # Properly format the description string which follows a tab character if there is one
         if [[ "$comp" == *$tab* ]]; then
-            __squadrn_debug "Original comp: $comp"
+            __srn_debug "Original comp: $comp"
             desc=${comp#*$tab}
             comp=${comp%%$tab*}
 
@@ -1016,12 +1016,12 @@ __squadrn_format_comp_descriptions()
                 comp+="  ($desc)"
             fi
             COMPREPLY[ci]=$comp
-            __squadrn_debug "Final comp: $comp"
+            __srn_debug "Final comp: $comp"
         fi
     done
 }
 
-__start_squadrn()
+__start_srn()
 {
     local cur prev words cword split
 
@@ -1032,38 +1032,38 @@ __start_squadrn()
     if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -n =: || return
     else
-        __squadrn_init_completion -n =: || return
+        __srn_init_completion -n =: || return
     fi
 
-    __squadrn_debug
-    __squadrn_debug "========= starting completion logic =========="
-    __squadrn_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
+    __srn_debug
+    __srn_debug "========= starting completion logic =========="
+    __srn_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
 
     # The user could have moved the cursor backwards on the command-line.
     # We need to trigger completion from the $cword location, so we need
     # to truncate the command-line ($words) up to the $cword location.
     words=("${words[@]:0:$cword+1}")
-    __squadrn_debug "Truncated words[*]: ${words[*]},"
+    __srn_debug "Truncated words[*]: ${words[*]},"
 
     local out directive
-    __squadrn_get_completion_results
-    __squadrn_process_completion_results
+    __srn_get_completion_results
+    __srn_process_completion_results
 }
 
 if [[ $(type -t compopt) = "builtin" ]]; then
-    complete -o default -F __start_squadrn squadrn
+    complete -o default -F __start_srn srn
 else
-    complete -o default -o nospace -F __start_squadrn squadrn
+    complete -o default -o nospace -F __start_srn srn
 fi
 
 # ex: ts=4 sw=4 et filetype=sh
 -- completion-zsh.txt --
-#compdef squadrn
-compdef _squadrn squadrn
+#compdef srn
+compdef _srn srn
 
-# zsh completion for squadrn                              -*- shell-script -*-
+# zsh completion for srn                                  -*- shell-script -*-
 
-__squadrn_debug()
+__srn_debug()
 {
     local file="$BASH_COMP_DEBUG_FILE"
     if [[ -n ${file} ]]; then
@@ -1071,7 +1071,7 @@ __squadrn_debug()
     fi
 }
 
-_squadrn()
+_srn()
 {
     local shellCompDirectiveError=1
     local shellCompDirectiveNoSpace=2
@@ -1083,21 +1083,21 @@ _squadrn()
     local lastParam lastChar flagPrefix requestComp out directive comp lastComp noSpace keepOrder
     local -a completions
 
-    __squadrn_debug "\n========= starting completion logic =========="
-    __squadrn_debug "CURRENT: ${CURRENT}, words[*]: ${words[*]}"
+    __srn_debug "\n========= starting completion logic =========="
+    __srn_debug "CURRENT: ${CURRENT}, words[*]: ${words[*]}"
 
     # The user could have moved the cursor backwards on the command-line.
     # We need to trigger completion from the $CURRENT location, so we need
     # to truncate the command-line ($words) up to the $CURRENT location.
     # (We cannot use $CURSOR as its value does not work when a command is an alias.)
     words=("${=words[1,CURRENT]}")
-    __squadrn_debug "Truncated words[*]: ${words[*]},"
+    __srn_debug "Truncated words[*]: ${words[*]},"
 
     lastParam=${words[-1]}
     lastChar=${lastParam[-1]}
-    __squadrn_debug "lastParam: ${lastParam}, lastChar: ${lastChar}"
+    __srn_debug "lastParam: ${lastParam}, lastChar: ${lastChar}"
 
-    # For zsh, when completing a flag with an = (e.g., squadrn -n=<TAB>)
+    # For zsh, when completing a flag with an = (e.g., srn -n=<TAB>)
     # completions must be prefixed with the flag
     setopt local_options BASH_REMATCH
     if [[ "${lastParam}" =~ '-.*=' ]]; then
@@ -1110,22 +1110,22 @@ _squadrn()
     if [ "${lastChar}" = "" ]; then
         # If the last parameter is complete (there is a space following it)
         # We add an extra empty parameter so we can indicate this to the go completion code.
-        __squadrn_debug "Adding extra empty parameter"
+        __srn_debug "Adding extra empty parameter"
         requestComp="${requestComp} \"\""
     fi
 
-    __squadrn_debug "About to call: eval ${requestComp}"
+    __srn_debug "About to call: eval ${requestComp}"
 
     # Use eval to handle any environment variables and such
     out=$(eval ${requestComp} 2>/dev/null)
-    __squadrn_debug "completion output: ${out}"
+    __srn_debug "completion output: ${out}"
 
     # Extract the directive integer following a : from the last line
     local lastLine
     while IFS='\n' read -r line; do
         lastLine=${line}
     done < <(printf "%s\n" "${out[@]}")
-    __squadrn_debug "last line: ${lastLine}"
+    __srn_debug "last line: ${lastLine}"
 
     if [ "${lastLine[1]}" = : ]; then
         directive=${lastLine[2,-1]}
@@ -1135,16 +1135,16 @@ _squadrn()
         out=${out[1,-$suffix]}
     else
         # There is no directive specified.  Leave $out as is.
-        __squadrn_debug "No directive found.  Setting do default"
+        __srn_debug "No directive found.  Setting do default"
         directive=0
     fi
 
-    __squadrn_debug "directive: ${directive}"
-    __squadrn_debug "completions: ${out}"
-    __squadrn_debug "flagPrefix: ${flagPrefix}"
+    __srn_debug "directive: ${directive}"
+    __srn_debug "completions: ${out}"
+    __srn_debug "flagPrefix: ${flagPrefix}"
 
     if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
-        __squadrn_debug "Completion received error. Ignoring completions."
+        __srn_debug "Completion received error. Ignoring completions."
         return
     fi
 
@@ -1155,11 +1155,11 @@ _squadrn()
     while IFS='\n' read -r comp; do
         # Check if this is an activeHelp statement (i.e., prefixed with $activeHelpMarker)
         if [ "${comp[1,$endIndex]}" = "$activeHelpMarker" ];then
-            __squadrn_debug "ActiveHelp found: $comp"
+            __srn_debug "ActiveHelp found: $comp"
             comp="${comp[$startIndex,-1]}"
             if [ -n "$comp" ]; then
                 compadd -x "${comp}"
-                __squadrn_debug "ActiveHelp will need delimiter"
+                __srn_debug "ActiveHelp will need delimiter"
                 hasActiveHelp=1
             fi
 
@@ -1176,7 +1176,7 @@ _squadrn()
             local tab="$(printf '\t')"
             comp=${comp//$tab/:}
 
-            __squadrn_debug "Adding completion: ${comp}"
+            __srn_debug "Adding completion: ${comp}"
             completions+=${comp}
             lastComp=$comp
         fi
@@ -1187,19 +1187,19 @@ _squadrn()
     # - file completion will be performed (so there will be choices after the activeHelp)
     if [ $hasActiveHelp -eq 1 ]; then
         if [ ${#completions} -ne 0 ] || [ $((directive & shellCompDirectiveNoFileComp)) -eq 0 ]; then
-            __squadrn_debug "Adding activeHelp delimiter"
+            __srn_debug "Adding activeHelp delimiter"
             compadd -x "--"
             hasActiveHelp=0
         fi
     fi
 
     if [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ]; then
-        __squadrn_debug "Activating nospace."
+        __srn_debug "Activating nospace."
         noSpace="-S ''"
     fi
 
     if [ $((directive & shellCompDirectiveKeepOrder)) -ne 0 ]; then
-        __squadrn_debug "Activating keep order."
+        __srn_debug "Activating keep order."
         keepOrder="-V"
     fi
 
@@ -1216,17 +1216,17 @@ _squadrn()
         done
         filteringCmd+=" ${flagPrefix}"
 
-        __squadrn_debug "File filtering command: $filteringCmd"
+        __srn_debug "File filtering command: $filteringCmd"
         _arguments '*:filename:'"$filteringCmd"
     elif [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
         # File completion for directories only
         local subdir
         subdir="${completions[1]}"
         if [ -n "$subdir" ]; then
-            __squadrn_debug "Listing directories in $subdir"
+            __srn_debug "Listing directories in $subdir"
             pushd "${subdir}" >/dev/null 2>&1
         else
-            __squadrn_debug "Listing directories in ."
+            __srn_debug "Listing directories in ."
         fi
 
         local result
@@ -1237,17 +1237,17 @@ _squadrn()
         fi
         return $result
     else
-        __squadrn_debug "Calling _describe"
+        __srn_debug "Calling _describe"
         if eval _describe $keepOrder "completions" completions $flagPrefix $noSpace; then
-            __squadrn_debug "_describe found some completions"
+            __srn_debug "_describe found some completions"
 
             # Return the success of having called _describe
             return 0
         else
-            __squadrn_debug "_describe did not find completions."
-            __squadrn_debug "Checking if we should do file completion."
+            __srn_debug "_describe did not find completions."
+            __srn_debug "Checking if we should do file completion."
             if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
-                __squadrn_debug "deactivating file completion"
+                __srn_debug "deactivating file completion"
 
                 # We must return an error code here to let zsh know that there were no
                 # completions found by _describe; this is what will trigger other
@@ -1256,7 +1256,7 @@ _squadrn()
                 return 1
             else
                 # Perform file completion
-                __squadrn_debug "Activating file completion"
+                __srn_debug "Activating file completion"
 
                 # We must return the result of this command, so it must be the
                 # last command, or else we must store its result to return it.
@@ -1267,34 +1267,34 @@ _squadrn()
 }
 
 # don't run the completion function when being source-ed or eval-ed
-if [ "$funcstack[1]" = "_squadrn" ]; then
-    _squadrn
+if [ "$funcstack[1]" = "_srn" ]; then
+    _srn
 fi
 -- completion-fish.txt --
-# fish completion for squadrn                              -*- shell-script -*-
+# fish completion for srn                                  -*- shell-script -*-
 
-function __squadrn_debug
+function __srn_debug
     set -l file "$BASH_COMP_DEBUG_FILE"
     if test -n "$file"
         echo "$argv" >> $file
     end
 end
 
-function __squadrn_perform_completion
-    __squadrn_debug "Starting __squadrn_perform_completion"
+function __srn_perform_completion
+    __srn_debug "Starting __srn_perform_completion"
 
     # Extract all args except the last one
     set -l args (commandline -opc)
     # Extract the last arg and escape it in case it is a space
     set -l lastArg (string escape -- (commandline -ct))
 
-    __squadrn_debug "args: $args"
-    __squadrn_debug "last arg: $lastArg"
+    __srn_debug "args: $args"
+    __srn_debug "last arg: $lastArg"
 
     # Disable ActiveHelp which is not supported for fish shell
-    set -l requestComp "SQUADRN_ACTIVE_HELP=0 $args[1] __complete $args[2..-1] $lastArg"
+    set -l requestComp "SRN_ACTIVE_HELP=0 $args[1] __complete $args[2..-1] $lastArg"
 
-    __squadrn_debug "Calling $requestComp"
+    __srn_debug "Calling $requestComp"
     set -l results (eval $requestComp 2> /dev/null)
 
     # Some programs may output extra empty lines after the directive.
@@ -1317,9 +1317,9 @@ function __squadrn_perform_completion
     # completions must be prefixed with the flag
     set -l flagPrefix (string match -r -- '-.*=' "$lastArg")
 
-    __squadrn_debug "Comps: $comps"
-    __squadrn_debug "DirectiveLine: $directiveLine"
-    __squadrn_debug "flagPrefix: $flagPrefix"
+    __srn_debug "Comps: $comps"
+    __srn_debug "DirectiveLine: $directiveLine"
+    __srn_debug "flagPrefix: $flagPrefix"
 
     for comp in $comps
         printf "%s%s\n" "$flagPrefix" "$comp"
@@ -1328,84 +1328,84 @@ function __squadrn_perform_completion
     printf "%s\n" "$directiveLine"
 end
 
-# this function limits calls to __squadrn_perform_completion, by caching the result behind $__squadrn_perform_completion_once_result
-function __squadrn_perform_completion_once
-    __squadrn_debug "Starting __squadrn_perform_completion_once"
+# this function limits calls to __srn_perform_completion, by caching the result behind $__srn_perform_completion_once_result
+function __srn_perform_completion_once
+    __srn_debug "Starting __srn_perform_completion_once"
 
-    if test -n "$__squadrn_perform_completion_once_result"
-        __squadrn_debug "Seems like a valid result already exists, skipping __squadrn_perform_completion"
+    if test -n "$__srn_perform_completion_once_result"
+        __srn_debug "Seems like a valid result already exists, skipping __srn_perform_completion"
         return 0
     end
 
-    set --global __squadrn_perform_completion_once_result (__squadrn_perform_completion)
-    if test -z "$__squadrn_perform_completion_once_result"
-        __squadrn_debug "No completions, probably due to a failure"
+    set --global __srn_perform_completion_once_result (__srn_perform_completion)
+    if test -z "$__srn_perform_completion_once_result"
+        __srn_debug "No completions, probably due to a failure"
         return 1
     end
 
-    __squadrn_debug "Performed completions and set __squadrn_perform_completion_once_result"
+    __srn_debug "Performed completions and set __srn_perform_completion_once_result"
     return 0
 end
 
-# this function is used to clear the $__squadrn_perform_completion_once_result variable after completions are run
-function __squadrn_clear_perform_completion_once_result
-    __squadrn_debug ""
-    __squadrn_debug "========= clearing previously set __squadrn_perform_completion_once_result variable =========="
-    set --erase __squadrn_perform_completion_once_result
-    __squadrn_debug "Successfully erased the variable __squadrn_perform_completion_once_result"
+# this function is used to clear the $__srn_perform_completion_once_result variable after completions are run
+function __srn_clear_perform_completion_once_result
+    __srn_debug ""
+    __srn_debug "========= clearing previously set __srn_perform_completion_once_result variable =========="
+    set --erase __srn_perform_completion_once_result
+    __srn_debug "Successfully erased the variable __srn_perform_completion_once_result"
 end
 
-function __squadrn_requires_order_preservation
-    __squadrn_debug ""
-    __squadrn_debug "========= checking if order preservation is required =========="
+function __srn_requires_order_preservation
+    __srn_debug ""
+    __srn_debug "========= checking if order preservation is required =========="
 
-    __squadrn_perform_completion_once
-    if test -z "$__squadrn_perform_completion_once_result"
-        __squadrn_debug "Error determining if order preservation is required"
+    __srn_perform_completion_once
+    if test -z "$__srn_perform_completion_once_result"
+        __srn_debug "Error determining if order preservation is required"
         return 1
     end
 
-    set -l directive (string sub --start 2 $__squadrn_perform_completion_once_result[-1])
-    __squadrn_debug "Directive is: $directive"
+    set -l directive (string sub --start 2 $__srn_perform_completion_once_result[-1])
+    __srn_debug "Directive is: $directive"
 
     set -l shellCompDirectiveKeepOrder 32
     set -l keeporder (math (math --scale 0 $directive / $shellCompDirectiveKeepOrder) % 2)
-    __squadrn_debug "Keeporder is: $keeporder"
+    __srn_debug "Keeporder is: $keeporder"
 
     if test $keeporder -ne 0
-        __squadrn_debug "This does require order preservation"
+        __srn_debug "This does require order preservation"
         return 0
     end
 
-    __squadrn_debug "This doesn't require order preservation"
+    __srn_debug "This doesn't require order preservation"
     return 1
 end
 
 
 # This function does two things:
-# - Obtain the completions and store them in the global __squadrn_comp_results
+# - Obtain the completions and store them in the global __srn_comp_results
 # - Return false if file completion should be performed
-function __squadrn_prepare_completions
-    __squadrn_debug ""
-    __squadrn_debug "========= starting completion logic =========="
+function __srn_prepare_completions
+    __srn_debug ""
+    __srn_debug "========= starting completion logic =========="
 
     # Start fresh
-    set --erase __squadrn_comp_results
+    set --erase __srn_comp_results
 
-    __squadrn_perform_completion_once
-    __squadrn_debug "Completion results: $__squadrn_perform_completion_once_result"
+    __srn_perform_completion_once
+    __srn_debug "Completion results: $__srn_perform_completion_once_result"
 
-    if test -z "$__squadrn_perform_completion_once_result"
-        __squadrn_debug "No completion, probably due to a failure"
+    if test -z "$__srn_perform_completion_once_result"
+        __srn_debug "No completion, probably due to a failure"
         # Might as well do file completion, in case it helps
         return 1
     end
 
-    set -l directive (string sub --start 2 $__squadrn_perform_completion_once_result[-1])
-    set --global __squadrn_comp_results $__squadrn_perform_completion_once_result[1..-2]
+    set -l directive (string sub --start 2 $__srn_perform_completion_once_result[-1])
+    set --global __srn_comp_results $__srn_perform_completion_once_result[1..-2]
 
-    __squadrn_debug "Completions are: $__squadrn_comp_results"
-    __squadrn_debug "Directive is: $directive"
+    __srn_debug "Completions are: $__srn_comp_results"
+    __srn_debug "Directive is: $directive"
 
     set -l shellCompDirectiveError 1
     set -l shellCompDirectiveNoSpace 2
@@ -1419,7 +1419,7 @@ function __squadrn_prepare_completions
 
     set -l compErr (math (math --scale 0 $directive / $shellCompDirectiveError) % 2)
     if test $compErr -eq 1
-        __squadrn_debug "Received error directive: aborting."
+        __srn_debug "Received error directive: aborting."
         # Might as well do file completion, in case it helps
         return 1
     end
@@ -1427,7 +1427,7 @@ function __squadrn_prepare_completions
     set -l filefilter (math (math --scale 0 $directive / $shellCompDirectiveFilterFileExt) % 2)
     set -l dirfilter (math (math --scale 0 $directive / $shellCompDirectiveFilterDirs) % 2)
     if test $filefilter -eq 1; or test $dirfilter -eq 1
-        __squadrn_debug "File extension filtering or directory filtering not supported"
+        __srn_debug "File extension filtering or directory filtering not supported"
         # Do full file completion instead
         return 1
     end
@@ -1435,7 +1435,7 @@ function __squadrn_prepare_completions
     set -l nospace (math (math --scale 0 $directive / $shellCompDirectiveNoSpace) % 2)
     set -l nofiles (math (math --scale 0 $directive / $shellCompDirectiveNoFileComp) % 2)
 
-    __squadrn_debug "nospace: $nospace, nofiles: $nofiles"
+    __srn_debug "nospace: $nospace, nofiles: $nofiles"
 
     # If we want to prevent a space, or if file completion is NOT disabled,
     # we need to count the number of valid completions.
@@ -1444,22 +1444,22 @@ function __squadrn_prepare_completions
     # criteria than the prefix.
     if test $nospace -ne 0; or test $nofiles -eq 0
         set -l prefix (commandline -t | string escape --style=regex)
-        __squadrn_debug "prefix: $prefix"
+        __srn_debug "prefix: $prefix"
 
-        set -l completions (string match -r -- "^$prefix.*" $__squadrn_comp_results)
-        set --global __squadrn_comp_results $completions
-        __squadrn_debug "Filtered completions are: $__squadrn_comp_results"
+        set -l completions (string match -r -- "^$prefix.*" $__srn_comp_results)
+        set --global __srn_comp_results $completions
+        __srn_debug "Filtered completions are: $__srn_comp_results"
 
         # Important not to quote the variable for count to work
-        set -l numComps (count $__squadrn_comp_results)
-        __squadrn_debug "numComps: $numComps"
+        set -l numComps (count $__srn_comp_results)
+        __srn_debug "numComps: $numComps"
 
         if test $numComps -eq 1; and test $nospace -ne 0
             # We must first split on \t to get rid of the descriptions to be
             # able to check what the actual completion will be.
             # We don't need descriptions anyway since there is only a single
             # real completion which the shell will expand immediately.
-            set -l split (string split --max 1 \t $__squadrn_comp_results[1])
+            set -l split (string split --max 1 \t $__srn_comp_results[1])
 
             # Fish won't add a space if the completion ends with any
             # of the following characters: @=/:.,
@@ -1467,16 +1467,16 @@ function __squadrn_prepare_completions
             if not string match -r -q "[@=/:.,]" -- "$lastChar"
                 # In other cases, to support the "nospace" directive we trick the shell
                 # by outputting an extra, longer completion.
-                __squadrn_debug "Adding second completion to perform nospace directive"
-                set --global __squadrn_comp_results $split[1] $split[1].
-                __squadrn_debug "Completions are now: $__squadrn_comp_results"
+                __srn_debug "Adding second completion to perform nospace directive"
+                set --global __srn_comp_results $split[1] $split[1].
+                __srn_debug "Completions are now: $__srn_comp_results"
             end
         end
 
         if test $numComps -eq 0; and test $nofiles -eq 0
             # To be consistent with bash and zsh, we only trigger file
             # completion when there are no other completions
-            __squadrn_debug "Requesting file completion"
+            __srn_debug "Requesting file completion"
             return 1
         end
     end
@@ -1488,24 +1488,24 @@ end
 # so we can properly delete any completions provided by another script.
 # Only do this if the program can be found, or else fish may print some errors; besides,
 # the existing completions will only be loaded if the program can be found.
-if type -q "squadrn"
+if type -q "srn"
     # The space after the program name is essential to trigger completion for the program
     # and not completion of the program name itself.
     # Also, we use '> /dev/null 2>&1' since '&>' is not supported in older versions of fish.
-    complete --do-complete "squadrn " > /dev/null 2>&1
+    complete --do-complete "srn " > /dev/null 2>&1
 end
 
 # Remove any pre-existing completions for the program since we will be handling all of them.
-complete -c squadrn -e
+complete -c srn -e
 
-# this will get called after the two calls below and clear the $__squadrn_perform_completion_once_result global
-complete -c squadrn -n '__squadrn_clear_perform_completion_once_result'
-# The call to __squadrn_prepare_completions will setup __squadrn_comp_results
+# this will get called after the two calls below and clear the $__srn_perform_completion_once_result global
+complete -c srn -n '__srn_clear_perform_completion_once_result'
+# The call to __srn_prepare_completions will setup __srn_comp_results
 # which provides the program's completion choices.
 # If this doesn't require order preservation, we don't use the -k flag
-complete -c squadrn -n 'not __squadrn_requires_order_preservation && __squadrn_prepare_completions' -f -a '$__squadrn_comp_results'
+complete -c srn -n 'not __srn_requires_order_preservation && __srn_prepare_completions' -f -a '$__srn_comp_results'
 # otherwise we use the -k flag
-complete -k -c squadrn -n '__squadrn_requires_order_preservation && __squadrn_prepare_completions' -f -a '$__squadrn_comp_results'
+complete -k -c srn -n '__srn_requires_order_preservation && __srn_prepare_completions' -f -a '$__srn_comp_results'
 -- hooks.json --
 {
   "hooks": {
@@ -1570,7 +1570,7 @@ config.toml file -rw-r--r--
 Make an existing config dir (e.g. ~/.claude-<name>) an account
 
 Usage:
-  squadrn account adopt [<provider>/]<name> [flags]
+  srn account adopt [<provider>/]<name> [flags]
 
 Flags:
   -h, --help   help for adopt
@@ -1586,7 +1586,7 @@ settings.json is wrapped, so squadrn sees what Claude Code reports while your ow
 running and showing. Accounts that share a settings file are set up together.
 
 Usage:
-  squadrn usage setup [<account>] [flags]
+  srn usage setup [<account>] [flags]
 
 Flags:
       --all    every account

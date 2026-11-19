@@ -11,18 +11,18 @@ stdout '"version": "dev"'
 exitcode 2 squadrn acount ls
 ! exec squadrn acount ls
 stderr 'unknown command or account "acount" \(did you mean account\?\)'
-stderr 'squadrn -- "acount"'
+stderr 'srn -- "acount"'
 exitcode 2 squadrn account lss
 ! exec squadrn account lss
 stderr 'unknown account command "lss" \(did you mean ls\?\)'
 
 # Completion scripts for every supported shell.
 exec squadrn completion zsh
-stdout '#compdef squadrn'
+stdout '#compdef srn'
 exec squadrn completion bash
-stdout 'bash completion V2 for squadrn'
+stdout 'bash completion V2 for srn'
 exec squadrn completion fish
-stdout 'complete -c squadrn'
+stdout 'complete -c srn'
 exec squadrn __complete ''
 stdout '^account'
 stdout '^claude/main'

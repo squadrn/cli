@@ -39,7 +39,7 @@ rm $WORK/home/.claude/.org $WORK/home/.claude-personal/.org
 rm $WORK/home/.claude-personal/.loggedin
 exitcode 1 squadrn swap --worktree feat-s --to personal
 ! exec squadrn swap --worktree feat-s --to personal
-stderr 'claude/personal is not logged in; run: squadrn account login claude/personal'
+stderr 'claude/personal is not logged in; run: srn account login claude/personal'
 cp $WORK/empty $WORK/home/.claude-personal/.loggedin
 exitcode 1 squadrn swap --worktree feat-nope --to personal
 exitcode 1 squadrn swap --worktree feat-empty --to personal
@@ -52,7 +52,7 @@ exec squadrn grid . feat-s
 exitcode 2 squadrn swap --worktree feat-s --to personal
 exec squadrn swap --worktree feat-s --to personal --yes
 stdout 'pane %[0-9]+ now runs feat-s as claude/personal'
-exec tmux list-panes -s -t squadrn-repo -F '#{@squadrn_acct}:#{@squadrn_name}'
+exec tmux list-panes -s -t srn-repo -F '#{@squadrn_acct}:#{@squadrn_name}'
 stdout '^claude/personal:feat-s$'
 waitfor ../home/calls.log 'cfg=.*/home/.claude-personal pwd=.*/feat-s args=--resume sid-2'
 exec tmux kill-server

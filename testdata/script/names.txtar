@@ -1,15 +1,15 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
-# A fresh machine (no options) gets the default names: squadrn + srn.
+# A fresh machine (no options) gets the default names: srn + squadrn.
 mkdir rel
 exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
 exec squadrn self-install rel
 stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
-stdout 'linked ~/.local/bin/squadrn'
 stdout 'linked ~/.local/bin/srn'
-stdout 'next: squadrn doctor'
-grep '^command = "squadrn"' home/.config/squadrn/config.toml
-grep '^aliases = \["srn"\]' home/.config/squadrn/config.toml
-exec sh -c 'readlink home/.local/bin/squadrn && readlink home/.local/bin/srn'
+stdout 'linked ~/.local/bin/squadrn'
+stdout 'next: srn doctor'
+grep '^command = "srn"' home/.config/squadrn/config.toml
+grep '^aliases = \["squadrn"\]' home/.config/squadrn/config.toml
+exec sh -c 'readlink home/.local/bin/srn && readlink home/.local/bin/squadrn'
 stdout -count=2 'home/.local/share/squadrn/bin/squadrn$'
 
 # Choosing no alias at install is respected.
@@ -20,5 +20,5 @@ env XDG_STATE_HOME=$WORK/bare/.local/state
 env XDG_CACHE_HOME=$WORK/bare/.cache
 mkdir bare/.claude
 exec squadrn self-install rel --alias ''
-stdout 'linked ~/.local/bin/squadrn'
-! stdout 'srn'
+stdout 'linked ~/.local/bin/srn'
+! stdout 'local/bin/squadrn'
