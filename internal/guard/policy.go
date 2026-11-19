@@ -124,7 +124,7 @@ func repoConfigKeys() []string {
 }
 
 // protectedSet combines the user's list with branches a repository adds. A repository can only
-// add: an agent writing `git config sprawl.protectedBranches none` must not unprotect main.
+// add: an agent writing `git config squadrn.protectedBranches none` must not unprotect main.
 func protectedSet(user []string, f Facts) branchMatcher {
 	globs := append([]string(nil), user...)
 	for _, k := range repoConfigKeys() {

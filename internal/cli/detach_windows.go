@@ -14,7 +14,7 @@ import (
 
 // startDetached starts cmd without a console (no window flashes for it or the programs it runs),
 // in its own process group (ctrl-c in the terminal does not reach it) and outside any job the
-// terminal put sprawl in, so it survives sprawl's exit. Breaking away is not always allowed;
+// terminal put squadrn in, so it survives squadrn's exit. Breaking away is not always allowed;
 // then it runs inside the job.
 func startDetached(cmd *exec.Cmd) error {
 	flags := uint32(windows.CREATE_NO_WINDOW | windows.CREATE_NEW_PROCESS_GROUP)
@@ -28,7 +28,7 @@ func startDetached(cmd *exec.Cmd) error {
 	return err
 }
 
-// removeAfterExit deletes paths a few seconds after sprawl exits, from a hidden cmd.exe: Windows
+// removeAfterExit deletes paths a few seconds after squadrn exits, from a hidden cmd.exe: Windows
 // keeps running executables locked until their process ends.
 func removeAfterExit(paths []string) error {
 	var b strings.Builder

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -26,16 +27,23 @@ func write(t *testing.T, path, body string) {
 
 func TestLoadConfig(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sprawl.toml")
+	path := filepath.Join(dir, "squadrn.toml")
 	legacy := filepath.Join(dir, "squad.toml")
 
 	if _, from, fresh, err := LoadConfig(path, []string{legacy}); err != nil || !fresh || from != "" {
 		t.Fatalf("nothing: %q %v %v", from, fresh, err)
 	}
-	write(t, legacy, "command = \"squad\"\nshared_mcp = [\"codegraph\"]\n")
+	write(t, legacy, "command = \"squad\"\naliases = [\"sq\"]\nshared_mcp = [\"codegraph\"]\n")
 	cfg, from, fresh, err := LoadConfig(path, []string{legacy})
-	if err != nil || !fresh || from != legacy || cfg.Command != "" || len(cfg.SharedMCP) != 1 {
+	if err != nil || !fresh || from != legacy || cfg.Command != "squadrn" || !slices.Equal(cfg.Aliases, []string{"sqd"}) || len(cfg.SharedMCP) != 1 {
 		t.Fatalf("legacy: %+v %q %v %v", cfg, from, fresh, err)
+	}
+	// A previous product's config with names the user chose keeps them; the newest one wins.
+	newer := filepath.Join(dir, "sprawl.toml")
+	write(t, newer, "command = \"ai\"\naliases = [\"x\", \"sra\"]\nupdate_check = false\n")
+	cfg, from, _, err = LoadConfig(path, []string{newer, legacy})
+	if err != nil || from != newer || cfg.Command != "ai" || !slices.Equal(cfg.Aliases, []string{"x", "sqd"}) || cfg.UpdateCheckEnabled() {
+		t.Fatalf("custom names: %+v %q %v", cfg, from, err)
 	}
 	write(t, path, "command = \"sx\"\n")
 	if cfg, _, fresh, err := LoadConfig(path, []string{legacy}); err != nil || fresh || cfg.Command != "sx" {
@@ -62,13 +70,13 @@ func TestNameCheck(t *testing.T) {
 		return "", errors.New("not found")
 	}
 	n := NameCheck{Layout: layout, Accepted: map[string]bool{}, LookPath: look}
-	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"mine"}}); err != nil {
+	if err := n.Check(config.Config{Command: "squadrn", Aliases: []string{"mine"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"sx"}}); !errors.Is(err, ErrNameTaken) {
+	if err := n.Check(config.Config{Command: "squadrn", Aliases: []string{"sx"}}); !errors.Is(err, ErrNameTaken) {
 		t.Fatalf("clash: %v", err)
 	}
-	if err := n.Check(config.Config{Command: "sprawl", Aliases: []string{"sprawl"}}); !errors.Is(err, ErrDuplicateName) {
+	if err := n.Check(config.Config{Command: "squadrn", Aliases: []string{"squadrn"}}); !errors.Is(err, ErrDuplicateName) {
 		t.Fatalf("duplicate: %v", err)
 	}
 	if err := n.Check(config.Config{Command: "con"}); !errors.Is(err, config.ErrInvalidCommand) {
@@ -147,7 +155,7 @@ func (f *fakeRunner) Output(_ context.Context, _ string, args ...string) ([]byte
 	case "plugin list --json":
 		return []byte(f.plugins), nil
 	case "plugin marketplace list --json":
-		return []byte(`[{"name":"sprawl"},{"name":"squad"}]`), nil
+		return []byte(`[{"name":"squadrn"},{"name":"squad"}]`), nil
 	}
 	return nil, nil
 }
@@ -169,11 +177,11 @@ func TestPlugins(t *testing.T) {
 	if len(res) != 1 || res[0].Action != PluginInstalled || len(res[0].Removed) != 1 {
 		t.Fatalf("install: %+v (%v)", res, r.calls)
 	}
-	r = &fakeRunner{plugins: `[{"id":"sprawl@sprawl"}]`}
+	r = &fakeRunner{plugins: `[{"id":"squadrn@squadrn"}]`}
 	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginUpdated || res[0].Err != nil {
 		t.Fatalf("update: %+v", res)
 	}
-	r = &fakeRunner{plugins: `[{"id":"sprawl@sprawl"}]`, fail: "plugin update"}
+	r = &fakeRunner{plugins: `[{"id":"squadrn@squadrn"}]`, fail: "plugin update"}
 	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginFailed {
 		t.Fatalf("update failure: %+v", res)
 	}
@@ -192,7 +200,7 @@ func TestRemovePlugins(t *testing.T) {
 	accts, _ := store.List()
 	r := &fakeRunner{}
 	errs := RemovePlugins(context.Background(), accts, r)
-	if errs["claude/main"] != nil || strings.Join(r.calls, ";") != "plugin uninstall sprawl@sprawl;plugin marketplace remove sprawl" {
+	if errs["claude/main"] != nil || strings.Join(r.calls, ";") != "plugin uninstall squadrn@squadrn;plugin marketplace remove squadrn" {
 		t.Fatalf("RemovePlugins = %v, calls %v", errs, r.calls)
 	}
 	r = &fakeRunner{fail: "plugin uninstall"}

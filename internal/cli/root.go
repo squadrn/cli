@@ -1,4 +1,4 @@
-// Package cli wires sprawl commands to the domain packages. It owns argument parsing and output;
+// Package cli wires squadrn commands to the domain packages. It owns argument parsing and output;
 // the domain packages return values and typed errors and never print.
 package cli
 
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -48,12 +49,12 @@ const (
 
 type app struct {
 	root *cobra.Command
-	// cmd is the name sprawl is installed under (config `command`), used in every message.
+	// cmd is the name squadrn is installed under (config `command`), used in every message.
 	cmd string
 	// cfg is the loaded config; cfgErr is reported by commands that depend on it.
 	cfg    config.Config
 	cfgErr error
-	// account is the account named before the subcommand (sprawl personal grid …); "" means main.
+	// account is the account named before the subcommand (squadrn personal grid …); "" means main.
 	account     string
 	store       account.Store
 	layout      release.Layout
@@ -80,7 +81,7 @@ type app struct {
 	gitChecked bool
 }
 
-// Run executes sprawl with args (program name excluded) and returns the process exit code.
+// Run executes squadrn with args (program name excluded) and returns the process exit code.
 func Run(args []string) int {
 	// Hooks run on every tool call and git hook: dispatch them before anything that can fail.
 	if len(args) > 0 && args[0] == "hook" {
@@ -130,6 +131,7 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 		now: time.Now,
 	}
 	a.signers = buildSigners()
+	a.warnRenamedEnv(os.Getenv)
 	root := a.rootCmd()
 	r, err := parseRoute(args, a.routeTable())
 	if err != nil {
@@ -165,7 +167,7 @@ func newStore(cfg config.Config, cfgErr error) (account.Store, error) {
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
 	}
-	// Accounts provisioned before account markers carry sprawl's plugin (or a previous name's).
+	// Accounts provisioned before account markers carry squadrn's plugin (or a previous name's).
 	store.HasPlugin = func(spec provider.Spec, dir string) bool {
 		if spec.ID != provider.Claude.ID {
 			return false
@@ -311,6 +313,15 @@ func takesAccount(cmd *cobra.Command) bool {
 func (a *app) out(format string, args ...any)  { _, _ = fmt.Fprintf(a.stdout, format, args...) }
 func (a *app) errf(format string, args ...any) { _, _ = fmt.Fprintf(a.stderr, format, args...) }
 
+// warnRenamedEnv names environment variables still set under a previous product name. They are
+// honoured through 2.x; hooks never print this (their output is read by the agent CLI).
+func (a *app) warnRenamedEnv(getenv func(string) string) {
+	renamed := config.RenamedEnv(getenv)
+	for _, old := range slices.Sorted(maps.Keys(renamed)) {
+		a.warnf("%s is renamed to %s; set that instead", old, renamed[old])
+	}
+}
+
 func (a *app) warnf(format string, args ...any) {
 	a.errf("%s: %s\n", a.cmd, a.paint(a.colorErr, "33", "warning: ")+fmt.Sprintf(format, args...))
 }
@@ -361,13 +372,13 @@ func (a *app) versionCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the sprawl version",
+		Short: "Print the squadrn version",
 		Args:  noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			if asJSON {
 				return a.printJSON(map[string]string{"version": Version})
 			}
-			a.out("sprawl %s\n", Version)
+			a.out("squadrn %s\n", Version)
 			return nil
 		},
 	}
@@ -391,7 +402,7 @@ func (a *app) agent(spec provider.Spec) (provider.Agent, error) {
 	return cl, nil
 }
 
-// sessionEnv points core.hooksPath at the git-level guard for sessions sprawl starts. An invalid
+// sessionEnv points core.hooksPath at the git-level guard for sessions squadrn starts. An invalid
 // config keeps it on: the guard fails closed (as the hooks do).
 func (a *app) sessionEnv() []string {
 	if a.cfgErr == nil && !a.cfg.GitHooksEnabled() {
@@ -586,10 +597,10 @@ func (a *app) addInteractively() error {
 	return a.session(ag, acct, ag.LoginArgs())
 }
 
-// marketplaceDir locates the local sprawl plugin marketplace: $SPRAWL_MARKETPLACE, else the
+// marketplaceDir locates the local squadrn plugin marketplace: $SQUADRN_MARKETPLACE, else the
 // installed release dir. "" means no plugin is available to install.
 func (a *app) marketplaceDir() string {
-	if dir := os.Getenv("SPRAWL_MARKETPLACE"); dir != "" {
+	if dir := config.Getenv("MARKETPLACE"); dir != "" {
 		if _, err := os.Stat(filepath.Join(dir, ".claude-plugin", "marketplace.json")); err == nil {
 			return dir
 		}

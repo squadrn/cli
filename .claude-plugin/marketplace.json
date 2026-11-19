@@ -1,12 +1,12 @@
 {
-  "name": "sprawl",
+  "name": "squadrn",
   "owner": {
-    "name": "Sprawling Agents"
+    "name": "Squadrn"
   },
-  "description": "Sprawling Agents: run many coding agents in parallel across accounts and worktrees, with git guardrails.",
+  "description": "Squadrn: run many coding agents in parallel across accounts and worktrees, with git guardrails.",
   "plugins": [
     {
-      "name": "sprawl",
+      "name": "squadrn",
       "source": "./plugin",
       "description": "Guardrails and helpers for parallel coding agents."
     }

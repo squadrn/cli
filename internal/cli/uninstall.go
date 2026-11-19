@@ -18,13 +18,13 @@ func (a *app) selfUninstallCmd() *cobra.Command {
 	var yes, purge bool
 	cmd := &cobra.Command{
 		Use:   "self-uninstall",
-		Short: "Remove sprawl: plugin from every account, command links, completions, installed files",
-		Long: `Remove sprawl from this machine. Accounts, their logins and conversations are kept.
+		Short: "Remove squadrn: plugin from every account, command links, completions, installed files",
+		Long: `Remove squadrn from this machine. Accounts, their logins and conversations are kept.
 --purge also removes the config, the guard log and caches. Running agent sessions keep going;
 restart them afterwards.`,
 		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
-			what := "Remove sprawl (plugin in every account, " + a.tilde(a.layout.DataDir) + ")"
+			what := "Remove squadrn (plugin in every account, " + a.tilde(a.layout.DataDir) + ")"
 			if purge {
 				what += " and its config, logs and caches"
 			}
@@ -52,7 +52,7 @@ func (a *app) uninstall(purge bool) error {
 		seen[acct.Provider] = true
 		ag, err := a.agent(acct.Spec)
 		if err != nil {
-			a.warnf("%v; remove the plugin yourself: %s plugin uninstall sprawl@sprawl", err, acct.Spec.Binary)
+			a.warnf("%v; remove the plugin yourself: %s plugin uninstall squadrn@squadrn", err, acct.Spec.Binary)
 			continue
 		}
 		same := accts[:0:0]
@@ -84,7 +84,7 @@ func (a *app) uninstall(purge bool) error {
 	}
 	a.removeProfileLines()
 	// Executables still running (this one, a session, a hook) cannot be deleted on Windows; they
-	// are removed once sprawl has exited.
+	// are removed once squadrn has exited.
 	var later []string
 	if err := os.RemoveAll(a.layout.DataDir); err != nil {
 		later = append(later, a.layout.DataDir)
@@ -107,11 +107,11 @@ func (a *app) uninstall(purge bool) error {
 			}
 		}
 	}
-	a.out("sprawl is uninstalled; restart running agent sessions\n")
+	a.out("squadrn is uninstalled; restart running agent sessions\n")
 	return nil
 }
 
-// removeCompletions deletes the completion scripts sprawl generated for name.
+// removeCompletions deletes the completion scripts squadrn generated for name.
 func (a *app) removeCompletions(name string) {
 	for shell, dir := range a.completionDirs() {
 		file := completionFile(shell, dir, name)

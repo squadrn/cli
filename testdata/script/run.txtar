@@ -1,48 +1,48 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
-# Bare sprawl without a terminal runs claude as main, with CLAUDE_CONFIG_DIR removed
+# Bare squadrn without a terminal runs claude as main, with CLAUDE_CONFIG_DIR removed
 # even when the caller's environment sets it.
 env CLAUDE_CONFIG_DIR=/should/be/removed
-exec sprawl
+exec squadrn
 stdout '^cfg=<unset> args=$'
 env CLAUDE_CONFIG_DIR=
 
 mkdir home/.claude-personal
 
 # Account selection: name, provider/name, -a, --account=
-exec sprawl personal
+exec squadrn personal
 stdout '^cfg=.*/home/.claude-personal args=$'
-exec sprawl claude/personal -p hi
+exec squadrn claude/personal -p hi
 stdout '^cfg=.*/home/.claude-personal args=-p hi$'
-exec sprawl -a personal --resume abc
+exec squadrn -a personal --resume abc
 stdout '^cfg=.*/home/.claude-personal args=--resume abc$'
-exec sprawl --account=personal
+exec squadrn --account=personal
 stdout '^cfg=.*/home/.claude-personal args=$'
-exec sprawl main
+exec squadrn main
 stdout '^cfg=<unset> args=$'
 
 # Prompts go after --; agent subcommands and flags pass through; unknown words are errors.
-exec sprawl -- fix the bug
+exec squadrn -- fix the bug
 stdout '^cfg=<unset> args=fix the bug$'
-exec sprawl personal -- doctor
+exec squadrn personal -- doctor
 stdout '^cfg=.*/home/.claude-personal args=doctor$'
-exec sprawl 'fix the bug'
+exec squadrn 'fix the bug'
 stdout '^cfg=<unset> args=fix the bug$'
-exec sprawl mcp list
+exec squadrn mcp list
 stdout '^cfg=<unset> args=mcp list$'
-exec sprawl personal --version
+exec squadrn personal --version
 stdout '^cfg=.*/home/.claude-personal args=--version$'
-exitcode 2 sprawl fix the bug
+exitcode 2 squadrn fix the bug
 
 # -C runs as if started elsewhere.
 mkdir elsewhere
-exec sprawl -C elsewhere -- here
+exec squadrn -C elsewhere -- here
 grep 'pwd=.*/elsewhere args=here' home/calls.log
-exitcode 2 sprawl -C missing-dir
+exitcode 2 squadrn -C missing-dir
 
 # Exit codes: 2 usage, 1 runtime.
-exitcode 2 sprawl -a
-exitcode 2 sprawl -a Bad_Name
-exitcode 1 sprawl -a ghost
-! exec sprawl -a ghost
-stderr 'account not found: claude/ghost \(run: sprawl account add claude/ghost\)'
--- home/.claude-personal/.sprawl-account --
+exitcode 2 squadrn -a
+exitcode 2 squadrn -a Bad_Name
+exitcode 1 squadrn -a ghost
+! exec squadrn -a ghost
+stderr 'account not found: claude/ghost \(run: squadrn account add claude/ghost\)'
+-- home/.claude-personal/.squadrn-account --

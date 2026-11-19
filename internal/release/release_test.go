@@ -58,14 +58,14 @@ func writeTarball(t *testing.T, path string, entries []entry) {
 }
 
 func TestAssetName(t *testing.T) {
-	if got := AssetName("v1.2.3", "darwin", "arm64"); got != "sprawl_1.2.3_darwin_arm64.tar.gz" {
+	if got := AssetName("v1.2.3", "darwin", "arm64"); got != "squadrn_1.2.3_darwin_arm64.tar.gz" {
 		t.Fatal(got)
 	}
 }
 
 func TestVerifyChecksum(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "sprawl_1_linux_amd64.tar.gz")
+	file := filepath.Join(dir, "squadrn_1_linux_amd64.tar.gz")
 	if err := os.WriteFile(file, []byte("payload"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +76,11 @@ func TestVerifyChecksum(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("deadbeef  other.tar.gz\n" + hex.EncodeToString(sum[:]) + "  sprawl_1_linux_amd64.tar.gz\n")
+	write("deadbeef  other.tar.gz\n" + hex.EncodeToString(sum[:]) + "  squadrn_1_linux_amd64.tar.gz\n")
 	if err := VerifyChecksum(sums, file); err != nil {
 		t.Fatalf("valid checksum rejected: %v", err)
 	}
-	write(strings.Repeat("0", 64) + "  sprawl_1_linux_amd64.tar.gz\n")
+	write(strings.Repeat("0", 64) + "  squadrn_1_linux_amd64.tar.gz\n")
 	if err := VerifyChecksum(sums, file); err == nil || !strings.Contains(err.Error(), "mismatch") {
 		t.Fatalf("tampered file accepted: %v", err)
 	}
@@ -165,11 +165,11 @@ func TestExtractRejectsUnsafeEntries(t *testing.T) {
 // TestAssetNamesStable pins the archive names existing installs and install.sh look for.
 func TestAssetNamesStable(t *testing.T) {
 	for _, tt := range []struct{ goos, goarch, want string }{
-		{"linux", "amd64", "sprawl_1.2.3_linux_amd64.tar.gz"},
-		{"linux", "arm64", "sprawl_1.2.3_linux_arm64.tar.gz"},
-		{"darwin", "amd64", "sprawl_1.2.3_darwin_amd64.tar.gz"},
-		{"darwin", "arm64", "sprawl_1.2.3_darwin_arm64.tar.gz"},
-		{"windows", "amd64", "sprawl_1.2.3_windows_amd64.zip"},
+		{"linux", "amd64", "squadrn_1.2.3_linux_amd64.tar.gz"},
+		{"linux", "arm64", "squadrn_1.2.3_linux_arm64.tar.gz"},
+		{"darwin", "amd64", "squadrn_1.2.3_darwin_amd64.tar.gz"},
+		{"darwin", "arm64", "squadrn_1.2.3_darwin_arm64.tar.gz"},
+		{"windows", "amd64", "squadrn_1.2.3_windows_amd64.zip"},
 	} {
 		if got := AssetName("v1.2.3", tt.goos, tt.goarch); got != tt.want {
 			t.Errorf("AssetName(%s/%s) = %s, want %s", tt.goos, tt.goarch, got, tt.want)
@@ -213,7 +213,7 @@ func writeZip(t *testing.T, path string, files map[string]string, modes map[stri
 func TestExtractZip(t *testing.T) {
 	dir := t.TempDir()
 	z := filepath.Join(dir, "r.zip")
-	writeZip(t, z, map[string]string{"sprawl.exe": "bin", "plugin/hooks/hooks.json": "{}", "plugin/": ""},
+	writeZip(t, z, map[string]string{"squadrn.exe": "bin", "plugin/hooks/hooks.json": "{}", "plugin/": ""},
 		map[string]os.FileMode{"plugin/": os.ModeDir | 0o755})
 	dst := filepath.Join(dir, "out")
 	if err := Extract(z, dst); err != nil {
@@ -222,8 +222,8 @@ func TestExtractZip(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dst, "plugin", "hooks", "hooks.json")); string(b) != "{}" {
 		t.Fatalf("hooks.json = %q", b)
 	}
-	if b, _ := os.ReadFile(filepath.Join(dst, "sprawl.exe")); string(b) != "bin" {
-		t.Fatalf("sprawl.exe = %q", b)
+	if b, _ := os.ReadFile(filepath.Join(dst, "squadrn.exe")); string(b) != "bin" {
+		t.Fatalf("squadrn.exe = %q", b)
 	}
 }
 
@@ -266,7 +266,7 @@ func TestExtractZipRejectsUnsafeEntries(t *testing.T) {
 }
 
 func TestSafeName(t *testing.T) {
-	for _, ok := range []string{"sprawl", "plugin/hooks/hooks.json", ".claude-plugin/marketplace.json", "./README.md", "dir/"} {
+	for _, ok := range []string{"squadrn", "plugin/hooks/hooks.json", ".claude-plugin/marketplace.json", "./README.md", "dir/"} {
 		if _, err := safeName(ok); err != nil {
 			t.Errorf("safeName(%q) = %v", ok, err)
 		}

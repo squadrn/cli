@@ -21,7 +21,7 @@ func TestQuiesceRefusesWhenStillRunning(t *testing.T) {
 	stopWait = 300 * time.Millisecond
 	defer func() { stopWait = old }()
 	var errb bytes.Buffer
-	a := &app{cmd: "sprawl", stderr: &errb}
+	a := &app{cmd: "squadrn", stderr: &errb}
 	err := a.quiesce([]holder{{pid: cmd.Process.Pid, desc: "claude/x session"}}, true)
 	if err == nil || !strings.Contains(err.Error(), "is still running; stop it, then swap again") {
 		t.Fatalf("quiesce = %v", err)

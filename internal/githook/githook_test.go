@@ -24,7 +24,7 @@ func TestInstall(t *testing.T) {
 	if err := os.WriteFile(foreign, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	const bin, cfg = "/opt/it's/sprawl", "/home/u/.config/sprawl/config.toml"
+	const bin, cfg = "/opt/it's/squadrn", "/home/u/.config/squadrn/config.toml"
 	if Installed(dir, bin, cfg) {
 		t.Fatal("Installed before Install")
 	}
@@ -35,7 +35,7 @@ func TestInstall(t *testing.T) {
 		t.Fatal("Installed")
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "pre-push"))
-	if err != nil || !strings.Contains(string(b), `exec '/opt/it'\''s/sprawl' hook git --config '/home/u/.config/sprawl/config.toml' pre-push "$@"`) {
+	if err != nil || !strings.Contains(string(b), `exec '/opt/it'\''s/squadrn' hook git --config '/home/u/.config/squadrn/config.toml' pre-push "$@"`) {
 		t.Fatalf("pre-push shim = %q, %v", b, err)
 	}
 	// A shim that was edited, or lost its execute bit, is not the guard.

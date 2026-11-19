@@ -7,7 +7,7 @@ import "os"
 // link makes dst share src: a symbolic link.
 func link(src, dst string) error { return os.Symlink(src, dst) }
 
-// linksTo reports whether dst is the link sprawl made to src.
+// linksTo reports whether dst is the link squadrn made to src.
 func linksTo(dst, src string) bool {
 	target, err := os.Readlink(dst)
 	return err == nil && target == src

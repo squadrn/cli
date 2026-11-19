@@ -2,53 +2,53 @@
 
 # Sessions run claude.exe as a child: main without CLAUDE_CONFIG_DIR, other accounts with it.
 mkdir home/.claude-personal
-exec sprawl -- hi
+exec squadrn -- hi
 stdout '^cfg=<unset> args=hi$'
-exec sprawl personal -- hi
+exec squadrn personal -- hi
 stdout '^cfg=.*home.\.claude-personal args=hi$'
 
 # Accounts.
 cp empty home/.claude/.loggedin
-exec sprawl account ls
+exec squadrn account ls
 stdout '^claude/main +yes '
-exec sprawl account add work
+exec squadrn account add work
 stdout '^account claude/work'
 exists home/.claude-work
 
 # The guard judges the PowerShell tool.
 stdin ps-force.json
-exec sprawl hook guard-git
+exec squadrn hook guard-git
 stdout '"permissionDecision":"deny"'
 stdin ps-iex.json
-exec sprawl hook guard-git
+exec squadrn hook guard-git
 stdout '"permissionDecision":"ask"'
 
 # Worktrees run through claude --worktree; grid explains that it needs tmux.
 exec git init -q repo
 cd repo
-exec sprawl wt feat-a
+exec squadrn wt feat-a
 stdout 'args=--worktree feat-a$'
-! exec sprawl grid ls
+! exec squadrn grid ls
 stderr 'not available on Windows'
 cd $WORK
 
 # Install: command names are copies listed in commands.json; hooks run through cmd.exe.
 release rel
-exec sprawl self-install rel --alias sx
-exists home/.local/bin/sprawl.exe
+exec squadrn self-install rel --alias sx
+exists home/.local/bin/squadrn.exe
 exists home/.local/bin/sx.exe
-exists home/.local/share/sprawl/commands.json
-grep 'cmd.exe' home/.local/share/sprawl/plugin/hooks/hooks.json
-exists home/.local/share/sprawl/completion.ps1
-exec sprawl config set aliases ''
+exists home/.local/share/squadrn/commands.json
+grep 'cmd.exe' home/.local/share/squadrn/plugin/hooks/hooks.json
+exists home/.local/share/squadrn/completion.ps1
+exec squadrn config set aliases ''
 ! exists home/.local/bin/sx.exe
-exec sprawl self-uninstall --yes
-! exists home/.local/bin/sprawl.exe
+exec squadrn self-uninstall --yes
+! exists home/.local/bin/squadrn.exe
 
 # cmd.exe would misread a data dir with % ^ & or !.
 env XDG_DATA_HOME=$WORK${/}R&D
-exitcode 2 sprawl self-install rel
-! exec sprawl self-install rel
+exitcode 2 squadrn self-install rel
+! exec squadrn self-install rel
 stderr 'which cmd.exe would misread'
 
 -- empty --
@@ -56,4 +56,4 @@ stderr 'which cmd.exe would misread'
 {"cwd":".","tool_name":"PowerShell","tool_input":{"command":"& git push -f origin x"}}
 -- ps-iex.json --
 {"cwd":".","tool_name":"PowerShell","tool_input":{"command":"iex 'git push'"}}
--- home/.claude-personal/.sprawl-account --
+-- home/.claude-personal/.squadrn-account --

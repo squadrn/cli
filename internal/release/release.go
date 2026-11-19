@@ -1,12 +1,12 @@
-// Package release verifies, unpacks and installs sprawl release archives.
+// Package release verifies, unpacks and installs squadrn release archives.
 //
 // Installed layout:
 //
-//	$XDG_DATA_HOME/sprawl/          (~/.local/share/sprawl) — also the local plugin marketplace
-//	├── bin/sprawl
+//	$XDG_DATA_HOME/squadrn/          (~/.local/share/squadrn) — also the local plugin marketplace
+//	├── bin/squadrn
 //	├── .claude-plugin/marketplace.json
 //	└── plugin/…
-//	~/.local/bin/<command>, ~/.local/bin/<alias>… → ~/.local/share/sprawl/bin/sprawl
+//	~/.local/bin/<command>, ~/.local/bin/<alias>… → ~/.local/share/squadrn/bin/squadrn
 package release
 
 import (
@@ -38,10 +38,10 @@ func AssetName(version, goos, goarch string) string {
 	if goos == "windows" {
 		ext = ".zip"
 	}
-	return fmt.Sprintf("sprawl_%s_%s_%s%s", strings.TrimPrefix(version, "v"), goos, goarch, ext)
+	return fmt.Sprintf(config.Slug+"_%s_%s_%s%s", strings.TrimPrefix(version, "v"), goos, goarch, ext)
 }
 
-// BinaryName (per platform: sprawl, sprawl.exe) is the executable inside a release and in the
+// BinaryName (per platform: squadrn, squadrn.exe) is the executable inside a release and in the
 // data dir; commands link to it.
 
 const ChecksumsName = "checksums.txt"
@@ -91,7 +91,7 @@ func sha256File(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// Limits for an unpacked release: generous for sprawl (a ~10 MB binary and a few small files),
+// Limits for an unpacked release: generous for squadrn (a ~10 MB binary and a few small files),
 // small enough that a hostile archive cannot fill the disk.
 const (
 	maxEntryBytes = 256 << 20
@@ -258,7 +258,7 @@ func Legacies(home string) []Legacy {
 	out := make([]Legacy, len(config.PreviousNames))
 	for i, n := range config.PreviousNames {
 		dir := config.DirsFor(home, n).Data
-		out[i] = Legacy{Name: n, DataDir: dir, Binary: filepath.Join(dir, "bin", n)}
+		out[i] = Legacy{Name: n, DataDir: dir, Binary: filepath.Join(dir, "bin", ExecutableName(n))}
 	}
 	return out
 }
@@ -296,13 +296,13 @@ func (l Layout) Marketplace() string {
 	return l.DataDir
 }
 
-// Install places an unpacked release (src holds sprawl, plugin/ and .claude-plugin/) into the
+// Install places an unpacked release (src holds squadrn, plugin/ and .claude-plugin/) into the
 // data dir. The binary goes first: plugin hooks call it, so new plugin files never run against
 // an old binary. The plugin version is set to version so Claude Code's plugin cache picks it up.
 func (l Layout) Install(src, version string) error {
 	for _, p := range []string{BinaryName, filepath.Join("plugin", ".claude-plugin", "plugin.json"), filepath.Join(".claude-plugin", "marketplace.json")} {
 		if !fsx.IsFile(filepath.Join(src, p)) {
-			return fmt.Errorf("not a sprawl release: missing %s", p)
+			return fmt.Errorf("not a squadrn release: missing %s", p)
 		}
 	}
 	if err := os.MkdirAll(l.DataDir, 0o700); err != nil { // as fsx.WriteFile created it before

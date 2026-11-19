@@ -3,17 +3,17 @@
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
-        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" guard-git", "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" guard-git", "timeout": 5 }]
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Cần input'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Cần input'", "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" notify 'Xong việc'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Xong việc'", "async": true }] }
     ],
     "StopFailure": [
-      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/sprawl-hook\" limit", "async": true }] }
+      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" limit", "async": true }] }
     ]
   }
 }

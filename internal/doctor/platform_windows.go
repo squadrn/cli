@@ -133,14 +133,14 @@ func (e Env) platform(ctx context.Context) []Check {
 	out = append(out, e.commandCopies(g)...)
 	if v, err := proc.Output(ctx, proc.Options{}, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-ExecutionPolicy"); err == nil {
 		if strings.EqualFold(strings.TrimSpace(string(v)), "Restricted") {
-			out = append(out, bad(g, Warn, "PowerShell execution policy is Restricted: profile scripts (sprawl completion) do not load", "Set-ExecutionPolicy -Scope CurrentUser RemoteSigned"))
+			out = append(out, bad(g, Warn, "PowerShell execution policy is Restricted: profile scripts (squadrn completion) do not load", "Set-ExecutionPolicy -Scope CurrentUser RemoteSigned"))
 		}
 	}
 	if v, _ := proc.Output(ctx, proc.Options{}, "git", "config", "--global", "core.longpaths"); strings.TrimSpace(string(v)) != "true" {
 		out = append(out, bad(g, Warn, "git core.longpaths is off: deep worktree paths can exceed 260 characters", "git config --global core.longpaths true"))
 	}
 	if !fsx.Protected(e.Layout.DataDir) {
-		out = append(out, bad(g, Warn, e.tilde(e.Layout.DataDir)+" is outside your profile and writable by other users", "reinstall, or keep sprawl's directories under %USERPROFILE%"))
+		out = append(out, bad(g, Warn, e.tilde(e.Layout.DataDir)+" is outside your profile and writable by other users", "reinstall, or keep squadrn's directories under %USERPROFILE%"))
 	}
 	return out
 }
@@ -183,7 +183,7 @@ func (e Env) commandCopies(g string) []Check {
 	for _, n := range names {
 		p := filepath.Join(e.Layout.BinDir, n+".exe")
 		if got := sha(p); got == "" || got != want {
-			out = append(out, bad(g, Fail, e.tilde(p)+" is not the installed sprawl (stale or missing copy)", "close running sessions, then: sprawl self-install or re-run install.ps1"))
+			out = append(out, bad(g, Fail, e.tilde(p)+" is not the installed squadrn (stale or missing copy)", "close running sessions, then: squadrn self-install or re-run install.ps1"))
 		}
 	}
 	return out

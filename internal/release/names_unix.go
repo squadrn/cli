@@ -10,7 +10,7 @@ import (
 )
 
 // BinaryName is the executable inside a release and in the data dir.
-const BinaryName = "sprawl"
+const BinaryName = "squadrn"
 
 // ExecutableName is the file name of command name in the bin dir.
 func ExecutableName(name string) string { return name }

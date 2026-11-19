@@ -1,0 +1,161 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
+# The machine runs sprawl 1.x with the default names (sprawl + sra), its plugin and markers in
+# every account, a repository protecting prod through sprawl's git key, and a running grid.
+# Leftovers of squad (two names back) are still there too.
+mkdir rel home/.claude-personal home/.local/bin home/.local/share/sprawl/bin home/.config/sprawl home/.local/state/sprawl
+mkdir home/.local/share/squad/bin home/.config/squad
+exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+cp old-binary home/.local/share/sprawl/bin/sprawl
+cp old-binary home/.local/share/squad/bin/squad
+exec sh -c 'for n in sprawl sra; do ln -s "$HOME/.local/share/sprawl/bin/sprawl" home/.local/bin/$n; done'
+exec sh -c 'ln -s "$HOME/.local/share/squad/bin/squad" home/.local/bin/squad'
+cp sprawl.toml home/.config/sprawl/config.toml
+cp squad.toml home/.config/squad/config.toml
+cp old-log home/.local/state/sprawl/guard.log
+cp plugins.json home/.claude/.plugins
+cp markets.json home/.claude/.markets
+cp plugins.json home/.claude-personal/.plugins
+cp markets.json home/.claude-personal/.markets
+exec git init -q -b feat-x repo
+exec git -C repo config sprawl.protectedBranches prod
+exec tmux new-session -d -s sra-repo -x 80 -y 24 'sleep 60'
+exec tmux set -t sra-repo @sprawl_repo $WORK/repo
+exec tmux set -p -t sra-repo: @sprawl_acct claude/personal
+exec tmux set -p -t sra-repo: @sprawl_name feat-old
+
+# Installing squadrn with no options moves everything over; the default names become squadrn + sqd.
+exec squadrn self-install rel
+stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
+stdout 'settings migrated from ~/.config/sprawl/config.toml'
+stdout '^command: sprawl → squadrn \(removed: sprawl, sra, added: squadrn, sqd\)$'
+stdout 'linked ~/.local/bin/squadrn'
+stdout 'linked ~/.local/bin/sqd'
+stdout 'removed ~/.local/bin/sprawl'
+stdout 'removed ~/.local/bin/sra'
+stdout 'removed ~/.local/bin/squad'
+stdout 'claude/main: removed plugin sprawl@sprawl'
+stdout 'claude/main: removed plugin squad@squad'
+stdout 'claude/personal: removed plugin sprawl@sprawl'
+stdout 'claude/personal: removed plugin squad@squad'
+stdout 'claude/main: plugin installed'
+stdout 'claude/personal: plugin installed'
+stdout 'previous sprawl files moved to ~/.local/state/squadrn/legacy-sprawl-'
+stdout 'previous squad files moved to ~/.local/state/squadrn/legacy-squad-'
+stdout 'next: squadrn doctor'
+! exists home/.local/bin/sprawl
+! exists home/.local/bin/sra
+! exists home/.local/bin/squad
+! exists home/.local/share/sprawl
+! exists home/.config/sprawl
+! exists home/.local/state/sprawl
+exists home/.local/state/squadrn/legacy-logs/sprawl-guard.log
+exec sh -c 'ls -d home/.local/state/squadrn/legacy-sprawl-*/share-sprawl/bin/sprawl'
+grep '^command = "squadrn"' home/.config/squadrn/config.toml
+grep '^aliases = \["sqd"\]' home/.config/squadrn/config.toml
+grep '^shared_mcp = \["codegraph"\]' home/.config/squadrn/config.toml
+grep '^protected_branches = \["main", "hotfix/\*"\]' home/.config/squadrn/config.toml
+exec sh -c 'readlink home/.local/bin/squadrn && readlink home/.local/bin/sqd'
+stdout -count=2 'home/.local/share/squadrn/bin/squadrn$'
+grep 'cfg=<unset> .*args=plugin uninstall sprawl@sprawl' home/calls.log
+grep 'cfg=.*/.claude-personal .*args=plugin uninstall sprawl@sprawl' home/calls.log
+grep 'args=plugin marketplace remove sprawl$' home/calls.log
+
+# The account marker is rewritten under the new name.
+exists home/.claude-personal/.squadrn-account
+! exists home/.claude-personal/.sprawl-account
+exec squadrn account ls
+stdout 'claude/personal'
+
+# The running grid is still found through its sprawl tmux options.
+exec squadrn ps
+stdout '^sra-repo +claude/personal +feat-old '
+
+# The repository's sprawl.protectedBranches still protects prod, in both guard layers.
+stdin push-prod.json
+exec squadrn hook guard-git
+stdout '"permissionDecision":"deny"'
+stdout 'direct push to protected branch \\"prod\\"'
+stdin push-feat.json
+exec squadrn hook guard-git
+! stdout .
+exec git -C repo commit -q --allow-empty -m one
+exec sh -c 'printf "refs/heads/feat-x %s refs/heads/prod %s\n" "$(git -C repo rev-parse HEAD)" 0000000000000000000000000000000000000000 > pp-prod.txt'
+cd repo
+stdin ../pp-prod.txt
+! exec squadrn hook git pre-push origin ../remote.git
+stderr 'squadrn guard: direct push to protected branch "prod"'
+cd $WORK
+
+# SPRAWL_* variables still work, with a warning; hooks never print it.
+env SPRAWL_SHARED_MCP=other
+exec squadrn config get shared_mcp
+stdout '^other$'
+stderr '^squadrn: warning: SPRAWL_SHARED_MCP is renamed to SQUADRN_SHARED_MCP; set that instead$'
+stdin push-feat.json
+exec squadrn hook guard-git
+! stderr .
+env SQUADRN_SHARED_MCP=mine
+exec squadrn config get shared_mcp
+stdout '^mine$'
+! stderr 'renamed'
+env SPRAWL_SHARED_MCP=
+env SQUADRN_SHARED_MCP=
+
+# A user who chose their own names keeps them; only links to the old install are replaced.
+env HOME=$WORK/custom
+env XDG_CONFIG_HOME=$WORK/custom/.config
+env XDG_DATA_HOME=$WORK/custom/.local/share
+env XDG_STATE_HOME=$WORK/custom/.local/state
+env XDG_CACHE_HOME=$WORK/custom/.cache
+mkdir custom/.claude custom/.local/bin custom/.local/share/sprawl/bin custom/.config/sprawl
+cp old-binary custom/.local/share/sprawl/bin/sprawl
+exec sh -c 'for n in ai sx; do ln -s "$HOME/.local/share/sprawl/bin/sprawl" custom/.local/bin/$n; done'
+exec sh -c 'ln -s /usr/bin/true custom/.local/bin/other'
+cp custom.toml custom/.config/sprawl/config.toml
+cp plugins.json custom/.claude/.plugins
+exec squadrn self-install rel
+stdout 'settings migrated from ~/.config/sprawl/config.toml'
+stdout 'linked ~/.local/bin/ai'
+stdout 'linked ~/.local/bin/sx'
+! stdout 'command: '
+! stdout 'linked ~/.local/bin/squadrn'
+stdout 'claude/main: removed plugin sprawl@sprawl'
+stdout 'next: ai doctor'
+grep '^command = "ai"' custom/.config/squadrn/config.toml
+grep '^aliases = \["sx"\]' custom/.config/squadrn/config.toml
+exec sh -c 'readlink custom/.local/bin/ai && readlink custom/.local/bin/sx'
+stdout -count=2 'custom/.local/share/squadrn/bin/squadrn$'
+! exists custom/.local/bin/squadrn
+! exists custom/.local/bin/sqd
+exec readlink custom/.local/bin/other
+stdout '^/usr/bin/true$'
+
+-- old-binary --
+#!/bin/sh
+echo sprawl
+-- old-log --
+2026-01-01T00:00:00Z	deny	pre-tool	repo	old entry
+-- sprawl.toml --
+schema = 1
+command = "sprawl"
+aliases = ["sra"]
+shared_mcp = ["codegraph"]
+protected_branches = ["main", "hotfix/*"]
+-- squad.toml --
+command = "squad"
+aliases = ["sq"]
+shared_mcp = ["from-squad"]
+-- custom.toml --
+schema = 1
+command = "ai"
+aliases = ["sx"]
+-- plugins.json --
+[{"id":"sprawl@sprawl","enabled":true},{"id":"squad@squad","enabled":true}]
+-- markets.json --
+[{"name":"sprawl"},{"name":"squad"}]
+-- home/.claude-personal/.sprawl-account --
+This directory is an account managed by Sprawling Agents.
+-- push-prod.json --
+{"cwd":"repo","tool_input":{"command":"git push origin prod"}}
+-- push-feat.json --
+{"cwd":"repo","tool_input":{"command":"git push origin feat-x"}}

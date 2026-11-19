@@ -14,14 +14,14 @@ func TestUnwrapStatusLine(t *testing.T) {
 		cmd, old string
 		ours     bool
 	}{
-		{"/x/sprawl hook statusline", "", true},
-		{"'/a b/sprawl' hook statusline --then 'echo hi'", "echo hi", true},
-		{"~/.local/share/sprawl/bin/sprawl.exe hook statusline --then 'x'", "x", true},
-		{"/x/sprawl hook statusline --then 'a'\\''b'", "a'b", true},
-		{"/x/sprawl hook statusline --then 'unterminated", "", false},
-		{"/x/sprawl hook statusline --then 'a' extra", "", false},
-		{"/x/sprawl hook statusline --other", "", false},
-		{"/x/sprawl hook statuslinex", "", false},
+		{"/x/squadrn hook statusline", "", true},
+		{"'/a b/squadrn' hook statusline --then 'echo hi'", "echo hi", true},
+		{"~/.local/share/squadrn/bin/squadrn.exe hook statusline --then 'x'", "x", true},
+		{"/x/squadrn hook statusline --then 'a'\\''b'", "a'b", true},
+		{"/x/squadrn hook statusline --then 'unterminated", "", false},
+		{"/x/squadrn hook statusline --then 'a' extra", "", false},
+		{"/x/squadrn hook statusline --other", "", false},
+		{"/x/squadrn hook statuslinex", "", false},
 		{"~/statusline.sh", "", false},
 		{"'unterminated hook statusline", "", false},
 		{"", "", false},

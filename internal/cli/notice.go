@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/update"
 )
 
@@ -28,7 +29,7 @@ func (a *app) updateNotice(r route) {
 	s := update.Load(path)
 	now := a.now()
 	if latest, ok := update.Available(Version, s, a.cfg.Channel()); ok && now.Sub(s.NotifiedAt) >= noticeEvery {
-		a.errf("%s\n", a.paint(a.colorErr, "1;36", "✦ sprawl "+latest+" is available")+
+		a.errf("%s\n", a.paint(a.colorErr, "1;36", "✦ squadrn "+latest+" is available")+
 			a.paint(a.colorErr, "2", " (you have v"+trimV(Version)+") · "+a.cmd+" self-update · what's new: "+a.cmd+" self-update --check"))
 		s.NotifiedAt = now
 		update.Save(path, s)
@@ -51,7 +52,7 @@ func trimV(v string) string {
 	return v
 }
 
-// startBackgroundCheck runs `sprawl self-update --background` detached: in its own session,
+// startBackgroundCheck runs `squadrn self-update --background` detached: in its own session,
 // with no terminal, so it outlives this process (and an exec into the agent) without waiting.
 func startBackgroundCheck() {
 	self, err := os.Executable()
@@ -59,7 +60,7 @@ func startBackgroundCheck() {
 		return
 	}
 	cmd := exec.Command(self, "self-update", "--background")
-	cmd.Env = append(os.Environ(), "SPRAWL_NO_UPDATE_CHECK=1")
+	cmd.Env = append(os.Environ(), config.EnvName("NO_UPDATE_CHECK")+"=1")
 	if startDetached(cmd) == nil {
 		_ = cmd.Process.Release()
 	}

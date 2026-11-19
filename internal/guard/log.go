@@ -41,7 +41,7 @@ type Log struct {
 	Path string
 }
 
-// DefaultLogPath is $XDG_STATE_HOME/sprawl/guard.log.
+// DefaultLogPath is $XDG_STATE_HOME/squadrn/guard.log.
 func DefaultLogPath(home string) string {
 	return filepath.Join(config.DirsFor(home, config.Slug).State, "guard.log")
 }

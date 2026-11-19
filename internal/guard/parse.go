@@ -58,7 +58,9 @@ type extractor struct {
 	// pushConfigChanged is set once the command line writes configuration git push reads.
 	pushConfigChanged bool
 	dirs              config.Dirs
-	// names are the lower-cased command names that run sprawl.
+	// legacyDirs are the directories of previous product names, guarded like dirs.
+	legacyDirs []config.Dirs
+	// names are the lower-cased command names that run squadrn, now or under a previous name.
 	names map[string]bool
 }
 
@@ -192,7 +194,7 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 	case base == "gh":
 		e.gh(argv[1:])
 	case e.names[base]:
-		e.sprawl(argv[1:])
+		e.self(argv[1:])
 	case base == "pwsh" || base == "powershell":
 		words := make([]psWord, len(argv)-1)
 		for i, a := range argv[1:] {

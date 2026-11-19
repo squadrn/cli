@@ -303,7 +303,7 @@ func copyVerified(src, dst string) (err error) {
 	if err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".sprawl-*")
+	tmp, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".squadrn-*")
 	if err != nil {
 		return err
 	}

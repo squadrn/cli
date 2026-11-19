@@ -1,216 +1,216 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # An unpacked release: this binary plus the repository's plugin and marketplace files.
 mkdir rel home/.claude-personal home/.local/bin
-exec sh -c 'cp "$(command -v sprawl)" rel/sprawl && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
 
 # First install with a chosen command name and alias.
-exec sprawl self-install rel --command ai --alias sx
-stdout 'installed sprawl dev → ~/.local/share/sprawl/bin/sprawl'
+exec squadrn self-install rel --command ai --alias sx
+stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
 stdout 'linked ~/.local/bin/ai'
 stdout 'linked ~/.local/bin/sx'
 stdout 'claude/main: plugin installed'
 stdout 'claude/personal: plugin installed'
 stdout 'next: ai doctor'
 ! stdout 'migrated'
-exists home/.local/share/sprawl/plugin/bin/sprawl-hook
-grep '"version": "dev"' home/.local/share/sprawl/plugin/.claude-plugin/plugin.json
-grep '^command = "ai"' home/.config/sprawl/config.toml
-grep '^aliases = \["sx"\]' home/.config/sprawl/config.toml
+exists home/.local/share/squadrn/plugin/bin/squadrn-hook
+grep '"version": "dev"' home/.local/share/squadrn/plugin/.claude-plugin/plugin.json
+grep '^command = "ai"' home/.config/squadrn/config.toml
+grep '^aliases = \["sx"\]' home/.config/squadrn/config.toml
 exec sh -c 'readlink home/.local/bin/ai && readlink home/.local/bin/sx'
-stdout -count=2 'home/.local/share/sprawl/bin/sprawl$'
+stdout -count=2 'home/.local/share/squadrn/bin/squadrn$'
 
 # Messages use the chosen name.
-exitcode 1 sprawl -a ghost
-! exec sprawl -a ghost
+exitcode 1 squadrn -a ghost
+! exec squadrn -a ghost
 stderr '^ai: account not found: claude/ghost \(run: ai account add claude/ghost\)$'
 
 # Upgrades keep the names and refresh the plugin.
-exec sprawl self-install rel
+exec squadrn self-install rel
 stdout 'claude/main: plugin updated'
 ! stdout 'linked'
-grep '^command = "ai"' home/.config/sprawl/config.toml
+grep '^command = "ai"' home/.config/squadrn/config.toml
 
 # Rename the command, then drop the alias: links follow, nothing else changes.
-exec sprawl config set command dev2
+exec squadrn config set command dev2
 stdout 'linked ~/.local/bin/dev2'
 stdout 'removed ~/.local/bin/ai'
 ! exists home/.local/bin/ai
 exists home/.local/bin/sx
-exec sprawl config
+exec squadrn config
 stdout '^command +dev2$'
 stdout '^aliases +sx$'
-exec sprawl config get aliases
+exec squadrn config get aliases
 stdout '^sx$'
-exec sprawl config --json
+exec squadrn config --json
 stdout '"command": "dev2"'
-exec sprawl config set protected_branches main,production
+exec squadrn config set protected_branches main,production
 stdout '^protected_branches = main,production$'
-exec sprawl config get protected_branches
+exec squadrn config get protected_branches
 stdout '^main,production$'
-exec sprawl config set git_hooks false
-exec sprawl config get git_hooks
+exec squadrn config set git_hooks false
+exec squadrn config get git_hooks
 stdout '^false$'
-exitcode 2 sprawl config set git_hooks maybe
-exitcode 2 sprawl config set default_provider nope
-exitcode 2 sprawl config get colour
-exec sprawl config set git_hooks true
-exec sprawl config set aliases ''
+exitcode 2 squadrn config set git_hooks maybe
+exitcode 2 squadrn config set default_provider nope
+exitcode 2 squadrn config get colour
+exec squadrn config set git_hooks true
+exec squadrn config set aliases ''
 stdout 'removed ~/.local/bin/sx'
 ! exists home/.local/bin/sx
 
 # Unusable or clashing names are refused; --force accepts a name another program has.
-exitcode 2 sprawl config set command cd
-exitcode 2 sprawl config set command claude
-exitcode 2 sprawl config set command Bad
-exitcode 2 sprawl config set colour blue
+exitcode 2 squadrn config set command cd
+exitcode 2 squadrn config set command claude
+exitcode 2 squadrn config set command Bad
+exitcode 2 squadrn config set colour blue
 cp fakeprog bin/taken
 chmod 755 bin/taken
-exitcode 2 sprawl config set command taken
-exec sprawl config set command taken --force
+exitcode 2 squadrn config set command taken
+exec squadrn config set command taken --force
 stdout 'linked ~/.local/bin/taken'
-exitcode 2 sprawl self-install rel --command dev2 --alias dev2
+exitcode 2 squadrn self-install rel --command dev2 --alias dev2
 
 # self-update needs a repository, given by flag only (an environment variable is ignored).
-env SPRAWL_REPO=me/sprawl
-exitcode 2 sprawl self-update
-! exec sprawl self-update
+env SQUADRN_REPO=me/squadrn
+exitcode 2 squadrn self-update
+! exec squadrn self-update
 stderr 'no release repository configured; pass --repo owner/name'
 
 # A published release, served by a fake gh: archive for this platform plus checksums.
-env SPRAWL_REPO=me/sprawl
+env SQUADRN_REPO=me/squadrn
 env COPYFILE_DISABLE=1
-exec sh -c 'os=$(uname -s | tr A-Z a-z); case $(uname -m) in x86_64|amd64) arch=amd64;; *) arch=arm64;; esac; mkdir -p pub && tar -czf "pub/sprawl_9.9.9_${os}_${arch}.tar.gz" -C rel . && cd pub && (sha256sum * 2>/dev/null || shasum -a 256 *) > checksums.txt'
+exec sh -c 'os=$(uname -s | tr A-Z a-z); case $(uname -m) in x86_64|amd64) arch=amd64;; *) arch=arm64;; esac; mkdir -p pub && tar -czf "pub/squadrn_9.9.9_${os}_${arch}.tar.gz" -C rel . && cd pub && (sha256sum * 2>/dev/null || shasum -a 256 *) > checksums.txt'
 cp fakegh bin/gh
 chmod 755 bin/gh
 
 # The build trusts a key, and the release is signed with it.
 exec ssh-keygen -q -t ed25519 -N '' -C test -f relkey
-envfile SPRAWL_TEST_SIGNERS relkey.pub
-exec ssh-keygen -Y sign -q -f relkey -n sprawl-release pub/checksums.txt
+envfile SQUADRN_TEST_SIGNERS relkey.pub
+exec ssh-keygen -Y sign -q -f relkey -n squadrn-release pub/checksums.txt
 
-exec sprawl self-update --repo me/sprawl --check
+exec squadrn self-update --repo me/squadrn --check
 stdout '^update available: vdev → v9.9.9$'
 stdout '^  - faster grids$'
 stdout 'install it with: taken self-update'
-exists home/.cache/sprawl/update.json
-grep '"latest":"v9.9.9"' home/.cache/sprawl/update.json
+exists home/.cache/squadrn/update.json
+grep '"latest":"v9.9.9"' home/.cache/squadrn/update.json
 
 # --check --json for scripts; a cached result is tied to its channel.
-exec sprawl self-update --repo me/sprawl --check --json
+exec squadrn self-update --repo me/squadrn --check --json
 stdout '"current": "vdev"'
 stdout '"latest": "v9.9.9"'
 stdout '"channel": "stable"'
 stdout '"available": true'
 stdout '"notes": "## 9.9.9\\n- faster grids"'
-grep '"channel":"stable"' home/.cache/sprawl/update.json
-exitcode 2 sprawl self-update --json
+grep '"channel":"stable"' home/.cache/squadrn/update.json
+exitcode 2 squadrn self-update --json
 
 # A tag without its v, and one that does not exist.
-exec sprawl self-update --repo me/sprawl --check --version 9.9.9
+exec squadrn self-update --repo me/squadrn --check --version 9.9.9
 stdout '^update available: vdev → v9.9.9$'
-! exec sprawl self-update --repo me/sprawl --version v7.7.7
-stderr 'cannot install v7.7.7: release v7.7.7 not found in me/sprawl'
+! exec squadrn self-update --repo me/squadrn --version v7.7.7
+stderr 'cannot install v7.7.7: release v7.7.7 not found in me/squadrn'
 
 # The beta channel also sees pre-releases.
-exec sprawl config set update_channel beta
-exec sprawl self-update --repo me/sprawl --check
+exec squadrn config set update_channel beta
+exec squadrn self-update --repo me/squadrn --check
 stdout '^update available: vdev → v10.0.0-rc.1$'
-exec sprawl config set update_channel stable
-exitcode 2 sprawl config set update_channel nightly
-exitcode 2 sprawl self-update --rollback --check
+exec squadrn config set update_channel stable
+exitcode 2 squadrn config set update_channel nightly
+exitcode 2 squadrn self-update --rollback --check
 
-exec sprawl self-update --repo me/sprawl
+exec squadrn self-update --repo me/squadrn
 stdout 'verified release signature'
 ! stderr 'attestation'
-stdout 'installed sprawl v9.9.9 → ~/.local/share/sprawl/bin/sprawl'
+stdout 'installed squadrn v9.9.9 → ~/.local/share/squadrn/bin/squadrn'
 stdout 'claude/main: plugin updated'
 stdout 'claude/personal: plugin updated'
-grep '"version": "9.9.9"' home/.local/share/sprawl/plugin/.claude-plugin/plugin.json
-grep '^command = "taken"' home/.config/sprawl/config.toml
-grep '^9.9.9$' home/.local/share/sprawl/VERSION
-grep '^dev$' home/.local/share/sprawl/previous/VERSION
+grep '"version": "9.9.9"' home/.local/share/squadrn/plugin/.claude-plugin/plugin.json
+grep '^command = "taken"' home/.config/squadrn/config.toml
+grep '^9.9.9$' home/.local/share/squadrn/VERSION
+grep '^dev$' home/.local/share/squadrn/previous/VERSION
 
 # The running build differs from the installed copy: say so.
-stderr 'warning: this is .*\(dev\), not the installed copy ~/.local/share/sprawl/bin/sprawl'
+stderr 'warning: this is .*\(dev\), not the installed copy ~/.local/share/squadrn/bin/squadrn'
 
 
 # --rollback reinstalls the release from before; doing it again goes forward again.
-exec sprawl self-update --rollback
+exec squadrn self-update --rollback
 stdout 'rolling back v9.9.9 → vdev'
-grep '^dev$' home/.local/share/sprawl/VERSION
-exec sprawl self-update --rollback
+grep '^dev$' home/.local/share/squadrn/VERSION
+exec squadrn self-update --rollback
 stdout 'rolling back vdev → v9.9.9'
-grep '^9.9.9$' home/.local/share/sprawl/VERSION
+grep '^9.9.9$' home/.local/share/squadrn/VERSION
 
 # Same version, but an install that stopped half way: self-update repairs it instead of saying
 # up to date.
-env SPRAWL_TEST_VERSION=9.9.9
-exec sprawl self-update --repo me/sprawl --version v9.9.9
-stdout 'sprawl v9.9.9 is up to date'
-exec sh -c 'echo 9.9.8 > home/.local/share/sprawl/VERSION'
-exec sprawl self-update --repo me/sprawl --check --version v9.9.9
+env SQUADRN_TEST_VERSION=9.9.9
+exec squadrn self-update --repo me/squadrn --version v9.9.9
+stdout 'squadrn v9.9.9 is up to date'
+exec sh -c 'echo 9.9.8 > home/.local/share/squadrn/VERSION'
+exec squadrn self-update --repo me/squadrn --check --version v9.9.9
 stdout 'is incomplete; repair it with: taken self-update'
-exec sprawl self-update --repo me/sprawl --version v9.9.9
+exec squadrn self-update --repo me/squadrn --version v9.9.9
 stdout 'the installed copy of v9.9.9 is incomplete \(VERSION "9.9.8"\); reinstalling it'
-grep '^9.9.9$' home/.local/share/sprawl/VERSION
+grep '^9.9.9$' home/.local/share/squadrn/VERSION
 
 # Two installs never overlap: a live process holding the lock blocks, a dead one does not.
-exec sh -c 'echo $PPID > home/.local/share/sprawl/install.lock'
-! exec sprawl self-install rel
-stderr 'another sprawl install or update is running \(pid [0-9]+\)'
-exec sh -c 'echo 999999 > home/.local/share/sprawl/install.lock'
-exec sprawl self-install rel
-! exists home/.local/share/sprawl/install.lock
-env SPRAWL_TEST_VERSION=
+exec sh -c 'echo $PPID > home/.local/share/squadrn/install.lock'
+! exec squadrn self-install rel
+stderr 'another squadrn install or update is running \(pid [0-9]+\)'
+exec sh -c 'echo 999999 > home/.local/share/squadrn/install.lock'
+exec squadrn self-install rel
+! exists home/.local/share/squadrn/install.lock
+env SQUADRN_TEST_VERSION=
 
 # Tampered checksums break the signature; an unsigned release is refused outright.
 cp pub/checksums.txt good-checksums.txt
 exec sh -c 'cd pub && sed "s/^[0-9a-f]\{8\}/00000000/" checksums.txt > c && mv c checksums.txt'
-exitcode 1 sprawl self-update --repo me/sprawl
-! exec sprawl self-update --repo me/sprawl
+exitcode 1 squadrn self-update --repo me/squadrn
+! exec squadrn self-update --repo me/squadrn
 stderr 'release signature is not valid; refusing to install it'
 rm pub/checksums.txt.sig
-! exec sprawl self-update --repo me/sprawl
+! exec squadrn self-update --repo me/squadrn
 stderr 'release v9.9.9 has no signature \(checksums.txt.sig\); refusing to install it'
 
 # A build without signing keys falls back to the checksum, says so, and still catches tampering.
-env SPRAWL_TEST_SIGNERS=
-! exec sprawl self-update --repo me/sprawl
+env SQUADRN_TEST_SIGNERS=
+! exec squadrn self-update --repo me/squadrn
 stderr 'this build has no release signing key'
 stderr 'checksum mismatch'
 cp good-checksums.txt pub/checksums.txt
-exec sprawl self-update --repo me/sprawl
+exec squadrn self-update --repo me/squadrn
 stderr 'verified by checksum only'
-stdout 'installed sprawl v9.9.9'
+stdout 'installed squadrn v9.9.9'
 
-exitcode 2 sprawl self-install
-exitcode 1 sprawl self-install nowhere
+exitcode 2 squadrn self-install
+exitcode 1 squadrn self-install nowhere
 
 # self-uninstall removes the plugin everywhere, the links and installed files; --purge also the
 # config, logs and caches. Accounts stay.
-exitcode 2 sprawl self-uninstall
-exec sprawl self-uninstall --yes --purge
+exitcode 2 squadrn self-uninstall
+exec squadrn self-uninstall --yes --purge
 stdout 'claude/main: plugin removed'
 stdout 'claude/personal: plugin removed'
 stdout 'removed ~/.local/bin/taken'
-stdout 'sprawl is uninstalled'
-! exists home/.local/share/sprawl
+stdout 'squadrn is uninstalled'
+! exists home/.local/share/squadrn
 ! exists home/.local/bin/taken
-! exists home/.config/sprawl
-! exists home/.cache/sprawl
+! exists home/.config/squadrn
+! exists home/.cache/squadrn
 exists home/.claude-personal
-grep 'args=plugin uninstall sprawl@sprawl' home/calls.log
+grep 'args=plugin uninstall squadrn@squadrn' home/calls.log
 
 # Installing a pre-release follows the beta channel unless a channel was chosen.
-env SPRAWL_TEST_VERSION=1.2.0-rc.3
-exec sprawl self-install rel
-stdout 'pre-release: following the beta channel \(back to stable: sprawl config set update_channel stable\)'
-grep '^update_channel = "beta"$' home/.config/sprawl/config.toml
-exec sprawl config set update_channel stable
-exec sprawl self-install rel
+env SQUADRN_TEST_VERSION=1.2.0-rc.3
+exec squadrn self-install rel
+stdout 'pre-release: following the beta channel \(back to stable: squadrn config set update_channel stable\)'
+grep '^update_channel = "beta"$' home/.config/squadrn/config.toml
+exec squadrn config set update_channel stable
+exec squadrn self-install rel
 ! stdout 'beta channel'
-grep '^update_channel = "stable"$' home/.config/sprawl/config.toml
-env SPRAWL_TEST_VERSION=
+grep '^update_channel = "stable"$' home/.config/squadrn/config.toml
+env SQUADRN_TEST_VERSION=
 
 -- fakeprog --
 #!/bin/sh
@@ -238,4 +238,4 @@ case "$1 $2" in
   "attestation verify") echo "Error: no attestations found for subject" >&2; exit 1 ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
--- home/.claude-personal/.sprawl-account --
+-- home/.claude-personal/.squadrn-account --

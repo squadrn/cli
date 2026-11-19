@@ -47,10 +47,10 @@ type Guard struct {
 	// GitHooks is set when the git-level guard is active; overriding core.hooksPath for a push
 	// would switch it off, so that is denied.
 	GitHooks bool
-	// Names are the command names sprawl is installed under besides the defaults (configured
+	// Names are the command names squadrn is installed under besides the defaults (configured
 	// command and aliases); agents may not change the guard's policy through them.
 	Names []string
-	// Dirs are sprawl's own directories; zero means derived from Home. Writes to the config file
+	// Dirs are squadrn's own directories; zero means derived from Home. Writes to the config file
 	// or the git hooks are denied, other writes into them ask.
 	Dirs config.Dirs
 }
@@ -70,11 +70,17 @@ func (g Guard) newExtractor(ctx context.Context) *extractor {
 	if dirs.Config == "" && g.Home != "" {
 		dirs = config.DirsFor(g.Home, config.Slug)
 	}
+	var legacy []config.Dirs
+	if g.Home != "" {
+		for _, n := range config.PreviousNames {
+			legacy = append(legacy, config.DirsFor(g.Home, n))
+		}
+	}
 	names := map[string]bool{config.DefaultCommand: true, config.Slug + "-hook": true}
-	for _, n := range append(config.DefaultAliases(), g.Names...) {
+	for _, n := range append(append(config.DefaultAliases(), config.LegacyCommands()...), g.Names...) {
 		names[cmdBase(n)] = true
 	}
-	return &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git), dirs: dirs, names: names}
+	return &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git), dirs: dirs, legacyDirs: legacy, names: names}
 }
 
 // verdict combines what the analysis found: the most severe finding or push decision wins, and

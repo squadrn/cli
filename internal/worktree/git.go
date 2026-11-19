@@ -129,7 +129,7 @@ func Toplevel(ctx context.Context, dir string) string {
 }
 
 // Exclude adds pattern to the repository's info/exclude (shared by all its worktrees) unless
-// it is already there, so git never reports the files sprawl keeps in a worktree.
+// it is already there, so git never reports the files squadrn keeps in a worktree.
 func Exclude(ctx context.Context, dir, pattern string) error {
 	path, err := git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude")
 	if err != nil {
@@ -218,7 +218,7 @@ func Dirty(ctx context.Context, path string) (bool, error) {
 }
 
 // Ignored counts the ignored paths in a worktree (an ignored directory counts once). Removing
-// the worktree deletes them; sprawl's own registry is not counted.
+// the worktree deletes them; squadrn's own registry is not counted.
 func Ignored(ctx context.Context, path string) (int, error) {
 	status, err := git(ctx, path, "status", "--porcelain", "--untracked-files=normal", "--ignored")
 	if err != nil {
@@ -227,7 +227,7 @@ func Ignored(ctx context.Context, path string) (int, error) {
 	n := 0
 	for _, line := range strings.Split(status, "\n") {
 		p, ok := strings.CutPrefix(line, "!! ")
-		if ok && strings.TrimSuffix(p, "/") != inuse.Dir {
+		if d := strings.TrimSuffix(p, "/"); ok && d != inuse.Dir && !slices.Contains(inuse.LegacyDirs(), d) {
 			n++
 		}
 	}

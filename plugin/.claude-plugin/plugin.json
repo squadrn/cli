@@ -1,9 +1,9 @@
 {
-  "name": "sprawl",
+  "name": "squadrn",
   "version": "0.0.0",
-  "description": "Sprawling Agents guardrails for parallel coding agents: blocks force pushes and pushes to protected branches, desktop notifications, read-only locator and reviewer agents.",
+  "description": "Squadrn guardrails for parallel coding agents: blocks force pushes and pushes to protected branches, desktop notifications, read-only locator and reviewer agents.",
   "author": {
-    "name": "Sprawling Agents"
+    "name": "Squadrn"
   },
   "license": "UNLICENSED",
   "keywords": [

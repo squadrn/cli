@@ -1,7 +1,7 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # The machine runs squad 3.0 (command squad, alias sq), its plugin in every account.
 mkdir rel home/.claude-personal home/.local/bin home/.local/share/squad/bin home/.config/squad
-exec sh -c 'cp "$(command -v sprawl)" rel/sprawl && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
 cp old-binary home/.local/share/squad/bin/squad
 exec sh -c 'ln -s "$HOME/.local/share/squad/bin/squad" home/.local/bin/squad && ln -s "$HOME/.local/share/squad/bin/squad" home/.local/bin/sq'
 cp squad.toml home/.config/squad/config.toml
@@ -10,28 +10,28 @@ cp squad-markets.json home/.claude/.markets
 cp squad-plugins.json home/.claude-personal/.plugins
 cp squad-markets.json home/.claude-personal/.markets
 
-# Installing with no options: defaults sprawl + sra; the old product's names do not carry over.
-exec sprawl self-install rel
-stdout 'installed sprawl dev → ~/.local/share/sprawl/bin/sprawl'
+# Installing with no options: squad's default names (squad + sq) become squadrn + sqd.
+exec squadrn self-install rel
+stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
 stdout 'settings migrated from ~/.config/squad/config.toml'
-stdout 'linked ~/.local/bin/sprawl'
-stdout 'linked ~/.local/bin/sra'
+stdout 'linked ~/.local/bin/squadrn'
+stdout 'linked ~/.local/bin/sqd'
 stdout 'removed ~/.local/bin/squad'
 stdout 'removed ~/.local/bin/sq'
 stdout 'claude/main: removed plugin squad@squad'
 stdout 'claude/personal: removed plugin squad@squad'
 stdout 'claude/main: plugin installed'
-stdout 'previous squad files moved to ~/.local/state/sprawl/legacy-squad-'
-stdout 'next: sprawl doctor'
+stdout 'previous squad files moved to ~/.local/state/squadrn/legacy-squad-'
+stdout 'next: squadrn doctor'
 ! exists home/.local/bin/squad
 ! exists home/.local/bin/sq
 ! exists home/.local/share/squad
 ! exists home/.config/squad
-grep '^command = "sprawl"' home/.config/sprawl/config.toml
-grep '^aliases = \["sra"\]' home/.config/sprawl/config.toml
-grep '^shared_mcp = \["codegraph"\]' home/.config/sprawl/config.toml
-exec sh -c 'readlink home/.local/bin/sprawl && readlink home/.local/bin/sra'
-stdout -count=2 'home/.local/share/sprawl/bin/sprawl$'
+grep '^command = "squadrn"' home/.config/squadrn/config.toml
+grep '^aliases = \["sqd"\]' home/.config/squadrn/config.toml
+grep '^shared_mcp = \["codegraph"\]' home/.config/squadrn/config.toml
+exec sh -c 'readlink home/.local/bin/squadrn && readlink home/.local/bin/sqd'
+stdout -count=2 'home/.local/share/squadrn/bin/squadrn$'
 
 # A fresh machine (no previous install, no options) gets the same defaults.
 env HOME=$WORK/fresh
@@ -40,11 +40,11 @@ env XDG_DATA_HOME=$WORK/fresh/.local/share
 env XDG_STATE_HOME=$WORK/fresh/.local/state
 env XDG_CACHE_HOME=$WORK/fresh/.cache
 mkdir fresh/.claude
-exec sprawl self-install rel
-stdout 'linked ~/.local/bin/sprawl'
-stdout 'linked ~/.local/bin/sra'
+exec squadrn self-install rel
+stdout 'linked ~/.local/bin/squadrn'
+stdout 'linked ~/.local/bin/sqd'
 ! stdout 'migrated'
-grep '^aliases = \["sra"\]' fresh/.config/sprawl/config.toml
+grep '^aliases = \["sqd"\]' fresh/.config/squadrn/config.toml
 
 # Choosing no alias at install is respected.
 env HOME=$WORK/bare
@@ -52,9 +52,9 @@ env XDG_CONFIG_HOME=$WORK/bare/.config
 env XDG_DATA_HOME=$WORK/bare/.local/share
 env XDG_STATE_HOME=$WORK/bare/.local/state
 mkdir bare/.claude
-exec sprawl self-install rel --alias ''
-stdout 'linked ~/.local/bin/sprawl'
-! stdout 'sra'
+exec squadrn self-install rel --alias ''
+stdout 'linked ~/.local/bin/squadrn'
+! stdout 'sqd'
 
 -- old-binary --
 #!/bin/sh

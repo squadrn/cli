@@ -395,7 +395,7 @@ type holder struct {
 }
 
 // holders are the processes that may be writing the conversation: Claude Code sessions listing
-// it in their registry, and sessions sprawl started as from in its directory (recorded both
+// it in their registry, and sessions squadrn started as from in its directory (recorded both
 // there and in from's config dir) unless the registry shows they hold another conversation.
 func (a *app) holders(src swapSource, from account.Account, accts []account.Account, dirs []string) []holder {
 	var out []holder
@@ -430,7 +430,7 @@ func (a *app) holders(src swapSource, from account.Account, accts []account.Acco
 func (a *app) quiesce(hs []holder, yes bool) error {
 	for _, h := range hs {
 		if !inuse.Live(h.pid, h.started) {
-			continue // ended with another holder (Windows: sprawl and its claude child)
+			continue // ended with another holder (Windows: squadrn and its claude child)
 		}
 		if err := a.confirm(yes, "Stop the %s that holds the conversation", h.desc); err != nil {
 			return err

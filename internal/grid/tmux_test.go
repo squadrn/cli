@@ -42,11 +42,11 @@ func TestStartWithAwkwardPaths(t *testing.T) {
 			t.Fatal(err)
 		}
 		agent := Agent{Account: "claude/main", Name: "feat-a"}
-		s, err := tm.Start(ctx, "sra", root, root, 80, 24, agent, "sleep 30")
+		s, err := tm.Start(ctx, "sqd", root, root, 80, 24, agent, "sleep 30")
 		if err != nil {
 			t.Fatalf("%s: Start: %v", name, err)
 		}
-		if _, err := tm.Start(ctx, "sra", root, root, 80, 24, Agent{Account: "claude/x", Name: "fix-b"}, "sleep 30"); err != nil {
+		if _, err := tm.Start(ctx, "sqd", root, root, 80, 24, Agent{Account: "claude/x", Name: "fix-b"}, "sleep 30"); err != nil {
 			t.Fatalf("%s: second Start: %v", name, err)
 		}
 		if got, err := tm.FindSession(ctx, root); err != nil || got != s {
@@ -71,5 +71,33 @@ func TestStartWithAwkwardPaths(t *testing.T) {
 		if ss, err := tm.Sessions(ctx); err != nil || len(ss) != i+1 {
 			t.Fatalf("Sessions = %+v, %v", ss, err)
 		}
+	}
+}
+
+// A grid an older release started is tagged with the previous product name's options.
+func TestFindsGridOfPreviousName(t *testing.T) {
+	privateTmux(t)
+	ctx := context.Background()
+	root := "/r/a|b c"
+	tmux := func(args ...string) {
+		if out, err := exec.Command("tmux", args...).CombinedOutput(); err != nil {
+			t.Fatalf("tmux %v: %v\n%s", args, err, out)
+		}
+	}
+	tmux("new-session", "-d", "-s", "sra-app", "-x", "80", "-y", "24", "sleep 30")
+	tmux("set", "-t", "sra-app", "@sprawl_repo", root)
+	tmux("set", "-p", "-t", "sra-app:", "@sprawl_acct", "claude/old")
+	tmux("set", "-p", "-t", "sra-app:", "@sprawl_name", "feat-old")
+	tm := Tmux{}
+	if s, err := tm.FindSession(ctx, root); err != nil || s != "sra-app" {
+		t.Fatalf("FindSession = %q, %v", s, err)
+	}
+	s, err := tm.Start(ctx, "sqd", root, t.TempDir(), 80, 24, Agent{Account: "claude/new", Name: "feat-new"}, "sleep 30")
+	if err != nil || s != "sra-app" {
+		t.Fatalf("Start = %q, %v (want to join the running grid)", s, err)
+	}
+	panes, err := tm.Panes(ctx, s)
+	if err != nil || len(panes) != 2 || panes[0].Account != "claude/old" || panes[0].Name != "feat-old" || panes[1].Account != "claude/new" {
+		t.Fatalf("Panes = %+v, %v", panes, err)
 	}
 }

@@ -22,7 +22,7 @@ func underProfile(dir string) bool {
 
 // ProtectDir gives dir, when it lies outside the user profile (XDG variables, another drive), a
 // protected DACL: full control for the current user, SYSTEM and Administrators only, so other
-// local users cannot plant executables sprawl or its hooks run.
+// local users cannot plant executables squadrn or its hooks run.
 func ProtectDir(dir string) error {
 	if underProfile(dir) {
 		return nil

@@ -107,7 +107,7 @@ func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool
 	if err != nil {
 		return err
 	}
-	unlock, err := inuse.Lock(filepath.Join(common, "sprawl-grid.lock"), 30*time.Second)
+	unlock, err := inuse.Lock(filepath.Join(common, "squadrn-grid.lock"), 30*time.Second)
 	if err != nil {
 		return fmt.Errorf("another %s grid is starting agents in this repository: %w", a.cmd, err)
 	}
@@ -379,7 +379,7 @@ func (a *app) anyPane(label string) string {
 	return ""
 }
 
-// selfPath is how panes re-invoke sprawl. It keeps the invoked name (not the symlink target),
+// selfPath is how panes re-invoke squadrn. It keeps the invoked name (not the symlink target),
 // so an ~/.local/bin link keeps working after the binary it points to is replaced.
 func selfPath() string {
 	p := os.Args[0]

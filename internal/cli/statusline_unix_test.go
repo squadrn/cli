@@ -10,8 +10,8 @@ import (
 
 func TestStatusLineWordRoundTrip(t *testing.T) {
 	for _, s := range []string{
-		"/usr/local/bin/sprawl",
-		"/Users/a b/.local/share/sprawl/bin/sprawl",
+		"/usr/local/bin/squadrn",
+		"/Users/a b/.local/share/squadrn/bin/squadrn",
 		`echo "it's"; printf '%s' $HOME`,
 		"",
 		"a'b'c",
@@ -24,7 +24,7 @@ func TestStatusLineWordRoundTrip(t *testing.T) {
 		if err != nil || string(out) != s {
 			t.Errorf("%q: shell read %q (%v) from %s", s, out, err, q)
 		}
-		cmd := "/x/sprawl" + statusLineHook + " --then " + q
+		cmd := "/x/squadrn" + statusLineHook + " --then " + q
 		if got, ours := unwrapStatusLine(cmd); s != "" && (!ours || got != s) {
 			t.Errorf("%q: unwrap %s = %q, %v", s, cmd, got, ours)
 		}

@@ -105,7 +105,7 @@ func TestRelocate(t *testing.T) {
 
 func TestHasPlugin(t *testing.T) {
 	dir := t.TempDir()
-	if HasPlugin(dir, "sprawl@sprawl") {
+	if HasPlugin(dir, "squadrn@squadrn") {
 		t.Fatal("no registry: installed")
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "plugins"), 0o700); err != nil {
@@ -113,14 +113,14 @@ func TestHasPlugin(t *testing.T) {
 	}
 	reg := filepath.Join(dir, "plugins", "installed_plugins.json")
 	for body, want := range map[string]bool{
-		`{"version":2,"plugins":{"sprawl@sprawl":[{"scope":"user"}]}}`: true,
-		`{"version":2,"plugins":{"other@x":[]}}`:                       false,
-		`not json`:                                                     false,
+		`{"version":2,"plugins":{"squadrn@squadrn":[{"scope":"user"}]}}`: true,
+		`{"version":2,"plugins":{"other@x":[]}}`:                         false,
+		`not json`:                                                       false,
 	} {
 		if err := os.WriteFile(reg, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if got := HasPlugin(dir, "sprawl@sprawl"); got != want {
+		if got := HasPlugin(dir, "squadrn@squadrn"); got != want {
 			t.Errorf("%s: %v", body, got)
 		}
 	}

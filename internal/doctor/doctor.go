@@ -1,4 +1,4 @@
-// Package doctor checks that sprawl, the agent CLIs and every account are set up correctly.
+// Package doctor checks that squadrn, the agent CLIs and every account are set up correctly.
 package doctor
 
 import (
@@ -63,7 +63,7 @@ type Env struct {
 	Layout   release.Layout
 	Config   config.Config
 	LookPath func(string) (string, error)
-	// Self is the running sprawl binary; Names are the command and aliases that must reach it.
+	// Self is the running squadrn binary; Names are the command and aliases that must reach it.
 	Self  string
 	Names []string
 	// Command is the user's command name, used in fix hints.
@@ -72,7 +72,7 @@ type Env struct {
 	// Repo is the repository doctor runs in ("" outside one); its branch protection is checked.
 	Repo string
 	GH   GH
-	// Version is the running sprawl; Latest the newest release seen by the update check ("" if
+	// Version is the running squadrn; Latest the newest release seen by the update check ("" if
 	// none); Signed reports whether this build verifies release signatures.
 	Version, Latest string
 	Signed          bool
@@ -122,7 +122,7 @@ func (e Env) gitCheck(ctx context.Context) Check {
 	case err != nil:
 		return bad(g, Fail, err.Error(), e.GitHint)
 	case !v.AtLeast(gitver.Min):
-		return bad(g, Fail, fmt.Sprintf("git %s is too old (sprawl needs %d.%d or newer)", v, gitver.Min.Major, gitver.Min.Minor), e.GitHint)
+		return bad(g, Fail, fmt.Sprintf("git %s is too old (squadrn needs %d.%d or newer)", v, gitver.Min.Major, gitver.Min.Minor), e.GitHint)
 	}
 	return ok(g, "git "+v.String())
 }
@@ -162,7 +162,7 @@ func (e Env) install() []Check {
 		if p, err := e.LookPath(n); err != nil {
 			out = append(out, bad(g, Warn, n+" not on PATH", e.pathFix()))
 		} else if !fsx.SameFile(p, e.Self) {
-			out = append(out, bad(g, Warn, n+" on PATH ("+e.tilde(p)+") is a different program than this sprawl", e.Command+" config set command <name>"))
+			out = append(out, bad(g, Warn, n+" on PATH ("+e.tilde(p)+") is a different program than this squadrn", e.Command+" config set command <name>"))
 		} else {
 			out = append(out, ok(g, n+" on PATH"))
 		}
@@ -182,7 +182,7 @@ func (e Env) install() []Check {
 		}
 	}
 	if e.Latest != "" {
-		out = append(out, bad(g, Warn, "sprawl "+e.Latest+" is available (you have v"+strings.TrimPrefix(e.Version, "v")+")", e.Command+" self-update"))
+		out = append(out, bad(g, Warn, "squadrn "+e.Latest+" is available (you have v"+strings.TrimPrefix(e.Version, "v")+")", e.Command+" self-update"))
 	}
 	if !e.Signed {
 		out = append(out, bad(g, Warn, "this build cannot verify release signatures (no signing key built in)", "install an official release"))
@@ -190,7 +190,7 @@ func (e Env) install() []Check {
 		out = append(out, ok(g, "release signatures verified on update"))
 	}
 	if e.Layout.Marketplace() == "" {
-		out = append(out, bad(g, Warn, "sprawl plugin files not installed in "+e.tilde(e.Layout.DataDir), "re-run install.sh"))
+		out = append(out, bad(g, Warn, "squadrn plugin files not installed in "+e.tilde(e.Layout.DataDir), "re-run install.sh"))
 	} else {
 		out = append(out, ok(g, "plugin marketplace"))
 	}
@@ -253,7 +253,7 @@ func (e Env) guard(ctx context.Context) []Check {
 	case !githook.Installed(e.Layout.GitHooks(), e.Layout.Binary(), e.configFile()):
 		out = append(out, bad(g, Warn, "layer 2 (git pre-push hook) is not installed or outdated in "+e.tilde(e.Layout.GitHooks()), reinstallHint))
 	default:
-		out = append(out, ok(g, "layer 2 (git pre-push hook) installed for sessions sprawl starts"))
+		out = append(out, ok(g, "layer 2 (git pre-push hook) installed for sessions squadrn starts"))
 	}
 	out = append(out, e.branchProtection(ctx)...)
 	return out
@@ -268,7 +268,7 @@ func (e Env) configFile() string {
 func (e Env) hookProbe(ctx context.Context) Check {
 	const g = "push guard"
 	if !fsx.IsFile(e.Layout.Binary()) {
-		return bad(g, Fail, "layer 1 (pre-tool hook): sprawl is not installed in "+e.tilde(e.Layout.Binary()), reinstallHint)
+		return bad(g, Fail, "layer 1 (pre-tool hook): squadrn is not installed in "+e.tilde(e.Layout.Binary()), reinstallHint)
 	}
 	root := filepath.Join(e.Layout.DataDir, "plugin")
 	bin, args, err := guardHookCommand(filepath.Join(root, "hooks", "hooks.json"), root)
@@ -337,7 +337,7 @@ type protection struct {
 
 // branchProtection checks layer 3, the server: whether the current repository's default branch
 // is protected on GitHub against force pushes and deletion, by classic branch protection or a
-// ruleset. Only the server can stop a push made outside sprawl.
+// ruleset. Only the server can stop a push made outside squadrn.
 func (e Env) branchProtection(ctx context.Context) []Check {
 	const g = "push guard"
 	if e.Repo == "" || e.GH == nil {
@@ -460,7 +460,7 @@ func (e Env) settings() []Check {
 					out = append(out, bad(g, Fail, "hook not executable: "+e.tilde(exe), "fix or remove it in "+e.tilde(path)))
 				}
 				if strings.HasSuffix(exe, "guard-git.sh") {
-					out = append(out, bad(g, Warn, "legacy guard-git.sh hook in "+spec.Settings+"; the sprawl plugin provides the guard", "remove the guard-git.sh entry from "+e.tilde(path)))
+					out = append(out, bad(g, Warn, "legacy guard-git.sh hook in "+spec.Settings+"; the squadrn plugin provides the guard", "remove the guard-git.sh entry from "+e.tilde(path)))
 				}
 			}
 		}
@@ -482,10 +482,10 @@ func (e Env) denyCheck(deny []string, path string) Check {
 		}
 	}
 	if len(missing) == 0 {
-		return ok(g, "agents cannot edit sprawl's files (permissions.deny)")
+		return ok(g, "agents cannot edit squadrn's files (permissions.deny)")
 	}
 	b, _ := json.Marshal(missing)
-	return bad(g, Warn, "agents can edit sprawl's own files", "add to permissions.deny in "+e.tilde(path)+": "+string(b))
+	return bad(g, Warn, "agents can edit squadrn's own files", "add to permissions.deny in "+e.tilde(path)+": "+string(b))
 }
 
 func (e Env) accounts(ctx context.Context) []Check {
@@ -555,7 +555,7 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 	}
 	_ = json.Unmarshal(b, &plugins)
 	var out []Check
-	status := bad(g, Fail, "sprawl plugin not installed (no git push guard)", e.Command+" account add "+a.Label())
+	status := bad(g, Fail, "squadrn plugin not installed (no git push guard)", e.Command+" account add "+a.Label())
 	if a.IsMain() {
 		status.Fix = "re-run install.sh"
 	}
@@ -564,9 +564,9 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 			out = append(out, bad(g, Warn, "old plugin "+p.ID+" still installed (guard runs twice)", a.Spec.Binary+" plugin uninstall "+p.ID))
 		}
 		if p.ID == account.PluginID {
-			status = ok(g, "sprawl plugin enabled")
+			status = ok(g, "squadrn plugin enabled")
 			if !p.Enabled {
-				status = bad(g, Fail, "sprawl plugin disabled (no git push guard)", a.Spec.Binary+" plugin enable "+account.PluginID)
+				status = bad(g, Fail, "squadrn plugin disabled (no git push guard)", a.Spec.Binary+" plugin enable "+account.PluginID)
 			}
 		}
 	}

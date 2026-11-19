@@ -14,7 +14,7 @@ import (
 // WriteEvery is how often an unchanged observation is written again, to keep ObservedAt fresh.
 const WriteEvery = time.Minute
 
-// Store keeps one file per account in Dir (the sprawl state dir's usage/), named after the
+// Store keeps one file per account in Dir (the squadrn state dir's usage/), named after the
 // account's fixed identifiers: <provider>-<name>.json. Files are private to the user.
 type Store struct {
 	Dir string

@@ -1,4 +1,4 @@
-// Package config owns sprawl's settings file and the directories sprawl uses on disk.
+// Package config owns squadrn's settings file and the directories squadrn uses on disk.
 package config
 
 import (
@@ -20,16 +20,109 @@ import (
 )
 
 // Slug names every fixed on-disk identifier: dirs, env vars, plugin id, git config keys.
-const Slug = "sprawl"
+const Slug = "squadrn"
 
 // DefaultCommand and DefaultAliases are installed when the user picks no names.
-const DefaultCommand = "sprawl"
+const DefaultCommand = "squadrn"
 
-func DefaultAliases() []string { return []string{"sra"} }
+func DefaultAliases() []string { return []string{"sqd"} }
 
-// PreviousNames are earlier product names, newest first. Their config, data dirs, plugins and
-// git keys are migrated or still honoured; every legacy identifier derives from this list.
-var PreviousNames = []string{"squad"}
+// PreviousNames are earlier product names, newest first. Their config, data dirs, plugins,
+// markers, environment variables and git keys are migrated or still honoured; every legacy
+// identifier derives from this list.
+var PreviousNames = []string{"sprawl", "squad"}
+
+// previousAliases are the default aliases previous product names installed besides their own
+// name. A migrated config that still uses them gets today's defaults instead.
+var previousAliases = map[string][]string{"sprawl": {"sra"}, "squad": {"sq"}}
+
+// MigrateNames maps command names of a previous product's config to this product's: its default
+// names (the product name, its default aliases) become DefaultCommand and DefaultAliases, names
+// the user chose are kept. Duplicates are dropped.
+func MigrateNames(command string, aliases []string) (string, []string) {
+	isDefault := func(n string) bool {
+		if slices.Contains(PreviousNames, n) {
+			return true
+		}
+		for _, as := range previousAliases {
+			if slices.Contains(as, n) {
+				return true
+			}
+		}
+		return false
+	}
+	if command == "" || isDefault(command) {
+		command = DefaultCommand
+	}
+	seen := map[string]bool{command: true}
+	var out []string
+	add := func(n string) {
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	for _, a := range aliases {
+		if isDefault(a) {
+			for _, d := range DefaultAliases() {
+				add(d)
+			}
+			continue
+		}
+		add(a)
+	}
+	return command, out
+}
+
+// LegacyCommands are the names previous product names ran under by default, and their hook
+// binaries (<name>-hook).
+func LegacyCommands() []string {
+	var out []string
+	for _, n := range PreviousNames {
+		out = append(out, n, n+"-hook")
+		out = append(out, previousAliases[n]...)
+	}
+	return out
+}
+
+// EnvName is the environment variable for key (SHARED_MCP → SQUADRN_SHARED_MCP).
+func EnvName(key string) string { return strings.ToUpper(Slug) + "_" + key }
+
+// LookupEnv reads EnvName(key), else the same variable under a previous product name; legacy
+// names that variable when the value came from it.
+func LookupEnv(getenv func(string) string, key string) (value, legacy string) {
+	if v := getenv(EnvName(key)); v != "" {
+		return v, ""
+	}
+	for _, n := range PreviousNames {
+		name := strings.ToUpper(n) + "_" + key
+		if v := getenv(name); v != "" {
+			return v, name
+		}
+	}
+	return "", ""
+}
+
+// Getenv is LookupEnv on the process environment, without the legacy name.
+func Getenv(key string) string {
+	v, _ := LookupEnv(os.Getenv, key)
+	return v
+}
+
+// EnvKeys are the environment variables squadrn reads, without the prefix.
+var EnvKeys = []string{"SHARED_MCP", "NO_UPDATE_CHECK", "MARKETPLACE"}
+
+// RenamedEnv maps each variable set under a previous product name, whose current name is
+// unset, to its current name.
+func RenamedEnv(getenv func(string) string) map[string]string {
+	out := map[string]string{}
+	for _, k := range EnvKeys {
+		if _, legacy := LookupEnv(getenv, k); legacy != "" {
+			out[legacy] = EnvName(k)
+		}
+	}
+	return out
+}
 
 // DefaultProtectedBranches applies when the config file names none.
 func DefaultProtectedBranches() []string { return []string{"main", "master", "develop", "release/*"} }
@@ -39,7 +132,7 @@ const schemaVersion = 1
 
 type Config struct {
 	Schema int `toml:"schema,omitempty"`
-	// Command is the name sprawl is installed under on PATH; Aliases are extra names.
+	// Command is the name squadrn is installed under on PATH; Aliases are extra names.
 	Command string   `toml:"command,omitempty"`
 	Aliases []string `toml:"aliases,omitempty"`
 	// DefaultProvider resolves account refs without a provider (personal → claude/personal).
@@ -47,9 +140,9 @@ type Config struct {
 	// SharedMCP lists user-scope MCP servers copied from a provider's main account into new accounts.
 	SharedMCP []string `toml:"shared_mcp,omitempty"`
 	// ProtectedBranches are branch globs agents must never push to directly. Repositories can only
-	// add to this list (git config sprawl.protectedBranches), never replace it.
+	// add to this list (git config squadrn.protectedBranches), never replace it.
 	ProtectedBranches []string `toml:"protected_branches,omitempty"`
-	// GitHooks enables the git-level guard (pre-push) for agent sessions sprawl starts.
+	// GitHooks enables the git-level guard (pre-push) for agent sessions squadrn starts.
 	GitHooks *bool `toml:"git_hooks,omitempty"`
 	// UpdateCheck enables the daily background check for new releases (a notice, never forced).
 	UpdateCheck *bool `toml:"update_check,omitempty"`
@@ -135,7 +228,7 @@ func LegacyPaths() ([]string, error) {
 	return paths, nil
 }
 
-// Load reads the config (a missing file yields defaults) and applies SPRAWL_SHARED_MCP.
+// Load reads the config (a missing file yields defaults) and applies SQUADRN_SHARED_MCP.
 // Unknown keys and invalid values are errors so mistakes never silently change behaviour.
 func Load() (Config, error) {
 	path, err := Path()
@@ -150,8 +243,8 @@ func load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// An empty variable counts as unset, so a stray `export SPRAWL_SHARED_MCP=` cannot wipe the list.
-	if v := os.Getenv("SPRAWL_SHARED_MCP"); strings.TrimSpace(v) != "" {
+	// An empty variable counts as unset, so a stray `export SQUADRN_SHARED_MCP=` cannot wipe the list.
+	if v := Getenv("SHARED_MCP"); strings.TrimSpace(v) != "" {
 		c.SharedMCP = strings.Fields(v)
 	}
 	if len(c.ProtectedBranches) == 0 {
@@ -166,8 +259,11 @@ func load(path string) (Config, error) {
 // EnvOverrides maps the settings an environment variable currently overrides to that variable.
 func EnvOverrides() map[string]string {
 	out := map[string]string{}
-	if strings.TrimSpace(os.Getenv("SPRAWL_SHARED_MCP")) != "" {
-		out["shared_mcp"] = "SPRAWL_SHARED_MCP"
+	if v, legacy := LookupEnv(os.Getenv, "SHARED_MCP"); strings.TrimSpace(v) != "" {
+		out["shared_mcp"] = EnvName("SHARED_MCP")
+		if legacy != "" {
+			out["shared_mcp"] = legacy
+		}
 	}
 	return out
 }
@@ -186,7 +282,7 @@ func Read(path string) (Config, error) {
 		return Config{}, fmt.Errorf("config %s: unknown key %q", path, keys[0].String())
 	}
 	if c.Schema > schemaVersion {
-		return Config{}, fmt.Errorf("config %s: schema %d is newer than this sprawl understands (%d); upgrade sprawl", path, c.Schema, schemaVersion)
+		return Config{}, fmt.Errorf("config %s: schema %d is newer than this squadrn understands (%d); upgrade squadrn", path, c.Schema, schemaVersion)
 	}
 	if err := c.validate(); err != nil {
 		return Config{}, fmt.Errorf("config %s: %w", path, err)
@@ -300,7 +396,7 @@ var ErrInvalidCommand = errors.New("invalid command name")
 
 var commandPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,15}$`)
 
-// unusableCommands are shell builtins/keywords and tools sprawl relies on.
+// unusableCommands are shell builtins/keywords and tools squadrn relies on.
 var unusableCommands = []string{
 	"alias", "bg", "bind", "break", "builtin", "case", "cd", "command", "continue", "declare", "do",
 	"done", "echo", "elif", "else", "esac", "eval", "exec", "exit", "export", "false", "fc", "fg", "fi",
@@ -317,7 +413,7 @@ func ValidateCommand(name string) error {
 		return fmt.Errorf("%w %q (expected %s)", ErrInvalidCommand, name, commandPattern)
 	}
 	if slices.Contains(unusableCommands, name) {
-		return fmt.Errorf("%w %q: it is a shell builtin or a tool sprawl relies on", ErrInvalidCommand, name)
+		return fmt.Errorf("%w %q: it is a shell builtin or a tool squadrn relies on", ErrInvalidCommand, name)
 	}
 	return nil
 }

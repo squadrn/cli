@@ -7,14 +7,15 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/githook"
 )
 
 // policyKeys are the settings that weaken the guard; only the user changes them, in a terminal.
 var policyKeys = []string{"protected_branches", "git_hooks"}
 
-// sprawl denies `sprawl config set protected_branches|git_hooks …` (under any of its names).
-func (e *extractor) sprawl(args []arg) {
+// self denies `squadrn config set protected_branches|git_hooks …` (under any of its names).
+func (e *extractor) self(args []arg) {
 	key := -1
 	for i, a := range args {
 		if slices.ContainsFunc(policyKeys, func(k string) bool { return strings.Contains(strings.ToLower(a.val), k) }) {
@@ -30,37 +31,47 @@ func (e *extractor) sprawl(args []arg) {
 		return
 	}
 	if slices.ContainsFunc(args, func(a arg) bool { return a.dynamic }) {
-		e.flag(Ask, "a sprawl command built at runtime may change the push guard's policy")
+		e.flag(Ask, "a squadrn command built at runtime may change the push guard's policy")
 	}
 }
 
 // pathVerdict judges a write to p: the config file and the git hooks are denied, anything else
-// in sprawl's directories asks.
+// in squadrn's directories (or those of a previous product name) asks.
 func (e *extractor) pathVerdict(p arg, dir string) (Verdict, string) {
 	if e.dirs.Config == "" {
 		return Allow, ""
 	}
+	const (
+		denied = "writing to squadrn's config file or git hooks would weaken the push guard"
+		asked  = "a write into squadrn's own directories; confirm it does not weaken the push guard"
+	)
 	if p.dynamic {
 		v := strings.ToLower(strings.ReplaceAll(p.val, `\`, "/"))
-		switch {
-		case strings.Contains(v, "sprawl/config.toml") || strings.Contains(v, "sprawl/git-hooks"):
-			return Deny, "writing to sprawl's config file or git hooks would weaken the push guard"
-		case strings.Contains(v, "/sprawl"):
-			return Ask, "a write into sprawl's own directories; confirm it does not weaken the push guard"
+		for _, n := range append([]string{config.Slug}, config.PreviousNames...) {
+			if strings.Contains(v, n+"/config.toml") || strings.Contains(v, n+"/git-hooks") {
+				return Deny, denied
+			}
+		}
+		for _, n := range append([]string{config.Slug}, config.PreviousNames...) {
+			if strings.Contains(v, "/"+n) {
+				return Ask, asked
+			}
 		}
 		return Allow, ""
 	}
 	target := e.resolve(dir, strings.ReplaceAll(p.val, `\`, "/"))
-	configFile := filepath.Join(e.dirs.Config, "config.toml")
-	hooks := githook.Dir(e.dirs.Data)
-	for _, guarded := range []string{configFile, hooks} {
-		if within(target, guarded) || within(guarded, target) && (within(target, e.dirs.Config) || within(target, e.dirs.Data)) {
-			return Deny, "writing to sprawl's config file or git hooks would weaken the push guard"
+	for _, d := range append([]config.Dirs{e.dirs}, e.legacyDirs...) {
+		for _, guarded := range []string{filepath.Join(d.Config, "config.toml"), githook.Dir(d.Data)} {
+			if within(target, guarded) || within(guarded, target) && (within(target, d.Config) || within(target, d.Data)) {
+				return Deny, denied
+			}
 		}
 	}
-	for _, d := range []string{e.dirs.Config, e.dirs.Data, e.dirs.State} {
-		if within(target, d) {
-			return Ask, "a write into sprawl's own directories; confirm it does not weaken the push guard"
+	for _, d := range append([]config.Dirs{e.dirs}, e.legacyDirs...) {
+		for _, sub := range []string{d.Config, d.Data, d.State} {
+			if within(target, sub) {
+				return Ask, asked
+			}
 		}
 	}
 	return Allow, ""

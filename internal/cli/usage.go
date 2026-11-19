@@ -365,7 +365,7 @@ func settingsPath(acct account.Account) string {
 	return filepath.Join(acct.Dir, acct.Spec.Settings)
 }
 
-// usageTracking: the account's status line already runs sprawl's recorder.
+// usageTracking: the account's status line already runs squadrn's recorder.
 func (a *app) usageTracking(acct account.Account) bool {
 	if !acct.Spec.Caps.UsageReport {
 		return false

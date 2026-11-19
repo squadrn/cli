@@ -36,7 +36,7 @@ var (
 	errAborted = errors.New("aborted")
 )
 
-// childExit carries the exit status of a program sprawl ran in the foreground.
+// childExit carries the exit status of a program squadrn ran in the foreground.
 type childExit struct{ code int }
 
 func (e childExit) Error() string { return fmt.Sprintf("exit status %d", e.code) }

@@ -21,16 +21,16 @@ func lookPath() (string, error) {
 		return bin, nil
 	}
 	if shim, err := exec.LookPath("claude"); err == nil {
-		return "", fmt.Errorf("found %s, but sprawl needs the native claude.exe; install it with: irm https://claude.ai/install.ps1 | iex", shim)
+		return "", fmt.Errorf("found %s, but squadrn needs the native claude.exe; install it with: irm https://claude.ai/install.ps1 | iex", shim)
 	}
 	return "", errNotInstalled
 }
 
 // run starts bin as a child on the same console and waits for it. Windows has no exec(2).
 //
-// ctrl-c reaches every process attached to the console. sprawl must survive it so it can
+// ctrl-c reaches every process attached to the console. squadrn must survive it so it can
 // return the child's status: signal.Notify keeps Go's console handler from exiting (Ignore
-// would let the default handler kill sprawl), and claude decides what ctrl-c means.
+// would let the default handler kill squadrn), and claude decides what ctrl-c means.
 func run(bin string, argv, env []string) error {
 	cmd := exec.Command(bin, argv[1:]...)
 	cmd.Env = env

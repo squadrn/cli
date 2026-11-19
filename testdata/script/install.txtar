@@ -2,36 +2,36 @@
 release rel
 
 # Without a terminal --interactive asks nothing and installs the defaults.
-exec sprawl self-install rel --interactive
+exec squadrn self-install rel --interactive
 ! stderr 'Command name'
-stdout 'linked ~/.local/bin/sprawl'
-stdout 'linked ~/.local/bin/sra'
+stdout 'linked ~/.local/bin/squadrn'
+stdout 'linked ~/.local/bin/sqd'
 
-# With a terminal (SPRAWL_TEST_TTY stands in for it) the current names are the defaults; a
+# With a terminal (SQUADRN_TEST_TTY stands in for it) the current names are the defaults; a
 # reinstall with other names removes the old ones.
-env SPRAWL_TEST_TTY=$WORK/answers
-exec sprawl self-install rel --interactive
-stderr 'Command name \[sprawl\]: '
-stderr 'Short alias \[sra\] \(''-'' for none\): '
+env SQUADRN_TEST_TTY=$WORK/answers
+exec squadrn self-install rel --interactive
+stderr 'Command name \[squadrn\]: '
+stderr 'Short alias \[sqd\] \(''-'' for none\): '
 stderr 'invalid command name "con": it is a reserved device name on Windows'
-stdout '^command: sprawl → ai \(removed: sprawl, sra, added: ai, sx\)$'
+stdout '^command: squadrn → ai \(removed: squadrn, sqd, added: ai, sx\)$'
 exists home/.local/bin/ai
 exists home/.local/bin/sx
-! exists home/.local/bin/sprawl
-! exists home/.local/bin/sra
-grep '^command = "ai"' home/.config/sprawl/config.toml
+! exists home/.local/bin/squadrn
+! exists home/.local/bin/sqd
+grep '^command = "ai"' home/.config/squadrn/config.toml
 
 # Enter keeps the names: nothing to report.
-env SPRAWL_TEST_TTY=$WORK/enter
-exec sprawl self-install rel --interactive
+env SQUADRN_TEST_TTY=$WORK/enter
+exec squadrn self-install rel --interactive
 stderr 'Command name \[ai\]: '
 stderr 'Short alias \[sx\]'
 ! stdout 'command:'
 
 # Name flags skip the prompt; self-update and rollback never prompt.
-exec sprawl self-install rel --interactive --command ai
+exec squadrn self-install rel --interactive --command ai
 ! stderr 'Command name'
-exec sprawl self-update --rollback
+exec squadrn self-update --rollback
 ! stderr 'Command name'
 
 -- answers --

@@ -21,7 +21,7 @@ func TestExtract(t *testing.T) {
 	if err := Extract(tarball, dst); err != nil {
 		t.Fatal(err)
 	}
-	if fi, err := os.Stat(filepath.Join(dst, "plugin", "bin", "sprawl-hook")); err != nil || fi.Mode().Perm() != 0o755 {
+	if fi, err := os.Stat(filepath.Join(dst, "plugin", "bin", "squadrn-hook")); err != nil || fi.Mode().Perm() != 0o755 {
 		t.Fatalf("executable bit lost: %v %v", fi, err)
 	}
 }
@@ -44,7 +44,7 @@ func TestExtractSanitisesModes(t *testing.T) {
 
 func TestInstall(t *testing.T) {
 	home := t.TempDir()
-	l := Layout{DataDir: filepath.Join(home, "data", "sprawl"), BinDir: filepath.Join(home, "bin")}
+	l := Layout{DataDir: filepath.Join(home, "data", "squadrn"), BinDir: filepath.Join(home, "bin")}
 	if err := l.Install(unpacked(t, "v1-binary"), "v1.0.0"); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestInstall(t *testing.T) {
 	}
 	var manifest map[string]any
 	b, _ := os.ReadFile(filepath.Join(l.DataDir, "plugin", ".claude-plugin", "plugin.json"))
-	if err := json.Unmarshal(b, &manifest); err != nil || manifest["version"] != "1.0.0" || manifest["name"] != "sprawl" {
+	if err := json.Unmarshal(b, &manifest); err != nil || manifest["version"] != "1.0.0" || manifest["name"] != "squadrn" {
 		t.Errorf("plugin.json = %s", b)
 	}
 
@@ -88,7 +88,7 @@ func TestInstall(t *testing.T) {
 
 func TestLinkCommands(t *testing.T) {
 	home := t.TempDir()
-	l := Layout{DataDir: filepath.Join(home, "data", "sprawl"), BinDir: filepath.Join(home, "bin")}
+	l := Layout{DataDir: filepath.Join(home, "data", "squadrn"), BinDir: filepath.Join(home, "bin")}
 	legacy := filepath.Join(home, "data", "squad", "bin", "squad")
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -106,11 +106,11 @@ func TestLinkCommands(t *testing.T) {
 	}
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
-	res, err := l.LinkCommands([]string{"sprawl", "ai", "squad"}, []string{legacy}, now)
+	res, err := l.LinkCommands([]string{"squadrn", "ai", "squad"}, []string{legacy}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range []string{"sprawl", "ai", "squad"} {
+	for _, n := range []string{"squadrn", "ai", "squad"} {
 		if target, _ := os.Readlink(filepath.Join(l.BinDir, n)); target != l.Binary() {
 			t.Errorf("%s → %q", n, target)
 		}
@@ -122,7 +122,7 @@ func TestLinkCommands(t *testing.T) {
 		t.Error("unrelated link was touched")
 	}
 
-	// Rename: sprawl → ai only. Links of ours under dropped names are removed.
+	// Rename: squadrn → ai only. Links of ours under dropped names are removed.
 	res, err = l.LinkCommands([]string{"ai"}, []string{legacy}, now)
 	if err != nil || len(res.Created) != 0 {
 		t.Fatalf("relink: %+v, %v", res, err)
@@ -130,7 +130,7 @@ func TestLinkCommands(t *testing.T) {
 	if len(res.Removed) != 2 {
 		t.Errorf("Removed = %v", res.Removed)
 	}
-	for _, gone := range []string{"sprawl", "squad"} {
+	for _, gone := range []string{"squadrn", "squad"} {
 		if _, err := os.Lstat(filepath.Join(l.BinDir, gone)); !os.IsNotExist(err) {
 			t.Errorf("%s still linked", gone)
 		}
@@ -139,18 +139,18 @@ func TestLinkCommands(t *testing.T) {
 
 func TestInstallRejectsIncompleteRelease(t *testing.T) {
 	src := t.TempDir()
-	if err := os.WriteFile(filepath.Join(src, "sprawl"), nil, 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(src, "squadrn"), nil, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	l := Layout{DataDir: filepath.Join(t.TempDir(), "d"), BinDir: t.TempDir()}
-	if err := l.Install(src, "v1"); err == nil || !strings.Contains(err.Error(), "not a sprawl release") {
+	if err := l.Install(src, "v1"); err == nil || !strings.Contains(err.Error(), "not a squadrn release") {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestSnapshotRollbackAndUnlink(t *testing.T) {
 	home := t.TempDir()
-	l := Layout{DataDir: filepath.Join(home, "data", "sprawl"), BinDir: filepath.Join(home, "bin")}
+	l := Layout{DataDir: filepath.Join(home, "data", "squadrn"), BinDir: filepath.Join(home, "bin")}
 	if err := l.Snapshot(l.Previous()); err != nil || fsx.IsDir(l.Previous()) {
 		t.Fatalf("snapshot of nothing: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestSnapshotRollbackAndUnlink(t *testing.T) {
 		t.Fatalf("after rollback: %q %q", b, l.Version())
 	}
 
-	if _, err := l.LinkCommands([]string{"sprawl", "sra"}, nil, time.Now()); err != nil {
+	if _, err := l.LinkCommands([]string{"squadrn", "sqd"}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("/elsewhere", filepath.Join(l.BinDir, "other")); err != nil {
@@ -197,11 +197,11 @@ func TestSnapshotRollbackAndUnlink(t *testing.T) {
 
 func releaseEntries(binary string) []entry {
 	return []entry{
-		{name: "sprawl", body: binary, mode: 0o755},
-		{name: "plugin/.claude-plugin/plugin.json", body: `{"name":"sprawl","version":"0.0.0"}`},
+		{name: "squadrn", body: binary, mode: 0o755},
+		{name: "plugin/.claude-plugin/plugin.json", body: `{"name":"squadrn","version":"0.0.0"}`},
 		{name: "plugin/hooks/hooks.json", body: `{}`},
-		{name: "plugin/bin/sprawl-hook", body: "#!/bin/sh\n", mode: 0o755},
-		{name: ".claude-plugin/marketplace.json", body: `{"name":"sprawl"}`},
+		{name: "plugin/bin/squadrn-hook", body: "#!/bin/sh\n", mode: 0o755},
+		{name: ".claude-plugin/marketplace.json", body: `{"name":"squadrn"}`},
 	}
 }
 

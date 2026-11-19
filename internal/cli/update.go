@@ -28,7 +28,7 @@ import (
 )
 
 // Repo is the GitHub repository releases come from, set at build time with
-// -ldflags "-X github.com/squadrn/cli/internal/cli.Repo=owner/sprawling-agents". Only the --repo flag
+// -ldflags "-X github.com/squadrn/cli/internal/cli.Repo=owner/squadrning-agents". Only the --repo flag
 // overrides it: an environment variable could be planted to redirect updates.
 var Repo = ""
 
@@ -43,7 +43,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 	var o updateOptions
 	cmd := &cobra.Command{
 		Use:   "self-update",
-		Short: "Update sprawl and its plugin in every account (--check: only look, --rollback: undo)",
+		Short: "Update squadrn and its plugin in every account (--check: only look, --rollback: undo)",
 		Example: fmt.Sprintf(`  %[1]s self-update --check       what is new
   %[1]s self-update               install the newest release of your channel
   %[1]s self-update --rollback    go back to the release installed before`, a.cmd),
@@ -165,14 +165,14 @@ func (a *app) selfUpdate(o updateOptions) error {
 	}
 	switch {
 	case upToDate && !repair:
-		a.out("sprawl %s is up to date (%s channel)\n", current, channel)
+		a.out("squadrn %s is up to date (%s channel)\n", current, channel)
 		return nil
 	case repair:
 		a.out("the installed copy of %s is incomplete (VERSION %q); reinstalling it\n", current, a.layout.Version())
 	case comparable && cmp < 0 && !o.allowDowngrade:
 		return usagef("%s is older than the installed %s; pass --allow-downgrade to install it", tag, current)
 	}
-	tmp, err := os.MkdirTemp("", "sprawl-update-")
+	tmp, err := os.MkdirTemp("", "squadrn-update-")
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (a *app) reportCheck(ctx context.Context, ghBin, repo, tag, current, channe
 	case repair:
 		a.out("the installed copy of %s is incomplete; repair it with: %s self-update\n", current, a.cmd)
 	case !available:
-		a.out("sprawl %s is up to date (%s channel)\n", current, channel)
+		a.out("squadrn %s is up to date (%s channel)\n", current, channel)
 	default:
 		a.out("update available: %s → %s\n", current, tag)
 		if notes != "" {
@@ -404,7 +404,7 @@ func (a *app) selfInstallCmd() *cobra.Command {
 			return a.installRelease(args[0], Version, nc)
 		},
 	}
-	cmd.Flags().StringVar(&nc.command, "command", "", "command name to install under (default: configured, else sprawl)")
+	cmd.Flags().StringVar(&nc.command, "command", "", "command name to install under (default: configured, else squadrn)")
 	cmd.Flags().StringSliceVar(&nc.aliases, "alias", nil, "extra command names, comma separated")
 	cmd.Flags().BoolVar(&nc.force, "force", false, "install even if a name is another program on PATH")
 	cmd.Flags().BoolVar(&nc.interactive, "interactive", false, "ask for the command name and aliases on the terminal")
@@ -431,6 +431,16 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	accepted := install.Names(cfg)
 	oldCmd, oldAliases := cfg.Command, cfg.Aliases
+	if migratedFrom != "" {
+		// Names the previous product chose for the user are new here: check them like any other.
+		delete(accepted, config.DefaultCommand)
+		for _, n := range config.DefaultAliases() {
+			delete(accepted, n)
+		}
+		if old, err := config.Read(migratedFrom); err == nil {
+			oldCmd, oldAliases = old.Command, old.Aliases
+		}
+	}
 	if nc.command != "" {
 		cfg.Command = nc.command
 	}
@@ -440,7 +450,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	switch {
 	case nc.aliasSet:
 		cfg.Aliases = nc.aliases
-	case fresh:
+	case fresh && migratedFrom == "":
 		cfg.Aliases = config.DefaultAliases()
 	}
 	if nc.interactive && nc.command == "" && !nc.aliasSet {
@@ -460,7 +470,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	unlock, err := fsx.Lock(a.installLockPath())
 	var held fsx.LockedError
 	if errors.As(err, &held) {
-		return fmt.Errorf("another sprawl install or update is running (pid %d); try again when it has finished", held.PID)
+		return fmt.Errorf("another squadrn install or update is running (pid %d); try again when it has finished", held.PID)
 	} else if err != nil {
 		return err
 	}
@@ -489,7 +499,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		return err
 	}
 	a.cmd, a.cfg, a.cfgErr = cfg.Command, cfg, nil
-	a.out("installed sprawl %s → %s\n", version, a.tilde(a.layout.Binary()))
+	a.out("installed squadrn %s → %s\n", version, a.tilde(a.layout.Binary()))
 	if migratedFrom != "" {
 		a.out("  settings migrated from %s\n", a.tilde(migratedFrom))
 	}
@@ -499,7 +509,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	if err := a.linkNames(cfg); err != nil {
 		return err
 	}
-	if !fresh && oldCmd != "" {
+	if (!fresh || migratedFrom != "") && oldCmd != "" {
 		if msg := renameSummary(oldCmd, oldAliases, cfg.Command, cfg.Aliases); msg != "" {
 			a.out("%s\n", msg)
 		}
@@ -575,7 +585,7 @@ func completionFile(shell, dir, name string) string {
 }
 
 // writeCompletions generates completion scripts for every name into the shells' completion dirs
-// that exist, and removes the ones sprawl generated for names that are gone.
+// that exist, and removes the ones squadrn generated for names that are gone.
 func (a *app) writeCompletions(names, removedLinks []string) {
 	use := a.root.Use
 	defer func() { a.root.Use = use }()
@@ -764,7 +774,7 @@ func (a *app) configCmd() *cobra.Command {
 			relink := args[0] == "command" || args[0] == "aliases"
 			if relink {
 				if !fsx.IsFile(a.layout.Binary()) {
-					return fmt.Errorf("sprawl is not installed in %s; run install.sh first", a.tilde(a.layout.DataDir))
+					return fmt.Errorf("squadrn is not installed in %s; run install.sh first", a.tilde(a.layout.DataDir))
 				}
 				if err := a.nameCheck(accepted, force).Check(cfg); err != nil {
 					return err

@@ -17,9 +17,9 @@ import (
 )
 
 // BinaryName is the executable inside a release and in the data dir.
-const BinaryName = "sprawl.exe"
+const BinaryName = "squadrn.exe"
 
-// commandsFile records the command names sprawl installed in BinDir. Windows has no links that
+// commandsFile records the command names squadrn installed in BinDir. Windows has no links that
 // survive replacing a running executable, so each name is a copy of the binary (ADR 0008), and
 // "ours" is what this manifest lists, not a link target.
 const commandsFile = "commands.json"
@@ -45,10 +45,10 @@ func ExecutableName(name string) string {
 func exe(dir, name string) string { return filepath.Join(dir, ExecutableName(name)) }
 
 // LinkCommands installs every name in names as a copy of the binary in BinDir (replacing older
-// copies even while they run) and removes the copies of names no longer wanted. A file that sprawl
-// did not install is moved aside rather than overwritten. ours is unused on Windows (no previous
-// product shipped there).
-func (l Layout) LinkCommands(names []string, _ []string, now time.Time) (LinkResult, error) {
+// copies even while they run) and removes the copies of names no longer wanted. A file that squadrn
+// did not install is moved aside rather than overwritten. ours are the binaries of previous
+// product names: the copies their manifests list count as installed here.
+func (l Layout) LinkCommands(names []string, ours []string, now time.Time) (LinkResult, error) {
 	var res LinkResult
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		return res, err
@@ -57,6 +57,14 @@ func (l Layout) LinkCommands(names []string, _ []string, now time.Time) (LinkRes
 		return res, err
 	}
 	prev := l.readCommands()
+	for _, o := range ours {
+		legacy := Layout{DataDir: filepath.Dir(filepath.Dir(o)), BinDir: l.BinDir}
+		for _, n := range legacy.readCommands() {
+			if !slices.Contains(prev, n) {
+				prev = append(prev, n)
+			}
+		}
+	}
 	for _, n := range names {
 		dst := exe(l.BinDir, n)
 		if _, err := os.Lstat(dst); err == nil && !slices.Contains(prev, n) && !fsx.SameFile(dst, l.Binary()) {
@@ -90,7 +98,7 @@ func (l Layout) LinkCommands(names []string, _ []string, now time.Time) (LinkRes
 	return res, fsx.WriteBytes(l.commandsPath(), b, 0o644)
 }
 
-// Unlink removes the command copies sprawl installed and returns them.
+// Unlink removes the command copies squadrn installed and returns them.
 func (l Layout) Unlink() ([]string, error) {
 	var removed []string
 	for _, n := range l.readCommands() {
@@ -114,7 +122,7 @@ func removeRunning(path string) error {
 }
 
 // CheckInstallDir refuses a data dir whose path cmd.exe would expand or split: the plugin hooks
-// run "<dir>\\bin\\sprawl.exe" through cmd.exe (ADR 0008, component 3).
+// run "<dir>\\bin\\squadrn.exe" through cmd.exe (ADR 0008, component 3).
 func CheckInstallDir(dir string) error {
 	if i := strings.IndexAny(dir, "%^&!"); i >= 0 {
 		return fmt.Errorf("%w: %s contains %q, which cmd.exe would misread in the plugin hooks; set XDG_DATA_HOME to a path without %%, ^, & or ! in it", ErrUnsafeInstallDir, dir, dir[i])

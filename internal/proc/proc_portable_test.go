@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-// The test binary doubles as the helper program (SPRAWL_PROC_HELPER selects the behaviour), so
+// The test binary doubles as the helper program (SQUADRN_PROC_HELPER selects the behaviour), so
 // these tests need no shell and run on every platform.
 func TestMain(m *testing.M) {
-	switch os.Getenv("SPRAWL_PROC_HELPER") {
+	switch os.Getenv("SQUADRN_PROC_HELPER") {
 	case "":
 		os.Exit(m.Run())
 	case "fail":
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 		// tree kill (process group, job object) stops the pipe from being held open.
 		self, _ := os.Executable()
 		child := exec.Command(self)
-		child.Env = append(os.Environ(), "SPRAWL_PROC_HELPER=sleep")
+		child.Env = append(os.Environ(), "SQUADRN_PROC_HELPER=sleep")
 		child.Stdout = os.Stdout
 		if err := child.Start(); err != nil {
 			os.Exit(9)
@@ -49,7 +49,7 @@ func helper(t *testing.T, mode string) (string, Options) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return self, Options{Env: append(os.Environ(), "SPRAWL_PROC_HELPER="+mode)}
+	return self, Options{Env: append(os.Environ(), "SQUADRN_PROC_HELPER="+mode)}
 }
 
 func TestPortableOutputOnFailure(t *testing.T) {

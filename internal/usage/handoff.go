@@ -20,7 +20,7 @@ type Handoff struct {
 	Cwd     string    `json:"cwd,omitempty"`
 }
 
-// Ledger is the append-only record of handoffs, one JSON object per line (the sprawl state
+// Ledger is the append-only record of handoffs, one JSON object per line (the squadrn state
 // dir's handoffs.jsonl, private to the user).
 type Ledger struct {
 	Path string

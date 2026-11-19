@@ -1,6 +1,7 @@
 package config
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -57,7 +58,7 @@ func TestLoadRejectsInvalidTOML(t *testing.T) {
 }
 
 func TestEnvOverridesSharedMCP(t *testing.T) {
-	t.Setenv("SPRAWL_SHARED_MCP", "a  b")
+	t.Setenv("SQUADRN_SHARED_MCP", "a  b")
 	c, err := load(writeConfig(t, `shared_mcp = ["x"]`))
 	if err != nil {
 		t.Fatal(err)
@@ -71,13 +72,13 @@ func TestPathHonoursXDG(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "cfg")
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	p, err := Path()
-	if err != nil || p != filepath.Join(cfg, "sprawl", "config.toml") {
+	if err != nil || p != filepath.Join(cfg, "squadrn", "config.toml") {
 		t.Fatalf("Path() = %q, %v", p, err)
 	}
 }
 
 func TestEmptyEnvDoesNotOverride(t *testing.T) {
-	t.Setenv("SPRAWL_SHARED_MCP", " ")
+	t.Setenv("SQUADRN_SHARED_MCP", " ")
 	c, err := load(writeConfig(t, `shared_mcp = ["x"]`))
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ aliases = ["sx", "cx"]
 }
 
 func TestLoadRejectsBadNames(t *testing.T) {
-	for _, body := range []string{`command = "cd"`, `command = "Sprawl"`, `aliases = ["ok", "claude"]`, `default_provider = "nope"`} {
+	for _, body := range []string{`command = "cd"`, `command = "Squadrn"`, `aliases = ["ok", "claude"]`, `default_provider = "nope"`} {
 		if _, err := load(writeConfig(t, body)); err == nil {
 			t.Errorf("accepted %s", body)
 		}
@@ -112,7 +113,7 @@ func TestLoadRejectsBadNames(t *testing.T) {
 }
 
 func TestValidateCommand(t *testing.T) {
-	for _, ok := range []string{"sprawl", "ai", "x", "cc-2", "abcdefghijklmnop"} {
+	for _, ok := range []string{"squadrn", "ai", "x", "cc-2", "abcdefghijklmnop"} {
 		if err := ValidateCommand(ok); err != nil {
 			t.Errorf("%q: %v", ok, err)
 		}
@@ -125,7 +126,7 @@ func TestValidateCommand(t *testing.T) {
 }
 
 func TestSaveRoundTrip(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sprawl", "config.toml")
+	path := filepath.Join(t.TempDir(), "squadrn", "config.toml")
 	in := Config{Command: "ai", Aliases: []string{"sx"}, SharedMCP: []string{"codegraph"}}
 	if err := Save(path, in); err != nil {
 		t.Fatal(err)
@@ -143,7 +144,7 @@ func TestLegacyPaths(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "cfg")
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	p, err := LegacyPaths()
-	if err != nil || !slices.Equal(p, []string{filepath.Join(cfg, "squad", "config.toml")}) {
+	if err != nil || !slices.Equal(p, []string{filepath.Join(cfg, "sprawl", "config.toml"), filepath.Join(cfg, "squad", "config.toml")}) {
 		t.Fatalf("LegacyPaths() = %q, %v", p, err)
 	}
 }
@@ -202,26 +203,71 @@ func TestDirsFor(t *testing.T) {
 	}
 	home := filepath.Join(t.TempDir(), "h")
 	j := filepath.Join
-	d := DirsFor(home, "sprawl")
-	if d != (Dirs{Config: j(home, ".config", "sprawl"), Data: j(home, ".local", "share", "sprawl"), State: j(home, ".local", "state", "sprawl"), Cache: j(home, ".cache", "sprawl")}) {
+	d := DirsFor(home, "squadrn")
+	if d != (Dirs{Config: j(home, ".config", "squadrn"), Data: j(home, ".local", "share", "squadrn"), State: j(home, ".local", "state", "squadrn"), Cache: j(home, ".cache", "squadrn")}) {
 		t.Fatalf("defaults: %+v", d)
 	}
 	cache := filepath.Join(t.TempDir(), "c")
 	t.Setenv("XDG_CACHE_HOME", cache)
 	t.Setenv("XDG_DATA_HOME", "relative")
-	d = DirsFor(home, "sprawl")
-	if d.Cache != j(cache, "sprawl") || d.Data != j(home, ".local", "share", "sprawl") {
+	d = DirsFor(home, "squadrn")
+	if d.Cache != j(cache, "squadrn") || d.Data != j(home, ".local", "share", "squadrn") {
 		t.Fatalf("XDG: %+v", d)
 	}
 }
 
+func TestMigrateNames(t *testing.T) {
+	for _, c := range []struct {
+		cmd, wantCmd   string
+		aliases, wantA []string
+	}{
+		{"sprawl", "squadrn", []string{"sra"}, []string{"sqd"}},
+		{"", "squadrn", nil, nil},
+		{"squad", "squadrn", []string{"sq"}, []string{"sqd"}},
+		{"ai", "ai", []string{"x", "sra", "sqd"}, []string{"x", "sqd"}},
+		{"ai", "ai", []string{"ai", "squadrn"}, []string{"squadrn"}},
+	} {
+		cmd, aliases := MigrateNames(c.cmd, c.aliases)
+		if cmd != c.wantCmd || !slices.Equal(aliases, c.wantA) {
+			t.Errorf("MigrateNames(%q, %q) = %q, %q", c.cmd, c.aliases, cmd, aliases)
+		}
+	}
+	if !slices.Equal(LegacyCommands(), []string{"sprawl", "sprawl-hook", "sra", "squad", "squad-hook", "sq"}) {
+		t.Errorf("LegacyCommands = %q", LegacyCommands())
+	}
+}
+
+func TestLegacyEnv(t *testing.T) {
+	env := map[string]string{"SPRAWL_SHARED_MCP": "a", "SQUAD_MARKETPLACE": "/m", "SPRAWL_NO_UPDATE_CHECK": "1", "SQUADRN_NO_UPDATE_CHECK": "1"}
+	get := func(k string) string { return env[k] }
+	if v, legacy := LookupEnv(get, "SHARED_MCP"); v != "a" || legacy != "SPRAWL_SHARED_MCP" {
+		t.Errorf("LookupEnv = %q, %q", v, legacy)
+	}
+	if v, legacy := LookupEnv(get, "NO_UPDATE_CHECK"); v != "1" || legacy != "" {
+		t.Errorf("the current name must win: %q, %q", v, legacy)
+	}
+	want := map[string]string{"SPRAWL_SHARED_MCP": "SQUADRN_SHARED_MCP", "SQUAD_MARKETPLACE": "SQUADRN_MARKETPLACE"}
+	if got := RenamedEnv(get); !maps.Equal(got, want) {
+		t.Errorf("RenamedEnv = %v", got)
+	}
+	t.Setenv("SQUADRN_SHARED_MCP", "")
+	t.Setenv("SPRAWL_SHARED_MCP", "x y")
+	if EnvOverrides()["shared_mcp"] != "SPRAWL_SHARED_MCP" {
+		t.Error("override by the previous name not reported")
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if c, err := load(path); err != nil || !slices.Equal(c.SharedMCP, []string{"x", "y"}) {
+		t.Errorf("load = %+v, %v", c.SharedMCP, err)
+	}
+}
+
 func TestEnvOverrides(t *testing.T) {
-	t.Setenv("SPRAWL_SHARED_MCP", " ")
+	t.Setenv("SQUADRN_SHARED_MCP", " ")
 	if len(EnvOverrides()) != 0 {
 		t.Fatal("a blank variable overrides nothing")
 	}
-	t.Setenv("SPRAWL_SHARED_MCP", "a b")
-	if EnvOverrides()["shared_mcp"] != "SPRAWL_SHARED_MCP" {
+	t.Setenv("SQUADRN_SHARED_MCP", "a b")
+	if EnvOverrides()["shared_mcp"] != "SQUADRN_SHARED_MCP" {
 		t.Fatal("shared_mcp override not reported")
 	}
 }

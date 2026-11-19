@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	MarketplaceName = "sprawl"
-	PluginID        = "sprawl@sprawl"
+	MarketplaceName = "squadrn"
+	PluginID        = "squadrn@squadrn"
 )
 
 // Provisioner prepares an account dir. It is idempotent: re-running repairs missing pieces.
@@ -119,7 +119,7 @@ func linkEntries(src, dst string, skip []string, r *Report) error {
 		p := filepath.Join(dst, e.Name())
 		target, ok := linkTarget(p)
 		if !ok || !within(src, target) {
-			continue // not a link sprawl made
+			continue // not a link squadrn made
 		}
 		if _, err := os.Stat(target); !errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -222,7 +222,7 @@ func carriesSecrets(raw json.RawMessage) bool {
 	return len(s.Env) > 0 || len(s.Headers) > 0
 }
 
-// InstallPlugin registers the local marketplace and installs the sprawl plugin for one config dir.
+// InstallPlugin registers the local marketplace and installs the squadrn plugin for one config dir.
 // It reports whether anything was installed; with no marketplace it does nothing.
 func (p Provisioner) InstallPlugin(ctx context.Context, configDir string) (bool, error) {
 	if p.Marketplace == "" {

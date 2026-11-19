@@ -1,6 +1,6 @@
-// Package githook is the git-level guard (layer 2). Sessions sprawl starts get core.hooksPath
+// Package githook is the git-level guard (layer 2). Sessions squadrn starts get core.hooksPath
 // pointed at a directory of shims through GIT_CONFIG_* environment entries; each shim calls
-// `sprawl hook git <name>`, which judges pushes (pre-push) and then runs the repository's own
+// `squadrn hook git <name>`, which judges pushes (pre-push) and then runs the repository's own
 // hook of the same name, so existing hooks (husky, lefthook, pre-commit) keep working.
 package githook
 
@@ -22,7 +22,7 @@ import (
 
 // Names are the hooks shimmed. Hooks git runs on hot paths (reference-transaction on every ref
 // update, post-index-change, fsmonitor-watchman) are left out: a repository's own hook of those
-// names does not run inside sprawl sessions.
+// names does not run inside squadrn sessions.
 var Names = []string{
 	"applypatch-msg", "pre-applypatch", "post-applypatch",
 	"pre-commit", "pre-merge-commit", "prepare-commit-msg", "commit-msg", "post-commit",
@@ -30,14 +30,14 @@ var Names = []string{
 	"pre-auto-gc", "push-to-checkout", "sendemail-validate", "post-update",
 }
 
-const marker = "# sprawl git-level guard"
+const marker = "# squadrn git-level guard"
 
-// Dir is where the shims live inside sprawl's data dir.
+// Dir is where the shims live inside squadrn's data dir.
 func Dir(dataDir string) string { return filepath.Join(dataDir, "git-hooks") }
 
 // Install writes one shim per hook name into dir, each calling binary with the absolute path of
-// sprawl's config file: the hook reads its policy from there, never from the environment of the
-// process that runs git (XDG_CONFIG_HOME, HOME). Files that are not sprawl shims are left alone.
+// squadrn's config file: the hook reads its policy from there, never from the environment of the
+// process that runs git (XDG_CONFIG_HOME, HOME). Files that are not squadrn shims are left alone.
 func Install(dir, binary, configFile string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -68,7 +68,7 @@ func shim(name, binary, configFile string) []byte {
 		marker, name, shellQuote(filepath.ToSlash(binary)), ConfigFlag, shellQuote(filepath.ToSlash(configFile)), name)
 }
 
-// ConfigFlag passes the config file baked into a shim to `sprawl hook git`.
+// ConfigFlag passes the config file baked into a shim to `squadrn hook git`.
 const ConfigFlag = "--config"
 
 // Installed reports whether dir holds exactly the current shims for binary and configFile, each
@@ -134,7 +134,7 @@ func Env(environ []string, dir string) []string {
 	return append(out, add...)
 }
 
-// RepoHook returns the repository's own hook called name, as git would run it without sprawl:
+// RepoHook returns the repository's own hook called name, as git would run it without squadrn:
 // the last core.hooksPath that is not ours, else <common git dir>/hooks. "" means there is none.
 // dir is the directory git runs the hook in (the worktree top level, or the git dir if bare).
 func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {

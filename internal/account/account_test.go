@@ -24,7 +24,7 @@ func newStore(t *testing.T, accounts ...string) Store {
 	return Store{Home: home}
 }
 
-// mkAccount creates an account dir as sprawl provisions it (with Marker).
+// mkAccount creates an account dir as squadrn provisions it (with Marker).
 func mkAccount(t *testing.T, dir string) {
 	t.Helper()
 	must(t, os.MkdirAll(dir, 0o755))
@@ -38,7 +38,7 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// codex is a stand-in second provider for resolution tests; it is not registered in sprawl.
+// codex is a stand-in second provider for resolution tests; it is not registered in squadrn.
 var codex = provider.Spec{ID: "codex", Binary: "codex", MainDir: ".codex", DirPrefix: ".codex-", ConfigEnv: "CODEX_HOME"}
 
 func twoProviders(s Store) Store {
@@ -207,9 +207,9 @@ func (f *fakeClaude) Output(_ context.Context, configDir string, args ...string)
 	case call == "plugin list --json":
 		return []byte(f.plugins), nil
 	case strings.HasPrefix(call, "plugin marketplace add"):
-		f.markets = `[{"name":"sprawl"}]`
+		f.markets = `[{"name":"squadrn"}]`
 	case strings.HasPrefix(call, "plugin install"):
-		f.plugins = `[{"id":"sprawl@sprawl"}]`
+		f.plugins = `[{"id":"squadrn@squadrn"}]`
 	}
 	return nil, nil
 }
@@ -327,7 +327,7 @@ func TestProvisionRemovesLinksToItemsMainNoLongerHas(t *testing.T) {
 		t.Error("stale agents link kept")
 	}
 	if _, err := os.Lstat(foreign); err != nil {
-		t.Error("a link sprawl does not manage must be left alone")
+		t.Error("a link squadrn does not manage must be left alone")
 	}
 }
 
@@ -355,10 +355,10 @@ func TestProvisionWithoutMarketplaceSkipsPlugin(t *testing.T) {
 
 func TestRemoveLegacyPlugins(t *testing.T) {
 	_, a, f, p := provisionFixture(t)
-	f.plugins = `[{"id":"squad@squad"},{"id":"ccx@ccx"},{"id":"other@x"}]` // ccx is no longer a previous name
-	f.markets = `[{"name":"squad"},{"name":"ccx"},{"name":"other"}]`
+	f.plugins = `[{"id":"squad@squad"},{"id":"sprawl@sprawl"},{"id":"squadrn@squadrn"},{"id":"ccx@ccx"},{"id":"other@x"}]` // ccx is no longer a previous name
+	f.markets = `[{"name":"squad"},{"name":"sprawl"},{"name":"squadrn"},{"name":"ccx"},{"name":"other"}]`
 	removed, err := p.RemoveLegacyPlugins(context.Background(), a.ConfigDir())
-	if err != nil || !slices.Equal(removed, []string{"squad@squad"}) {
+	if err != nil || !slices.Equal(removed, []string{"sprawl@sprawl", "squad@squad"}) {
 		t.Fatalf("RemoveLegacyPlugins = %v, %v", removed, err)
 	}
 	var mutations []string
@@ -367,7 +367,7 @@ func TestRemoveLegacyPlugins(t *testing.T) {
 			mutations = append(mutations, strings.SplitN(c, "|", 2)[1])
 		}
 	}
-	want := []string{"plugin uninstall squad@squad", "plugin marketplace remove squad"}
+	want := []string{"plugin uninstall sprawl@sprawl", "plugin marketplace remove sprawl", "plugin uninstall squad@squad", "plugin marketplace remove squad"}
 	if !slices.Equal(mutations, want) {
 		t.Errorf("mutations = %v", mutations)
 	}
@@ -375,7 +375,7 @@ func TestRemoveLegacyPlugins(t *testing.T) {
 	if removed, _ := p.RemoveLegacyPlugins(context.Background(), a.ConfigDir()); len(removed) != 0 {
 		t.Error("nothing to remove must report nothing")
 	}
-	if !slices.Equal(LegacyPluginIDs(), []string{"squad@squad"}) {
+	if !slices.Equal(LegacyPluginIDs(), []string{"sprawl@sprawl", "squad@squad"}) {
 		t.Errorf("LegacyPluginIDs = %v", LegacyPluginIDs())
 	}
 }
@@ -392,7 +392,7 @@ func TestMarkerAdoptAndMigration(t *testing.T) {
 	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "squad" {
 		t.Fatalf("Unmanaged = %+v", un)
 	}
-	// Dirs provisioned before markers carry the sprawl plugin: adopted on sight.
+	// Dirs provisioned before markers carry the squadrn plugin: adopted on sight.
 	s.HasPlugin = func(_ provider.Spec, dir string) bool { return filepath.Base(dir) == ".claude-legacy" }
 	got, err := s.List()
 	must(t, err)
@@ -413,6 +413,19 @@ func TestMarkerAdoptAndMigration(t *testing.T) {
 	m, _ := s.Get("main")
 	if Mark(m) != nil || isFile(filepath.Join(m.Dir, Marker)) {
 		t.Fatal("main got a marker")
+	}
+}
+
+func TestLegacyMarkerIsRewritten(t *testing.T) {
+	s := newStore(t)
+	dir := filepath.Join(s.Home, ".claude-old")
+	must(t, os.MkdirAll(dir, 0o755))
+	must(t, os.WriteFile(filepath.Join(dir, ".sprawl-account"), nil, 0o600))
+	if !s.Exists("old") {
+		t.Fatal("an account with a previous product's marker is not an account")
+	}
+	if Marker != ".squadrn-account" || !isFile(filepath.Join(dir, Marker)) || isFile(filepath.Join(dir, ".sprawl-account")) {
+		t.Fatal("legacy marker not rewritten under the new name")
 	}
 }
 

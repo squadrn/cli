@@ -27,7 +27,7 @@ type Candidate struct {
 	Ignored int
 }
 
-// BranchPrefix starts the branch of every agent worktree (Claude Code: worktree-<name>). sprawl
+// BranchPrefix starts the branch of every agent worktree (Claude Code: worktree-<name>). squadrn
 // only ever deletes branches named BranchPrefix+<worktree name>.
 const BranchPrefix = "worktree-"
 
@@ -130,7 +130,7 @@ func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (rem
 var (
 	// ErrUnmerged means a branch was kept because it has commits outside its upstream/HEAD.
 	ErrUnmerged = errors.New("branch not fully merged")
-	// ErrInUse means a session sprawl started still runs in the worktree.
+	// ErrInUse means a session squadrn started still runs in the worktree.
 	ErrInUse = errors.New("worktree in use")
 )
 

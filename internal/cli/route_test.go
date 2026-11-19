@@ -18,7 +18,7 @@ func table(interactive bool) routeTable {
 		passthrough: func(s string) bool { return s == "mcp" || s == "auth" },
 		suggestions: func() []string { return []string{"account", "wt", "version", "completion", "doctor", "personal"} },
 		interactive: interactive,
-		cmd:         "sprawl",
+		cmd:         "squadrn",
 	}
 }
 
@@ -44,7 +44,7 @@ func TestParseRoute(t *testing.T) {
 		{"quoted prompt", []string{"fix the bug"}, false, route{args: []string{"fix the bug"}}},
 		{"agent subcommand passes through", []string{"mcp", "list"}, false, route{args: []string{"mcp", "list"}}},
 		{"account agent subcommand", []string{"personal", "auth", "status"}, false, route{account: "personal", args: []string{"auth", "status"}}},
-		{"--help is sprawl help", []string{"--help"}, false, route{sub: "help", args: []string{}}},
+		{"--help is squadrn help", []string{"--help"}, false, route{sub: "help", args: []string{}}},
 		{"account --help", []string{"personal", "-h"}, false, route{account: "personal", sub: "help", args: []string{}}},
 		{"--version", []string{"--version"}, false, route{sub: "version", args: []string{}}},
 		{"--version --json", []string{"--version", "--json"}, false, route{sub: "version", args: []string{"--json"}}},
@@ -79,10 +79,10 @@ func TestParseRouteRejects(t *testing.T) {
 		"--dir=":          "--dir requires a value",
 		"personal -a x":   "the account is given twice (personal and -a x)",
 		"acount ls":       `unknown command or account "acount" (did you mean account?)`,
-		"fix the":         `to give the agent a prompt: sprawl -- "fix"`,
+		"fix the":         `to give the agent a prompt: squadrn -- "fix"`,
 		"personal acount": `unknown command or account "acount"`,
 		"persnal":         `did you mean personal?`,
-		"zzzzzzzzzz":      `to create an account:       sprawl account add zzzzzzzzzz`,
+		"zzzzzzzzzz":      `to create an account:       squadrn account add zzzzzzzzzz`,
 	} {
 		_, err := parseRoute(strings.Fields(args), table(false))
 		var ue usageError

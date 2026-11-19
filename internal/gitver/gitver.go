@@ -1,4 +1,4 @@
-// Package gitver checks that the installed Git is new enough for sprawl and says how to upgrade.
+// Package gitver checks that the installed Git is new enough for squadrn and says how to upgrade.
 package gitver
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/squadrn/cli/internal/proc"
 )
 
-// Min is the oldest Git sprawl supports: worktree.Open relies on
+// Min is the oldest Git squadrn supports: worktree.Open relies on
 // `git rev-parse --path-format=absolute` (Git 2.31).
 var Min = Version{Major: 2, Minor: 31}
 
@@ -71,7 +71,7 @@ type TooOldError struct {
 }
 
 func (e TooOldError) Error() string {
-	return fmt.Sprintf("git %s is too old; sprawl needs git %d.%d or newer (upgrade: %s)", e.Have, Min.Major, Min.Minor, e.Hint)
+	return fmt.Sprintf("git %s is too old; squadrn needs git %d.%d or newer (upgrade: %s)", e.Have, Min.Major, Min.Minor, e.Hint)
 }
 
 func (e TooOldError) Unwrap() error { return ErrTooOld }
@@ -119,7 +119,7 @@ func UpgradeHint(goos, osRelease string) string {
 	return "install a current git from https://git-scm.com/downloads"
 }
 
-// Hint is UpgradeHint for the system sprawl runs on.
+// Hint is UpgradeHint for the system squadrn runs on.
 func Hint(goos string) string { return UpgradeHint(goos, readOSRelease()) }
 
 func readOSRelease() string {

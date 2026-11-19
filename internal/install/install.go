@@ -25,7 +25,8 @@ var (
 )
 
 // LoadConfig returns the config as written. Without one (fresh is true) it adopts the settings
-// of a previous product's config, but not its command names: those belonged to the old product.
+// of a previous product's config; its command names are kept when the user chose them and
+// replaced by today's defaults when they were the old product's (config.MigrateNames).
 func LoadConfig(path string, legacy []string) (cfg config.Config, migratedFrom string, fresh bool, err error) {
 	if _, err := os.Stat(path); err == nil {
 		c, err := config.Read(path)
@@ -41,7 +42,8 @@ func LoadConfig(path string, legacy []string) (cfg config.Config, migratedFrom s
 		if err != nil {
 			return config.Config{}, "", false, err
 		}
-		c := config.Config{SharedMCP: old.SharedMCP, ProtectedBranches: old.ProtectedBranches, DefaultProvider: old.DefaultProvider, GitHooks: old.GitHooks}
+		c := config.Config{SharedMCP: old.SharedMCP, ProtectedBranches: old.ProtectedBranches, DefaultProvider: old.DefaultProvider, GitHooks: old.GitHooks, UpdateCheck: old.UpdateCheck, UpdateChannel: old.UpdateChannel}
+		c.Command, c.Aliases = config.MigrateNames(old.Command, old.Aliases)
 		return c, lp, true, nil
 	}
 	return config.Config{}, "", true, nil
@@ -101,7 +103,7 @@ func (n NameCheck) Valid(name string) error {
 }
 
 // Clash returns the path of another program that already answers to name, "" when none does
-// (or the name was accepted before, or it is sprawl itself).
+// (or the name was accepted before, or it is squadrn itself).
 func (n NameCheck) Clash(name string) string {
 	lookPath := n.LookPath
 	if lookPath == nil {
@@ -167,7 +169,7 @@ func MigrateLegacy(home string, now time.Time) ([]Moved, []error) {
 	return moved, errs
 }
 
-// PluginAction is what happened to the sprawl plugin in one account.
+// PluginAction is what happened to the squadrn plugin in one account.
 type PluginAction string
 
 const (
@@ -216,7 +218,7 @@ func Plugins(ctx context.Context, accts []account.Account, store account.Store, 
 	return out
 }
 
-// RemovePlugins uninstalls the sprawl plugin and its marketplace from every account whose
+// RemovePlugins uninstalls the squadrn plugin and its marketplace from every account whose
 // provider supports plugins. Errors are per account; a missing plugin is not an error.
 func RemovePlugins(ctx context.Context, accts []account.Account, r provider.Runner) map[string]error {
 	errs := map[string]error{}

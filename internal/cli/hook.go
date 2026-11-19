@@ -23,7 +23,7 @@ import (
 // hookDeadline bounds a pre-tool decision; the plugin gives the hook 5 seconds.
 const hookDeadline = 3 * time.Second
 
-// hookInput is the part of Claude Code's hook payload sprawl reads.
+// hookInput is the part of Claude Code's hook payload squadrn reads.
 type hookInput struct {
 	Cwd string `json:"cwd"`
 	// ToolName is Bash or PowerShell (Windows); missing means Bash (older Claude Code).
@@ -49,9 +49,9 @@ type hookEnv struct {
 	now            func() time.Time
 }
 
-const hookUsage = "usage: sprawl hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit"
+const hookUsage = "usage: squadrn hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit"
 
-// runHook handles `sprawl hook …` and returns the exit code.
+// runHook handles `squadrn hook …` and returns the exit code.
 func runHook(args []string, h hookEnv) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(h.stderr, hookUsage)
@@ -175,7 +175,7 @@ func (h hookEnv) guardGit() {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "the guard does not know the " + in.ToolName + " tool; confirm this command manually"}
 	}
 	if cfgErr != nil && d.Verdict == guard.Allow && strings.Contains(strings.ToLower(cmd), "push") {
-		d = guard.Decision{Verdict: guard.Ask, Reason: "sprawl config is invalid (" + cfgErr.Error() + "), so protected branches are uncertain"}
+		d = guard.Decision{Verdict: guard.Ask, Reason: "squadrn config is invalid (" + cfgErr.Error() + "), so protected branches are uncertain"}
 	}
 }
 
@@ -183,7 +183,7 @@ func (h hookEnv) writeDecision(d guard.Decision) {
 	var out hookOutput
 	out.HookSpecificOutput.HookEventName = "PreToolUse"
 	out.HookSpecificOutput.PermissionDecision = d.Verdict.String()
-	out.HookSpecificOutput.PermissionDecisionReason = "sprawl guard: " + d.Reason
+	out.HookSpecificOutput.PermissionDecisionReason = "squadrn guard: " + d.Reason
 	_ = json.NewEncoder(h.stdout).Encode(out)
 }
 
@@ -246,7 +246,7 @@ func (h hookEnv) prePush(ctx context.Context, cfgFile, dir, home string, args []
 		}
 		g, cfgErr := hookGuard(cfgFile)
 		if cfgErr != nil {
-			d = guard.Decision{Verdict: guard.Deny, Reason: "sprawl config is invalid: " + cfgErr.Error()}
+			d = guard.Decision{Verdict: guard.Deny, Reason: "squadrn config is invalid: " + cfgErr.Error()}
 			return
 		}
 		d = g.DecidePrePush(ctx, dir, updates)
@@ -256,12 +256,12 @@ func (h hookEnv) prePush(ctx context.Context, cfgFile, dir, home string, args []
 	}
 	remote := strings.Join(args, " ")
 	guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-push", d, dir, "git push "+remote+" ("+strings.TrimSpace(strings.ReplaceAll(string(input), "\n", "; "))+")")
-	_, _ = fmt.Fprintf(h.stderr, "sprawl guard: %s\nPush a feature branch and open a pull request instead.\n", d.Reason)
+	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s\nPush a feature branch and open a pull request instead.\n", d.Reason)
 	return exitError
 }
 
 func (h hookEnv) gitFail(name string, err error) int {
-	_, _ = fmt.Fprintf(h.stderr, "sprawl guard: %s hook failed: %v\n", name, err)
+	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s hook failed: %v\n", name, err)
 	return exitError
 }
 
