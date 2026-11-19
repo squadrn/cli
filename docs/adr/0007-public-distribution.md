@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Supersedes the private model of sprawl (history below).
+Accepted. Supersedes ADR 0003.
 
 ## Context
 
@@ -53,11 +53,3 @@ does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signat
 - Anonymous API use is rate limited (60 requests an hour per IP); one update check costs one
   request, an update two plus its downloads.
 - Losing the signing key forces every user to reinstall once; the key is backed up outside GitHub.
-
-## History
-
-Under the sprawl name the source was private: releases went to a separate binaries-only repository that
-users were invited to read, installed with `gh release download … | sh` and published with a
-fine-grained token (`sprawl-releases`). Making the source public (ADR 0010, Step C of the move
-to `squadrn/squadrn`) removed the reason for the second repository, the token and the `gh`
-requirement; the signature model stayed.

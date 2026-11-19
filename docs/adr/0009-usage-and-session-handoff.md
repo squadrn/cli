@@ -7,7 +7,7 @@ Accepted. U1 ships with this ADR; S1 implemented; S2 is later.
 ## Context
 
 Subscription accounts stop at their usage limits (a 5-hour session window, a 7-day window, and
-model-specific weekly limits). `swap` (0005) already moves a conversation between accounts, but
+model-specific weekly limits). `swap` already moves a conversation between accounts, but
 the user has to notice the limit, guess which account still has room and type the swap. squadrn
 needs to know each account's usage, and, later, to hand a stopped session over with less typing.
 

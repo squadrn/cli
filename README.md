@@ -328,18 +328,6 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 (ctrl-c, esc) · `deps` passes the package manager's status through. Commands with `--json` print
 machine-readable output on stdout.
 
-## Coming from sprawl
-
-Squadrn was called Sprawling Agents (`sprawl`) before 2.0 and does not migrate it (ADR 0010).
-Uninstall the old tool first, then install Squadrn fresh:
-
-```sh
-sprawl self-uninstall --purge
-```
-
-Protection is not carried over: a repository that set `git config sprawl.protectedBranches`
-must set `git config squadrn.protectedBranches` instead.
-
 ## Releasing (maintainer)
 
 Releases are published in this repository by the `release` workflow when a `vX.Y.Z` tag is
