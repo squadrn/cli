@@ -110,7 +110,7 @@ jobs:
           PREV: ${{ steps.prev.outputs.tag }}
         run: |
           gh release download $env:TAG -R $env:REPO -p install.ps1 -O install.ps1
-          ./install.ps1 -Version $env:PREV -Name squadrn -Alias ''
+          ./install.ps1 -Version $env:PREV -Command squadrn -Alias ''
           if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed" }
           $squadrn = Join-Path $env:USERPROFILE ".local\bin\squadrn.exe"
           & $squadrn version

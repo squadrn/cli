@@ -2,10 +2,10 @@
 # GitHub account or gh.
 #
 #   irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex
-#   & ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Name ai -Alias sx
+#   & ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Command ai -Alias sx
 #
 # It installs the release it was downloaded from (latest/download is the newest stable release).
-# Parameters, for the script block form, mirror install.sh: -Name (command name), -Alias (comma
+# Parameters, for the script block form, mirror install.sh: -Command (command name), -Alias (comma
 # separated; '' for none), -Version vX.Y.Z (another release), -Force (accept a name another
 # program uses), -Repo OWNER/NAME, and -AddToProfile (load tab completion from your PowerShell
 # profile). The "| iex" form takes no parameters; set SQUADRN_COMMAND, SQUADRN_ALIASES or
@@ -15,7 +15,7 @@
 # Errors are reported without closing the PowerShell session that ran the script.
 # Keep this file ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 param(
-    [string]$Name = $env:SQUADRN_COMMAND,
+    [string]$Command = $env:SQUADRN_COMMAND,
     [string]$Alias = $null,
     [string]$Version = $env:SQUADRN_VERSION,
     [switch]$Force,
@@ -67,7 +67,7 @@ function Add-Completion {
 }
 
 function Install-Squadrn {
-    param([string]$Name, [AllowNull()][string]$Alias, [bool]$AliasGiven, [string]$Version, [bool]$Force, [bool]$AddToProfile, [string]$Repo)
+    param([string]$Command, [AllowNull()][string]$Alias, [bool]$AliasGiven, [string]$Version, [bool]$Force, [bool]$AddToProfile, [string]$Repo)
     # Both are local to this function: nothing leaks into the session that ran the script.
     $ErrorActionPreference = "Stop"
     # The progress bar slows Invoke-WebRequest down considerably in Windows PowerShell 5.1.
@@ -182,11 +182,11 @@ __SQUADRN_SIGNERS__
         # This session too, so self-install (and the user, right after) finds the command.
         if (-not (($env:Path -split ";") -contains $bin)) { $env:Path = "$env:Path;$bin" }
         $installArgs = @("self-install", $release)
-        if ($Name) { $installArgs += @("--command", $Name) }
+        if ($Command) { $installArgs += @("--command", $Command) }
         if ($AliasGiven) { $installArgs += "--alias=$Alias" }
         if ($Force) { $installArgs += "--force" }
         # squadrn asks for the names itself (on the console) unless they were given.
-        if (-not $Name -and -not $AliasGiven -and -not $env:CI -and [Environment]::UserInteractive) { $installArgs += "--interactive" }
+        if (-not $Command -and -not $AliasGiven -and -not $env:CI -and [Environment]::UserInteractive) { $installArgs += "--interactive" }
         Invoke-Native (Join-Path $release "squadrn.exe") $installArgs
         if ($LASTEXITCODE -ne 0) { throw "squadrn self-install failed" }
 
@@ -210,7 +210,7 @@ __SQUADRN_SIGNERS__
 try {
     $aliasGiven = ($PSBoundParameters -and $PSBoundParameters.ContainsKey("Alias"))
     if (-not $aliasGiven -and (Test-Path Env:SQUADRN_ALIASES)) { $Alias = $env:SQUADRN_ALIASES; $aliasGiven = $true }
-    Install-Squadrn -Name $Name -Alias $Alias -AliasGiven $aliasGiven -Version $Version `
+    Install-Squadrn -Command $Command -Alias $Alias -AliasGiven $aliasGiven -Version $Version `
         -Force $Force.IsPresent -AddToProfile $AddToProfile.IsPresent -Repo $Repo
 } catch {
     Write-Host "install.ps1: $($_.Exception.Message)" -ForegroundColor Red
