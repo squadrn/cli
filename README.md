@@ -56,7 +56,7 @@ irm https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.ps1
 `$env:SQUADRN_VERSION` first, or use the script block form:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Name ai -Alias '' -AddToProfile
+& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Command ai -Alias '' -AddToProfile
 ```
 
 A failed install prints the reason in red and leaves the window open. `-AddToProfile` loads tab
