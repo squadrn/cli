@@ -12,7 +12,7 @@ provider-neutral, since Squadrn drives several agent CLIs.
 
 - Product name **Squadrn**, pronounced "squadron": a group of agents flying in formation, each
   under its own account and worktree.
-- Checked before choosing: the `squadrn` organisations on GitHub and npm are ours; no command
+- Checked before choosing: the `squadrn` organizations on GitHub and npm are ours; no command
   `squadrn` or `srn` in Homebrew, Debian or on a default macOS/Linux PATH.
 - Accepted risk: the spelling invites the typo "squadron". The command is what people type, and
   the default alias `srn` sidesteps it.
