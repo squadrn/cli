@@ -1,6 +1,6 @@
 # 0005 — Name: Sprawling Agents (`sprawl`, alias `sra`)
 
-Status: accepted (v1.0.0)
+Status: accepted (v1.0.0); the name is superseded by 0010 (Squadrn) — the structure stays
 
 ## Context
 
