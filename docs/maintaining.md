@@ -84,6 +84,49 @@ If the release workflow fails before publishing, fix it (and delete a leftover d
 
 ## Signing key
 
+### First-time setup (macOS, with pass)
+
+`scripts/release-key.sh` refuses to create a key without a backup: either `pass` or
+`--backup FILE` on an encrypted volume. With `pass` (run in a terminal; GPG asks for passphrases):
+
+```sh
+# 1. tools
+brew install pass gnupg pinentry-mac
+
+# 2. passphrase prompts as a macOS dialog (can be remembered in the Keychain)
+mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+echo "pinentry-program $(brew --prefix)/bin/pinentry-mac" >> ~/.gnupg/gpg-agent.conf
+gpgconf --kill gpg-agent
+
+# 3. a personal GPG key: signing/certification + an encryption subkey, valid 2 years
+gpg --quick-gen-key "Your Name <you@example.com>" ed25519 cert,sign 2y
+FPR=$(gpg --list-keys --with-colons you@example.com | awk -F: '/^fpr/{print $10; exit}')
+gpg --quick-add-key "$FPR" cv25519 encr 2y
+# extend later: gpg --quick-set-expire "$FPR" 2y
+
+# 4. the password store (git history is optional)
+pass init you@example.com
+pass git init
+
+# 5. back up the GPG key: without it every secret in pass is lost
+gpg --export-secret-keys --armor you@example.com > /Volumes/<offline-drive>/gpg-secret.asc
+gpg --gen-revoke you@example.com > /Volumes/<offline-drive>/gpg-revoke.asc
+# also copy ~/.password-store (already encrypted) somewhere safe
+
+# 6. the release signing key: secret SQUADRN_SIGNING_KEY, pass entry
+#    squadrn/release-signing-key, public key appended to internal/release/signers.pub
+scripts/release-key.sh squadrn/squadrn
+
+# 7. check without printing the key
+pass ls squadrn
+gh secret list -R squadrn/squadrn
+```
+
+Then commit `internal/release/signers.pub` through a pull request. Without `pass`, mount an
+encrypted volume (`hdiutil create -encryption AES-256 -size 20m -fs APFS -volname Keys keys.dmg`,
+then `hdiutil attach keys.dmg`) and run
+`scripts/release-key.sh squadrn/squadrn --backup /Volumes/Keys/release-signing-key`.
+
 ### Backups
 
 Losing only the backup is harmless: CI signs with the secret, which stays on GitHub. A lost
