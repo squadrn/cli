@@ -152,7 +152,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 	current := release.Tag(Version)
 	cmp, comparable := release.Compare(tag, current)
 	upToDate := tag == current || (comparable && cmp == 0)
-	repair := upToDate && a.needsRepair(tag)
+	repair := upToDate && a.layout.Incomplete(tag)
 	if o.check {
 		return a.reportCheck(rel.Body, tag, current, channel, upToDate, repair, o.asJSON)
 	}
@@ -229,21 +229,11 @@ func (a *app) reportCheck(body, tag, current, channel string, upToDate, repair, 
 	return nil
 }
 
-// needsRepair reports whether the installed release is not fully tag: an install that failed
-// half way leaves a new binary next to an old plugin and VERSION.
-func (a *app) needsRepair(tag string) bool {
-	if !fsx.IsFile(a.layout.Binary()) {
-		return false // not installed here (a development build); nothing to repair
-	}
-	return a.layout.Version() != strings.TrimPrefix(tag, "v") || a.layout.Marketplace() == "" ||
-		!fsx.IsDir(filepath.Join(a.layout.DataDir, "plugin"))
-}
-
 // warnOutsideLayout says when the running binary is not the installed one (a development build,
 // go install, a package manager): self-update replaces the installed copy, not this one.
 func (a *app) warnOutsideLayout() {
 	self, err := os.Executable()
-	if err != nil || !fsx.IsFile(a.layout.Binary()) || fsx.SameFile(self, a.layout.Binary()) || a.isCommandCopy(self) {
+	if err != nil || !fsx.IsFile(a.layout.Binary()) || a.layout.IsInstalledCopy(self) {
 		return
 	}
 	msg := fmt.Sprintf("this is %s (%s), not the installed copy %s (%s); self-update replaces the installed copy",
@@ -252,11 +242,6 @@ func (a *app) warnOutsideLayout() {
 		msg += fmt.Sprintf("; %s on PATH is %s", a.cmd, a.tilde(p))
 	}
 	a.warnf("%s", msg)
-}
-
-// isCommandCopy reports whether path is one of the command copies in the bin dir (Windows).
-func (a *app) isCommandCopy(path string) bool {
-	return filepath.Clean(filepath.Dir(path)) == filepath.Clean(a.layout.BinDir)
 }
 
 // normalizeTag adds the v prefix release tags carry (1.2.0 → v1.2.0).

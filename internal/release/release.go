@@ -280,6 +280,23 @@ func (l Layout) Marketplace() string {
 	return l.DataDir
 }
 
+// Incomplete reports whether the release installed here is not fully version: an install that
+// stopped half way leaves a new binary next to an old plugin and VERSION. Without an installed
+// binary there is nothing to repair.
+func (l Layout) Incomplete(version string) bool {
+	if !fsx.IsFile(l.Binary()) {
+		return false
+	}
+	return l.Version() != strings.TrimPrefix(version, "v") || l.Marketplace() == "" ||
+		!fsx.IsDir(filepath.Join(l.DataDir, "plugin"))
+}
+
+// IsInstalledCopy reports whether path is the installed binary or one of the command copies
+// next to it in BinDir (Windows).
+func (l Layout) IsInstalledCopy(path string) bool {
+	return fsx.SameFile(path, l.Binary()) || filepath.Clean(filepath.Dir(path)) == filepath.Clean(l.BinDir)
+}
+
 // Install places an unpacked release (src holds squadrn, plugin/ and .claude-plugin/) into the
 // data dir. The binary goes first: plugin hooks call it, so new plugin files never run against
 // an old binary. The plugin version is set to version so Claude Code's plugin cache picks it up.
