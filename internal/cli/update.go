@@ -124,7 +124,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 		rels, err := gh.Releases(ctx, repo)
 		if err != nil {
 			if o.background {
-				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel, Err: err.Error()})
+				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel})
 				return nil
 			}
 			return fmt.Errorf("cannot list releases of %s: %s", repo, releaseFailure(err, repo, ""))

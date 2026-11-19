@@ -16,12 +16,8 @@ type LiveSession struct {
 	PID       int    `json:"pid"`
 	SessionID string `json:"sessionId"`
 	Cwd       string `json:"cwd"`
-	Status    string `json:"status"`
-	Kind      string `json:"kind"`
 	// Owner is the index of the config dir (in the list given to RunningSessions) listing it.
 	Owner int `json:"-"`
-	// ModTime is when the entry was last written.
-	ModTime int64 `json:"-"`
 }
 
 // RunningSessions returns the sessions listed in configDirs whose process alive reports
@@ -40,9 +36,6 @@ func RunningSessions(configDirs []string, alive func(pid int) bool) []LiveSessio
 				continue
 			}
 			s.Owner = i
-			if fi, err := os.Stat(f); err == nil {
-				s.ModTime = fi.ModTime().UnixNano()
-			}
 			out = append(out, s)
 		}
 	}

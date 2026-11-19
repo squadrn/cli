@@ -69,23 +69,21 @@ func TestInstall(t *testing.T) {
 	}
 }
 
-func TestEnv(t *testing.T) {
-	got := Env([]string{"PATH=/bin"}, "/h")
-	want := []string{"PATH=/bin", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=/h"}
-	if !slices.Equal(got, want) {
-		t.Fatalf("Env = %v", got)
+func TestEntries(t *testing.T) {
+	want := []string{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=/h"}
+	if got := Entries([]string{"PATH=/bin"}, "/h"); !slices.Equal(got, want) {
+		t.Fatalf("Entries = %v", got)
 	}
-	if again := Env(got, "/h"); !slices.Equal(again, got) {
-		t.Fatalf("Env is not idempotent: %v", again)
+	if got := Entries(append([]string{"PATH=/bin"}, want...), "/h"); got != nil {
+		t.Fatalf("Entries with the dir already set = %v", got)
 	}
 	user := []string{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=user.name", "GIT_CONFIG_VALUE_0=x"}
-	got = Env(user, "/h")
-	want = []string{"GIT_CONFIG_KEY_0=user.name", "GIT_CONFIG_VALUE_0=x", "GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_1=core.hooksPath", "GIT_CONFIG_VALUE_1=/h"}
-	if !slices.Equal(got, want) {
-		t.Fatalf("Env with user entries = %v", got)
+	want = []string{"GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_1=core.hooksPath", "GIT_CONFIG_VALUE_1=/h"}
+	if got := Entries(user, "/h"); !slices.Equal(got, want) {
+		t.Fatalf("Entries with user entries = %v", got)
 	}
-	if got := Env([]string{"GIT_CONFIG_COUNT=junk"}, "/h"); !slices.Contains(got, "GIT_CONFIG_COUNT=1") {
-		t.Fatalf("Env with junk count = %v", got)
+	if got := Entries([]string{"GIT_CONFIG_COUNT=junk"}, "/h"); !slices.Contains(got, "GIT_CONFIG_COUNT=1") {
+		t.Fatalf("Entries with junk count = %v", got)
 	}
 }
 
@@ -107,7 +105,7 @@ func TestRepoHook(t *testing.T) {
 	for _, k := range []string{"GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"} {
 		t.Setenv(k, "")
 	}
-	for _, kv := range Env(nil, ours) {
+	for _, kv := range Entries(nil, ours) {
 		k, v, _ := strings.Cut(kv, "=")
 		t.Setenv(k, v)
 	}

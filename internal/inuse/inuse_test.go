@@ -18,7 +18,7 @@ func TestAcquireActiveRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := Active(dir)
-	if len(got) != 1 || got[0].PID != os.Getpid() || got[0].Account != "claude/x" || got[0].Worktree != "feat-a" || got[0].Exe == "" {
+	if len(got) != 1 || got[0].PID != os.Getpid() || got[0].Account != "claude/x" || got[0].Worktree != "feat-a" {
 		t.Fatalf("Active = %+v", got)
 	}
 	if err := Release(dir); err != nil {

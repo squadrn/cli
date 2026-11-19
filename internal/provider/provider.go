@@ -142,11 +142,3 @@ func Get(id string) (Spec, bool) {
 	}
 	return Spec{}, false
 }
-
-func IDs() []string {
-	ids := make([]string, len(registry))
-	for i, s := range registry {
-		ids[i] = s.ID
-	}
-	return ids
-}

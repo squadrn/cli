@@ -119,21 +119,6 @@ func Entries(environ []string, dir string) []string {
 	}
 }
 
-// Env returns environ with Entries applied.
-func Env(environ []string, dir string) []string {
-	add := Entries(environ, dir)
-	if add == nil {
-		return environ
-	}
-	out := make([]string, 0, len(environ)+len(add))
-	for _, kv := range environ {
-		if !strings.HasPrefix(kv, "GIT_CONFIG_COUNT=") {
-			out = append(out, kv)
-		}
-	}
-	return append(out, add...)
-}
-
 // RepoHook returns the repository's own hook called name, as git would run it without squadrn:
 // the last core.hooksPath that is not ours, else <common git dir>/hooks. "" means there is none.
 // dir is the directory git runs the hook in (the worktree top level, or the git dir if bare).
@@ -172,9 +157,6 @@ func RepoHook(ctx context.Context, dir, ours, name string) (string, error) {
 	}
 	return p, nil
 }
-
-// HookCommand is how git would start the hook at path with args.
-func HookCommand(path string, args []string) (string, []string) { return hookCommand(path, args) }
 
 func expandHome(p string) string {
 	if rest, ok := strings.CutPrefix(p, "~/"); ok {

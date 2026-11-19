@@ -27,7 +27,6 @@ type State struct {
 	Latest    string    `json:"latest,omitempty"` // newest release tag on Channel
 	// Channel is the channel Latest was looked up on; a result for another channel is stale.
 	Channel string `json:"channel,omitempty"`
-	Err     string `json:"error,omitempty"`
 	// NotifiedAt is when the notice was last shown, so it is not repeated on every command.
 	NotifiedAt time.Time `json:"notified_at,omitzero"`
 }

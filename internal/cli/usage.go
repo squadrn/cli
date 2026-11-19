@@ -126,7 +126,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 		st := statuses[i]
 		snap, _, _ := a.usageStore().Load(acct.Provider, acct.Name)
 		c := usage.Candidate{
-			Account: acct.Label(), Provider: acct.Provider, Org: st.Status.OrgName,
+			Account: acct.Label(), Provider: acct.Provider,
 			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
 			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
 		}
@@ -158,7 +158,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 			}
 		}
 	}
-	ranked, next := usage.Rank(cands, rep.From, now, usage.RankOptions{})
+	ranked, next := usage.Rank(cands, rep.From, now)
 	if len(ranked) > 0 {
 		rep.Best = ranked[0].Account
 	}

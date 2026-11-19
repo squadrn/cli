@@ -30,9 +30,9 @@ func isRunnable(path string, fi fs.FileInfo) bool {
 	return bytes.Equal(head[:n], []byte("#!"))
 }
 
-// hookCommand starts the hook the way Git for Windows does: an .exe directly, a script through
+// HookCommand starts the hook the way Git for Windows does: an .exe directly, a script through
 // Git's own sh.exe, which reads the #! line.
-func hookCommand(path string, args []string) (string, []string) {
+func HookCommand(path string, args []string) (string, []string) {
 	if strings.EqualFold(filepath.Ext(path), ".exe") {
 		return path, args
 	}

@@ -93,10 +93,10 @@ func TestMerge(t *testing.T) {
 	t0 := now.Add(-10 * time.Minute)
 	t1 := now.Add(-5 * time.Minute)
 	t.Run("newer wins per window", func(t *testing.T) {
-		old := Snapshot{Account: "claude/a", Five: w(10, time.Hour), Seven: w(5, 48*time.Hour), ObservedAt: t0, Session: "s0", Cwd: "/r", Source: "statusline"}
+		old := Snapshot{Five: w(10, time.Hour), Seven: w(5, 48*time.Hour), ObservedAt: t0, Session: "s0", Cwd: "/r"}
 		obs := Snapshot{Five: w(20, time.Hour), ObservedAt: t1}
 		m := Merge(old, obs)
-		if m.Five.UsedPct != 20 || m.Seven.UsedPct != 5 || m.Account != "claude/a" || m.Session != "s0" || m.Source != "statusline" || !m.ObservedAt.Equal(t1) {
+		if m.Five.UsedPct != 20 || m.Seven.UsedPct != 5 || m.Session != "s0" || !m.ObservedAt.Equal(t1) {
 			t.Fatalf("merge = %+v", m)
 		}
 	})
@@ -185,22 +185,22 @@ func TestSameValues(t *testing.T) {
 }
 
 func TestRank(t *testing.T) {
-	mk := func(name, org string, s Snapshot) Candidate {
-		return Candidate{Account: name, Provider: "claude", Org: org, LoggedIn: true, Snapshot: s}
+	mk := func(name string, s Snapshot) Candidate {
+		return Candidate{Account: name, Provider: "claude", LoggedIn: true, Snapshot: s}
 	}
 	fresh := now.Add(-time.Minute)
 	cands := []Candidate{
-		mk("claude/from", "acme", Snapshot{LimitedAt: fresh, ResetEstimate: now.Add(2 * time.Hour)}),
-		mk("claude/high", "acme", Snapshot{Five: w(85, time.Hour), ObservedAt: fresh}),
-		mk("claude/nodata", "acme", Snapshot{}),
-		mk("claude/ok50", "acme", Snapshot{Five: w(50, time.Hour), ObservedAt: fresh}),
-		mk("claude/ok10", "other", Snapshot{Five: w(10, time.Hour), ObservedAt: fresh}),
-		mk("claude/ok10b", "acme", Snapshot{Five: w(10, time.Hour), Seven: w(5, time.Hour), ObservedAt: fresh}),
-		mk("claude/ok10c", "acme", Snapshot{Five: w(10, time.Hour), Seven: w(5, time.Hour), ObservedAt: now}),
-		mk("claude/limited", "acme", Snapshot{Five: w(100, 30*time.Minute), ObservedAt: fresh}),
-		{Account: "claude/out", Provider: "claude", Org: "acme"},
-		{Account: "codex/x", Provider: "codex", Org: "acme", LoggedIn: true},
-		mk("claude/metered", "acme", Snapshot{}),
+		mk("claude/from", Snapshot{LimitedAt: fresh, ResetEstimate: now.Add(2 * time.Hour)}),
+		mk("claude/high", Snapshot{Five: w(85, time.Hour), ObservedAt: fresh}),
+		mk("claude/nodata", Snapshot{}),
+		mk("claude/ok50", Snapshot{Five: w(50, time.Hour), ObservedAt: fresh}),
+		mk("claude/ok10", Snapshot{Five: w(10, time.Hour), ObservedAt: fresh}),
+		mk("claude/ok10b", Snapshot{Five: w(10, time.Hour), Seven: w(5, time.Hour), ObservedAt: fresh}),
+		mk("claude/ok10c", Snapshot{Five: w(10, time.Hour), Seven: w(5, time.Hour), ObservedAt: now}),
+		mk("claude/limited", Snapshot{Five: w(100, 30*time.Minute), ObservedAt: fresh}),
+		{Account: "claude/out", Provider: "claude"},
+		{Account: "codex/x", Provider: "codex", LoggedIn: true},
+		mk("claude/metered", Snapshot{}),
 	}
 	cands[len(cands)-1].Metered = true
 	names := func(cs []Candidate) []string {
@@ -210,25 +210,21 @@ func TestRank(t *testing.T) {
 		}
 		return out
 	}
-	got, next := Rank(cands, "claude/from", now, RankOptions{})
+	got, next := Rank(cands, "claude/from", now)
 	want := []string{"claude/ok10", "claude/ok10c", "claude/ok10b", "claude/ok50", "claude/nodata", "claude/high", "claude/metered"}
 	if g := names(got); !equal(g, want) || !next.IsZero() {
 		t.Fatalf("Rank = %v next %v, want %v", g, next, want)
 	}
-	got, _ = Rank(cands, "claude/from", now, RankOptions{SameOrgOnly: true})
-	if g := names(got); len(g) == 0 || g[0] != "claude/ok10c" || contains(g, "claude/ok10") {
-		t.Fatalf("same org: %v", g)
-	}
-	got, _ = Rank(cands, "", now, RankOptions{})
+	got, _ = Rank(cands, "", now)
 	if g := names(got); !contains(g, "codex/x") || contains(g, "claude/from") {
 		t.Fatalf("no source: %v", g)
 	}
-	got, next = Rank(cands[:1:1], "", now, RankOptions{})
+	got, next = Rank(cands[:1:1], "", now)
 	if len(got) != 0 || !next.Equal(now.Add(2*time.Hour)) {
 		t.Fatalf("all limited: %v next %v", names(got), next)
 	}
 	only := []Candidate{cands[0], cands[7]}
-	if got, next = Rank(only, "claude/from", now, RankOptions{}); len(got) != 0 || !next.Equal(now.Add(30*time.Minute)) {
+	if got, next = Rank(only, "claude/from", now); len(got) != 0 || !next.Equal(now.Add(30*time.Minute)) {
 		t.Fatalf("earliest reset: %v next %v", names(got), next)
 	}
 }
@@ -259,7 +255,7 @@ func TestStore(t *testing.T) {
 	if _, ok, err := s.Load("claude", "work"); ok || err != nil {
 		t.Fatalf("empty store: ok=%v err=%v", ok, err)
 	}
-	obs := Snapshot{Account: "claude/work", Five: w(10, time.Hour), ObservedAt: now}
+	obs := Snapshot{Five: w(10, time.Hour), ObservedAt: now}
 	if _, wrote, err := s.Record("claude", "work", obs); !wrote || err != nil {
 		t.Fatalf("first record: wrote=%v err=%v", wrote, err)
 	}
@@ -284,7 +280,7 @@ func TestStore(t *testing.T) {
 		t.Fatalf("changed value: wrote=%v err=%v snap=%+v", wrote, err, snap)
 	}
 	got, ok, err := s.Load("claude", "work")
-	if !ok || err != nil || got.Five.UsedPct != 11 || got.Account != "claude/work" {
+	if !ok || err != nil || got.Five.UsedPct != 11 {
 		t.Fatalf("load: %+v ok=%v err=%v", got, ok, err)
 	}
 

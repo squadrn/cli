@@ -54,7 +54,7 @@ func ParseStatusLine(b []byte, now time.Time) (usage.Snapshot, error) {
 	if err := json.Unmarshal(b, &in); err != nil {
 		return usage.Snapshot{}, err
 	}
-	s := usage.Snapshot{ObservedAt: now, Session: in.SessionID, Cwd: in.Cwd, Source: "statusline"}
+	s := usage.Snapshot{ObservedAt: now, Session: in.SessionID, Cwd: in.Cwd}
 	if rl := in.RateLimits; rl != nil {
 		s.Five, s.Seven = rl.FiveHour.window(), rl.SevenDay.window()
 		if sp := rl.SpendLimit; sp != nil && sp.UsedPercentage != nil {
@@ -92,7 +92,7 @@ func ParseStopFailure(b []byte, now time.Time, loc *time.Location) (StopFailure,
 	f := StopFailure{Error: in.Error, Details: in.ErrorDetails, Limited: in.Error == "rate_limit"}
 	if f.Limited {
 		f.Observation = usage.Snapshot{
-			ObservedAt: now, Session: in.SessionID, Cwd: in.Cwd, Source: "stopfailure",
+			ObservedAt: now, Session: in.SessionID, Cwd: in.Cwd,
 			LimitedAt: now, LimitedSession: in.SessionID, LimitedCwd: in.Cwd,
 		}
 		if t, ok := ParseResetTime(in.LastAssistantMessage, now, loc); ok {

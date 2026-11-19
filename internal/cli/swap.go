@@ -347,13 +347,13 @@ func (a *app) pickTarget(accts []account.Account, from account.Account) (account
 		snap, _, _ := a.usageStore().Load(acct.Provider, acct.Name)
 		st := statuses[i]
 		cands[i] = usage.Candidate{
-			Account: acct.Label(), Provider: acct.Provider, Org: st.Status.OrgName,
+			Account: acct.Label(), Provider: acct.Provider,
 			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
 			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
 		}
 		byLabel[acct.Label()] = acct
 	}
-	ranked, next := usage.Rank(cands, from.Label(), now, usage.RankOptions{})
+	ranked, next := usage.Rank(cands, from.Label(), now)
 	if len(ranked) == 0 {
 		msg := fmt.Sprintf("no other account can take the conversation from %s", from.Label())
 		if !next.IsZero() {
