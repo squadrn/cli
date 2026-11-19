@@ -114,7 +114,7 @@ func TestDecidePowerShell(t *testing.T) {
 		{Ask, "feat", `Set-Item Env:GIT_DIR x`},
 		{Ask, "feat", `ri env:GIT_EXEC_PATH`},
 		{Deny, "feat", `squadrn config set protected_branches x`},
-		{Deny, "feat", `& 'C:\Users\me\.local\bin\sqd.exe' config set git_hooks false`},
+		{Deny, "feat", `& 'C:\Users\me\.local\bin\srn.exe' config set git_hooks false`},
 		{Deny, "feat", `ai.exe config set protected_branches x`},
 		{Allow, "feat", `squadrn config get protected_branches`},
 		{Deny, "feat", `Set-Content -Path ~\.config\squadrn\config.toml -Value x`},

@@ -399,9 +399,9 @@ func TestVersions(t *testing.T) {
 
 func TestUsageTrackingLine(t *testing.T) {
 	e := env(t, fakeAgent{loggedIn: true}, nil)
-	e.Command = "sqd"
+	e.Command = "srn"
 	e.Usage = func(account.Account) bool { return false }
-	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (sqd usage setup claude/main)"); !ok || c.Status != OK {
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (srn usage setup claude/main)"); !ok || c.Status != OK {
 		t.Errorf("off: %+v", c)
 	}
 	e.Usage = func(account.Account) bool { return true }

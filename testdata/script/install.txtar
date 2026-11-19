@@ -5,20 +5,20 @@ release rel
 exec squadrn self-install rel --interactive
 ! stderr 'Command name'
 stdout 'linked ~/.local/bin/squadrn'
-stdout 'linked ~/.local/bin/sqd'
+stdout 'linked ~/.local/bin/srn'
 
 # With a terminal (SQUADRN_TEST_TTY stands in for it) the current names are the defaults; a
 # reinstall with other names removes the old ones.
 env SQUADRN_TEST_TTY=$WORK/answers
 exec squadrn self-install rel --interactive
 stderr 'Command name \[squadrn\]: '
-stderr 'Short alias \[sqd\] \(''-'' for none\): '
+stderr 'Short alias \[srn\] \(''-'' for none\): '
 stderr 'invalid command name "con": it is a reserved device name on Windows'
-stdout '^command: squadrn → ai \(removed: squadrn, sqd, added: ai, sx\)$'
+stdout '^command: squadrn → ai \(removed: squadrn, srn, added: ai, sx\)$'
 exists home/.local/bin/ai
 exists home/.local/bin/sx
 ! exists home/.local/bin/squadrn
-! exists home/.local/bin/sqd
+! exists home/.local/bin/srn
 grep '^command = "ai"' home/.config/squadrn/config.toml
 
 # Enter keeps the names: nothing to report.

@@ -82,7 +82,7 @@ to match byte for byte and be executable.
 ### Policy is the user's
 
 Repository config (`git config squadrn.protectedBranches`) can add protected branches, never
-remove them. `squadrn|sqd|squadrn-hook|<configured names> config set protected_branches|git_hooks`
+remove them. `squadrn|srn|squadrn-hook|<configured names> config set protected_branches|git_hooks`
 is denied, as are writes (redirections, `tee`, `sed -i`, `cp`/`mv`/`ln`/`install`, `rm`, `chmod`,
 `truncate`, `Set-Content`/`Out-File`/`Copy-Item`/`Remove-Item`, …) to the config file or the git
 hooks; other writes into squadrn's config, data or state dirs ask.

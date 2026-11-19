@@ -1,15 +1,15 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
-# A fresh machine (no options) gets the default names: squadrn + sqd.
+# A fresh machine (no options) gets the default names: squadrn + srn.
 mkdir rel
 exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
 exec squadrn self-install rel
 stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
 stdout 'linked ~/.local/bin/squadrn'
-stdout 'linked ~/.local/bin/sqd'
+stdout 'linked ~/.local/bin/srn'
 stdout 'next: squadrn doctor'
 grep '^command = "squadrn"' home/.config/squadrn/config.toml
-grep '^aliases = \["sqd"\]' home/.config/squadrn/config.toml
-exec sh -c 'readlink home/.local/bin/squadrn && readlink home/.local/bin/sqd'
+grep '^aliases = \["srn"\]' home/.config/squadrn/config.toml
+exec sh -c 'readlink home/.local/bin/squadrn && readlink home/.local/bin/srn'
 stdout -count=2 'home/.local/share/squadrn/bin/squadrn$'
 
 # Choosing no alias at install is respected.
@@ -21,4 +21,4 @@ env XDG_CACHE_HOME=$WORK/bare/.cache
 mkdir bare/.claude
 exec squadrn self-install rel --alias ''
 stdout 'linked ~/.local/bin/squadrn'
-! stdout 'sqd'
+! stdout 'srn'

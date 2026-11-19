@@ -25,7 +25,7 @@ it was downloaded from; see [releases](https://github.com/squadrn/squadrn/releas
 curl -fsSL https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.sh | sh
 ```
 
-The default command is **`squadrn`** with the short alias **`sqd`**. At a terminal the installer
+The default command is **`squadrn`** with the short alias **`srn`**. At a terminal the installer
 asks for other names (Enter keeps the default); or pass them up front (`--alias ''` installs no
 alias; `SQUADRN_COMMAND`, `SQUADRN_ALIASES` and `SQUADRN_VERSION` work too):
 
@@ -101,7 +101,7 @@ installed files; accounts are kept). `--purge` also removes the config, guard lo
 
 ```sh
 <command> config set command ai          # relinks ~/.local/bin and the shell completions
-<command> config set aliases sqd,sx
+<command> config set aliases srn,sx
 ```
 
 Completions for zsh (`~/.zsh/completions`), bash (`~/.local/share/bash-completion/completions`)
@@ -111,7 +111,7 @@ and fish (`~/.config/fish/completions`) are written when those directories exist
 Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`.
 Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`, build provenance).
 Updates read the public GitHub API; set `GH_TOKEN` or `GITHUB_TOKEN` (or log in with `gh`) only if
-you hit its rate limit. Examples below use `squadrn`; `sqd` works the same.
+you hit its rate limit. Examples below use `squadrn`; `srn` works the same.
 
 ## Use within Anthropic's terms
 
@@ -308,7 +308,7 @@ agents cannot edit squadrn's own files with their file tools.
 ```toml
 schema = 1
 command = "ai"                               # set at install; change with: config set command
-aliases = ["sqd"]
+aliases = ["srn"]
 default_provider = "claude"
 shared_mcp = ["codegraph"]                   # MCP servers copied from main into new accounts
 protected_branches = ["main", "release/*"]   # repositories can only add to this list

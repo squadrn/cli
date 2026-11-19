@@ -20,7 +20,7 @@ worktrees, with a guard against destructive pushes. Apache-2.0.
   safety net, not a sandbox.
 - **Install and update:** one-line installers (`curl … | sh`, `irm … | iex`) that verify the release
   signature and checksum; `self-update` (stable or beta channel), `--rollback`, `self-uninstall`;
-  your own command name and alias (`squadrn`/`sqd` by default).
+  your own command name and alias (`squadrn`/`srn` by default).
 - **Platforms:** macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in beta, without
   `grid`. Git 2.31 or newer.
 - Release signing key `squadrn-release-20261119`.

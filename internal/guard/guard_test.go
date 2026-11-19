@@ -302,7 +302,7 @@ var decideCases = []decideCase{
 	{Allow, "feat", `GIT_TRACE=1 git status`},
 	// agents cannot lower the guard's policy.
 	{Deny, "feat", `squadrn config set protected_branches none`},
-	{Deny, "feat", `sqd config set git_hooks false`},
+	{Deny, "feat", `srn config set git_hooks false`},
 	{Deny, "feat", `~/.local/bin/ai config set protected_branches x`},
 	{Deny, "feat", `env FOO=1 squadrn config set --force protected_branches x`},
 	{Ask, "feat", `squadrn config "$OP" protected_branches x`},

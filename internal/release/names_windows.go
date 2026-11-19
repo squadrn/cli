@@ -42,7 +42,7 @@ func executableName(name string) string {
 	return name + ".exe"
 }
 
-// CommandName is the command a file in the bin dir provides (sqd.exe → sqd).
+// CommandName is the command a file in the bin dir provides (srn.exe → srn).
 func CommandName(file string) string {
 	if strings.EqualFold(filepath.Ext(file), ".exe") {
 		return file[:len(file)-len(".exe")]

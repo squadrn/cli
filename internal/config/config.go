@@ -25,7 +25,7 @@ const Slug = "squadrn"
 // DefaultCommand and DefaultAliases are installed when the user picks no names.
 const DefaultCommand = "squadrn"
 
-func DefaultAliases() []string { return []string{"sqd"} }
+func DefaultAliases() []string { return []string{"srn"} }
 
 // DefaultProtectedBranches applies when the config file names none.
 func DefaultProtectedBranches() []string { return []string{"main", "master", "develop", "release/*"} }

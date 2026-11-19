@@ -48,7 +48,7 @@ Facts about Claude Code (as of Claude Code 2.1.327). **D** = documented,
   `StopFailure` hook (matcher `rate_limit`, async) runs `squadrn hook limit`: it records the limit,
   estimates the reset from "resets 3:45pm" in the last message (local time, next occurrence;
   fallback: the stored 5-hour `resets_at`) and notifies "claude/work hit its usage limit (resets
-  15:45) — sqd swap".
+  15:45) — srn swap".
 - **Setup**: `squadrn usage setup [<account> | --all] [--undo] [-y]` wraps `statusLine.command`
   (other fields and keys kept in place). `settings.json` is usually a link to main's, so the change
   is written through the link and covers every account sharing it; the output names them. The

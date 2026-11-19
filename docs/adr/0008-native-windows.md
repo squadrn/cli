@@ -81,7 +81,7 @@ platform.
    `%USERPROFILE%\.local\share\squadrn` etc., the same convention as Claude Code;
    `%USERPROFILE%\.local\bin` is usually on PATH already (Claude's installer adds it).
 2. **Commands and aliases on Windows: copies, not links.** Hard links cannot follow a
-   rename-aside update and a running link cannot be removed. Each name (`squadrn.exe`, `sqd.exe`,
+   rename-aside update and a running link cannot be removed. Each name (`squadrn.exe`, `srn.exe`,
    …) is a copy updated with `fsx.ReplaceExecutable`. "Ours" is what the manifest
    `<data dir>\commands.json` lists, not a link target; a file squadrn did not install is moved
    aside, never overwritten. `doctor` fails when a listed copy differs from the installed binary

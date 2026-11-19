@@ -1562,8 +1562,8 @@ plugin/bin/squadrn-hook file -rwxr-xr-x
 plugin/hooks dir -rwxr-xr-x
 plugin/hooks/hooks.json file -rw-r--r--
 -- layout-bin.txt --
-sqd link -> $WORK/home/.local/share/squadrn/bin/squadrn
 squadrn link -> $WORK/home/.local/share/squadrn/bin/squadrn
+srn link -> $WORK/home/.local/share/squadrn/bin/squadrn
 -- layout-config.txt --
 config.toml file -rw-r--r--
 -- help-account-adopt.txt --

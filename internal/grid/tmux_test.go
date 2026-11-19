@@ -42,11 +42,11 @@ func TestStartWithAwkwardPaths(t *testing.T) {
 			t.Fatal(err)
 		}
 		agent := Agent{Account: "claude/main", Name: "feat-a"}
-		s, err := tm.Start(ctx, "sqd", root, root, 80, 24, agent, "sleep 30")
+		s, err := tm.Start(ctx, "srn", root, root, 80, 24, agent, "sleep 30")
 		if err != nil {
 			t.Fatalf("%s: Start: %v", name, err)
 		}
-		if _, err := tm.Start(ctx, "sqd", root, root, 80, 24, Agent{Account: "claude/x", Name: "fix-b"}, "sleep 30"); err != nil {
+		if _, err := tm.Start(ctx, "srn", root, root, 80, 24, Agent{Account: "claude/x", Name: "fix-b"}, "sleep 30"); err != nil {
 			t.Fatalf("%s: second Start: %v", name, err)
 		}
 		if got, err := tm.FindSession(ctx, root); err != nil || got != s {

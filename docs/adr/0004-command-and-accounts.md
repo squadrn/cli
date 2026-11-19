@@ -15,7 +15,7 @@ Separate three kinds of name:
 | Kind | Chosen by | Examples |
 |---|---|---|
 | Product identity | fixed (ADR 0010) | `~/.config/squadrn`, `SQUADRN_*`, plugin `squadrn@squadrn`, git key `squadrn.protectedBranches`, tmux options `@squadrn_*` |
-| Command name | each user at install (default `squadrn`, alias `sqd`), renamable, with aliases | `ai`, `sx` |
+| Command name | each user at install (default `squadrn`, alias `srn`), renamable, with aliases | `ai`, `sx` |
 | Account | provider + name | `claude/main`, `claude/personal`, later `codex/work` |
 
 - The binary has a fixed name and path (`~/.local/share/squadrn/bin/squadrn`); command names are
