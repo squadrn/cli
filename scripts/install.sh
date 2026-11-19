@@ -2,8 +2,8 @@
 # Installs squadrn from its GitHub releases. Needs curl or wget, tar, git 2.31 or newer, and
 # ssh-keygen to verify the release signature. No GitHub account or gh needed.
 #
-#   curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh
-#   curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh -s -- --name ai --alias sx
+#   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --name ai --alias sx
 #
 # It installs the release it was downloaded from (latest/download is the newest stable release;
 # releases/download/vX.Y.Z/install.sh is that release).
@@ -19,7 +19,7 @@
 set -eu
 
 repo=__SQUADRN_REPO__
-case $repo in */*) ;; *) repo=squadrn/cli ;; esac
+case $repo in */*) ;; *) repo=squadrn/squadrn ;; esac
 # The release this script was published with; a placeholder in a source checkout.
 release_tag=__SQUADRN_VERSION__
 # Public keys allowed to sign releases (ssh-ed25519 lines); empty in unreleased builds.

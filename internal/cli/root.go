@@ -18,14 +18,14 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/githook"
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/provider/claude"
-	"github.com/squadrn/cli/internal/release"
-	"github.com/squadrn/cli/internal/ui"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/githook"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider/claude"
+	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn/internal/ui"
 )
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
@@ -37,7 +37,7 @@ var buildSigners = func() string {
 	return ""
 }
 
-// Version is set at build time with -ldflags "-X github.com/squadrn/cli/internal/cli.Version=…".
+// Version is set at build time with -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=…".
 var Version = "dev"
 
 const (

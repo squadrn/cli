@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 // Facts is what the guard needs to know about one repository, read once per decision.

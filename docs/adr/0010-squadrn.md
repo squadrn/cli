@@ -4,7 +4,7 @@ Status: accepted (v2.0.0); supersedes the name in 0005 — the structure from 00
 
 ## Context
 
-The project moves to a public home, `github.com/squadrn/cli`, and needs a name it can own there.
+The project moves to a public home, `github.com/squadrn/squadrn`, and needs a name it can own there.
 "Sprawling Agents" (0005) had an accepted risk that became real: `2youg1/sprawling-agents` uses the
 same name, and a "Sprawl CLI" already exists in the coding-agent space, so `sprawl` reads as
 someone else's tool in searches, package registries and conversation.
@@ -21,7 +21,7 @@ someone else's tool in searches, package registries and conversation.
 | Thing | Before (sprawl) | Now |
 |---|---|---|
 | Product name | Sprawling Agents | Squadrn |
-| Go module | `sprawling-agents` | `github.com/squadrn/cli` |
+| Go module | `sprawling-agents` | `github.com/squadrn/squadrn` |
 | Binary, `cmd/` dir | `sprawl` | `squadrn` (`squadrn.exe`) |
 | Default command, alias | `sprawl`, `sra` | `squadrn`, `sqd` |
 | Slug: config/data/state/cache dirs | `~/.config/sprawl` … | `~/.config/squadrn` … |
@@ -33,6 +33,12 @@ someone else's tool in searches, package registries and conversation.
 | Release assets | `sprawl_<ver>_<os>_<arch>.*` | `squadrn_<ver>_<os>_<arch>.*` |
 | Signature namespace | `sprawl-release` | `squadrn-release` (same key, `signers.pub` unchanged) |
 | Signing key secret | `SPRAWL_SIGNING_KEY` | `SQUADRN_SIGNING_KEY` |
+| Repository | private `sprawling-agents` + `sprawl-releases` | `squadrn/squadrn` (public) |
+
+The module path is `github.com/squadrn/squadrn`, matching the repository. The repository was first
+published as `squadrn/cli`, and versions of the module `github.com/squadrn/cli` are recorded for
+good in the Go checksum database (sum.golang.org); reusing that path would tie new code to tags
+that no longer exist, so the repository and module were renamed together and old tags removed.
 
 `SPRAWL_RELEASES_*` (releases repository settings) stayed until the separate releases
 repository went away with the move to the public repository (ADR 0007).

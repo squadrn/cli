@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/install"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/install"
 )
 
 func (a *app) selfUninstallCmd() *cobra.Command {

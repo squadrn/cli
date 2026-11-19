@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/gitver"
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/worktree"
+	"github.com/squadrn/squadrn/internal/gitver"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/worktree"
 )
 
 // defaultSpec is the provider for commands that name no account.

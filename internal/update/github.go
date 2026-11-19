@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // DefaultAPI is the GitHub REST API. Releases of a public repository need no token; one only

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/cli/internal/account"
-	"github.com/squadrn/cli/internal/install"
-	"github.com/squadrn/cli/internal/ui"
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/install"
+	"github.com/squadrn/squadrn/internal/ui"
 )
 
 func table(interactive bool) routeTable {

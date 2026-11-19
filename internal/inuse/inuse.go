@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // Dir is the registry directory inside a used directory. It is a fixed identifier.

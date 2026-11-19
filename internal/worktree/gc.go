@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/squadrn/cli/internal/inuse"
-	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 type Action string

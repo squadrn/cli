@@ -20,9 +20,9 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
-	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/squadrn/internal/release"
 
-	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 func TestMain(m *testing.M) {

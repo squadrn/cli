@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 const (

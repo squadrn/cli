@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/squadrn/internal/config"
 )
 
 // secretPatterns mask credentials that commonly appear in agent commands before they are logged.

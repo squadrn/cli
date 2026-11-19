@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/cli/internal/provider"
-	"github.com/squadrn/cli/internal/usage"
+	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/usage"
 )
 
 func TestUnwrapStatusLine(t *testing.T) {

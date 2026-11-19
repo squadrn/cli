@@ -10,7 +10,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/squadrn/internal/config"
 )
 
 // maxDepth bounds recursion through nested shells, eval, aliases and here-documents.

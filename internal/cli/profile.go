@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // profileLine is the line install.ps1 adds to a PowerShell profile to load completion. It

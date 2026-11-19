@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/squadrn/cli/internal/worktree"
+	"github.com/squadrn/squadrn/internal/worktree"
 )
 
 var ErrInvalidSpec = errors.New("invalid agent spec")

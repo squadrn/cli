@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/squadrn/internal/fsx"
 )
 
 // BinaryName is the executable inside a release and in the data dir.

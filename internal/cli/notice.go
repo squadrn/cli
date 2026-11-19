@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/squadrn/cli/internal/update"
+	"github.com/squadrn/squadrn/internal/update"
 )
 
 // noticeEvery limits how often the same update notice is shown.

@@ -22,5 +22,5 @@ A private Homebrew tap was rejected: every user would have to configure a token.
 ## Consequences
 
 - One-line install for invited users; no toolchain, no extra secrets.
-- Repository slug is a build-time value (`-X github.com/squadrn/cli/internal/cli.Repo`), set by the release workflow.
+- Repository slug is a build-time value (`-X github.com/squadrn/squadrn/internal/cli.Repo`), set by the release workflow.
 - Plugin updates require a version change in `plugin.json`; installs stamp the release version.

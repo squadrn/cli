@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/cli/internal/install"
-	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/squadrn/internal/install"
+	"github.com/squadrn/squadrn/internal/release"
 )
 
 func TestNamePrompt(t *testing.T) {

@@ -16,18 +16,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/cli/internal/config"
-	"github.com/squadrn/cli/internal/doctor"
-	"github.com/squadrn/cli/internal/fsx"
-	"github.com/squadrn/cli/internal/gitver"
-	"github.com/squadrn/cli/internal/install"
-	"github.com/squadrn/cli/internal/proc"
-	"github.com/squadrn/cli/internal/release"
-	"github.com/squadrn/cli/internal/update"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/doctor"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/gitver"
+	"github.com/squadrn/squadrn/internal/install"
+	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn/internal/update"
 )
 
 // Repo is the GitHub repository releases come from, set at build time with
-// -ldflags "-X github.com/squadrn/cli/internal/cli.Repo=squadrn/cli". Only the --repo flag
+// -ldflags "-X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn". Only the --repo flag
 // overrides it: an environment variable could be planted to redirect updates.
 var Repo = ""
 

@@ -14,15 +14,15 @@ Platforms: macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in
 macOS and Linux (needs `curl` or `wget`, `git` 2.31+ and `ssh-keygen`; no GitHub account):
 
 ```sh
-curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
 ```
 
 This installs the latest stable release. The installer installs the release it was downloaded
 from, so for another one (a pre-release included; see
-[releases](https://github.com/squadrn/cli/releases)) take that release's installer:
+[releases](https://github.com/squadrn/squadrn/releases)) take that release's installer:
 
 ```sh
-curl -fsSL https://github.com/squadrn/cli/releases/download/vX.Y.Z/install.sh | sh
+curl -fsSL https://github.com/squadrn/squadrn/releases/download/vX.Y.Z/install.sh | sh
 ```
 
 The default command is **`squadrn`** with the short alias **`sqd`**. At a terminal the installer
@@ -30,7 +30,7 @@ asks for other names (Enter keeps the default); or pass them up front (`--alias 
 alias; `SQUADRN_COMMAND`, `SQUADRN_ALIASES` and `SQUADRN_VERSION` work too):
 
 ```sh
-curl -fsSL https://github.com/squadrn/cli/releases/latest/download/install.sh | sh -s -- --name ai --alias ''
+curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --name ai --alias ''
 ```
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
@@ -43,14 +43,14 @@ logged in it also verifies GitHub's build provenance.
 Requires [Git for Windows](https://git-scm.com/download/win) 2.31+. In PowerShell:
 
 ```powershell
-irm https://github.com/squadrn/cli/releases/latest/download/install.ps1 | iex
+irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex
 ```
 
 `| iex` cannot pass options: set `$env:SQUADRN_COMMAND`, `$env:SQUADRN_ALIASES` or
 `$env:SQUADRN_VERSION` first, or use the script block form:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/squadrn/cli/releases/latest/download/install.ps1))) -Name ai -Alias '' -AddToProfile
+& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Name ai -Alias '' -AddToProfile
 ```
 
 A failed install prints the reason in red and leaves the window open. `-AddToProfile` loads tab

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/squadrn/internal/account"
 )
 
 func TestBannerAndPickerNeedATerminalNotColors(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 func newStore(t *testing.T, accounts ...string) Store {

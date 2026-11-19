@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 func alive(pid int) bool {
