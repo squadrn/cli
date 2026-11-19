@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -164,7 +165,9 @@ func (a *app) wtRmCmd() *cobra.Command {
 				return err
 			}
 			w, err := repo.Find(ctx, name)
-			if err != nil {
+			if errors.Is(err, worktree.ErrNotFound) && repo.BranchExists(ctx, worktree.AgentBranch(name)) {
+				return a.rmOrphanBranch(ctx, repo, name, forceBranch, yes)
+			} else if err != nil {
 				return err
 			}
 			for _, p := range a.panes(repo.Root) {
@@ -172,26 +175,46 @@ func (a *app) wtRmCmd() *cobra.Command {
 					return fmt.Errorf("%s is running in tmux pane %s; stop it first", name, p.ID)
 				}
 			}
-			if used := repo.InUse(w); len(used) > 0 && !force {
-				return fmt.Errorf("%s is in use by %s; stop it first (or use --force)", name, a.sessionDesc(used[0]))
+			// Decide before removing anything, so a refusal leaves the worktree and branch as they were.
+			var risks []string
+			if used := repo.InUse(w); len(used) > 0 {
+				if !force {
+					return fmt.Errorf("%s is in use by %s; stop it first (or use --force)", name, a.sessionDesc(used[0]))
+				}
+				risks = append(risks, "in use by "+a.sessionDesc(used[0]))
 			}
-			switch {
-			case force && forceBranch:
-				err = a.confirm(yes, "Remove %s with its uncommitted changes and unmerged commits", a.tilde(w.Path))
-			case force:
-				err = a.confirm(yes, "Remove %s with its uncommitted changes", a.tilde(w.Path))
-			case forceBranch:
-				err = a.confirm(yes, "Remove %s and delete its branch even if unmerged", a.tilde(w.Path))
+			if dirty, err := worktree.Dirty(ctx, w.Path); err != nil || dirty {
+				if !force {
+					return fmt.Errorf("%s %w (or its status is unavailable); commit or stash them, or remove it anyway with --force", name, worktree.ErrDirty)
+				}
+				risks = append(risks, "uncommitted changes")
 			}
-			if err != nil {
-				return err
+			if w.Branch == worktree.AgentBranch(name) {
+				unmerged, err := repo.Unmerged(ctx, w.Branch)
+				if err != nil {
+					return err
+				}
+				if unmerged && !forceBranch {
+					return fmt.Errorf("%s has commits that are not merged (branch %s); merge them first, or remove both with --force-branch", name, w.Branch)
+				}
+				if unmerged {
+					risks = append(risks, "unmerged commits on "+w.Branch)
+				}
+			}
+			if len(risks) > 0 {
+				if err := a.confirm(yes, "Remove %s (%s)", name, strings.Join(risks, ", ")); err != nil {
+					return err
+				}
 			}
 			ignored, _ := worktree.Ignored(ctx, w.Path)
-			err = repo.Remove(ctx, w, force, forceBranch)
+			deleted, err := repo.Remove(ctx, w, force, forceBranch)
 			if err != nil && !errors.Is(err, worktree.ErrUnmerged) {
 				return err
 			}
 			a.out("removed worktree %s%s\n", name, ignoredNote(ignored))
+			if deleted != "" {
+				a.out("deleted branch %s\n", deleted)
+			}
 			if err != nil {
 				a.warnf("%v; delete it with --force-branch once you no longer need it", err)
 			}
@@ -202,6 +225,30 @@ func (a *app) wtRmCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "also delete the branch when it is not merged")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation with --force or --force-branch")
 	return cmd
+}
+
+// rmOrphanBranch handles `wt rm <name>` when the worktree is gone but its agent branch is left:
+// a merged branch is deleted, an unmerged one only with --force-branch.
+func (a *app) rmOrphanBranch(ctx context.Context, repo worktree.Repo, name string, forceBranch, yes bool) error {
+	branch := worktree.AgentBranch(name)
+	unmerged, err := repo.Unmerged(ctx, branch)
+	if err != nil {
+		return err
+	}
+	// Same rule as with the worktree: merged goes, unmerged needs --force-branch (and asks).
+	if unmerged {
+		if !forceBranch {
+			return fmt.Errorf("worktree %s is gone, but its branch %s with unmerged commits is left; delete it with --force-branch", name, branch)
+		}
+		if err := a.confirm(yes, "Delete branch %s with its unmerged commits", branch); err != nil {
+			return err
+		}
+	}
+	if err := repo.DeleteBranch(ctx, name); err != nil {
+		return err
+	}
+	a.out("deleted branch %s\n", branch)
+	return nil
 }
 
 func (a *app) gcJSON(ctx context.Context, repo worktree.Repo, base string, cands []worktree.Candidate, yes, force bool) error {

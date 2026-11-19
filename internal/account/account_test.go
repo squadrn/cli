@@ -168,13 +168,22 @@ func TestMoveToTrash(t *testing.T) {
 	a, _ := s.Get("old")
 	dst, err := s.MoveToTrash(a, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
 	must(t, err)
-	if want := filepath.Join(s.Home, "data", "Trash", "files", ".claude-old-20260102-030405"); dst != want {
-		t.Errorf("dst = %q", dst)
+	if runtime.GOOS == "darwin" {
+		if want := filepath.Join(s.Home, ".Trash", ".claude-old-20260102-030405"); dst != want {
+			t.Errorf("dst = %q, want %q", dst, want)
+		}
+	} else {
+		if want := filepath.Join(s.Home, "data", "Trash", "files", ".claude-old-20260102-030405"); dst != want {
+			t.Errorf("dst = %q", dst)
+		}
+		info, err := os.ReadFile(filepath.Join(s.Home, "data", "Trash", "info", ".claude-old-20260102-030405.trashinfo"))
+		must(t, err)
+		if want := "[Trash Info]\nPath=" + filepath.ToSlash(a.Dir) + "\nDeletionDate=2026-01-02T03:04:05\n"; runtime.GOOS != "windows" && string(info) != want {
+			t.Errorf("trashinfo = %q, want %q", info, want)
+		}
 	}
-	info, err := os.ReadFile(filepath.Join(s.Home, "data", "Trash", "info", ".claude-old-20260102-030405.trashinfo"))
-	must(t, err)
-	if want := "[Trash Info]\nPath=" + filepath.ToSlash(a.Dir) + "\nDeletionDate=2026-01-02T03:04:05\n"; runtime.GOOS != "windows" && string(info) != want {
-		t.Errorf("trashinfo = %q, want %q", info, want)
+	if !fsx.IsDir(dst) {
+		t.Errorf("trashed dir missing: %s", dst)
 	}
 	if s.Exists("old") {
 		t.Error("account still exists after removal")
@@ -333,6 +342,56 @@ func TestProvisionReportsConflicts(t *testing.T) {
 	must(t, err)
 	if !slices.Equal(r.Conflicts, []string{filepath.Join(a.Dir, "settings.json")}) {
 		t.Errorf("Conflicts = %v", r.Conflicts)
+	}
+}
+
+func TestProvisionRelinkKeepsABackup(t *testing.T) {
+	s, a, _, p := provisionFixture(t)
+	own := filepath.Join(a.Dir, "settings.json")
+	must(t, os.MkdirAll(a.Dir, 0o700))
+	must(t, os.WriteFile(own, []byte(`{"own":true}`), 0o600))
+	if c := p.Conflicts(a); !slices.Equal(c, []string{own}) {
+		t.Fatalf("Conflicts = %v", c)
+	}
+	p.Relink = true
+	p.Now = time.Date(2026, 11, 19, 10, 0, 0, 0, time.UTC)
+	r, err := p.Provision(context.Background(), a)
+	must(t, err)
+	bak := own + ".bak-20261119-100000"
+	if r.Backups[own] != bak || len(r.Conflicts) != 0 {
+		t.Fatalf("report = %+v", r)
+	}
+	if b, err := os.ReadFile(bak); err != nil || string(b) != `{"own":true}` {
+		t.Fatalf("backup = %q, %v", b, err)
+	}
+	if !LinksTo(own, filepath.Join(s.MainDir(provider.Claude), "settings.json")) {
+		t.Fatal("settings.json not linked after relink")
+	}
+	if c := p.Conflicts(a); len(c) != 0 {
+		t.Fatalf("Conflicts after relink = %v", c)
+	}
+	// A backup with the same name is never overwritten.
+	must(t, os.Remove(own))
+	must(t, os.WriteFile(own, []byte("again"), 0o600))
+	if _, err := p.Provision(context.Background(), a); err == nil {
+		t.Fatal("relink overwrote an existing backup")
+	}
+	if b, _ := os.ReadFile(bak); string(b) != `{"own":true}` {
+		t.Fatalf("backup changed: %q", b)
+	}
+}
+
+func TestProvisionCreatesMainSettings(t *testing.T) {
+	s, a, _, p := provisionFixture(t)
+	main := filepath.Join(s.MainDir(provider.Claude), "settings.json")
+	must(t, os.Remove(main))
+	r, err := p.Provision(context.Background(), a)
+	must(t, err)
+	if b, err := os.ReadFile(main); err != nil || string(b) != "{}\n" {
+		t.Fatalf("main settings = %q, %v", b, err)
+	}
+	if !slices.Contains(r.Linked, filepath.Join(a.Dir, "settings.json")) {
+		t.Fatalf("Linked = %v", r.Linked)
 	}
 }
 

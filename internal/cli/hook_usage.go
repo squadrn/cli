@@ -138,10 +138,10 @@ func (h hookEnv) recordLimit(raw []byte) (msg string) {
 	return msg + " — " + cfg.CommandName() + " swap"
 }
 
-// clock shows t as 15:45, with the weekday when it is not within the next 24 hours.
+// clock shows t as 15:45 when it is today, else with the weekday (Thu 15:45).
 func clock(t, now time.Time) string {
-	t = t.Local()
-	if d := t.Sub(now); d >= 0 && d < 24*time.Hour {
+	t, now = t.Local(), now.Local()
+	if y, m, d := t.Date(); y == now.Year() && m == now.Month() && d == now.Day() {
 		return t.Format("15:04")
 	}
 	return t.Format("Mon 15:04")

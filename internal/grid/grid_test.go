@@ -181,3 +181,20 @@ func TestSessionsAndPanes(t *testing.T) {
 		t.Fatalf("no server panes: %v, %v", ps, err)
 	}
 }
+
+func TestNoServer(t *testing.T) {
+	for msg, want := range map[string]bool{
+		"tmux: exit status 1: no server running on /tmp/tmux-501/default":                            true,
+		"tmux: exit status 1: error connecting to /tmp/tmux-501/default (No such file or directory)": true,
+		"tmux: exit status 1: error connecting to /tmp/tmux-501/default (Permission denied)":         false,
+		"tmux: exit status 1: can't find session: x":                                                 false,
+	} {
+		err := noServer(errors.New(msg))
+		if errors.Is(err, ErrNoServer) != want {
+			t.Errorf("%s: %v", msg, err)
+		}
+		if !want && err.Error() != msg {
+			t.Errorf("tmux's message lost: %v", err)
+		}
+	}
+}

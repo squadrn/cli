@@ -221,6 +221,9 @@ func (a *app) gridAttachCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if !a.interactive {
+				return fmt.Errorf("grid attach needs a terminal; run it in one: tmux attach -t %s", session)
+			}
 			return grid.Tmux{}.Attach(session)
 		},
 	}

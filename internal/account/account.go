@@ -191,6 +191,13 @@ func (s Store) Unmanaged() ([]Account, error) {
 	return out, nil
 }
 
+// IsUnmanaged reports whether input names a dir like an account's (~/.claude-<name>) that is not
+// an account: one Adopt would take over.
+func (s Store) IsUnmanaged(input string) bool {
+	a, err := s.Define(input)
+	return err == nil && fsx.IsDir(a.Dir) && !s.exists(a)
+}
+
 // Adopt makes an existing dir named like an account an account (writes Marker).
 func (s Store) Adopt(input string) (Account, error) {
 	a, err := s.Define(input)
@@ -389,14 +396,4 @@ func (s Store) Rename(a Account, newName string) (Account, error) {
 		return Account{}, err
 	}
 	return to, nil
-}
-
-// trashDirs returns where trashed files go and, for the freedesktop trash, where their
-// .trashinfo files go ("" on macOS).
-func trashDirs(home string) (files, info string) {
-	if mac := filepath.Join(home, ".Trash"); fsx.IsDir(mac) {
-		return mac, ""
-	}
-	base := config.DirsFor(home, "Trash").Data
-	return filepath.Join(base, "files"), filepath.Join(base, "info")
 }

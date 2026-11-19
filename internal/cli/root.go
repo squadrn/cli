@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -87,12 +88,19 @@ func Run(args []string) int {
 	var nf account.NotFoundError
 	switch {
 	case err == nil, silent(err):
+	case errors.As(err, &nf) && unmanaged(nf.Ref.String()):
+		_, _ = fmt.Fprintf(os.Stderr, "%s: %s; its dir exists but is not a %s account (run: %s account adopt %s)\n", name, err, config.Slug, name, nf.Ref)
 	case errors.As(err, &nf):
 		_, _ = fmt.Fprintf(os.Stderr, "%s: %s (run: %s account add %s)\n", name, err, name, nf.Ref)
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", name, err)
 	}
 	return exitCode(err)
+}
+
+func unmanaged(ref string) bool {
+	s, err := account.NewStore()
+	return err == nil && s.IsUnmanaged(ref)
 }
 
 func isTerminal(f *os.File) bool { return term.IsTerminal(f.Fd()) }
@@ -170,6 +178,7 @@ func (a *app) routeTable() routeTable {
 	}
 	return routeTable{
 		isAccount:   a.store.Exists,
+		isUnmanaged: a.store.IsUnmanaged,
 		subcommands: subs,
 		passthrough: func(w string) bool {
 			for _, spec := range provider.All() {
@@ -271,6 +280,7 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 	a.root = root
+	a.completionForEveryName()
 	return root
 }
 
@@ -314,12 +324,20 @@ func (a *app) printJSON(v any) error {
 
 // confirm asks a yes/no question on the terminal. yes skips it; without a terminal the command
 // must be re-run with --yes. "no" (or anything but y/yes) aborts with exit 1.
+// lowerFirst turns a question ("Remove x") into the start of an error message ("remove x").
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
+}
+
 func (a *app) confirm(yes bool, format string, args ...any) error {
 	if yes {
 		return nil
 	}
 	if !a.interactive {
-		return usagef("%s; re-run with --yes to confirm", fmt.Sprintf(format, args...))
+		return usagef("%s; re-run with --yes to confirm", lowerFirst(fmt.Sprintf(format, args...)))
 	}
 	a.errf("%s? [y/N] ", fmt.Sprintf(format, args...))
 	line, err := bufio.NewReader(a.stdin).ReadString('\n')
@@ -430,10 +448,10 @@ func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt
 	a.banner(acct)
 	r := a.store.RefreshShared(acct)
 	for _, c := range r.Conflicts {
-		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+		a.warnf("%s was edited in %s, so it no longer follows the main account; to link it again (keeps a backup): %s", a.tilde(c), acct.Label(), a.relinkHint(acct))
 	}
 	for _, c := range r.Replaced {
-		a.warnf("%s was replaced in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+		a.warnf("%s was replaced in %s, so it no longer follows the main account; to link it again (keeps a backup): %s", a.tilde(c), acct.Label(), a.relinkHint(acct))
 	}
 	if a.cfgErr != nil && !a.cfgWarned {
 		a.cfgWarned = true
@@ -442,6 +460,11 @@ func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt
 	a.layout.CleanOld(append([]string{a.cmd}, a.cfg.Aliases...))
 	defer a.markInUse(acct, wt)()
 	return ag.Exec(acct.ConfigDir(), args)
+}
+
+// relinkHint is the command that links an account's own copies of shared files to main again.
+func (a *app) relinkHint(acct account.Account) string {
+	return a.cmd + " account add " + acct.Label() + " --relink"
 }
 
 func (a *app) tilde(path string) string {
@@ -596,13 +619,26 @@ func (a *app) marketplaceDir() string {
 	return a.layout.Marketplace()
 }
 
+func (a *app) provisioner(ag provider.Agent) account.Provisioner {
+	return account.Provisioner{Store: a.store, Agent: ag, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
+}
+
 func (a *app) provision(acct account.Account, ag provider.Agent) error {
+	return a.provisionWith(acct, ag, false)
+}
+
+// provisionWith creates or repairs acct; relink moves its own copies of shared files aside.
+func (a *app) provisionWith(acct account.Account, ag provider.Agent, relink bool) error {
 	if a.cfgErr != nil {
 		return a.cfgErr
 	}
-	p := account.Provisioner{Store: a.store, Agent: ag, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
+	p := a.provisioner(ag)
+	p.Relink = relink
 	rep, err := p.Provision(context.Background(), acct)
 	a.out("account %s → %s\n", acct.Label(), a.tilde(acct.Dir))
+	for _, dst := range slices.Sorted(maps.Keys(rep.Backups)) {
+		a.out("  moved %s aside to %s\n", a.tilde(dst), a.tilde(rep.Backups[dst]))
+	}
 	for _, l := range rep.Linked {
 		a.out("  linked %s\n", a.tilde(l))
 	}
@@ -610,7 +646,7 @@ func (a *app) provision(acct account.Account, ag provider.Agent) error {
 		a.out("  removed stale link %s\n", a.tilde(l))
 	}
 	for _, c := range rep.Conflicts {
-		a.out("  kept %s (exists and is not a link to main)\n", a.tilde(c))
+		a.out("  kept %s (exists and is not a link to main; to link it: %s)\n", a.tilde(c), a.relinkHint(acct))
 	}
 	for _, m := range rep.MCPAdded {
 		a.out("  mcp added %s\n", m)

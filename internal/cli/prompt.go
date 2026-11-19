@@ -112,8 +112,8 @@ func (p *namePrompt) aliases(answer, command string, forced map[string]bool) ([]
 }
 
 // renameSummary describes a change of command names: "command: ai → srn (removed: ai, sx,
-// added: srn, squadrn)"; "command: squadrn → srn (aliases: squadrn)" for a swap; "" when nothing
-// changed.
+// added: srn, squadrn)"; "command: squadrn → srn (aliases: squadrn)" for a swap; "aliases: sx
+// (removed: srn, added: sx)" when only aliases changed; "" when nothing changed.
 func renameSummary(oldCmd string, oldAliases []string, newCmd string, newAliases []string) string {
 	before := append([]string{oldCmd}, oldAliases...)
 	after := append([]string{newCmd}, newAliases...)
@@ -139,6 +139,9 @@ func renameSummary(oldCmd string, oldAliases []string, newCmd string, newAliases
 			return ""
 		}
 		return fmt.Sprintf("command: %s → %s (aliases: %s)", oldCmd, newCmd, none(newAliases))
+	}
+	if oldCmd == newCmd {
+		return fmt.Sprintf("aliases: %s (removed: %s, added: %s)", none(newAliases), none(removed), none(added))
 	}
 	return fmt.Sprintf("command: %s → %s (removed: %s, added: %s)", oldCmd, newCmd, none(removed), none(added))
 }

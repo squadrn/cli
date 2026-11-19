@@ -53,6 +53,10 @@ stdout '^command: squadrn → srn \(aliases: squadrn\)$'
 
 exec squadrn config set aliases squadrn
 ! stdout .
+exec squadrn config set aliases squadrn,sq
+stdout '^aliases: squadrn, sq \(removed: none, added: sq\)$'
+! stdout 'command:'
+exec squadrn config set aliases squadrn
 grep '^command = "srn"' old/.config/squadrn/config.toml
 grep '^aliases = \["squadrn"\]' old/.config/squadrn/config.toml
 exec sh -c 'readlink old/.local/bin/srn && readlink old/.local/bin/squadrn'

@@ -27,9 +27,28 @@ exec squadrn __complete ''
 stdout '^account'
 stdout '^claude/main'
 
+# Printed scripts register the command and every alias; an unknown shell is a usage error.
+cp home/.config/squadrn/config.toml bad.toml
+cp names.toml home/.config/squadrn/config.toml
+exec squadrn completion zsh
+stdout '^compdef _srn srn$'
+stdout '^compdef _squadrn squadrn$'
+exec squadrn completion bash
+stdout 'complete .*__start_srn srn'
+stdout 'complete .*__start_squadrn squadrn'
+exec squadrn completion fish
+stdout 'complete -c squadrn'
+exitcode 2 squadrn completion tcsh
+! exec squadrn completion tcsh
+stderr '^srn: unknown shell "tcsh" \(supported: bash, fish, powershell, zsh\)$'
+cp bad.toml home/.config/squadrn/config.toml
+
 # A bad config file is reported, not ignored.
 ! exec squadrn account add work
 stderr 'unknown key "shared_mpc"'
 
 -- home/.config/squadrn/config.toml --
 shared_mpc = ["typo"]
+-- names.toml --
+command = "srn"
+aliases = ["squadrn"]

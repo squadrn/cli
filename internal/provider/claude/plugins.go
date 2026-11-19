@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -83,9 +84,18 @@ func updatePlugin(ctx context.Context, r provider.Runner, configDir string) erro
 }
 
 // removePlugin uninstalls the plugin, then drops the marketplace whatever happened.
+// removePlugin uninstalls the plugin and removes the marketplace registration, checking that it
+// is gone: its files are deleted with the installation, so a registration left behind would
+// point at nothing.
 func removePlugin(ctx context.Context, r provider.Runner, configDir string) error {
 	_, err := r.Output(ctx, configDir, "plugin", "uninstall", provider.Claude.Plugin)
-	_, _ = r.Output(ctx, configDir, "plugin", "marketplace", "remove", marketplace)
+	markets, lerr := listNames(ctx, r, configDir, "name", "plugin", "marketplace", "list", "--json")
+	if lerr == nil && !markets[marketplace] {
+		return err
+	}
+	if _, merr := r.Output(ctx, configDir, "plugin", "marketplace", "remove", marketplace); merr != nil {
+		return errors.Join(err, fmt.Errorf("remove the %s marketplace: %w", marketplace, merr))
+	}
 	return err
 }
 

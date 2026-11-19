@@ -338,3 +338,22 @@ func TestStoreErrors(t *testing.T) {
 		t.Fatal("record over a directory succeeded")
 	}
 }
+
+func TestBestKeepsTheCurrentAccount(t *testing.T) {
+	fresh := now.Add(-time.Minute)
+	cands := []Candidate{
+		{Account: "claude/main", Provider: "claude", LoggedIn: true, Snapshot: Snapshot{Five: w(20, time.Hour), ObservedAt: fresh}},
+		{Account: "claude/work", Provider: "claude", LoggedIn: true},
+		{Account: "claude/old", Provider: "claude", LoggedIn: true, Snapshot: Snapshot{Five: w(5, time.Hour), ObservedAt: now.Add(-7 * time.Hour)}},
+	}
+	if got, _ := Best(cands, "claude/main", now); len(got) != 3 || got[0].Account != "claude/main" {
+		t.Fatalf("Best = %v; the current account with known headroom must win over nodata and stale", got)
+	}
+	if got, _ := Rank(cands, "claude/main", now); got[0].Account == "claude/main" {
+		t.Fatal("Rank (swap targets) must not offer the source")
+	}
+	cands[0].Snapshot = Snapshot{LimitedAt: fresh, ResetEstimate: now.Add(time.Hour)}
+	if got, _ := Best(cands, "claude/main", now); got[0].Account == "claude/main" {
+		t.Fatal("a limited current account is not the best")
+	}
+}

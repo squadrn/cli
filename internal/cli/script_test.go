@@ -54,6 +54,15 @@ func TestMain(m *testing.M) {
 	testscript.Main(m, cmds)
 }
 
+// appendCall records an invocation in $HOME/calls.log like the shell fake does.
+func appendCall(cfg, cmd string) {
+	f, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), "calls.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err == nil {
+		_, _ = fmt.Fprintf(f, "cfg=%s args=%s\n", cfg, cmd)
+		_ = f.Close()
+	}
+}
+
 // fakeClaudeMain behaves exactly like the fakeClaude shell script, for Windows.
 func fakeClaudeMain(args []string) int {
 	cfg := os.Getenv("CLAUDE_CONFIG_DIR")
@@ -82,6 +91,8 @@ func fakeClaudeMain(args []string) int {
 		return 1
 	case cmd == "auth logout":
 		_ = os.Remove(filepath.Join(dir, ".loggedin"))
+	case cmd == "auth login":
+		_ = os.WriteFile(filepath.Join(dir, ".loggedin"), nil, 0o600)
 	case strings.HasPrefix(cmd, "mcp get "):
 		b, _ := os.ReadFile(filepath.Join(dir, ".mcp"))
 		if !slices.Contains(strings.Split(strings.ReplaceAll(string(b), "\r", ""), "\n"), args[2]) {
@@ -101,6 +112,12 @@ func fakeClaudeMain(args []string) int {
 		cat(".plugins", "[]")
 	case strings.HasPrefix(cmd, "plugin install "):
 		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"squadrn@squadrn"}]`+"\n"), 0o644)
+	case strings.HasPrefix(cmd, "plugin uninstall "):
+		_ = os.Remove(filepath.Join(dir, ".plugins"))
+		appendCall(cfg, cmd)
+	case strings.HasPrefix(cmd, "plugin marketplace remove "):
+		_ = os.Remove(filepath.Join(dir, ".markets"))
+		appendCall(cfg, cmd)
 	default:
 		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)
 		wd, _ := os.Getwd()
@@ -142,12 +159,15 @@ case "$*" in
     if [ -f "$dir/.loggedin" ]; then echo '{"loggedIn":true,"email":"me@'"$(basename "$dir")"'","orgName":"'"$org"'","subscriptionType":"'"$plan"'"}'; exit 0; fi
     echo '{"loggedIn":false}'; exit 1 ;;
   "auth logout") rm -f "$dir/.loggedin"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
+  "auth login") [ -n "$FAKE_LOGIN_FAILS" ] || : >"$dir/.loggedin"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
   "mcp get "*) grep -qx "$3" "$dir/.mcp" 2>/dev/null ;;
   "mcp add-json -s user "*) echo "$5" >>"$dir/.mcp" ;;
   "plugin marketplace list --json") cat "$dir/.markets" 2>/dev/null || echo '[]' ;;
   "plugin marketplace add "*) echo '[{"name":"squadrn"}]' >"$dir/.markets" ;;
   "plugin list --json") cat "$dir/.plugins" 2>/dev/null || echo '[]' ;;
   "plugin install "*) echo '[{"id":"squadrn@squadrn"}]' >"$dir/.plugins" ;;
+  "plugin uninstall "*) rm -f "$dir/.plugins"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
+  "plugin marketplace remove "*) rm -f "$dir/.markets"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
   *)
     echo "cfg=$cfg args=$*"
     echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"
@@ -166,7 +186,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "FAKE_LOGIN_FAILS", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 

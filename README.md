@@ -144,7 +144,7 @@ srn account ls [--json]
 srn account logout work
 srn account adopt other          # make an existing ~/.claude-other an account (asks; --yes)
 srn account rename work job      # logs work out first; log in again as job
-srn account rm work              # logs out and moves the dir to the trash
+srn account rm work              # logs out and moves the dir to the trash (macOS ~/.Trash)
 ```
 
 A word that is neither a squadrn command, an account nor an agent subcommand is a usage error with
@@ -185,8 +185,10 @@ Usage is only known for claude.ai subscriptions (Pro, Max, …), after a session
 only as fresh as the last status line update. States: `ok`, `high` (5h ≥ 80% or 7d ≥ 90%),
 `limited`, `reset` (a limit or high window has reset since), `stale` (older than 6 hours),
 `nodata`, `metered` (API billing), `loggedout`, `na` (provider does not report usage). The footer
-names the best account for the current repository: the same provider, not limited, then lowest 5h
-and 7d use. Records live in `~/.local/state/squadrn/usage/` (private).
+names the best account for the current repository, the current account included: the same
+provider, not limited, known headroom (`ok`, `reset`) before `nodata`/`stale`, then lowest 5h and
+7d use. Reset times show the weekday when they are not today (`Thu 15:45`). Logged-out accounts are
+not listed as untracked. Records live in `~/.local/state/squadrn/usage/` (private).
 
 ## Swap
 
@@ -322,7 +324,8 @@ update_channel = "stable"                    # or "beta" for pre-releases
 ```
 
 `srn config [--json]` shows every setting; `srn config get|set <key> [value]` reads or
-changes one.
+changes one. In JSON, lists (`aliases`, `shared_mcp`, `protected_branches`) are arrays and
+`git_hooks`/`update_check` are booleans.
 
 MCP servers whose config has a non-empty `env` or `headers` are never copied; add those per account.
 
@@ -337,7 +340,9 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 `0` ok · `1` error, or "no" at a confirmation · `2` usage or invalid input · `130` cancelled
 (ctrl-c, esc) · running the agent (`srn [<account>]`, `wt`, `swap`) passes the agent's exit
 status through, as `deps` does the package manager's. Commands with `--json` print
-machine-readable output on stdout.
+machine-readable output on stdout, with snake_case keys: `grid ls --json` gives
+`[{"name", "repo", "panes", "attached"}]`, `ps --json` gives
+`[{"id", "session", "account", "name", "command"}]`.
 
 ## Development
 

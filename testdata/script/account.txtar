@@ -51,11 +51,17 @@ exec squadrn account ls
 stdout '^unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)$'
 ! stdout '^claude/tool '
 exitcode 2 squadrn tool
+! exec squadrn tool
+stderr 'to make the existing dir an account: srn account adopt tool'
+! stderr 'account add'
+! exec squadrn -a claude/tool
+stderr 'account not found: claude/tool; its dir exists but is not a squadrn account \(run: srn account adopt claude/tool\)'
 ! exec squadrn account add tool
-stderr 'exists but is not a squadrn account'
+stderr 'exists but is not a squadrn account .*run: srn account adopt tool$'
 exitcode 2 squadrn account adopt tool
 exec squadrn account adopt tool --yes
 stdout 'adopted claude/tool'
+stdout 'link main.s settings with: srn account add claude/tool$'
 exists home/.claude-tool/.squadrn-account
 exec squadrn account adopt tool
 stdout 'already an account'
@@ -85,6 +91,17 @@ stderr 'claude/work is in use by pid 1 \(claude/work\); stop it first \(or use -
 ! exec squadrn account rm work --yes
 stderr 'in use by pid 1'
 rm home/.claude-work/.squadrn-inuse/1.json
+
+# login runs the agent's login and says who is logged in.
+exec squadrn account login work
+stdout '^logged in to claude/work as me@.claude-work$'
+grep 'args=auth login' home/calls.log
+exec squadrn account logout work
+env FAKE_LOGIN_FAILS=1
+! exec squadrn account login work
+stderr 'claude/work is still not logged in; try again: srn account login claude/work'
+env FAKE_LOGIN_FAILS=
+exec squadrn account login work
 
 # logout keeps the dir; rename logs out first, moves it and rewrites the plugin registry's paths.
 exec squadrn account logout work
@@ -123,13 +140,15 @@ exitcode 2 squadrn account ls extra
 exitcode 2 squadrn account rm work
 exitcode 2 squadrn account rm main --yes
 exec squadrn account rm claude/work --yes
-stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
+[darwin] stdout 'removed account claude/work \(moved to ~/.Trash/.claude-work-'
+[!darwin] stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
 ! exists home/.claude-work
 ! exists home/.local/state/squadrn/usage/claude-work.json
-exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
-stdout '^\[Trash Info\]$'
-stdout '^Path=/.*/home/.claude-work$'
-stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
+[darwin] exec sh -c 'ls -d home/.Trash/.claude-work-*'
+[!darwin] exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
+[!darwin] stdout '^\[Trash Info\]$'
+[!darwin] stdout '^Path=/.*/home/.claude-work$'
+[!darwin] stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
 exitcode 1 squadrn account rm work --yes
 
 -- empty --

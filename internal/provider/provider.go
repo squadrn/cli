@@ -117,6 +117,8 @@ type Agent interface {
 	// Exec runs an interactive session in place of squadrn: on Unix it replaces the process; on
 	// Windows it runs as a child and returns ExitStatus when the session ends.
 	Exec(configDir string, args []string) error
+	// Run runs an interactive command (a login) as a child and returns when it ends.
+	Run(configDir string, args []string) error
 	Auth(ctx context.Context, configDir string) (AuthStatus, error)
 	// LoginArgs, WorktreeArgs and ResumeArgs are the CLI arguments for those sessions.
 	LoginArgs() []string

@@ -153,13 +153,43 @@ func load(path string) (Config, error) {
 	if v := os.Getenv("SQUADRN_SHARED_MCP"); strings.TrimSpace(v) != "" {
 		c.SharedMCP = strings.Fields(v)
 	}
+	return c.WithDefaults(), nil
+}
+
+// WithDefaults fills the settings that have a default when unset: protected_branches and
+// default_provider.
+func (c Config) WithDefaults() Config {
 	if len(c.ProtectedBranches) == 0 {
 		c.ProtectedBranches = DefaultProtectedBranches()
 	}
 	if c.DefaultProvider == "" {
 		c.DefaultProvider = provider.Default
 	}
-	return c, nil
+	return c
+}
+
+// Value is one setting (defaults applied) as a JSON value: lists as arrays, switches as booleans.
+func (c Config) Value(key string) (any, error) {
+	switch key {
+	case "aliases":
+		return list(c.Aliases), nil
+	case "shared_mcp":
+		return list(c.SharedMCP), nil
+	case "protected_branches":
+		return list(c.ProtectedBranches), nil
+	case "git_hooks":
+		return c.GitHooksEnabled(), nil
+	case "update_check":
+		return c.UpdateCheckEnabled(), nil
+	}
+	return c.Get(key)
+}
+
+func list(l []string) []string {
+	if l == nil {
+		return []string{}
+	}
+	return l
 }
 
 // EnvOverrides maps the settings an environment variable currently overrides to that variable.
@@ -208,12 +238,12 @@ func Read(path string) (Config, error) {
 func (c Config) validate() error {
 	if c.Command != "" {
 		if err := ValidateCommand(c.Command); err != nil {
-			return fmt.Errorf("command: %w", err)
+			return err
 		}
 	}
 	for _, a := range c.Aliases {
 		if err := ValidateCommand(a); err != nil {
-			return fmt.Errorf("aliases: %w", err)
+			return err
 		}
 	}
 	if c.DefaultProvider != "" {

@@ -71,7 +71,7 @@ func TestRenameSummary(t *testing.T) {
 	if got := renameSummary("ai", []string{"sx"}, "srn", []string{"sx", "squadrn"}); got != "command: ai → srn (removed: ai, added: srn, squadrn)" {
 		t.Fatalf("got %q", got)
 	}
-	if got := renameSummary("ai", []string{"sx"}, "ai", nil); got != "command: ai → ai (removed: sx, added: none)" {
+	if got := renameSummary("ai", []string{"sx"}, "ai", nil); got != "aliases: none (removed: sx, added: none)" {
 		t.Fatalf("got %q", got)
 	}
 	if got := renameSummary("squadrn", []string{"srn"}, "srn", []string{"squadrn"}); got != "command: squadrn → srn (aliases: squadrn)" {

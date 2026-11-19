@@ -34,7 +34,8 @@ func (a *app) updateNotice(r route) {
 		s.NotifiedAt = now
 		update.Save(path, s)
 	}
-	if Repo != "" && update.Due(s, now, a.cfg.Channel()) {
+	// Development builds (not a release version) never check in the background.
+	if Repo != "" && release.Valid(Version) && update.Due(s, now, a.cfg.Channel()) {
 		s.CheckedAt = now // claim the slot so parallel invocations do not all start a check
 		update.Save(path, s)
 		if a.backgroundCheck != nil {

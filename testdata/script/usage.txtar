@@ -20,7 +20,14 @@ exec squadrn usage
 stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
 stdout '^claude/main +max +acme +- +- +- +- +nodata +-$'
 stdout '^claude/work +- +acme +- +- +- +- +nodata +-$'
-stdout 'not tracked: claude/main, claude/work \(run: srn usage setup\)'
+stdout 'not tracked: claude/main, claude/work \(run: srn usage setup --all\)$'
+# A logged-out account is not listed as untracked.
+rm home/.claude-work/.loggedin
+exec squadrn usage --refresh
+stdout '^claude/work .*loggedout'
+stdout 'not tracked: claude/main \(run: srn usage setup claude/main\)$'
+cp empty home/.claude-work/.loggedin
+exec squadrn usage --refresh
 
 # Setup asks first; without a terminal it needs --yes.
 exitcode 2 squadrn usage setup
@@ -131,6 +138,7 @@ stdout 'not set up'
 mkdir home/.claude-solo
 cp emptyobj home/.claude-solo/settings.json
 exec squadrn account adopt solo --yes
+stdout 'link main.s settings with: srn account add claude/solo --relink$'
 exec squadrn account add solo --usage
 stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
 grep '"command": ".* hook statusline"' home/.claude-solo/settings.json
@@ -138,6 +146,11 @@ grep '"command": ".* hook statusline"' home/.claude-solo/settings.json
 exec squadrn usage setup --undo solo -y
 ! grep 'statusLine' home/.claude-solo/settings.json
 exitcode 2 squadrn account add solo --usage --no-usage
+
+# --all asks once and names every settings file with the accounts it covers.
+! exec squadrn usage setup --all
+stderr 'record usage limits through the status line of ~/.claude/settings.json \(claude/main, claude/work\); ~/.claude-solo/settings.json \(claude/solo\); re-run with --yes'
+! grep 'hook statusline' home/.claude/settings.json
 
 # self-uninstall puts every status line back.
 exec squadrn usage setup --all -y

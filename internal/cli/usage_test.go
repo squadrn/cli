@@ -28,6 +28,9 @@ func TestUsageFormatting(t *testing.T) {
 	if got := clock(now.Add(3*time.Hour+45*time.Minute), now); got != "15:45" {
 		t.Errorf("clock today: %q", got)
 	}
+	if got := clock(now.Add(13*time.Hour), now); got != "Thu 01:00" {
+		t.Errorf("clock tomorrow within 24h: %q", got)
+	}
 	if got := clock(now.Add(48*time.Hour), now); got != "Fri 12:00" {
 		t.Errorf("clock later: %q", got)
 	}

@@ -180,11 +180,14 @@ Usage:
 Examples:
   srn account add work
   srn account add claude/work
+  srn account add work --relink   link files the account has its own copy of (keeps a backup)
 
 Flags:
   -h, --help       help for add
       --no-usage   do not track usage limits and do not ask
+      --relink     move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)
       --usage      track usage limits in the status line without asking
+  -y, --yes        do not ask for confirmation with --relink
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -579,8 +582,9 @@ Global Flags:
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-self-uninstall.txt --
 Remove squadrn from this machine. Accounts, their logins and conversations are kept.
---purge also removes the config, the guard log and caches. Running agent sessions keep going;
-restart them afterwards.
+--purge also removes the config, the guard log and caches, and the session registries
+(.squadrn-inuse) in account dirs and in the directories squadrn recorded. Running agent sessions
+keep going; restart them afterwards.
 
 Usage:
   srn self-uninstall [flags]
@@ -613,6 +617,7 @@ Generate the autocompletion script for srn for the specified shell.
 See each sub-command's help for details on how to use the generated script.
 
 Usage:
+  srn completion [flags]
   srn completion [command]
 
 Available Commands:

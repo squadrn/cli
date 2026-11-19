@@ -12,6 +12,7 @@ import (
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/usage"
 )
 
@@ -162,7 +163,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 			}
 		}
 	}
-	ranked, next := usage.Rank(cands, rep.From, now)
+	ranked, next := usage.Best(cands, rep.From, now)
 	if len(ranked) > 0 {
 		rep.Best = ranked[0].Account
 	}
@@ -233,19 +234,23 @@ func (a *app) usageTable(rep usageReport) {
 	case !rep.NextReset.IsZero():
 		a.out("every account is at its limit; the first resets at %s\n", clock(rep.NextReset, now))
 	}
-	if untracked := a.untracked(rep); untracked != "" {
-		a.out("not tracked: %s (run: %s usage setup)\n", untracked, a.cmd)
+	if untracked := a.untracked(rep); len(untracked) > 0 {
+		target := "--all"
+		if len(untracked) == 1 {
+			target = untracked[0]
+		}
+		a.out("not tracked: %s (run: %s usage setup %s)\n", strings.Join(untracked, ", "), a.cmd, target)
 	}
 }
 
-func (a *app) untracked(rep usageReport) string {
+func (a *app) untracked(rep usageReport) []string {
 	var out []string
 	for _, r := range rep.Accounts {
-		if !r.Tracking && r.State != usage.NA {
+		if !r.Tracking && r.State != usage.NA && r.State != usage.LoggedOut {
 			out = append(out, r.Account)
 		}
 	}
-	return strings.Join(out, ", ")
+	return out
 }
 
 func (a *app) usageDetails(r usageRow, rep usageReport) {
@@ -373,6 +378,30 @@ func (a *app) usageSetup(target string, all, undo, yes bool) error {
 	groups, err := a.settingsGroups(targets)
 	if err != nil {
 		return err
+	}
+	if len(groups) > 1 && !yes {
+		// One question for all of them, naming every settings file and the accounts it covers.
+		var pending []string
+		for _, g := range groups {
+			cmd, has, err := claude.StatusLineCommand(g.path)
+			if err != nil {
+				return err
+			}
+			_, ours := unwrapStatusLine(cmd)
+			if on := has && ours; on == undo {
+				pending = append(pending, a.groupWhere(g))
+			}
+		}
+		if len(pending) > 0 {
+			what := "Record usage limits through the status line of "
+			if undo {
+				what = "Restore the previous status line in "
+			}
+			if err := a.confirm(false, "%s%s", what, strings.Join(pending, "; ")); err != nil {
+				return err
+			}
+		}
+		yes = true
 	}
 	for _, g := range groups {
 		if err := a.setupGroup(g, undo, yes); err != nil {

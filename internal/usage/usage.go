@@ -246,6 +246,16 @@ func group(s State) int {
 // accounts, from itself and other providers' accounts are dropped. When none is left, next is
 // the earliest time a limited account resets (zero if unknown).
 func Rank(cands []Candidate, from string, now time.Time) (ranked []Candidate, next time.Time) {
+	return rank(cands, from, now, false)
+}
+
+// Best ranks like Rank but keeps from itself: the account to work on in from's repository,
+// which is from as long as it has more known headroom than the others.
+func Best(cands []Candidate, from string, now time.Time) (ranked []Candidate, next time.Time) {
+	return rank(cands, from, now, true)
+}
+
+func rank(cands []Candidate, from string, now time.Time, keepFrom bool) (ranked []Candidate, next time.Time) {
 	var src *Candidate
 	for i := range cands {
 		if cands[i].Account == from {
@@ -253,7 +263,7 @@ func Rank(cands []Candidate, from string, now time.Time) (ranked []Candidate, ne
 		}
 	}
 	for _, c := range cands {
-		if c.Account == from {
+		if c.Account == from && !keepFrom {
 			continue
 		}
 		if src != nil && c.Provider != src.Provider {

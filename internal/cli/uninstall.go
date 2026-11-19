@@ -9,10 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/install"
+	"github.com/squadrn/squadrn/internal/inuse"
 	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn/internal/usage"
 )
 
 func (a *app) selfUninstallCmd() *cobra.Command {
@@ -21,8 +24,9 @@ func (a *app) selfUninstallCmd() *cobra.Command {
 		Use:   "self-uninstall",
 		Short: "Remove squadrn: plugin from every account, command links, completions, installed files",
 		Long: `Remove squadrn from this machine. Accounts, their logins and conversations are kept.
---purge also removes the config, the guard log and caches. Running agent sessions keep going;
-restart them afterwards.`,
+--purge also removes the config, the guard log and caches, and the session registries
+(.squadrn-inuse) in account dirs and in the directories squadrn recorded. Running agent sessions
+keep going; restart them afterwards.`,
 		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			what := "Remove squadrn (plugin in every account, " + a.tilde(a.layout.DataDir) + ")"
@@ -96,6 +100,7 @@ func (a *app) uninstall(purge bool) error {
 		a.out("  removed %s\n", a.tilde(a.layout.DataDir))
 	}
 	if purge {
+		a.purgeInUse(accts)
 		dirs := config.DirsFor(a.store.Home, config.Slug)
 		for _, d := range []string{dirs.Config, dirs.State, dirs.Cache} {
 			if fsx.IsDir(d) {
@@ -117,5 +122,53 @@ func (a *app) removeCompletions(name string) {
 		if b, err := os.ReadFile(file); err == nil && generatedCompletion(b, name) {
 			_ = os.Remove(file)
 		}
+	}
+}
+
+// purgeInUse removes the session registries (.squadrn-inuse) squadrn can find without searching
+// the disk: in every account dir, and in the directories its usage records and handoffs name and
+// their parents. A registry with a live session is left alone.
+func (a *app) purgeInUse(accts []account.Account) {
+	seen := map[string]bool{}
+	var dirs []string
+	add := func(d string) {
+		if d != "" && !seen[d] {
+			seen[d] = true
+			dirs = append(dirs, d)
+		}
+	}
+	for _, acct := range accts {
+		add(acct.Dir)
+	}
+	var recorded []string
+	for _, acct := range accts {
+		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok {
+			recorded = append(recorded, snap.Cwd, snap.LimitedCwd)
+		}
+	}
+	_, _, _ = a.ledger().Latest(func(h usage.Handoff) bool {
+		recorded = append(recorded, h.Cwd)
+		return false
+	})
+	for _, d := range recorded {
+		for d != "" && filepath.IsAbs(d) && d != a.store.Home && d != filepath.Dir(d) {
+			add(d)
+			d = filepath.Dir(d)
+		}
+	}
+	for _, d := range dirs {
+		reg := filepath.Join(d, inuse.Dir)
+		if !fsx.IsDir(reg) {
+			continue
+		}
+		if live := inuse.Active(d); len(live) > 0 {
+			a.warnf("kept %s: %s is still running", a.tilde(reg), a.sessionDesc(live[0]))
+			continue
+		}
+		if err := os.RemoveAll(reg); err != nil {
+			a.warnf("cannot remove %s: %v", a.tilde(reg), err)
+			continue
+		}
+		a.out("  removed %s\n", a.tilde(reg))
 	}
 }

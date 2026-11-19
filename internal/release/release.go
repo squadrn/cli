@@ -433,8 +433,14 @@ func Valid(v string) bool {
 	return ok
 }
 
-// Tag is v with the v prefix release tags carry (1.2.0 → v1.2.0).
-func Tag(v string) string { return "v" + strings.TrimPrefix(v, "v") }
+// Tag is v with the v prefix release tags carry (1.2.0 → v1.2.0). A version that is not a
+// release (dev) is returned as it is.
+func Tag(v string) string {
+	if !Valid(v) {
+		return v
+	}
+	return "v" + strings.TrimPrefix(v, "v")
+}
 
 // Prerelease reports whether v has a pre-release part (v1.2.0-rc.1).
 func Prerelease(v string) bool {
