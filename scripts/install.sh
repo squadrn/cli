@@ -3,14 +3,14 @@
 # ssh-keygen to verify the release signature. No GitHub account or gh needed.
 #
 #   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
-#   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --name ai --alias sx
+#   curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --command ai --alias sx
 #
 # It installs the release it was downloaded from (latest/download is the newest stable release;
 # releases/download/vX.Y.Z/install.sh is that release).
 #
 # Options (or environment):
-#   --name NAME       command name (SQUADRN_COMMAND; default: asked, else "squadrn")
-#   --alias A,B       short aliases (SQUADRN_ALIASES; default: asked, else "sqd"; '' for none)
+#   --command NAME    command name (SQUADRN_COMMAND; default: asked, else "squadrn")
+#   --alias A,B       short aliases (SQUADRN_ALIASES; default: asked, else "srn"; '' for none)
 #   --version vX.Y.Z  another release (SQUADRN_VERSION; default: this script's release)
 #   --repo OWNER/NAME the repository to install from (default: the one this script came from)
 #   --force           accept a name that another program on PATH already uses
@@ -38,7 +38,7 @@ die() { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --name) [ $# -ge 2 ] || die "--name needs a value"; name=$2; shift 2 ;;
+    --command) [ $# -ge 2 ] || die "--command needs a value"; name=$2; shift 2 ;;
     --alias) [ $# -ge 2 ] || die "--alias needs a value"; aliases=$2; alias_set=yes; shift 2 ;;
     --version) [ $# -ge 2 ] || die "--version needs a value"; tag=$2; shift 2 ;;
     --repo) [ $# -ge 2 ] || die "--repo needs a value"; repo=$2; shift 2 ;;

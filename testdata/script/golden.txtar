@@ -15,12 +15,16 @@ exec squadrn account login --help
 cmp stdout help-account-login.txt
 exec squadrn account logout --help
 cmp stdout help-account-logout.txt
+exec squadrn account adopt --help
+cmp stdout help-account-adopt.txt
 exec squadrn account rename --help
 cmp stdout help-account-rename.txt
 exec squadrn account rm --help
 cmp stdout help-account-rm.txt
 exec squadrn usage --help
 cmp stdout help-usage.txt
+exec squadrn usage setup --help
+cmp stdout help-usage-setup.txt
 exec squadrn wt --help
 cmp stdout help-wt.txt
 exec squadrn wt ls --help
@@ -92,17 +96,17 @@ Usage:
   squadrn [command]
 
 Examples:
-  squadrn                          pick an account interactively
-  squadrn personal                 run as claude/personal (also: -a personal, claude/personal)
-  squadrn personal -p "hi"         agent flags go to the agent CLI
-  squadrn personal -- "fix the bug"  a prompt goes after --
-  squadrn account add work         create claude/work, then: squadrn account login work
-  squadrn grid ~/repo feat-a personal:fix-b
+  squadrn                                  pick an account interactively
+  squadrn personal                         run as claude/personal (also: -a personal, claude/personal)
+  squadrn personal -p "hi"                 agent flags go to the agent CLI
+  squadrn personal -- "fix the bug"        a prompt goes after --
+  squadrn account add work                 create claude/work, then: squadrn account login work
+  squadrn grid ~/repo feat-a personal:fix-b  two agents side by side
 
 Agents:
   deps           Install dependencies in a worktree (package manager from its lockfile)
   gc             Remove clean worktrees that are merged or empty (dry run without --yes)
-  grid           tmux grid for <repo>, one agent per pane in its own worktree; re-running adds panes
+  grid           Run agents side by side in a tmux grid, one worktree each
   ps             List running agents: session, account, worktree
   swap           Move a conversation to another account and resume it there
   wt             Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
@@ -117,7 +121,7 @@ Setup:
   doctor         Check the install, the push guard, hooks and every account
   help           Help about any command
   self-uninstall Remove squadrn: plugin from every account, command links, completions, installed files
-  self-update    Update squadrn and its plugin in every account (--check: only look, --rollback: undo)
+  self-update    Update squadrn and its plugin in every account
   version        Print the squadrn version
 
 Flags:
@@ -221,6 +225,7 @@ Usage:
 Flags:
   -f, --force   rename even if a session seems to use the account
   -h, --help    help for rename
+  -y, --yes     do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -246,31 +251,33 @@ Show what the status line last reported about each account's usage limits (5-hou
 7-day windows), when it last hit a limit, and the best account to continue with in this repository.
 
 Usage is recorded by the status line, so it needs a one-time setup per settings file:
-squadrn usage --setup wraps the status line command (your own one keeps running and showing).
+squadrn usage setup wraps the status line command (your own one keeps running and showing).
 
 Usage:
   squadrn usage [<account>] [flags]
+  squadrn usage [command]
 
 Examples:
   squadrn usage                 all accounts
   squadrn usage work            details of claude/work
-  squadrn usage --setup --all   record usage for every account
-  squadrn usage --setup --undo  restore the previous status line
+  squadrn usage setup --all     record usage for every account
+  squadrn usage setup --undo    restore the previous status line
+
+Available Commands:
+  setup       Record an account's usage through its status line
 
 Flags:
-      --all       with --setup: every account
   -h, --help      help for usage
       --json      print JSON
-      --refresh   query login status, plan and organisation again
-      --setup     record usage through the account's status line
-      --undo      with --setup: restore the previous status line
+      --refresh   query login status, plan and organization again
       --watch     redraw every 5 seconds
-  -y, --yes       do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
+
+Use "squadrn usage [command] --help" for more information about a command.
 -- help-wt.txt --
 Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
 
@@ -279,14 +286,14 @@ Usage:
   squadrn wt [command]
 
 Examples:
-  squadrn wt feat-login             as main
-  squadrn personal wt fix-otp        as claude/personal
-  squadrn wt ls                      list worktrees
-  squadrn wt rm feat-login           remove one
+  squadrn wt feat-login           as main
+  squadrn personal wt fix-otp      as claude/personal
+  squadrn wt ls                    list worktrees
+  squadrn wt rm feat-login         remove one
 
 Available Commands:
   ls          List the agent worktrees of this repository
-  rm          Remove a worktree and its branch if merged (--force: even if modified; --force-branch: even if unmerged)
+  rm          Remove a worktree and its branch if merged
 
 Flags:
   -h, --help   help for wt
@@ -312,7 +319,8 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-wt-rm.txt --
-Remove a worktree and its branch if merged (--force: even if modified; --force-branch: even if unmerged)
+Remove a worktree and its branch if merged. --force also removes a modified worktree,
+--force-branch also deletes an unmerged branch; both ask first (-y skips).
 
 Usage:
   squadrn wt rm <name> [flags]
@@ -328,7 +336,8 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-grid.txt --
-tmux grid for <repo>, one agent per pane in its own worktree; re-running adds panes
+Run agents side by side in a tmux grid for <repo>: one pane per agent, each in its own
+worktree. Running grid again for the same repository adds panes.
 
 Usage:
   squadrn grid <repo> [<account>:]<name>... [flags]
@@ -420,23 +429,24 @@ A running session is stopped first (asks; in a grid its pane is restarted in pla
 conversation to an account of another organization asks first too. When the target account
 already holds the conversation and it went on there, the swap is refused unless --force.
 
-The legacy form <worktree> <account> moves the latest conversation of that worktree.
+--worktree <name> moves the latest conversation of that agent worktree instead.
 
 Usage:
-  squadrn swap [<worktree> <account>] [flags]
+  squadrn swap [flags]
 
 Examples:
-  squadrn swap                            the conversation that just hit its limit here
-  squadrn swap --to personal              the same, to claude/personal
-  squadrn swap feat-a personal            latest conversation of worktree feat-a
-  squadrn swap --session <id> --to work
+  squadrn swap                              the conversation that just hit its limit here
+  squadrn swap --to personal                the same, to claude/personal
+  squadrn swap --worktree feat-a --to work  latest conversation of worktree feat-a
+  squadrn swap --session <id> --to work     any conversation, by session ID
 
 Flags:
-      --force            overwrite the target's copy when it differs
-  -h, --help             help for swap
-      --session string   session ID of the conversation to move
-      --to string        account to move it to
-  -y, --yes              do not ask for confirmation
+  -f, --force             move it even if the target's copy went on and differs
+  -h, --help              help for swap
+      --session string    session ID of the conversation to move
+      --to string         account to move it to
+      --worktree string   move the latest conversation of this agent worktree
+  -y, --yes               do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -451,7 +461,7 @@ Usage:
 Flags:
   -f, --force   let git remove clean worktrees it refuses (those containing submodules)
   -h, --help    help for gc
-      --json    print the plan as JSON
+      --json    print JSON (with --yes: also what was removed)
   -y, --yes     remove instead of only listing
 
 Global Flags:
@@ -500,7 +510,7 @@ Examples:
 
 Available Commands:
   get         Print one setting
-  set         Change one setting (lists are comma separated; "" clears a list, or restores the default protected_branches)
+  set         Change one setting
 
 Flags:
   -h, --help   help for config
@@ -527,13 +537,14 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-config-set.txt --
-Change one setting (lists are comma separated; "" clears a list, or restores the default protected_branches)
+Change one setting. Lists are comma separated; "" clears a list, or restores the default
+protected_branches. Changing command or aliases relinks them in the bin dir.
 
 Usage:
   squadrn config set <key> <value> [flags]
 
 Flags:
-      --force   use a command name even if another program on PATH has it
+  -f, --force   use a command name even if another program on PATH has it
   -h, --help    help for set
 
 Global Flags:
@@ -541,7 +552,9 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-self-update.txt --
-Update squadrn and its plugin in every account (--check: only look, --rollback: undo)
+Update squadrn and its plugin in every account to the newest release of your channel.
+--check only looks and shows the release notes; --rollback goes back to the release installed
+before.
 
 Usage:
   squadrn self-update [flags]
@@ -558,7 +571,7 @@ Flags:
       --json              with --check: print JSON (current, latest, channel, available, notes)
       --repo string       GitHub repository to update from (owner/name)
       --rollback          reinstall the release that was installed before this one
-      --version string    install this release tag instead of the newest
+      --tag string        install this release (v1.2.3) instead of the newest
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -1549,7 +1562,39 @@ plugin/bin/squadrn-hook file -rwxr-xr-x
 plugin/hooks dir -rwxr-xr-x
 plugin/hooks/hooks.json file -rw-r--r--
 -- layout-bin.txt --
-sqd link -> $WORK/home/.local/share/squadrn/bin/squadrn
 squadrn link -> $WORK/home/.local/share/squadrn/bin/squadrn
+srn link -> $WORK/home/.local/share/squadrn/bin/squadrn
 -- layout-config.txt --
 config.toml file -rw-r--r--
+-- help-account-adopt.txt --
+Make an existing config dir (e.g. ~/.claude-<name>) an account
+
+Usage:
+  squadrn account adopt [<provider>/]<name> [flags]
+
+Flags:
+  -h, --help   help for adopt
+  -y, --yes    do not ask for confirmation
+
+Global Flags:
+  -a, --account string   account to run as (provider/name or name)
+  -C, --dir string       run as if started in this directory
+      --no-color         disable colors (also: NO_COLOR=1)
+-- help-usage-setup.txt --
+Record an account's usage through its status line: the status line command in the account's
+settings.json is wrapped, so squadrn sees what Claude Code reports while your own command keeps
+running and showing. Accounts that share a settings file are set up together.
+
+Usage:
+  squadrn usage setup [<account>] [flags]
+
+Flags:
+      --all    every account
+  -h, --help   help for setup
+      --undo   restore the previous status line
+  -y, --yes    do not ask for confirmation
+
+Global Flags:
+  -a, --account string   account to run as (provider/name or name)
+  -C, --dir string       run as if started in this directory
+      --no-color         disable colors (also: NO_COLOR=1)

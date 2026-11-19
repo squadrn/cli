@@ -1,4 +1,4 @@
-# 0010 — Product name Squadrn (`squadrn`, alias `sqd`)
+# 0010 — Product name Squadrn (`squadrn`, alias `srn`)
 
 Status: accepted (v1.0.0)
 
@@ -12,10 +12,10 @@ provider-neutral, since Squadrn drives several agent CLIs.
 
 - Product name **Squadrn**, pronounced "squadron": a group of agents flying in formation, each
   under its own account and worktree.
-- Checked before choosing: the `squadrn` organisations on GitHub and npm are ours; no command
-  `squadrn` or `sqd` in Homebrew, Debian/Ubuntu or on a default macOS/Linux PATH.
+- Checked before choosing: the `squadrn` organizations on GitHub and npm are ours; no command
+  `squadrn` or `srn` in Homebrew, Debian or on a default macOS/Linux PATH.
 - Accepted risk: the spelling invites the typo "squadron". The command is what people type, and
-  the default alias `sqd` sidesteps it.
+  the default alias `srn` sidesteps it.
 
 Fixed identifiers (they never follow the user's command name, ADR 0004):
 
@@ -23,7 +23,7 @@ Fixed identifiers (they never follow the user's command name, ADR 0004):
 |---|---|
 | Repository, Go module | `github.com/squadrn/squadrn` |
 | Binary, `cmd/` dir | `squadrn` (`squadrn.exe`) |
-| Default command, alias | `squadrn`, `sqd` |
+| Default command, alias | `squadrn`, `srn` |
 | Config/data/state/cache dirs | `~/.config/squadrn`, `~/.local/share/squadrn`, `~/.local/state/squadrn`, `~/.cache/squadrn` |
 | Environment variables | `SQUADRN_*` |
 | Plugin, marketplace, hook shim | `squadrn@squadrn`, `squadrn-hook` |

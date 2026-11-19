@@ -79,8 +79,8 @@ func TestGCWithOriginAndSquashMergedPR(t *testing.T) {
 	}
 
 	removed, errs := repo.RemoveAll(ctx, cands, false)
-	if removed != 1 || len(errs) != 0 {
-		t.Fatalf("Apply = %d, %v", removed, errs)
+	if len(removed) != 1 || removed[0] != "feat-squashed" || len(errs) != 0 {
+		t.Fatalf("Apply = %v, %v", removed, errs)
 	}
 	if _, err := os.Stat(repo.Dir("feat-squashed")); !os.IsNotExist(err) {
 		t.Error("squash-merged worktree still exists")

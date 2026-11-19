@@ -48,7 +48,7 @@ Facts about Claude Code (as of Claude Code 2.1.327). **D** = documented,
   `StopFailure` hook (matcher `rate_limit`, async) runs `squadrn hook limit`: it records the limit,
   estimates the reset from "resets 3:45pm" in the last message (local time, next occurrence;
   fallback: the stored 5-hour `resets_at`) and notifies "claude/work hit its usage limit (resets
-  15:45) — sqd swap".
+  15:45) — srn swap".
 - **Setup**: `squadrn usage setup [<account> | --all] [--undo] [-y]` wraps `statusLine.command`
   (other fields and keys kept in place). `settings.json` is usually a link to main's, so the change
   is written through the link and covers every account sharing it; the output names them. The
@@ -75,7 +75,7 @@ Facts about Claude Code (as of Claude Code 2.1.327). **D** = documented,
   directory (from the usage store) and offers ranked target accounts, showing their usage.
 - Every handoff is appended to `~/.local/state/squadrn/handoffs.jsonl` (time, session, from, to,
   cwd).
-- Moving to an account of another organisation always asks.
+- Moving to an account of another organization always asks.
 - As built: the transcript moves under the source's project folder name (Claude Code shortens long
   keys with a hash, so the key is never computed for a session ID; `--worktree <name>` computes
   it and falls back to the transcripts whose first records name the worktree as `cwd`).
@@ -95,7 +95,7 @@ Facts about Claude Code (as of Claude Code 2.1.327). **D** = documented,
 
 - A supervisor watches limit events and acts by `swap_policy`: `ask` (default) offers the swap,
   `auto` performs it.
-- `auto` never crosses organisations: its ranking leaves out accounts of other organisations.
+- `auto` never crosses organizations: its ranking leaves out accounts of other organizations.
 - `auto` sends no continuation prompt unless one is configured.
 
 ### Decisions recorded
@@ -103,7 +103,7 @@ Facts about Claude Code (as of Claude Code 2.1.327). **D** = documented,
 1. The status line wrapper is offered once at `account add` (asked) and through
    `usage setup`; it is never installed silently.
 2. S2's default policy is `ask`.
-3. `auto` never moves a session to another organisation.
+3. `auto` never moves a session to another organization.
 4. `auto` sends no continuation prompt by default.
 
 ## Consequences

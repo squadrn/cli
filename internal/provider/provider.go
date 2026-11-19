@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"strconv"
+	"strings"
 )
 
 type Caps struct {
@@ -58,6 +59,12 @@ type AuthStatus struct {
 	// SubscriptionType is the plan ("pro", "max", …); empty for API billing or older CLIs.
 	SubscriptionType string `json:"subscriptionType,omitempty"`
 	AuthMethod       string `json:"authMethod,omitempty"`
+}
+
+// Metered: logged in without a subscription, billed per use (no usage limits to track).
+func (s AuthStatus) Metered() bool {
+	m := strings.ToLower(s.AuthMethod)
+	return s.LoggedIn && s.SubscriptionType == "" && (strings.Contains(m, "api") || strings.Contains(m, "key"))
 }
 
 // ExitStatus is returned by Agent.Exec on platforms where the session runs as a child process

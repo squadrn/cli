@@ -56,7 +56,10 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 	var o updateOptions
 	cmd := &cobra.Command{
 		Use:   "self-update",
-		Short: "Update squadrn and its plugin in every account (--check: only look, --rollback: undo)",
+		Short: "Update squadrn and its plugin in every account",
+		Long: `Update squadrn and its plugin in every account to the newest release of your channel.
+--check only looks and shows the release notes; --rollback goes back to the release installed
+before.`,
 		Example: fmt.Sprintf(`  %[1]s self-update --check       what is new
   %[1]s self-update               install the newest release of your channel
   %[1]s self-update --rollback    go back to the release installed before`, a.cmd),
@@ -67,7 +70,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 			}
 			if o.rollback {
 				if o.check || o.tag != "" {
-					return usagef("--rollback cannot be combined with --check or --version")
+					return usagef("--rollback cannot be combined with --check or --tag")
 				}
 				return a.rollback()
 			}
@@ -75,7 +78,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&o.check, "check", false, "only report whether an update is available, with its release notes")
-	cmd.Flags().StringVar(&o.tag, "version", "", "install this release tag instead of the newest")
+	cmd.Flags().StringVar(&o.tag, "tag", "", "install this release (v1.2.3) instead of the newest")
 	cmd.Flags().StringVar(&o.repo, "repo", "", "GitHub repository to update from (owner/name)")
 	cmd.Flags().BoolVar(&o.allowDowngrade, "allow-downgrade", false, "install a release older than the running one")
 	cmd.Flags().BoolVar(&o.rollback, "rollback", false, "reinstall the release that was installed before this one")
@@ -155,7 +158,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 		a.out("squadrn %s is up to date (%s channel)\n", current, channel)
 		return nil
 	case repair:
-		a.out("the installed copy of %s is incomplete (VERSION %q); reinstalling it\n", current, a.layout.Version())
+		a.out("the installed copy of %s is incomplete; reinstalling it\n", current)
 	case comparable && cmp < 0 && !o.allowDowngrade:
 		return usagef("%s is older than the installed %s; pass --allow-downgrade to install it", tag, current)
 	}

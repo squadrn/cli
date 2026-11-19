@@ -10,7 +10,6 @@ import (
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/provider/claude"
@@ -23,25 +22,6 @@ const thenDeadline = 10 * time.Second
 
 func usageStore(home string) usage.Store {
 	return usage.Store{Dir: filepath.Join(config.DirsFor(home, config.Slug).State, "usage")}
-}
-
-// hookAccount is the account a hook runs in, from the provider's config-dir variable: unset is
-// main; a dir that is no known account gives ok false.
-func hookAccount(store account.Store, spec provider.Spec) (account.Account, bool) {
-	dir := os.Getenv(spec.ConfigEnv)
-	accts, err := store.List()
-	if err != nil {
-		return account.Account{}, false
-	}
-	for _, a := range accts {
-		if a.Provider != spec.ID {
-			continue
-		}
-		if dir == "" && a.IsMain() || dir != "" && fsx.SamePath(a.Dir, dir) {
-			return a, true
-		}
-	}
-	return account.Account{}, false
 }
 
 // statusline records the usage the status line reports, then shows the wrapped command's output
@@ -90,7 +70,7 @@ func (h hookEnv) recordStatus(raw []byte) (name string, snap usage.Snapshot) {
 	if err != nil {
 		return "", snap
 	}
-	acct, ok := hookAccount(store, provider.Claude)
+	acct, ok := hookAccount(store)
 	if !ok {
 		return "", snap
 	}
@@ -139,7 +119,7 @@ func (h hookEnv) recordLimit(raw []byte) (msg string) {
 	}
 	label := "this account"
 	snap := f.Observation
-	if acct, ok := hookAccount(store, provider.Claude); ok {
+	if acct, ok := hookAccount(store); ok {
 		label = acct.Label()
 		us := usageStore(store.Home)
 		if snap.ResetEstimate.IsZero() {
@@ -165,4 +145,9 @@ func clock(t, now time.Time) string {
 		return t.Format("15:04")
 	}
 	return t.Format("Mon 15:04")
+}
+
+// hookAccount is the account a hook runs in, from Claude Code's config-dir variable.
+func hookAccount(store account.Store) (account.Account, bool) {
+	return store.ByConfigDir(provider.Claude, os.Getenv(provider.Claude.ConfigEnv))
 }

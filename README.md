@@ -25,12 +25,12 @@ it was downloaded from; see [releases](https://github.com/squadrn/squadrn/releas
 curl -fsSL https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.sh | sh
 ```
 
-The default command is **`squadrn`** with the short alias **`sqd`**. At a terminal the installer
+The default command is **`squadrn`** with the short alias **`srn`**. At a terminal the installer
 asks for other names (Enter keeps the default); or pass them up front (`--alias ''` installs no
 alias; `SQUADRN_COMMAND`, `SQUADRN_ALIASES` and `SQUADRN_VERSION` work too):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --name ai --alias ''
+curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --command ai --alias ''
 ```
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
@@ -56,7 +56,7 @@ irm https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.ps1
 `$env:SQUADRN_VERSION` first, or use the script block form:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Name ai -Alias '' -AddToProfile
+& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Command ai -Alias '' -AddToProfile
 ```
 
 A failed install prints the reason in red and leaves the window open. `-AddToProfile` loads tab
@@ -85,6 +85,7 @@ it checks in the background (never delaying a command) and, at a terminal, shows
 squadrn self-update --check       # what is new (release notes)
 squadrn self-update               # install it: signature, checksum, then the plugin in every account
 squadrn self-update --rollback    # back to the release installed before (run again to go forward)
+squadrn self-update --tag v1.2.0  # a specific release
 squadrn config set update_channel beta    # also pre-releases; stable is the default
 squadrn config set update_check false     # no checks, no notices (also: SQUADRN_NO_UPDATE_CHECK=1)
 ```
@@ -100,7 +101,7 @@ installed files; accounts are kept). `--purge` also removes the config, guard lo
 
 ```sh
 <command> config set command ai          # relinks ~/.local/bin and the shell completions
-<command> config set aliases sqd,sx
+<command> config set aliases srn,sx
 ```
 
 Completions for zsh (`~/.zsh/completions`), bash (`~/.local/share/bash-completion/completions`)
@@ -110,7 +111,7 @@ and fish (`~/.config/fish/completions`) are written when those directories exist
 Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`.
 Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`, build provenance).
 Updates read the public GitHub API; set `GH_TOKEN` or `GITHUB_TOKEN` (or log in with `gh`) only if
-you hit its rate limit. Examples below use `squadrn`; `sqd` works the same.
+you hit its rate limit. Examples below use `squadrn`; `srn` works the same.
 
 ## Use within Anthropic's terms
 
@@ -165,11 +166,11 @@ squadrn usage work                   # details, including the last limit hit and
 squadrn usage --json                 # stable JSON (below)
 squadrn usage --refresh              # also re-query login, plan and organization
 squadrn usage --watch                # redraw every 5 seconds
-squadrn usage --setup [work|--all]   # record usage through the status line (asks; -y skips)
-squadrn usage --setup --undo         # restore the previous status line
+squadrn usage setup [work|--all]     # record usage through the status line (asks; -y skips)
+squadrn usage setup --undo           # restore the previous status line
 ```
 
-`--setup` wraps the status line command in `settings.json`: squadrn records what it receives, then
+`usage setup` wraps the status line command in `settings.json`: squadrn records what it receives, then
 runs your own command with the same input and shows its output unchanged (without one, it shows
 `work · 5h 42% · 7d 18%`). Accounts that share main's `settings.json` are all covered by one
 change. `account add` offers it once (`--usage`/`--no-usage` decide without asking);
@@ -190,10 +191,10 @@ and 7d use. Records live in `~/.local/state/squadrn/usage/` (private).
 was started in.
 
 ```sh
-squadrn swap                          # the conversation that just hit its limit here; pick the target
-squadrn swap --to personal            # same, to claude/personal
-squadrn swap --session <id> --to work # any conversation, by session ID
-squadrn swap feat-a personal          # latest conversation of worktree feat-a (earlier form)
+squadrn swap                                  # the conversation that just hit its limit here; pick the target
+squadrn swap --to personal                    # same, to claude/personal
+squadrn swap --session <id> --to work         # any conversation, by session ID
+squadrn swap --worktree feat-a --to personal  # latest conversation of worktree feat-a
 ```
 
 Without `--session`, the conversation is the one that last hit its limit in the current directory
@@ -307,7 +308,7 @@ agents cannot edit squadrn's own files with their file tools.
 ```toml
 schema = 1
 command = "ai"                               # set at install; change with: config set command
-aliases = ["sqd"]
+aliases = ["srn"]
 default_provider = "claude"
 shared_mcp = ["codegraph"]                   # MCP servers copied from main into new accounts
 protected_branches = ["main", "release/*"]   # repositories can only add to this list
@@ -330,7 +331,8 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 ## Exit codes
 
 `0` ok · `1` error, or "no" at a confirmation · `2` usage or invalid input · `130` cancelled
-(ctrl-c, esc) · `deps` passes the package manager's status through. Commands with `--json` print
+(ctrl-c, esc) · running the agent (`squadrn [<account>]`, `wt`, `swap`) passes the agent's exit
+status through, as `deps` does the package manager's. Commands with `--json` print
 machine-readable output on stdout.
 
 ## Development

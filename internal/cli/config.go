@@ -73,8 +73,10 @@ func (a *app) configCmd() *cobra.Command {
 	cmd.AddCommand(get)
 	var force bool
 	set := &cobra.Command{
-		Use:       "set <key> <value>",
-		Short:     "Change one setting (lists are comma separated; \"\" clears a list, or restores the default protected_branches)",
+		Use:   "set <key> <value>",
+		Short: "Change one setting",
+		Long: `Change one setting. Lists are comma separated; "" clears a list, or restores the default
+protected_branches. Changing command or aliases relinks them in the bin dir.`,
 		Args:      exactArgs(2),
 		ValidArgs: config.Keys,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -121,7 +123,7 @@ func (a *app) configCmd() *cobra.Command {
 			return nil
 		},
 	}
-	set.Flags().BoolVar(&force, "force", false, "use a command name even if another program on PATH has it")
+	set.Flags().BoolVarP(&force, "force", "f", false, "use a command name even if another program on PATH has it")
 	cmd.AddCommand(set)
 	return cmd
 }

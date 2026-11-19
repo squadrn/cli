@@ -40,14 +40,14 @@ func TestReplaceExecutableRestoresOnFailure(t *testing.T) {
 
 func TestMoveAside(t *testing.T) {
 	dir := t.TempDir()
-	p := filepath.Join(dir, "sqd")
+	p := filepath.Join(dir, "srn")
 	if err := os.WriteFile(p, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := MoveAside(p); err != nil {
 		t.Fatal(err)
 	}
-	if left := Leftovers(dir, []string{"sqd"}, time.Now()); len(left) != 1 {
+	if left := Leftovers(dir, []string{"srn"}, time.Now()); len(left) != 1 {
 		t.Fatalf("moved aside: %v", left)
 	}
 }

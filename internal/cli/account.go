@@ -52,14 +52,15 @@ func (a *app) accountCmd() *cobra.Command {
 }
 
 func (a *app) accountRenameCmd() *cobra.Command {
-	var force bool
+	var force, yes bool
 	cmd := &cobra.Command{
 		Use:               "rename <account> <new-name>",
 		Short:             "Rename an account (logs it out first; log in again afterwards)",
 		Args:              exactArgs(2),
-		RunE:              func(_ *cobra.Command, args []string) error { return a.accountRename(args[0], args[1], force) },
+		RunE:              func(_ *cobra.Command, args []string) error { return a.accountRename(args[0], args[1], force, yes) },
 		ValidArgsFunction: a.completeAccounts,
 	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "rename even if a session seems to use the account")
 	return cmd
 }
@@ -199,7 +200,7 @@ func (a *app) accountAdd(input string, trackUsage *bool) error {
 	}
 	a.cache.Forget(acct.Label())
 	if err := a.offerUsageTracking(acct, trackUsage); err != nil {
-		a.warnf("usage tracking: %v; run: %s usage --setup %s", err, a.cmd, acct.Label())
+		a.warnf("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
 	}
 	if s, err := ag.Auth(context.Background(), acct.ConfigDir()); err != nil || !s.LoggedIn {
 		a.out("next: %s account login %s\n", a.cmd, acct.Label())
@@ -242,7 +243,7 @@ type relocator interface {
 	Relocate(oldDir, newDir string) error
 }
 
-func (a *app) accountRename(input, newName string, force bool) error {
+func (a *app) accountRename(input, newName string, force, yes bool) error {
 	acct, err := a.store.Get(input)
 	if err != nil {
 		return err
@@ -250,7 +251,11 @@ func (a *app) accountRename(input, newName string, force bool) error {
 	if err := a.checkAccountFree(acct, force); err != nil {
 		return err
 	}
-	if _, err := a.store.RenameTarget(acct, newName); err != nil {
+	to, err := a.store.RenameTarget(acct, newName)
+	if err != nil {
+		return err
+	}
+	if err := a.confirm(yes, "Rename %s to %s; it is logged out and has to log in again", acct.Label(), to.Label()); err != nil {
 		return err
 	}
 	ag, err := a.agent(acct.Spec)
@@ -261,18 +266,18 @@ func (a *app) accountRename(input, newName string, force bool) error {
 	// named after it): sign out first so the old item does not stay behind.
 	a.cache.Forget(acct.Label())
 	if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
-		a.warnf("could not log %s out before renaming: %v", acct.Label(), err)
+		a.warnf("cannot log %s out before renaming: %v", acct.Label(), err)
 	}
-	to, err := a.store.Rename(acct, newName)
+	to, err = a.store.Rename(acct, newName)
 	if err != nil {
 		return err
 	}
 	if err := usageStore(a.store.Home).Rename(acct.Provider, acct.Name, to.Name); err != nil {
-		a.warnf("could not move the usage record of %s: %v", acct.Label(), err)
+		a.warnf("cannot move the usage record of %s: %v", acct.Label(), err)
 	}
 	if r, ok := ag.(relocator); ok {
 		if err := r.Relocate(acct.Dir, to.Dir); err != nil {
-			a.warnf("could not update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
+			a.warnf("cannot update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
 		}
 	}
 	a.out("renamed %s → %s (%s), logged out\n", acct.Label(), to.Label(), a.tilde(to.Dir))
@@ -316,7 +321,7 @@ func (a *app) accountRmCmd() *cobra.Command {
 				return err
 			}
 			if err := usageStore(a.store.Home).Remove(acct.Provider, acct.Name); err != nil {
-				a.warnf("could not remove the usage record of %s: %v", acct.Label(), err)
+				a.warnf("cannot remove the usage record of %s: %v", acct.Label(), err)
 			}
 			a.out("removed account %s (moved to %s)\n", acct.Label(), a.tilde(dst))
 			return nil

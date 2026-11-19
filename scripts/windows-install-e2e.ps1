@@ -56,10 +56,10 @@ foreach ($shell in "powershell.exe", "pwsh") {
     New-Item -ItemType Directory -Force -Path (Join-Path $env:USERPROFILE ".claude") | Out-Null
     $bin = Join-Path $env:USERPROFILE ".local\bin"
 
-    # No -Version: the script installs its own release, not the latest stable one. The fake home
-    # has no Documents yet: Windows PowerShell 5.1 then has no profile path, which must only cost
-    # completion.
-    $run = "$doc -AddToProfile; 'EAP=' + `$ErrorActionPreference; 'PROFILE=' + `$PROFILE.CurrentUserAllHosts"
+    # No -Version: the script installs its own release, not the latest stable one. -Command is
+    # install.sh's --command. The fake home has no Documents yet: Windows PowerShell 5.1 then has no
+    # profile path, which must only cost completion.
+    $run = "$doc -Command squadrn -AddToProfile; 'EAP=' + `$ErrorActionPreference; 'PROFILE=' + `$PROFILE.CurrentUserAllHosts"
     $out = & $shell -NoProfile -Command $run 2>&1 | Out-String
     Write-Host $out
     Check ($out -match "verified release signature") "${shell}: signature verified" $out

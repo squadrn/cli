@@ -175,7 +175,7 @@ func TestSnapshotRollbackAndUnlink(t *testing.T) {
 		t.Fatalf("after rollback: %q %q", b, l.Version())
 	}
 
-	if _, err := l.LinkCommands([]string{"squadrn", "sqd"}, time.Now()); err != nil {
+	if _, err := l.LinkCommands([]string{"squadrn", "srn"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("/elsewhere", filepath.Join(l.BinDir, "other")); err != nil {
@@ -233,7 +233,7 @@ func TestIncompleteAndInstalledCopy(t *testing.T) {
 	if !l.Incomplete("v1.0.0") {
 		t.Fatal("a missing plugin dir is not incomplete")
 	}
-	if !l.IsInstalledCopy(l.Binary()) || !l.IsInstalledCopy(filepath.Join(l.BinDir, "sqd")) || l.IsInstalledCopy(filepath.Join(home, "squadrn")) {
+	if !l.IsInstalledCopy(l.Binary()) || !l.IsInstalledCopy(filepath.Join(l.BinDir, "srn")) || l.IsInstalledCopy(filepath.Join(home, "squadrn")) {
 		t.Fatal("IsInstalledCopy")
 	}
 }

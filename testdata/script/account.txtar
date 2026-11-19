@@ -80,7 +80,7 @@ stdout 'linked ~/.claude-work/settings.json'
 # A session in progress blocks rename and rm unless --force.
 mkdir home/.claude-work/.squadrn-inuse
 cp inuse.json home/.claude-work/.squadrn-inuse/1.json
-! exec squadrn account rename work job
+! exec squadrn account rename work job -y
 stderr 'claude/work is in use by pid 1 \(claude/work\); stop it first \(or use --force\)'
 ! exec squadrn account rm work --yes
 stderr 'in use by pid 1'
@@ -94,9 +94,10 @@ exists home/.claude-work
 mkdir home/.claude-work/plugins
 exec sh -c 'printf "{\"installPath\":\"%s/.claude-work/plugins/cache/x\"}" "$HOME" > home/.claude-work/plugins/installed_plugins.json'
 cp empty home/.claude-work/.loggedin
+exitcode 2 squadrn account rename work job
 mkdir home/.local/state/squadrn/usage
 cp settings.json home/.local/state/squadrn/usage/claude-work.json
-exec squadrn account rename work job
+exec squadrn account rename work job -y
 stdout 'renamed claude/work → claude/job \(~/.claude-job\), logged out'
 stdout 'next: squadrn account login claude/job'
 ! exists home/.claude-work
@@ -107,7 +108,7 @@ exists home/.local/state/squadrn/usage/claude-job.json
 exitcode 2 squadrn account rename job grid
 exitcode 2 squadrn account rename main x2
 exitcode 1 squadrn account rename ghost x3
-exec squadrn account rename job work
+exec squadrn account rename job work -y
 exists home/.local/state/squadrn/usage/claude-work.json
 
 # Validation: invalid and reserved names are usage errors (2).

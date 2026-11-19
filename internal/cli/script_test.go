@@ -227,7 +227,7 @@ func TestScript(t *testing.T) {
 			if runtime.GOOS == "windows" {
 				tmpRoot = ""
 			}
-			sock, err := os.MkdirTemp(tmpRoot, "sqdt")
+			sock, err := os.MkdirTemp(tmpRoot, "srnt")
 			if err != nil {
 				return err
 			}

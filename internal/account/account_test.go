@@ -421,3 +421,23 @@ func TestRefreshSharedReconcilesEntriesAndReportsReplaced(t *testing.T) {
 		t.Error("main refreshed")
 	}
 }
+
+func TestByConfigDir(t *testing.T) {
+	s := twoProviders(newStore(t, "personal"))
+	mkAccount(t, filepath.Join(s.Home, ".codex-personal"))
+	if a, ok := s.ByConfigDir(provider.Claude, ""); !ok || a.Label() != "claude/main" {
+		t.Errorf("unset dir = %+v, %v", a, ok)
+	}
+	if a, ok := s.ByConfigDir(provider.Claude, filepath.Join(s.Home, ".claude-personal")); !ok || a.Label() != "claude/personal" {
+		t.Errorf("account dir = %+v, %v", a, ok)
+	}
+	if a, ok := s.ByConfigDir(codex, filepath.Join(s.Home, ".codex-personal")); !ok || a.Label() != "codex/personal" {
+		t.Errorf("other provider = %+v, %v", a, ok)
+	}
+	if _, ok := s.ByConfigDir(provider.Claude, filepath.Join(s.Home, ".codex-personal")); ok {
+		t.Error("another provider's dir matched")
+	}
+	if _, ok := s.ByConfigDir(provider.Claude, filepath.Join(s.Home, "elsewhere")); ok {
+		t.Error("unknown dir matched")
+	}
+}

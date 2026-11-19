@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -48,10 +49,10 @@ func (a *app) wtCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wt <name>",
 		Short: "Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)",
-		Example: fmt.Sprintf(`  %[1]s wt feat-login             as main
-  %[1]s personal wt fix-otp        as claude/personal
-  %[1]s wt ls                      list worktrees
-  %[1]s wt rm feat-login           remove one`, a.cmd),
+		Example: fmt.Sprintf(`  %[1]s wt feat-login           as main
+  %[1]s personal wt fix-otp      as claude/personal
+  %[1]s wt ls                    list worktrees
+  %[1]s wt rm feat-login         remove one`, a.cmd),
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -146,8 +147,10 @@ func (a *app) wtLsCmd() *cobra.Command {
 func (a *app) wtRmCmd() *cobra.Command {
 	var force, forceBranch, yes bool
 	cmd := &cobra.Command{
-		Use:               "rm <name>",
-		Short:             "Remove a worktree and its branch if merged (--force: even if modified; --force-branch: even if unmerged)",
+		Use:   "rm <name>",
+		Short: "Remove a worktree and its branch if merged",
+		Long: `Remove a worktree and its branch if merged. --force also removes a modified worktree,
+--force-branch also deletes an unmerged branch; both ask first (-y skips).`,
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -201,6 +204,29 @@ func (a *app) wtRmCmd() *cobra.Command {
 	return cmd
 }
 
+func (a *app) gcJSON(ctx context.Context, repo worktree.Repo, base string, cands []worktree.Candidate, yes, force bool) error {
+	rep := gcReport{Base: base, Worktrees: make([]gcRow, len(cands)), Errors: []string{}}
+	var removed []string
+	var errs []error
+	if yes {
+		removed, errs = repo.RemoveAll(ctx, cands, force)
+	}
+	for i, c := range cands {
+		name, _ := repo.Name(c.Worktree)
+		rep.Worktrees[i] = gcRow{Name: name, Branch: c.Branch, Action: c.Action, Reason: a.gcReason(c), Ignored: c.Ignored, Removed: slices.Contains(removed, name)}
+	}
+	for _, e := range errs {
+		rep.Errors = append(rep.Errors, e.Error())
+	}
+	if err := a.printJSON(rep); err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return errQuiet
+	}
+	return nil
+}
+
 // gcReason says why gc keeps or removes a worktree.
 func (a *app) gcReason(c worktree.Candidate) string {
 	if len(c.InUse) > 0 {
@@ -223,6 +249,14 @@ type gcRow struct {
 	Action  worktree.Action `json:"action"`
 	Reason  string          `json:"reason"`
 	Ignored int             `json:"ignored"`
+	Removed bool            `json:"removed"`
+}
+
+// gcReport is gc --json: the plan, and with --yes what was removed and what failed.
+type gcReport struct {
+	Base      string   `json:"base"`
+	Worktrees []gcRow  `json:"worktrees"`
+	Errors    []string `json:"errors"`
 }
 
 func (a *app) gcCmd() *cobra.Command {
@@ -248,34 +282,8 @@ func (a *app) gcCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if asJSON && !yes {
-				rows := make([]gcRow, len(cands))
-				for i, c := range cands {
-					name, _ := repo.Name(c.Worktree)
-					rows[i] = gcRow{Name: name, Branch: c.Branch, Action: c.Action, Reason: a.gcReason(c), Ignored: c.Ignored}
-				}
-				return a.printJSON(map[string]any{"base": base, "worktrees": rows})
-			}
 			if asJSON {
-				removed := []string{}
-				errs := []string{}
-				_, rerrs := repo.RemoveAll(ctx, cands, force)
-				for _, c := range cands {
-					if _, err := os.Stat(c.Path); c.Action != worktree.Keep && errors.Is(err, os.ErrNotExist) {
-						name, _ := repo.Name(c.Worktree)
-						removed = append(removed, name)
-					}
-				}
-				for _, e := range rerrs {
-					errs = append(errs, e.Error())
-				}
-				if err := a.printJSON(map[string]any{"base": base, "removed": removed, "errors": errs}); err != nil {
-					return err
-				}
-				if len(rerrs) > 0 {
-					return errQuiet
-				}
-				return nil
+				return a.gcJSON(ctx, repo, base, cands, yes, force)
 			}
 			a.out("base: %s\n", base)
 			for _, c := range cands {
@@ -290,15 +298,15 @@ func (a *app) gcCmd() *cobra.Command {
 			for _, e := range errs {
 				a.errf("%s: %v\n", a.cmd, e)
 			}
-			a.out("removed %d worktree(s)\n", removed)
+			a.out("removed %d worktree(s)\n", len(removed))
 			if len(errs) > 0 {
-				return fmt.Errorf("%d worktree(s) could not be removed", len(errs))
+				return fmt.Errorf("%d worktree(s) cannot be removed", len(errs))
 			}
 			return nil
 		},
 	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "remove instead of only listing")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "print the plan as JSON")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON (with --yes: also what was removed)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "let git remove clean worktrees it refuses (those containing submodules)")
 	return cmd
 }

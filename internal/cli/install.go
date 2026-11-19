@@ -59,7 +59,7 @@ func (a *app) selfInstallCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&nc.command, "command", "", "command name to install under (default: configured, else squadrn)")
 	cmd.Flags().StringSliceVar(&nc.aliases, "alias", nil, "extra command names, comma separated")
-	cmd.Flags().BoolVar(&nc.force, "force", false, "install even if a name is another program on PATH")
+	cmd.Flags().BoolVarP(&nc.force, "force", "f", false, "install even if another program on PATH has one of the names")
 	cmd.Flags().BoolVar(&nc.interactive, "interactive", false, "ask for the command name and aliases on the terminal")
 	return cmd
 }
@@ -126,7 +126,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	if fsx.IsDir(staged) {
 		if err := fsx.MoveDir(staged, a.layout.Previous()); err != nil {
-			a.warnf("could not keep the previous release for --rollback (%v); a rollback may reinstall an older one", err)
+			a.warnf("cannot keep the previous release for --rollback (%v); a rollback may reinstall an older one", err)
 			_ = os.RemoveAll(staged)
 		}
 	}

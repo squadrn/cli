@@ -25,7 +25,9 @@ func (a *app) gridCmd() *cobra.Command {
 	var spread bool
 	cmd := &cobra.Command{
 		Use:   "grid <repo> [<account>:]<name>...",
-		Short: "tmux grid for <repo>, one agent per pane in its own worktree; re-running adds panes",
+		Short: "Run agents side by side in a tmux grid, one worktree each",
+		Long: `Run agents side by side in a tmux grid for <repo>: one pane per agent, each in its own
+worktree. Running grid again for the same repository adds panes.`,
 		Example: fmt.Sprintf(`  %[1]s grid ~/repo feat-a personal:fix-b          per-agent account (default: main or -a)
   %[1]s grid ~/repo feat-a claude/personal:fix-b   account as provider/name
   %[1]s grid ~/repo feat-1 feat-2 --spread         round-robin over logged-in accounts
@@ -281,13 +283,20 @@ func (a *app) gridLsCmd() *cobra.Command {
 			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, "SESSION\tREPO\tPANES\tATTACHED")
 			for _, s := range sessions {
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%v\n", s.Name, a.tilde(s.Repo), s.Panes, s.Attached)
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.Name, a.tilde(s.Repo), s.Panes, yesNo(s.Attached))
 			}
 			return w.Flush()
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
 	return cmd
+}
+
+func yesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
 }
 
 func (a *app) psCmd() *cobra.Command {
@@ -311,7 +320,7 @@ func (a *app) psCmd() *cobra.Command {
 				return a.printJSON(panes)
 			}
 			if len(panes) == 0 {
-				a.out("no running grids\n")
+				a.out("no running agents\n")
 				return nil
 			}
 			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)

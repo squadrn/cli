@@ -361,7 +361,7 @@ func TestConfigAndInstalledRelease(t *testing.T) {
 		}
 	}
 	e.Self, e.Version = bin, "1.2.0"
-	if c, _ := find(e.install(context.Background()), "installed release is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
+	if c, _ := find(e.install(context.Background()), "the installed copy of v1.2.0 is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
 		t.Fatalf("mismatch: %+v", c)
 	}
 	e.Version = "v1.1.0"
@@ -399,9 +399,9 @@ func TestVersions(t *testing.T) {
 
 func TestUsageTrackingLine(t *testing.T) {
 	e := env(t, fakeAgent{loggedIn: true}, nil)
-	e.Command = "sqd"
+	e.Command = "srn"
 	e.Usage = func(account.Account) bool { return false }
-	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (sqd usage --setup claude/main)"); !ok || c.Status != OK {
+	if c, ok := find(e.accounts(context.Background()), "usage tracking: off (srn usage setup claude/main)"); !ok || c.Status != OK {
 		t.Errorf("off: %+v", c)
 	}
 	e.Usage = func(account.Account) bool { return true }

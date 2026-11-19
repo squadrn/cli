@@ -29,15 +29,14 @@ import (
 var stopWait = 10 * time.Second
 
 type swapOptions struct {
-	session, to string
-	worktree    string // legacy form: <worktree> <account>
-	yes, force  bool
+	session, to, worktree string
+	yes, force            bool
 }
 
 func (a *app) swapCmd() *cobra.Command {
 	var o swapOptions
 	cmd := &cobra.Command{
-		Use:   "swap [<worktree> <account>]",
+		Use:   "swap",
 		Short: "Move a conversation to another account and resume it there",
 		Long: `Move a conversation to another account and resume it there, e.g. when an account hits its
 usage limit. Without arguments the conversation is the one that last hit its limit in this
@@ -48,28 +47,21 @@ A running session is stopped first (asks; in a grid its pane is restarted in pla
 conversation to an account of another organization asks first too. When the target account
 already holds the conversation and it went on there, the swap is refused unless --force.
 
-The legacy form <worktree> <account> moves the latest conversation of that worktree.`,
-		Example: fmt.Sprintf(`  %[1]s swap                            the conversation that just hit its limit here
-  %[1]s swap --to personal              the same, to claude/personal
-  %[1]s swap feat-a personal            latest conversation of worktree feat-a
-  %[1]s swap --session <id> --to work`, a.cmd),
-		Args: func(cmd *cobra.Command, args []string) error {
-			switch {
-			case len(args) == 0:
-			case len(args) == 2 && o.session == "" && o.to == "":
-				o.worktree, o.to = args[0], args[1]
-			default:
-				return usagef("usage: %s", cmd.UseLine())
-			}
-			return nil
-		},
-		ValidArgsFunction: a.completeWorktrees,
-		RunE:              func(*cobra.Command, []string) error { return a.swap(o) },
+--worktree <name> moves the latest conversation of that agent worktree instead.`,
+		Example: fmt.Sprintf(`  %[1]s swap                              the conversation that just hit its limit here
+  %[1]s swap --to personal                the same, to claude/personal
+  %[1]s swap --worktree feat-a --to work  latest conversation of worktree feat-a
+  %[1]s swap --session <id> --to work     any conversation, by session ID`, a.cmd),
+		Args: noArgs,
+		RunE: func(*cobra.Command, []string) error { return a.swap(o) },
 	}
 	cmd.Flags().StringVar(&o.session, "session", "", "session ID of the conversation to move")
+	cmd.Flags().StringVar(&o.worktree, "worktree", "", "move the latest conversation of this agent worktree")
 	cmd.Flags().StringVar(&o.to, "to", "", "account to move it to")
 	cmd.Flags().BoolVarP(&o.yes, "yes", "y", false, "do not ask for confirmation")
-	cmd.Flags().BoolVar(&o.force, "force", false, "overwrite the target's copy when it differs")
+	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "move it even if the target's copy went on and differs")
+	_ = cmd.RegisterFlagCompletionFunc("worktree", a.completeWorktrees)
+	_ = cmd.RegisterFlagCompletionFunc("to", a.completeAccounts)
 	return cmd
 }
 
@@ -85,6 +77,9 @@ type swapSource struct {
 }
 
 func (a *app) swap(o swapOptions) error {
+	if o.session != "" && o.worktree != "" {
+		return usagef("--session and --worktree name the conversation two ways; pass one")
+	}
 	if o.worktree != "" {
 		if err := worktree.ValidateName(o.worktree); err != nil {
 			return err
@@ -134,7 +129,7 @@ func (a *app) swap(o swapOptions) error {
 	}
 	st := a.statuses([]account.Account{from, *to}, true)
 	if st[1].Err == nil && !st[1].Status.LoggedIn {
-		return fmt.Errorf("%s is not logged in; run: %s account login %s", to.Label(), a.cmd, to.Name)
+		return fmt.Errorf("%s is not logged in; run: %s account login %s", to.Label(), a.cmd, to.Label())
 	}
 	if from.Label() != to.Label() {
 		fromOrg, toOrg := st[0].Status.OrgName, st[1].Status.OrgName
@@ -166,7 +161,7 @@ func (a *app) swap(o swapOptions) error {
 		}
 		h := usage.Handoff{At: a.now(), Session: src.session.ID, From: from.Label(), To: to.Label(), Cwd: src.cwd}
 		if err := a.ledger().Append(h); err != nil {
-			a.warnf("could not record the handoff: %v", err)
+			a.warnf("cannot record the handoff: %v", err)
 		}
 	}
 	what := "swap"
@@ -196,8 +191,8 @@ func (a *app) ledger() usage.Ledger {
 	return usage.Ledger{Path: filepath.Join(config.DirsFor(a.store.Home, config.Slug).State, "handoffs.jsonl")}
 }
 
-// swapSource finds the conversation to move: --session, the legacy worktree form, else the
-// candidates in the working directory.
+// swapSource finds the conversation to move: --session, --worktree, else the candidates in the
+// working directory.
 func (a *app) swapSource(o swapOptions, spec provider.Spec, accts []account.Account, dirs []string) (swapSource, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -230,7 +225,7 @@ func (a *app) swapSource(o swapOptions, spec provider.Spec, accts []account.Acco
 	cands := a.swapCandidates(accts, dirs, cwd)
 	switch len(cands) {
 	case 0:
-		return swapSource{}, fmt.Errorf("no conversation hit its limit or runs in %s; pass --session <id> (or: %s swap <worktree> <account>)", a.tilde(cwd), a.cmd)
+		return swapSource{}, fmt.Errorf("no conversation hit its limit or runs in %s; pass --session <id> or --worktree <name>", a.tilde(cwd))
 	case 1:
 		return a.located(cands[0], spec, cwd)
 	}

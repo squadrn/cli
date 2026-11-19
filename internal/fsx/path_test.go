@@ -39,7 +39,7 @@ func TestPaths(t *testing.T) {
 }
 
 func TestBackupName(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "sqd")
+	p := filepath.Join(t.TempDir(), "srn")
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	if got := BackupName(p, now); got != p+".bak-20260102-030405" {
 		t.Fatalf("BackupName = %s", got)

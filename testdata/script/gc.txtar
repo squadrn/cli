@@ -54,12 +54,14 @@ exec squadrn gc --json
 stdout '"action": "keep"'
 stdout '"name": "feat-open"'
 stdout '"ignored": 0'
+stdout '"removed": false'
+stdout '"errors": \[\]'
 
 # --json --yes reports what was removed, as JSON only.
 exec git -C $WORK/repo worktree add -q -b worktree-feat-two .claude/worktrees/feat-two
 exec squadrn gc --json --yes
 stdout '"base": "main"'
-stdout '"removed": \[\n +"feat-two"\n +\]'
+stdout '"name": "feat-two",(\n.*){5}"removed": true'
 stdout '"errors": \[\]'
 ! stdout 'removed 1'
 ! exists $WORK/repo/.claude/worktrees/feat-two

@@ -252,7 +252,7 @@ func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows in
 			return "", err
 		}
 	}
-	return "", errors.New("could not find a free tmux session name")
+	return "", errors.New("cannot find a free tmux session name")
 }
 
 // isGone: the pane or session disappeared because its command exited immediately.

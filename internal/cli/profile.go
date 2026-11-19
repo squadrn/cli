@@ -43,7 +43,7 @@ func (a *app) removeProfileLines() {
 			continue
 		}
 		if err := fsx.WriteBytes(p, []byte(content), 0o644); err != nil {
-			a.warnf("could not remove squadrn's completion line from %s: %v", p, err)
+			a.warnf("cannot remove squadrn's completion line from %s: %v", p, err)
 			continue
 		}
 		a.out("  removed completion from %s\n", a.tilde(p))

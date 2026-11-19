@@ -205,12 +205,12 @@ func (a *app) rootCmd() *cobra.Command {
 		Long: fmt.Sprintf(`%[1]s runs coding agents (today: Claude Code) as one of several accounts on this machine.
 
 Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.`, c),
-		Example: fmt.Sprintf(`  %[1]s                          pick an account interactively
-  %[1]s personal                 run as claude/personal (also: -a personal, claude/personal)
-  %[1]s personal -p "hi"         agent flags go to the agent CLI
-  %[1]s personal -- "fix the bug"  a prompt goes after --
-  %[1]s account add work         create claude/work, then: %[1]s account login work
-  %[1]s grid ~/repo feat-a personal:fix-b`, c),
+		Example: fmt.Sprintf(`  %[1]s                                  pick an account interactively
+  %[1]s personal                         run as claude/personal (also: -a personal, claude/personal)
+  %[1]s personal -p "hi"                 agent flags go to the agent CLI
+  %[1]s personal -- "fix the bug"        a prompt goes after --
+  %[1]s account add work                 create claude/work, then: %[1]s account login work
+  %[1]s grid ~/repo feat-a personal:fix-b  two agents side by side`, c),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.ArbitraryArgs,
@@ -242,7 +242,7 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 			a.account = acct
 		}
 		if a.account != "" && !takesAccount(cmd) {
-			return usagef("%s does not take an account", strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" "))
+			return usagef("%s does not take an account", commandName(cmd))
 		}
 		if dir != "" {
 			if err := os.Chdir(dir); err != nil {
@@ -627,9 +627,21 @@ func (a *app) provision(acct account.Account, r provider.Runner) error {
 	return err
 }
 
+// commandName is the command path without the program name, which error messages already carry.
+func commandName(cmd *cobra.Command) string {
+	return strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" ")
+}
+
 func noArgs(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
-		return usagef("%s takes no arguments", cmd.CommandPath())
+		return usagef("%s takes no arguments", commandName(cmd))
+	}
+	return nil
+}
+
+func optionalArg(cmd *cobra.Command, args []string) error {
+	if len(args) > 1 {
+		return usagef("usage: %s", cmd.UseLine())
 	}
 	return nil
 }

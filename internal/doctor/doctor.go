@@ -216,7 +216,7 @@ func (e Env) installedRelease() (Check, bool) {
 		return Check{}, false
 	}
 	if e.Layout.Incomplete(running) {
-		return bad(g, Fail, fmt.Sprintf("installed release is incomplete (VERSION %q, running %s)", e.Layout.Version(), running), e.Command+" self-update"), true
+		return bad(g, Fail, "the installed copy of v"+running+" is incomplete", e.Command+" self-update"), true
 	}
 	return ok(g, "installed release "+running), true
 }
@@ -531,7 +531,7 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 		if e.Usage(a) {
 			out = append(out, ok(g, "usage tracking: on"))
 		} else {
-			out = append(out, ok(g, "usage tracking: off ("+e.Command+" usage --setup "+a.Label()+")"))
+			out = append(out, ok(g, "usage tracking: off ("+e.Command+" usage setup "+a.Label()+")"))
 		}
 	}
 	if !a.IsMain() {

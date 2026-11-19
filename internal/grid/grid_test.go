@@ -87,15 +87,15 @@ func TestStartCreatesTaggedSessionInOneCall(t *testing.T) {
 		}
 		return "", nil
 	}}
-	s, err := Tmux{Run: f.run}.Start(context.Background(), "sqd", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-a"}, "cmd")
-	if err != nil || s != "sqd-app" {
+	s, err := Tmux{Run: f.run}.Start(context.Background(), "srn", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-a"}, "cmd")
+	if err != nil || s != "srn-app" {
 		t.Fatalf("Start = %q, %v", s, err)
 	}
 	if len(f.calls) != 2 {
 		t.Fatalf("calls = %v", f.calls)
 	}
 	joined := strings.Join(f.calls[1], " ")
-	for _, want := range []string{"new-session -d -s sqd-app", "; set -t sqd-app @squadrn_repo /r/app", "@squadrn_acct claude/p", "@squadrn_name feat-a"} {
+	for _, want := range []string{"new-session -d -s srn-app", "; set -t srn-app @squadrn_repo /r/app", "@squadrn_acct claude/p", "@squadrn_name feat-a"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("batch %q lacks %q", joined, want)
 		}
@@ -111,16 +111,16 @@ func TestStartJoinsSessionCreatedConcurrently(t *testing.T) {
 			if listed == 1 {
 				return "", nil
 			}
-			return "sqd-app|/r/app|0", nil
+			return "srn-app|/r/app|0", nil
 		case "new-session":
-			return "", errors.New("tmux new-session: exit status 1: duplicate session: sqd-app")
+			return "", errors.New("tmux new-session: exit status 1: duplicate session: srn-app")
 		case "split-window":
 			return "%7", nil
 		}
 		return "", nil
 	}}
-	s, err := Tmux{Run: f.run}.Start(context.Background(), "sqd", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-b"}, "cmd")
-	if err != nil || s != "sqd-app" {
+	s, err := Tmux{Run: f.run}.Start(context.Background(), "srn", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "feat-b"}, "cmd")
+	if err != nil || s != "srn-app" {
 		t.Fatalf("Start = %q, %v (calls %v)", s, err, f.calls)
 	}
 	last := strings.Join(f.calls[len(f.calls)-1], " ")
@@ -133,16 +133,16 @@ func TestStartPicksNextNameForOtherRepo(t *testing.T) {
 	f := &fakeTmux{replies: func(args []string) (string, error) {
 		switch args[0] {
 		case "list-sessions":
-			return "sqd-app|/other/app|0", nil
+			return "srn-app|/other/app|0", nil
 		case "new-session":
-			if args[3] == "sqd-app" {
-				return "", errors.New("duplicate session: sqd-app")
+			if args[3] == "srn-app" {
+				return "", errors.New("duplicate session: srn-app")
 			}
 		}
 		return "", nil
 	}}
-	s, err := Tmux{Run: f.run}.Start(context.Background(), "sqd", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "x"}, "cmd")
-	if err != nil || s != "sqd-app-2" {
+	s, err := Tmux{Run: f.run}.Start(context.Background(), "srn", "/r/app", "/r/app", 80, 24, Agent{"claude/p", "x"}, "cmd")
+	if err != nil || s != "srn-app-2" {
 		t.Fatalf("Start = %q, %v", s, err)
 	}
 }
@@ -151,26 +151,26 @@ func TestSessionsAndPanes(t *testing.T) {
 	f := &fakeTmux{replies: func(args []string) (string, error) {
 		switch args[0] {
 		case "list-sessions":
-			return "plain||0\nsqd-app|/r/app|1\nodd\\|name|/r/a\\|b\\ c|0", nil
+			return "plain||0\nsrn-app|/r/app|1\nodd\\|name|/r/a\\|b\\ c|0", nil
 		case "list-panes":
 			if args[1] == "-a" {
-				return "plain\nsqd-app\nsqd-app\nsqd-app\nodd\\|name", nil
+				return "plain\nsrn-app\nsrn-app\nsrn-app\nodd\\|name", nil
 			}
-			return "%1|sqd-app|claude/main|feat-a|claude\n%2|sqd-app|||zsh", nil
+			return "%1|srn-app|claude/main|feat-a|claude\n%2|srn-app|||zsh", nil
 		}
 		return "", errors.New("unexpected")
 	}}
 	tm := Tmux{Run: f.run}
 	ss, err := tm.Sessions(context.Background())
-	if err != nil || len(ss) != 2 || ss[0] != (Session{Name: "sqd-app", Repo: "/r/app", Panes: 3, Attached: true}) ||
+	if err != nil || len(ss) != 2 || ss[0] != (Session{Name: "srn-app", Repo: "/r/app", Panes: 3, Attached: true}) ||
 		ss[1] != (Session{Name: "odd|name", Repo: "/r/a|b c", Panes: 1}) {
 		t.Fatalf("Sessions = %+v, %v", ss, err)
 	}
-	ps, err := tm.Panes(context.Background(), "sqd-app")
+	ps, err := tm.Panes(context.Background(), "srn-app")
 	if err != nil || len(ps) != 1 || ps[0].Name != "feat-a" {
 		t.Fatalf("Panes = %+v, %v", ps, err)
 	}
-	if err := tm.Kill(context.Background(), "sqd-app"); err == nil {
+	if err := tm.Kill(context.Background(), "srn-app"); err == nil {
 		t.Fatal("Kill error not returned")
 	}
 	none := Tmux{Run: func(context.Context, ...string) (string, error) { return "", ErrNoServer }}
