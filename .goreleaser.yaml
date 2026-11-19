@@ -60,8 +60,8 @@ archives:
         dst: plugin/README.md
         info: *fileinfo
 
-  # Windows: a zip with squadrn.exe, the same plugin files, and hooks that run through cmd.exe so
-  # a binary that cannot start blocks the tool call (ADR 0008).
+  # Windows: a zip with squadrn.exe, the plugin without the sh shim, and hooks that run the binary
+  # through cmd.exe so a binary that cannot start blocks the tool call (ADR 0008).
   - id: windows
     ids: [windows]
     formats: [zip]
@@ -73,8 +73,6 @@ archives:
         info: &wininfo
           mtime: "{{ .CommitDate }}"
       - src: plugin/agents/*
-        info: *wininfo
-      - src: plugin/bin/*
         info: *wininfo
       - src: plugin/README.md
         dst: plugin/README.md
