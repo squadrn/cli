@@ -32,8 +32,8 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
   New push forms go into `TestDecide`.
 - Platform code lives only in `_unix.go` / `_windows.go` pairs next to the code that needs it
   (ADR 0008); domain logic never branches on `runtime.GOOS`. macOS and Linux behaviour is pinned
-  by golden files (`-update` rewrites them; review the diff). Windows is in progress and not yet
-  supported for users.
+  by golden files (`-update` rewrites them; review the diff). Windows is a beta (ADR 0008, phase
+  P5 open).
 - Git 2.31 or newer (`internal/gitver`).
 - Distribution is public (ADR 0007): releases are published in `squadrn/squadrn` by the release
   workflow with `GITHUB_TOKEN`; installers and `self-update` use plain HTTPS and the GitHub REST
