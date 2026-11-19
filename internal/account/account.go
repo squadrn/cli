@@ -397,4 +397,3 @@ func (s Store) Rename(a Account, newName string) (Account, error) {
 	}
 	return to, nil
 }
-
