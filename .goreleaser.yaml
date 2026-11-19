@@ -53,6 +53,8 @@ archives:
         info: *fileinfo
       - src: LICENSE
         info: *fileinfo
+      - src: NOTICE
+        info: *fileinfo
       # Same basename as the root README; without an explicit dst it is dropped.
       - src: plugin/README.md
         dst: plugin/README.md
@@ -85,6 +87,8 @@ archives:
       - src: README.md
         info: *wininfo
       - src: LICENSE
+        info: *wininfo
+      - src: NOTICE
         info: *wininfo
 
 sboms:
