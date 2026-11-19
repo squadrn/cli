@@ -11,9 +11,8 @@ is lost. Design: [ADR 0007](adr/0007-public-distribution.md).
 | signing key backup | your password manager (and `pass` if installed) | copy of the private key | keep it there; GitHub cannot show a secret again |
 | `internal/release/signers.pub` | this repository | public keys every build and installer trusts | — |
 
-Publishing uses the workflow's own `GITHUB_TOKEN`; there is no token to renew. The `maintenance`
-workflow runs on the 1st of every month (and on demand: *Actions → maintenance → Run workflow*)
-and fails — GitHub emails you — when the signing key no longer matches `signers.pub`.
+Publishing uses the workflow's own `GITHUB_TOKEN`. `scripts/sign.sh` verifies every new signature
+against `signers.pub`, so a secret that no longer matches fails the release while it is a draft.
 
 ## Release
 
