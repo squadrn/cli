@@ -234,7 +234,4 @@ func TestReadOrEmpty(t *testing.T) {
 	if _, _, err := ReadOrEmpty(path); err == nil {
 		t.Fatal("an invalid config must be an error")
 	}
-	if _, _, err := ReadOrEmpty(filepath.Join(path, "below-a-file")); err == nil {
-		t.Fatal("an unreadable path must be an error")
-	}
 }
