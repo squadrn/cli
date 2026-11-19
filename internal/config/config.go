@@ -66,10 +66,16 @@ func (c Config) GitHooksEnabled() bool { return c.GitHooks == nil || *c.GitHooks
 
 func (c Config) UpdateCheckEnabled() bool { return c.UpdateCheck == nil || *c.UpdateCheck }
 
-// Channel is the update channel, "stable" by default.
+// Update channels: stable sees releases, beta also sees pre-releases (v1.2.0-rc.1).
+const (
+	Stable = "stable"
+	Beta   = "beta"
+)
+
+// Channel is the update channel, Stable by default.
 func (c Config) Channel() string {
 	if c.UpdateChannel == "" {
-		return "stable"
+		return Stable
 	}
 	return c.UpdateChannel
 }
@@ -193,7 +199,7 @@ func (c Config) validate() error {
 			return fmt.Errorf("%w: unknown default_provider %q", ErrInvalidValue, c.DefaultProvider)
 		}
 	}
-	if c.UpdateChannel != "" && c.UpdateChannel != "stable" && c.UpdateChannel != "beta" {
+	if c.UpdateChannel != "" && c.UpdateChannel != Stable && c.UpdateChannel != Beta {
 		return fmt.Errorf("%w: update_channel %q is not stable or beta", ErrInvalidValue, c.UpdateChannel)
 	}
 	for _, b := range c.ProtectedBranches {

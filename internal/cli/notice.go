@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/squadrn/squadrn/internal/release"
 	"github.com/squadrn/squadrn/internal/update"
 )
 
@@ -29,7 +30,7 @@ func (a *app) updateNotice(r route) {
 	now := a.now()
 	if latest, ok := update.Available(Version, s, a.cfg.Channel()); ok && now.Sub(s.NotifiedAt) >= noticeEvery {
 		a.errf("%s\n", a.paint(a.colorErr, "1;36", "✦ squadrn "+latest+" is available")+
-			a.paint(a.colorErr, "2", " (you have v"+trimV(Version)+") · "+a.cmd+" self-update · what's new: "+a.cmd+" self-update --check"))
+			a.paint(a.colorErr, "2", " (you have "+release.Tag(Version)+") · "+a.cmd+" self-update · what's new: "+a.cmd+" self-update --check"))
 		s.NotifiedAt = now
 		update.Save(path, s)
 	}
@@ -42,13 +43,6 @@ func (a *app) updateNotice(r route) {
 			startBackgroundCheck()
 		}
 	}
-}
-
-func trimV(v string) string {
-	if len(v) > 0 && v[0] == 'v' {
-		return v[1:]
-	}
-	return v
 }
 
 // startBackgroundCheck runs `squadrn self-update --background` detached: in its own session,

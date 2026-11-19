@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/update"
 )
 
@@ -31,7 +32,7 @@ func TestUpdateNotice(t *testing.T) {
 	if stderr.Len() != 0 || started != 1 {
 		t.Fatalf("first run: %q, %d checks", stderr.String(), started)
 	}
-	update.Save(a.updateStatePath(), update.State{CheckedAt: now, Latest: "v1.1.0", Channel: update.Stable})
+	update.Save(a.updateStatePath(), update.State{CheckedAt: now, Latest: "v1.1.0", Channel: config.Stable})
 	a.updateNotice(route{})
 	if !strings.Contains(stderr.String(), "squadrn v1.1.0 is available") || !strings.Contains(stderr.String(), "you have v1.0.0") {
 		t.Fatalf("notice: %q", stderr.String())

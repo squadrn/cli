@@ -13,6 +13,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bufio"
+	"cmp"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -321,13 +322,7 @@ func (l Layout) Install(src, version string) error {
 const versionFile = "VERSION"
 
 // Version is the installed release, "" when unknown.
-func (l Layout) Version() string {
-	b, err := os.ReadFile(filepath.Join(l.DataDir, versionFile))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(b))
-}
+func (l Layout) Version() string { return readVersion(l.DataDir) }
 
 // Previous holds the release that was installed before the current one (for rollback).
 func (l Layout) Previous() string { return filepath.Join(l.DataDir, "previous") }
@@ -351,7 +346,9 @@ func (l Layout) Snapshot(dst string) error {
 }
 
 // SnapshotVersion is the version recorded in a snapshot dir.
-func SnapshotVersion(dir string) string {
+func SnapshotVersion(dir string) string { return readVersion(dir) }
+
+func readVersion(dir string) string {
 	b, err := os.ReadFile(filepath.Join(dir, versionFile))
 	if err != nil {
 		return ""
@@ -386,14 +383,14 @@ func setPluginVersion(path, version string) error {
 // A pre-release sorts before its release; pre-release identifiers compare numerically when both
 // are numbers (rc.9 < rc.10), numbers before words, and a shorter list first when the rest is
 // equal. Build metadata (+…) is ignored. ok is false when either is not a version (e.g. "dev").
-func Compare(a, b string) (cmp int, ok bool) {
+func Compare(a, b string) (order int, ok bool) {
 	pa, prea, oka := parseVersion(a)
 	pb, preb, okb := parseVersion(b)
 	if !oka || !okb {
 		return 0, false
 	}
 	for i := range 3 {
-		if c := compareInt(pa[i], pb[i]); c != 0 {
+		if c := cmp.Compare(pa[i], pb[i]); c != 0 {
 			return c, true
 		}
 	}
@@ -410,8 +407,17 @@ func Compare(a, b string) (cmp int, ok bool) {
 			return c, true
 		}
 	}
-	return compareInt(len(prea), len(preb)), true
+	return cmp.Compare(len(prea), len(preb)), true
 }
+
+// Valid reports whether v is a release version (v1.2.3, 1.2.3-rc.1); "dev" is not.
+func Valid(v string) bool {
+	_, _, ok := parseVersion(v)
+	return ok
+}
+
+// Tag is v with the v prefix release tags carry (1.2.0 → v1.2.0).
+func Tag(v string) string { return "v" + strings.TrimPrefix(v, "v") }
 
 // Prerelease reports whether v has a pre-release part (v1.2.0-rc.1).
 func Prerelease(v string) bool {
@@ -419,22 +425,12 @@ func Prerelease(v string) bool {
 	return ok && len(pre) > 0
 }
 
-func compareInt(a, b int) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
-}
-
 func comparePre(a, b string) int {
 	na, errA := strconv.Atoi(a)
 	nb, errB := strconv.Atoi(b)
 	switch {
 	case errA == nil && errB == nil:
-		return compareInt(na, nb)
+		return cmp.Compare(na, nb)
 	case errA == nil:
 		return -1
 	case errB == nil:

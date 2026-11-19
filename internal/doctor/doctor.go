@@ -184,7 +184,7 @@ func (e Env) install(ctx context.Context) []Check {
 		}
 	}
 	if e.Latest != "" {
-		out = append(out, bad(g, Warn, "squadrn "+e.Latest+" is available (you have v"+strings.TrimPrefix(e.Version, "v")+")", e.Command+" self-update"))
+		out = append(out, bad(g, Warn, "squadrn "+e.Latest+" is available (you have "+release.Tag(e.Version)+")", e.Command+" self-update"))
 	}
 	if !e.Signed {
 		out = append(out, bad(g, Warn, "this build cannot verify release signatures (no signing key built in)", "install an official release"))
@@ -212,7 +212,7 @@ func (e Env) installedRelease() (Check, bool) {
 		return Check{}, false // a development build or another copy; self-update warns about it
 	}
 	running := strings.TrimPrefix(e.Version, "v")
-	if _, ok := release.Compare(running, running); !ok {
+	if !release.Valid(running) {
 		return Check{}, false
 	}
 	if v := e.Layout.Version(); v != running || e.Layout.Marketplace() == "" {

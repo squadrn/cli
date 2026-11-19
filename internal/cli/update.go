@@ -149,7 +149,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 	if !o.asJSON {
 		a.warnOutsideLayout()
 	}
-	current := "v" + strings.TrimPrefix(Version, "v")
+	current := release.Tag(Version)
 	cmp, comparable := release.Compare(tag, current)
 	upToDate := tag == current || (comparable && cmp == 0)
 	repair := upToDate && a.needsRepair(tag)
@@ -261,10 +261,7 @@ func (a *app) isCommandCopy(path string) bool {
 
 // normalizeTag adds the v prefix release tags carry (1.2.0 → v1.2.0).
 func normalizeTag(tag string) string {
-	if tag == "" || strings.HasPrefix(tag, "v") {
-		return tag
-	}
-	if _, ok := release.Compare(tag, tag); ok {
+	if tag != "" && !strings.HasPrefix(tag, "v") && release.Valid(tag) {
 		return "v" + tag
 	}
 	return tag
@@ -464,7 +461,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	beta := nc.selfInstall && cfg.UpdateChannel == "" && release.Prerelease(version)
 	if beta {
-		cfg.UpdateChannel = update.Beta
+		cfg.UpdateChannel = config.Beta
 	}
 	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
