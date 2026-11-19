@@ -9,8 +9,8 @@
 # releases/download/vX.Y.Z/install.sh is that release).
 #
 # Options (or environment):
-#   --command NAME    command name (SQUADRN_COMMAND; default: asked, else "squadrn")
-#   --alias A,B       short aliases (SQUADRN_ALIASES; default: asked, else "srn"; '' for none)
+#   --command NAME    command name (SQUADRN_COMMAND; default: asked, else "srn")
+#   --alias A,B       short aliases (SQUADRN_ALIASES; default: asked, else "squadrn"; '' for none)
 #   --version vX.Y.Z  another release (SQUADRN_VERSION; default: this script's release)
 #   --repo OWNER/NAME the repository to install from (default: the one this script came from)
 #   --force           accept a name that another program on PATH already uses

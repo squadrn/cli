@@ -226,7 +226,7 @@ grep 'args=plugin uninstall squadrn@squadrn' home/calls.log
 # Installing a pre-release follows the beta channel unless a channel was chosen.
 env SQUADRN_TEST_VERSION=1.2.0-rc.3
 exec squadrn self-install rel
-stdout 'pre-release: following the beta channel \(back to stable: squadrn config set update_channel stable\)'
+stdout 'pre-release: following the beta channel \(back to stable: srn config set update_channel stable\)'
 grep '^update_channel = "beta"$' home/.config/squadrn/config.toml
 exec squadrn config set update_channel stable
 exec squadrn self-install rel

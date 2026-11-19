@@ -173,6 +173,31 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
+func TestSetCommandPromotesAlias(t *testing.T) {
+	c := Config{Command: "squadrn", Aliases: []string{"x", "srn"}}
+	if err := c.Set("command", "srn"); err != nil {
+		t.Fatal(err)
+	}
+	if c.Command != "srn" || !slices.Equal(c.Aliases, []string{"x", "squadrn"}) {
+		t.Fatalf("after promoting srn: %+v", c)
+	}
+	aliases := []string{"srn"}
+	c = Config{Command: "squadrn", Aliases: aliases}
+	c.SetCommand("ai")
+	if c.Command != "ai" || !slices.Equal(c.Aliases, []string{"srn"}) {
+		t.Fatalf("a new name keeps the aliases: %+v", c)
+	}
+	c.SetCommand("srn")
+	if !slices.Equal(c.Aliases, []string{"ai"}) || aliases[0] != "srn" {
+		t.Fatalf("the swap must not modify the caller's slice: %+v %v", c, aliases)
+	}
+	c = Config{Aliases: []string{"srn"}}
+	c.SetCommand("srn")
+	if c.Command != "srn" || !slices.Equal(c.Aliases, []string{"srn"}) {
+		t.Fatalf("without a command there is nothing to swap in: %+v", c)
+	}
+}
+
 func TestSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "c.toml")
 	if err := Save(path, Config{Command: "ai"}); err != nil {

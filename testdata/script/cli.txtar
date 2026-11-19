@@ -14,7 +14,7 @@ stderr 'the account is given twice'
 # Commands that do not run as an account refuse one instead of ignoring it.
 exitcode 2 squadrn personal doctor
 ! exec squadrn personal config
-stderr '^squadrn: config does not take an account$'
+stderr '^srn: config does not take an account$'
 ! exec squadrn -a personal wt ls
 stderr 'wt ls does not take an account'
 ! exec squadrn personal grid --spread repo a b
@@ -23,8 +23,8 @@ stderr '--spread picks the accounts itself'
 # Extra arguments are usage errors that name the command once.
 exitcode 2 squadrn version extra
 ! exec squadrn version extra
-stderr '^squadrn: version takes no arguments$'
-! stderr 'squadrn version'
+stderr '^srn: version takes no arguments$'
+! stderr 'srn version'
 
 # JSON for --version and config get.
 exec squadrn --version --json

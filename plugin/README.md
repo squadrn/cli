@@ -11,7 +11,7 @@ Claude Code side of [squadrn](../README.md). Installed into every Claude account
   Decisions are logged to `~/.local/state/squadrn/guard.log` with credentials masked.
 - **notify** (Notification, Stop; async): desktop notification (macOS, Linux with notify-send).
 - **limit** (StopFailure, matcher `rate_limit`; async): records that the account hit its usage
-  limit and notifies with the estimated reset, for `squadrn usage` and `squadrn swap`.
+  limit and notifies with the estimated reset, for `srn usage` and `srn swap`.
 - **agents**: `squadrn:locator` (read-only code locator), `squadrn:reviewer` (diff review).
 
 On macOS and Linux the hooks call the installed `squadrn` binary through `bin/squadrn-hook`;

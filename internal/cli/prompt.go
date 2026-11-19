@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/install"
 )
 
@@ -49,7 +50,8 @@ func (p *namePrompt) accept(name string, forced map[string]bool) bool {
 	return true
 }
 
-// run asks for both names; Enter keeps the default (the current names, else squadrn and srn).
+// run asks for both names; Enter keeps the default (the current names, else srn and squadrn).
+// Choosing an alias as the command swaps the two, so the alias default is then the old command.
 // Without more input (EOF) the defaults are returned as they are, for the install to check.
 func (p *namePrompt) run(command string, aliases []string) (string, []string, map[string]bool) {
 	forced := map[string]bool{}
@@ -59,7 +61,9 @@ func (p *namePrompt) run(command string, aliases []string) (string, []string, ma
 			answer = command
 		}
 		if p.accept(answer, forced) {
-			command = answer
+			c := config.Config{Command: command, Aliases: aliases}
+			c.SetCommand(answer)
+			command, aliases = c.Command, c.Aliases
 			break
 		}
 	}
@@ -107,8 +111,9 @@ func (p *namePrompt) aliases(answer, command string, forced map[string]bool) ([]
 	return list, true
 }
 
-// renameSummary describes a change of command names: "command: ai → squadrn (removed: ai, sx,
-// added: squadrn, srn)"; "" when nothing changed.
+// renameSummary describes a change of command names: "command: ai → srn (removed: ai, sx,
+// added: srn, squadrn)"; "command: squadrn → srn (aliases: squadrn)" for a swap; "" when nothing
+// changed.
 func renameSummary(oldCmd string, oldAliases []string, newCmd string, newAliases []string) string {
 	before := append([]string{oldCmd}, oldAliases...)
 	after := append([]string{newCmd}, newAliases...)
@@ -123,14 +128,17 @@ func renameSummary(oldCmd string, oldAliases []string, newCmd string, newAliases
 			added = append(added, n)
 		}
 	}
-	if len(removed) == 0 && len(added) == 0 {
-		return ""
-	}
 	none := func(l []string) string {
 		if len(l) == 0 {
 			return "none"
 		}
 		return strings.Join(l, ", ")
+	}
+	if len(removed) == 0 && len(added) == 0 {
+		if oldCmd == newCmd {
+			return ""
+		}
+		return fmt.Sprintf("command: %s → %s (aliases: %s)", oldCmd, newCmd, none(newAliases))
 	}
 	return fmt.Sprintf("command: %s → %s (removed: %s, added: %s)", oldCmd, newCmd, none(removed), none(added))
 }

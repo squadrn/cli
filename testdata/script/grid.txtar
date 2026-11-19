@@ -9,7 +9,7 @@ cp empty home/.claude-personal/.loggedin
 exec squadrn grid repo feat-a personal:fix-b
 stdout 'claude/main +→ feat-a'
 stdout 'claude/personal +→ fix-b'
-exec tmux list-panes -s -t squadrn-repo -F '#{@squadrn_acct}:#{@squadrn_name}'
+exec tmux list-panes -s -t srn-repo -F '#{@squadrn_acct}:#{@squadrn_name}'
 stdout '^claude/main:feat-a$'
 stdout '^claude/personal:fix-b$'
 
@@ -19,22 +19,22 @@ waitfor home/calls.log 'cfg=.*/home/.claude-personal pwd=.*/repo args=--worktree
 
 # Re-running adds new agents and skips running ones.
 exec squadrn grid repo feat-a main:chore-c
-stderr '"feat-a" is already running in squadrn-repo; skipped'
+stderr '"feat-a" is already running in srn-repo; skipped'
 stdout 'claude/main +→ chore-c'
-exec sh -c 'tmux list-panes -s -t squadrn-repo | wc -l'
+exec sh -c 'tmux list-panes -s -t srn-repo | wc -l'
 stdout '^ *3$'
 
 exec squadrn ps
 stdout '^SESSION +ACCOUNT +WORKTREE +PROCESS$'
-stdout '^squadrn-repo +claude/main +feat-a '
-stdout '^squadrn-repo +claude/personal +fix-b '
-stdout '^squadrn-repo +claude/main +chore-c '
+stdout '^srn-repo +claude/main +feat-a '
+stdout '^srn-repo +claude/personal +fix-b '
+stdout '^srn-repo +claude/main +chore-c '
 
 exec squadrn ps --json
 stdout '"Name": "fix-b"'
 exec squadrn grid ls
 stdout '^SESSION +REPO +PANES +ATTACHED$'
-stdout '^squadrn-repo +.*/repo +3 +no$'
+stdout '^srn-repo +.*/repo +3 +no$'
 exec squadrn grid ls --json
 stdout '"Repo": ".*/repo"'
 exitcode 2 squadrn grid stop repo
@@ -45,7 +45,7 @@ stdout '^feat-a +worktree-feat-a +clean +claude/main$'
 cd $WORK
 exitcode 1 squadrn account rename personal p2
 exec squadrn grid stop repo --yes
-stdout 'stopped squadrn-repo'
+stdout 'stopped srn-repo'
 exitcode 1 squadrn grid attach repo
 ! exec squadrn grid attach repo
 stderr 'no grid is running for'
@@ -81,12 +81,12 @@ exec git -C other/repo commit -q --allow-empty -m init
 exec squadrn grid repo feat-a
 exec squadrn grid other/repo feat-b
 exec tmux list-sessions -F '#{session_name}'
-stdout '^squadrn-repo$'
-stdout '^squadrn-repo-2$'
+stdout '^srn-repo$'
+stdout '^srn-repo-2$'
 cp ai.toml home/.config/squadrn/config.toml
 exec squadrn grid repo feat-c
 stdout 'claude/main +→ feat-c'
-exec tmux list-panes -s -t squadrn-repo -F '#{@squadrn_name}'
+exec tmux list-panes -s -t srn-repo -F '#{@squadrn_name}'
 stdout '^feat-c$'
 ! exec tmux has-session -t ai-repo
 exec tmux kill-server

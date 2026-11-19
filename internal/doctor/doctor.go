@@ -413,12 +413,14 @@ func (e Env) rulesetProtects(ctx context.Context, repo, branch string) bool {
 	return nonFF && del
 }
 
-// recommendedDeny keeps an agent from editing the guard itself through its file tools.
+// recommendedDeny keeps an agent from editing the guard itself through its file tools. Edit rules
+// cover every file-editing tool; Claude Code warns about Write rules at each start, so a settings
+// file is judged on its Edit rules only.
 func (e Env) recommendedDeny() []string {
 	var rules []string
 	for _, dir := range []string{e.Layout.DataDir, config.DirsFor(e.Store.Home, config.Slug).Config} {
 		p := filepath.ToSlash(e.tilde(dir)) // Claude's permission rules use / on every platform
-		rules = append(rules, "Edit("+p+"/**)", "Write("+p+"/**)")
+		rules = append(rules, "Edit("+p+"/**)")
 	}
 	return rules
 }

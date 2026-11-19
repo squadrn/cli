@@ -35,7 +35,7 @@ cd $WORK
 # Install: command names are copies listed in commands.json; hooks run through cmd.exe.
 release rel
 exec squadrn self-install rel --alias sx
-exists home/.local/bin/squadrn.exe
+exists home/.local/bin/srn.exe
 exists home/.local/bin/sx.exe
 exists home/.local/share/squadrn/commands.json
 grep 'cmd.exe' home/.local/share/squadrn/plugin/hooks/hooks.json
@@ -43,7 +43,7 @@ exists home/.local/share/squadrn/completion.ps1
 exec squadrn config set aliases ''
 ! exists home/.local/bin/sx.exe
 exec squadrn self-uninstall --yes
-! exists home/.local/bin/squadrn.exe
+! exists home/.local/bin/srn.exe
 
 # cmd.exe would misread a data dir with % ^ & or !.
 env XDG_DATA_HOME=$WORK${/}R&D

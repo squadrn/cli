@@ -58,12 +58,12 @@ standard (non-admin) user with Defender on:
 - `install.ps1` in Windows PowerShell 5.1 and PowerShell 7, run as documented (`irm … | iex` and
   the script block form); a tampered `checksums.txt` is refused; a failure leaves the PowerShell
   window open
-- a new terminal finds `squadrn`; `squadrn doctor` is green
-- `squadrn account add`/`login`, run as an account, ctrl-c in a session returns to the prompt
-- `squadrn wt`, `squadrn gc`
+- a new terminal finds `srn`; `srn doctor` is green
+- `srn account add`/`login`, run as an account, ctrl-c in a session returns to the prompt
+- `srn wt`, `srn gc`
 - push to `main` from the Bash tool, the PowerShell tool and the plain terminal of a session:
   denied or asked each time
-- `squadrn self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
+- `srn self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
 - colours and the account picker in Windows Terminal and the classic console
 
 ## Repository settings

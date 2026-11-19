@@ -16,7 +16,7 @@ stdout 'mcp added codegraph'
 stdout 'mcp skipped secret'
 stdout 'mcp missing absent'
 stdout 'plugin installed squadrn@squadrn'
-stdout 'next: squadrn account login claude/work'
+stdout 'next: srn account login claude/work'
 exists home/.claude-work/agents
 ! exists home/.claude-work/skills/synced
 
@@ -48,7 +48,7 @@ stdout '"account": "claude/main"'
 # Dirs named like accounts but not made by squadrn are not accounts; adopt makes them one.
 mkdir home/.claude-tool
 exec squadrn account ls
-stdout '^unmanaged: ~/.claude-tool \(squadrn account adopt claude/tool\)$'
+stdout '^unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)$'
 ! stdout '^claude/tool '
 exitcode 2 squadrn tool
 ! exec squadrn account add tool
@@ -99,7 +99,7 @@ mkdir home/.local/state/squadrn/usage
 cp settings.json home/.local/state/squadrn/usage/claude-work.json
 exec squadrn account rename work job -y
 stdout 'renamed claude/work → claude/job \(~/.claude-job\), logged out'
-stdout 'next: squadrn account login claude/job'
+stdout 'next: srn account login claude/job'
 ! exists home/.claude-work
 ! exists home/.claude-job/.loggedin
 grep '.claude-job/plugins/cache/x' home/.claude-job/plugins/installed_plugins.json

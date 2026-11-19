@@ -27,9 +27,9 @@ func TestNamePrompt(t *testing.T) {
 		forced      []string
 		output      []string
 	}{
-		{"enter keeps both", "\n\n", "squadrn", []string{"srn"}, nil, []string{"Command name [squadrn]: ", "Short alias [srn] ('-' for none): "}},
+		{"enter keeps both", "\n\n", "srn", []string{"squadrn"}, nil, []string{"Command name [srn]: ", "Short alias [squadrn] ('-' for none): "}},
 		{"change both", "ai\nsx,sy\n", "ai", []string{"sx", "sy"}, nil, nil},
-		{"dash for no alias", "\n-\n", "squadrn", nil, nil, nil},
+		{"dash for no alias", "\n-\n", "srn", nil, nil, nil},
 		{
 			"invalid then valid", "Bad\ncon\nai\nai\nsx\n", "ai",
 			[]string{"sx"},
@@ -42,13 +42,14 @@ func TestNamePrompt(t *testing.T) {
 			[]string{"taken", "tk"},
 			[]string{"taken is already a command (/usr/bin/taken). Use it anyway? [y/N] "},
 		},
-		{"alias listed twice", "\nsx,sx\nsx\n", "squadrn", []string{"sx"}, nil, []string{"sx is listed twice"}},
-		{"no more input keeps the defaults", "", "squadrn", []string{"srn"}, nil, nil},
+		{"alias listed twice", "\nsx,sx\nsx\n", "srn", []string{"sx"}, nil, []string{"sx is listed twice"}},
+		{"an alias as command swaps them", "squadrn\n\n", "squadrn", []string{"srn"}, nil, []string{"Short alias [srn] ('-' for none): "}},
+		{"no more input keeps the defaults", "", "srn", []string{"squadrn"}, nil, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
 			p := namePrompt{in: bufio.NewReader(strings.NewReader(tt.input)), out: &out, check: check}
-			cmd, aliases, forced := p.run("squadrn", []string{"srn"})
+			cmd, aliases, forced := p.run("srn", []string{"squadrn"})
 			var f []string
 			for n := range forced {
 				f = append(f, n)
@@ -67,10 +68,13 @@ func TestNamePrompt(t *testing.T) {
 }
 
 func TestRenameSummary(t *testing.T) {
-	if got := renameSummary("ai", []string{"sx"}, "squadrn", []string{"sx", "srn"}); got != "command: ai → squadrn (removed: ai, added: squadrn, srn)" {
+	if got := renameSummary("ai", []string{"sx"}, "srn", []string{"sx", "squadrn"}); got != "command: ai → srn (removed: ai, added: srn, squadrn)" {
 		t.Fatalf("got %q", got)
 	}
 	if got := renameSummary("ai", []string{"sx"}, "ai", nil); got != "command: ai → ai (removed: sx, added: none)" {
+		t.Fatalf("got %q", got)
+	}
+	if got := renameSummary("squadrn", []string{"srn"}, "srn", []string{"squadrn"}); got != "command: squadrn → srn (aliases: squadrn)" {
 		t.Fatalf("got %q", got)
 	}
 	if renameSummary("ai", nil, "ai", nil) != "" {

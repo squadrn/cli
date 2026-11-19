@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-rc.2
+
+- **Breaking:** the default command is now `srn`, with `squadrn` as its alias (was `squadrn` with
+  the alias `srn`); the installers and `self-install --interactive` offer the new defaults. Existing
+  installs keep their configured names; to switch, run `squadrn config set command srn`, then
+  `srn config set aliases squadrn`. Making an alias the command (`config set command`, the
+  installer's `--command` or its prompt) swaps the two names instead of failing.
+- `doctor` recommends only `Edit(…)` deny rules for squadrn's files: Claude Code warned at every
+  start that the `Write(…)` rules it also suggested are not matched. Settings that have the `Edit`
+  rules pass, with or without `Write` ones; remove the `Write(~/.local/share/squadrn/**)` and
+  `Write(~/.config/squadrn/**)` rules to silence the warning.
+
 ## 1.0.0-rc.1
 
 First public release of Squadrn: run Claude Code as several of your own accounts, in parallel git

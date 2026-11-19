@@ -23,9 +23,9 @@ import (
 const Slug = "squadrn"
 
 // DefaultCommand and DefaultAliases are installed when the user picks no names.
-const DefaultCommand = "squadrn"
+const DefaultCommand = "srn"
 
-func DefaultAliases() []string { return []string{"srn"} }
+func DefaultAliases() []string { return []string{"squadrn"} }
 
 // DefaultProtectedBranches applies when the config file names none.
 func DefaultProtectedBranches() []string { return []string{"main", "master", "develop", "release/*"} }
@@ -59,6 +59,16 @@ func (c Config) CommandName() string {
 		return DefaultCommand
 	}
 	return c.Command
+}
+
+// SetCommand makes name the command. Promoting an alias swaps the names: the old command takes
+// the alias's place.
+func (c *Config) SetCommand(name string) {
+	if i := slices.Index(c.Aliases, name); i >= 0 && c.Command != "" {
+		c.Aliases = slices.Clone(c.Aliases)
+		c.Aliases[i] = c.Command
+	}
+	c.Command = name
 }
 
 // GitHooksEnabled reports whether the git-level guard is on (the default).
@@ -270,7 +280,7 @@ func (c *Config) Set(key, value string) error {
 	}
 	switch key {
 	case "command":
-		c.Command = value
+		c.SetCommand(value)
 	case "aliases":
 		c.Aliases = list()
 	case "default_provider":

@@ -44,5 +44,5 @@ exitcode 2 squadrn -a
 exitcode 2 squadrn -a Bad_Name
 exitcode 1 squadrn -a ghost
 ! exec squadrn -a ghost
-stderr 'account not found: claude/ghost \(run: squadrn account add claude/ghost\)'
+stderr 'account not found: claude/ghost \(run: srn account add claude/ghost\)'
 -- home/.claude-personal/.squadrn-account --

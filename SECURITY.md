@@ -6,7 +6,7 @@ Please report vulnerabilities privately through GitHub:
 [Report a vulnerability](https://github.com/squadrn/squadrn/security/advisories/new) (Security →
 Advisories). Do not open a public issue.
 
-Include what you found, how to reproduce it, the squadrn version (`squadrn version`), the OS and
+Include what you found, how to reproduce it, the squadrn version (`srn version`), the OS and
 the agent CLI version. You get an answer within a week; a fix and an advisory follow once the
 issue is confirmed.
 
