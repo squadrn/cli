@@ -1,0 +1,47 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
+# install.sh as published (rendered with a test key and tag), against a local release dir:
+# no gh and no GitHub account involved.
+[!exec:ssh-keygen] skip 'ssh-keygen not installed'
+mkdir rel pub/v9.9.9
+exec sh -c 'cp "$(command -v squadrn)" rel/squadrn && cp -R "$REPO_ROOT/plugin" "$REPO_ROOT/.claude-plugin" rel/'
+env COPYFILE_DISABLE=1
+exec sh -c 'os=$(uname -s | tr A-Z a-z); case $(uname -m) in x86_64|amd64) arch=amd64;; *) arch=arm64;; esac; tar -czf "pub/v9.9.9/squadrn_9.9.9_${os}_${arch}.tar.gz" -C rel . && cd pub/v9.9.9 && (sha256sum * 2>/dev/null || shasum -a 256 *) > checksums.txt'
+exec ssh-keygen -q -t ed25519 -N '' -C test -f relkey
+exec ssh-keygen -Y sign -q -f relkey -n squadrn-release pub/v9.9.9/checksums.txt
+exec sh -c 'key=$(cat relkey.pub); sed -e "s|__SQUADRN_REPO__|me/squadrn|" -e "s|__SQUADRN_VERSION__|v9.9.9|" -e "s|^__SQUADRN_SIGNERS__\$|$key|" "$REPO_ROOT/scripts/install.sh" > install.sh'
+cp fakegh bin/gh
+chmod 755 bin/gh
+env SQUADRN_INSTALL_BASE=$WORK/pub
+
+# Its own release, names from flags; the signature is verified.
+exec sh install.sh --name ai --alias ''
+stdout 'verified release signature'
+stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
+stdout 'linked ~/.local/bin/ai'
+! stdout 'provenance'
+grep '^command = "ai"' home/.config/squadrn/config.toml
+
+# Names from the environment, as with curl | sh.
+env SQUADRN_COMMAND=bx
+env SQUADRN_ALIASES=
+exec sh install.sh
+stdout 'linked ~/.local/bin/bx'
+env SQUADRN_COMMAND=
+env SQUADRN_ALIASES=
+
+# A release that does not exist, a tampered checksum list and an unsigned release are refused.
+! exec sh install.sh --version v7.7.7
+stderr 'cannot download the signature of v7.7.7'
+cp pub/v9.9.9/checksums.txt good.txt
+exec sh -c 'cd pub/v9.9.9 && sed "s/^[0-9a-f]\{8\}/00000000/" checksums.txt > c && mv c checksums.txt'
+! exec sh install.sh --name ai
+stderr 'the release signature is not valid; refusing to install'
+cp good.txt pub/v9.9.9/checksums.txt
+rm pub/v9.9.9/checksums.txt.sig
+! exec sh install.sh --name ai
+stderr 'cannot download the signature of v9.9.9'
+
+-- fakegh --
+#!/bin/sh
+echo "not logged in" >&2
+exit 1

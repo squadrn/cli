@@ -1,8 +1,9 @@
-# End-to-end check of install.ps1 as users run it (the documented script block), under Windows
-# PowerShell 5.1 and PowerShell 7, by CI on windows-latest. Hermetic: a fake gh serves a release
-# built from this checkout; nothing is downloaded. The fixture dir holds an ed25519 key pair
-# (key, key.pub) and build/install.ps1 must be rendered with that key and $Tag:
-#   scripts/render-install.sh test/squadrn-releases v1.2.0-rc.99 FIXTURE/key.pub
+# End-to-end check of install.ps1 as users run it ("irm ... | iex" and the script block form),
+# under Windows PowerShell 5.1 and PowerShell 7, by CI on windows-latest. Hermetic: the release is
+# built from this checkout into a local directory that SQUADRN_INSTALL_BASE points at; nothing is
+# downloaded. The fixture dir holds an ed25519 key pair (key, key.pub) and build/install.ps1 must
+# be rendered with that key and $Tag:
+#   scripts/render-install.sh squadrn/cli v1.2.0-rc.99 FIXTURE/key.pub
 param(
     [Parameter(Mandatory = $true)][string]$Fixture,
     [string]$Tag = "v1.2.0-rc.99"
@@ -22,10 +23,10 @@ function ProfileOf([string]$out) {
 
 $version = $Tag.TrimStart("v")
 $root = Join-Path ([IO.Path]::GetTempPath()) ("squadrn-ps1-" + [guid]::NewGuid())
-$pub = Join-Path $root "pub"
+$base = Join-Path $root "pub"
+$pub = Join-Path $base $Tag
 $rel = Join-Path $root "rel"
-$fakebin = Join-Path $root "fakebin"
-New-Item -ItemType Directory -Force -Path $pub, "$rel\plugin\hooks", "$rel\.claude-plugin", $fakebin | Out-Null
+New-Item -ItemType Directory -Force -Path $pub, "$rel\plugin\hooks", "$rel\.claude-plugin" | Out-Null
 
 # The release: what goreleaser puts into the Windows zip, built from this checkout.
 & go build -trimpath -ldflags "-X github.com/squadrn/cli/internal/cli.Version=$version" -o "$rel\squadrn.exe" ./cmd/squadrn
@@ -41,42 +42,14 @@ $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
 if ($LASTEXITCODE -ne 0) { throw "signing failed" }
 Copy-Item -Force build\install.ps1 $pub
 
-# A fake gh (gh.cmd; the script has another name so PowerShell does not run it in-process):
-# release download (files or -O -), release view (the latest stable has no Windows
-# build, like v1.1.0), attestation verify (none).
-@'
-$a = @($args)
-if ($a.Count -ge 3 -and $a[0] -eq "release" -and $a[1] -eq "download") {
-    if ($a[2] -ne $env:FAKE_GH_TAG) { [Console]::Error.WriteLine("release not found"); exit 1 }
-    $pats = @(); $dir = "."; $out = $null
-    for ($i = 3; $i -lt $a.Count; $i++) {
-        switch -regex ($a[$i]) {
-            '^(-p|--pattern)$' { $i++; $pats += $a[$i] }
-            '^(-D|--dir)$' { $i++; $dir = $a[$i] }
-            '^(-O|--output)$' { $i++; $out = $a[$i] }
-            '^(-R|--repo)$' { $i++ }
-        }
-    }
-    foreach ($p in $pats) {
-        $f = Join-Path $env:FAKE_GH_PUB $p
-        if (-not (Test-Path $f)) { [Console]::Error.WriteLine("no assets match the file pattern"); exit 1 }
-        if ($out -eq "-") { [Console]::Out.Write([IO.File]::ReadAllText($f)) } else { Copy-Item $f $dir }
-    }
-    exit 0
-}
-if ($a.Count -ge 2 -and $a[0] -eq "release" -and $a[1] -eq "view") { "v1.1.0"; exit 0 }
-if ($a.Count -ge 1 -and $a[0] -eq "attestation") { [Console]::Error.WriteLine("no attestations found for subject"); exit 1 }
-[Console]::Error.WriteLine("unexpected gh $a"); exit 1
-'@ | Set-Content -Encoding ascii (Join-Path $fakebin "fakegh.ps1")
-"@pwsh -NoProfile -ExecutionPolicy Bypass -File `"%~dp0fakegh.ps1`" %*`r`n@exit /b %ERRORLEVEL%`r`n" | Set-Content -Encoding ascii -NoNewline (Join-Path $fakebin "gh.cmd")
-$env:PATH = "$fakebin;$env:PATH"
-$env:FAKE_GH_PUB = $pub
-$env:FAKE_GH_TAG = $Tag
+$env:SQUADRN_INSTALL_BASE = $base
 $env:SQUADRN_NO_UPDATE_CHECK = "1"
 foreach ($k in "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME") { Remove-Item "Env:$k" -ErrorAction SilentlyContinue }
 
-# Exactly the README command, with the tag the release was published under.
-$doc = "& ([scriptblock]::Create((gh release download $Tag -R test/squadrn-releases -p install.ps1 -O - | Out-String)))"
+# The README commands, with the script read from the release dir instead of irm.
+$script = Join-Path $pub "install.ps1"
+$doc = "& ([scriptblock]::Create((Get-Content -Raw '$script')))"
+$iex = "Get-Content -Raw '$script' | iex"
 foreach ($shell in "powershell.exe", "pwsh") {
     $env:USERPROFILE = Join-Path $root "home-$shell"
     $env:HOME = $env:USERPROFILE
@@ -108,13 +81,24 @@ foreach ($shell in "powershell.exe", "pwsh") {
     }
     Check ((Test-Path $profilePath) -and ((Get-Content -Raw $profilePath) -match [regex]::Escape("if (Test-Path '"))) "${shell}: guarded completion line in $profilePath" $out
 
+    # "| iex" takes its names from the environment.
+    & "$bin\squadrn.exe" self-uninstall --yes
+    Start-Sleep -Seconds 6 # uninstall removes the running binary's files once it has exited
+    $env:SQUADRN_COMMAND = "bx"
+    $env:SQUADRN_ALIASES = "by"
+    $out = & $shell -NoProfile -Command "$iex; 'still here'" 2>&1 | Out-String
+    Remove-Item Env:SQUADRN_COMMAND, Env:SQUADRN_ALIASES
+    Write-Host $out
+    Check ($out -match "verified release signature" -and $out -match "still here") "${shell}: irm | iex form" $out
+    Check ((Test-Path "$bin\bx.exe") -and (Test-Path "$bin\by.exe")) "${shell}: names from SQUADRN_COMMAND and SQUADRN_ALIASES" $out
+
     # A failure is reported in red and the session goes on.
     $out = & $shell -NoProfile -Command "$doc -Version v9.9.9; 'still here'" 2>&1 | Out-String
     Check ($out -match "install.ps1: .*v9\.9\.9") "${shell}: missing release reported" $out
     Check ($out -match "still here") "${shell}: the session survives a failed install" $out
 
     # Uninstall takes squadrn's line out of the profile, so PowerShell still starts cleanly.
-    & "$bin\squadrn.exe" self-uninstall --yes --purge
+    & "$bin\bx.exe" self-uninstall --yes --purge
     Check ($LASTEXITCODE -eq 0) "${shell}: self-uninstall"
     Check (-not ((Test-Path $profilePath) -and ((Get-Content -Raw $profilePath) -match "squadrn\\completion\.ps1"))) "${shell}: completion line removed from $profilePath"
     $out = & $shell -Command "'profile ok'" 2>&1 | Out-String

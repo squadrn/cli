@@ -1,19 +1,23 @@
-# Installs squadrn on Windows from its releases repository (binaries only). Requires gh (logged in
-# with read access to that repository) and Git for Windows 2.31 or newer.
+# Installs squadrn on Windows from its GitHub releases. Needs Git for Windows 2.31 or newer; no
+# GitHub account or gh.
 #
-#   & ([scriptblock]::Create((gh release download TAG -R __SQUADRN_REPO__ -p install.ps1 -O - | Out-String)))
-#   & ([scriptblock]::Create((gh release download TAG -R __SQUADRN_REPO__ -p install.ps1 -O - | Out-String))) -Name ai -Alias sx
+#   irm https://github.com/squadrn/cli/releases/latest/download/install.ps1 | iex
+#   & ([scriptblock]::Create((irm https://github.com/squadrn/cli/releases/latest/download/install.ps1))) -Name ai -Alias sx
 #
-# It installs the release it was downloaded from (TAG). Parameters mirror install.sh: -Name
-# (command name), -Alias (comma separated; '' for none), -Version vX.Y.Z (another release),
-# -Force (accept a name another program uses), -Repo OWNER/NAME, and -AddToProfile (load tab
-# completion from your PowerShell profile). Without -Name and -Alias, squadrn asks for the names.
+# It installs the release it was downloaded from (latest/download is the newest stable release).
+# Parameters, for the script block form, mirror install.sh: -Name (command name), -Alias (comma
+# separated; '' for none), -Version vX.Y.Z (another release), -Force (accept a name another
+# program uses), -Repo OWNER/NAME, and -AddToProfile (load tab completion from your PowerShell
+# profile). The "| iex" form takes no parameters; set SQUADRN_COMMAND, SQUADRN_ALIASES or
+# SQUADRN_VERSION instead. Without names, squadrn asks for them. SQUADRN_INSTALL_BASE replaces
+# https://github.com/OWNER/NAME/releases/download (a mirror, or a local directory holding
+# <tag>\<files> for tests); signatures are verified all the same.
 # Errors are reported without closing the PowerShell session that ran the script.
 # Keep this file ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 param(
-    [string]$Name = "",
+    [string]$Name = $env:SQUADRN_COMMAND,
     [string]$Alias = $null,
-    [string]$Version = "",
+    [string]$Version = $env:SQUADRN_VERSION,
     [switch]$Force,
     [switch]$AddToProfile,
     [string]$Repo = "__SQUADRN_REPO__"
@@ -67,6 +71,8 @@ function Install-Squadrn {
     param([string]$Name, [AllowNull()][string]$Alias, [bool]$AliasGiven, [string]$Version, [bool]$Force, [bool]$AddToProfile, [string]$Repo)
     # Both are local to this function: nothing leaks into the session that ran the script.
     $ErrorActionPreference = "Stop"
+    # The progress bar slows Invoke-WebRequest down considerably in Windows PowerShell 5.1.
+    $ProgressPreference = "SilentlyContinue"
     Set-StrictMode -Version 2
 
     # Public keys allowed to sign releases (ssh-ed25519 lines); empty in unreleased builds.
@@ -76,7 +82,9 @@ __SQUADRN_SIGNERS__
     # The release this script was published with; a placeholder in a source checkout.
     $releaseTag = "__SQUADRN_VERSION__"
 
-    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh is required: https://cli.github.com (then: gh auth login)" }
+    if ($Repo -notmatch '/') { $Repo = "squadrn/cli" }
+    # Windows PowerShell 5.1 may default to TLS 1.0, which GitHub refuses.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $git = Get-Command git -ErrorAction SilentlyContinue
     if (-not $git) { throw "Git for Windows is required: winget install --id Git.Git -e" }
     $gitVersion = (Invoke-Native git @("version") | Out-String).Trim() -replace '^git version ', ''
@@ -92,27 +100,39 @@ __SQUADRN_SIGNERS__
 
     if (-not $Version -and $releaseTag -match '^v\d') { $Version = $releaseTag }
     if (-not $Version) {
-        $Version = (Invoke-Native gh @("release", "view", "--repo", $Repo, "--json", "tagName", "--jq", ".tagName") | Out-String).Trim()
-        if ($LASTEXITCODE -ne 0 -or -not $Version) { throw "cannot read releases of $Repo; check gh auth status and your access" }
+        try { $Version = [string](Invoke-RestMethod -UseBasicParsing "https://api.github.com/repos/$Repo/releases/latest").tag_name }
+        catch { throw "cannot look up the latest release of $Repo (network, or GitHub API rate limit): $($_.Exception.Message)" }
+        if (-not $Version) { throw "cannot read the latest release of $Repo" }
     }
+    $base = "https://github.com/$Repo/releases/download"
+    if ($env:SQUADRN_INSTALL_BASE) { $base = $env:SQUADRN_INSTALL_BASE.TrimEnd("/", "\") }
     $asset = "squadrn_$($Version.TrimStart('v'))_windows_$arch.zip"
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ("squadrn-install-" + [guid]::NewGuid())
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
+        # Get-ReleaseFile: one file of the release into $tmp; a local base directory is copied from.
+        function Get-ReleaseFile([string]$File) {
+            $dst = Join-Path $tmp $File
+            if (Test-Path -LiteralPath $base -PathType Container) {
+                $src = Join-Path (Join-Path $base $Version) $File
+                if (-not (Test-Path -LiteralPath $src)) { return $false }
+                Copy-Item -LiteralPath $src $dst
+                return $true
+            }
+            try {
+                Invoke-WebRequest -UseBasicParsing -Uri "$base/$Version/$File" -OutFile $dst
+                return $true
+            } catch { return $false }
+        }
         $keys = @($signers -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -like "ssh-ed25519 *" })
         if ($keys.Count -gt 0) {
             # The signature first and on its own, so a release without one is refused clearly.
-            $out = Invoke-Native gh @("release", "download", $Version, "--repo", $Repo, "--pattern", "checksums.txt.sig", "--dir", $tmp) -Merge | Out-String
-            if ($LASTEXITCODE -ne 0) {
-                if ($out -match "no assets match") { throw "release $Version has no signature (checksums.txt.sig); refusing to install" }
-                throw "cannot download release $Version from ${Repo}: $($out.Trim())"
+            if (-not (Get-ReleaseFile "checksums.txt.sig")) {
+                throw "cannot download the signature of $Version (checksums.txt.sig): no such release, no signature, or no network; refusing to install"
             }
         }
-        $out = Invoke-Native gh @("release", "download", $Version, "--repo", $Repo, "--pattern", $asset, "--pattern", "checksums.txt", "--dir", $tmp) -Merge | Out-String
-        if ($LASTEXITCODE -ne 0) {
-            if ($out -match "no assets match") { throw "release $Version has no $asset (no Windows build in that release?)" }
-            throw "cannot download $asset from ${Repo}: $($out.Trim())"
-        }
+        if (-not (Get-ReleaseFile "checksums.txt")) { throw "cannot download checksums.txt of $Version (no such release, or no network)" }
+        if (-not (Get-ReleaseFile $asset)) { throw "cannot download $asset (no Windows build in $Version?)" }
 
         $sums = Join-Path $tmp "checksums.txt"
         if ($keys.Count -gt 0) {
@@ -148,15 +168,18 @@ __SQUADRN_SIGNERS__
         $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $asset)).Hash.ToLower()
         if ($actual -ne $expected) { throw "checksum mismatch for $asset" }
 
-        # Build provenance, where GitHub provides it (public repositories, Enterprise Cloud). Signed
-        # releases do not depend on it.
-        $out = Invoke-Native gh @("attestation", "verify", (Join-Path $tmp $asset), "--owner", ($Repo -split "/")[0]) -Merge | Out-String
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "verified build provenance of $asset"
-        } elseif ($out -match "no attestations found|unknown command|HTTP 404|HTTP 403") {
-            if ($keys.Count -eq 0) { Write-Host "note: $asset has no build attestation" -ForegroundColor Yellow }
-        } else {
-            throw "build provenance check failed for ${asset}: $($out.Trim())"
+        # Build provenance as an extra when gh is installed and logged in; the signature is what
+        # the install relies on.
+        if (Get-Command gh -ErrorAction SilentlyContinue) {
+            $null = Invoke-Native gh @("auth", "status") -Quiet
+            if ($LASTEXITCODE -eq 0) {
+                $out = Invoke-Native gh @("attestation", "verify", (Join-Path $tmp $asset), "--repo", $Repo) -Merge | Out-String
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "verified build provenance of $asset"
+                } elseif ($out -notmatch "no attestations found|unknown command|HTTP 404") {
+                    throw "build provenance check failed for ${asset}: $($out.Trim())"
+                }
+            }
         }
 
         $release = Join-Path $tmp "release"
@@ -200,7 +223,9 @@ __SQUADRN_SIGNERS__
 }
 
 try {
-    Install-Squadrn -Name $Name -Alias $Alias -AliasGiven ($PSBoundParameters -and $PSBoundParameters.ContainsKey("Alias")) -Version $Version `
+    $aliasGiven = ($PSBoundParameters -and $PSBoundParameters.ContainsKey("Alias"))
+    if (-not $aliasGiven -and (Test-Path Env:SQUADRN_ALIASES)) { $Alias = $env:SQUADRN_ALIASES; $aliasGiven = $true }
+    Install-Squadrn -Name $Name -Alias $Alias -AliasGiven $aliasGiven -Version $Version `
         -Force $Force.IsPresent -AddToProfile $AddToProfile.IsPresent -Repo $Repo
 } catch {
     Write-Host "install.ps1: $($_.Exception.Message)" -ForegroundColor Red
