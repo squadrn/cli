@@ -48,7 +48,7 @@ func newRepos(t testing.TB) repos {
 	}
 	r.feat = mk("feat", "feat-x")
 	r.main = mk("on-main", "main")
-	r.prod = mk("prod", "feat-x", RepoConfigKey, "production, staging")
+	r.prod = mk("prod", "feat-x", repoConfigKey, "production, staging")
 	r.remotePush = mk("remote-push", "feat-x", "remote.origin.push", "HEAD:refs/heads/main")
 	r.matching = mk("matching", "feat-x", "push.default", "matching")
 	r.upstream = mk("upstream", "feat-x", "push.default", "upstream", "branch.feat-x.remote", "origin", "branch.feat-x.merge", "refs/heads/main")
@@ -580,7 +580,7 @@ func TestDecidePrePush(t *testing.T) {
 			}
 		})
 	}
-	gitRun(t, dir, "config", RepoConfigKey, "feat-x")
+	gitRun(t, dir, "config", repoConfigKey, "feat-x")
 	if d := g.DecidePrePush(context.Background(), dir, []RefUpdate{{"refs/heads/feat-x", b, "refs/heads/feat-x", a}}); d.Verdict != Deny {
 		t.Errorf("repo-added protected branch: %+v", d)
 	}
@@ -649,7 +649,7 @@ func TestMask(t *testing.T) {
 		`login --password "a b c"`:                                     `login --password ***`,
 		`git push origin main`:                                         `git push origin main`,
 	} {
-		if got := Mask(in); got != want {
+		if got := mask(in); got != want {
 			t.Errorf("Mask(%q)\n got  %q\n want %q", in, got, want)
 		}
 	}

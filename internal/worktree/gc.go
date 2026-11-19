@@ -27,9 +27,9 @@ type Candidate struct {
 	Ignored int
 }
 
-// BranchPrefix starts the branch of every agent worktree (Claude Code: worktree-<name>). squadrn
-// only ever deletes branches named BranchPrefix+<worktree name>.
-const BranchPrefix = "worktree-"
+// branchPrefix starts the branch of every agent worktree (Claude Code: worktree-<name>). squadrn
+// only ever deletes branches named branchPrefix+<worktree name>.
+const branchPrefix = "worktree-"
 
 // InUse returns the sessions running in an agent worktree: those recorded in the worktree and
 // those recorded in the main checkout for it before it existed (wt <name>).
@@ -171,7 +171,7 @@ func (r Repo) remove(ctx context.Context, w Worktree, forceTree, forceBranch boo
 		return err
 	}
 	name, _ := r.Name(w)
-	if w.Branch == "" || w.Branch != BranchPrefix+name {
+	if w.Branch == "" || w.Branch != branchPrefix+name {
 		return nil // not a branch the agent CLI made for this worktree: never delete it
 	}
 	flag := "-d"

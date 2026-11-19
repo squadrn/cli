@@ -255,7 +255,7 @@ func (l Layout) CleanOld(names []string) {
 	fsx.CleanOld(filepath.Dir(l.Binary()), []string{BinaryName})
 	files := make([]string, len(names))
 	for i, n := range names {
-		files[i] = ExecutableName(n)
+		files[i] = executableName(n)
 	}
 	fsx.CleanOld(l.BinDir, files)
 }
@@ -264,7 +264,7 @@ func (l Layout) CleanOld(names []string) {
 func (l Layout) Leftovers(names []string) []string {
 	files := make([]string, len(names))
 	for i, n := range names {
-		files[i] = ExecutableName(n)
+		files[i] = executableName(n)
 	}
 	return fsx.Leftovers(l.BinDir, files, time.Now().Add(24*time.Hour))
 }

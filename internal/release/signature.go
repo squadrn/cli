@@ -14,9 +14,9 @@ import (
 	"strings"
 )
 
-// SignatureNamespace binds release signatures to their purpose: a key used here cannot have its
+// signatureNamespace binds release signatures to their purpose: a key used here cannot have its
 // signatures replayed from another context (ssh-keygen -Y sign -n squadrn-release).
-const SignatureNamespace = "squadrn-release"
+const signatureNamespace = "squadrn-release"
 
 // SignatureName is the detached signature of ChecksumsName published with every release.
 const SignatureName = ChecksumsName + ".sig"
@@ -27,22 +27,22 @@ const SignatureName = ChecksumsName + ".sig"
 //go:embed signers.pub
 var signers string
 
-// Signers returns the embedded release signing keys.
-func Signers() string { return signers }
-
-// HasSigners reports whether this build carries at least one valid release signing key.
-func HasSigners() bool {
-	keys, err := parseSigners(signers)
-	return err == nil && len(keys) > 0
+// Signers returns the release signing keys built into this binary, "" when it carries no valid
+// key.
+func Signers() string {
+	if keys, err := parseSigners(signers); err != nil || len(keys) == 0 {
+		return ""
+	}
+	return signers
 }
 
 var (
 	ErrNoSigners    = errors.New("no release signing key is configured in this build")
-	ErrBadSignature = errors.New("release signature is not valid")
+	errBadSignature = errors.New("release signature is not valid")
 )
 
 // VerifySignature checks an SSH signature (ssh-keygen -Y sign, armored SSHSIG) of message made
-// in SignatureNamespace by one of the ed25519 keys in allowed.
+// in signatureNamespace by one of the ed25519 keys in allowed.
 func VerifySignature(message, armored []byte, allowed string) error {
 	keys, err := parseSigners(allowed)
 	if err != nil {
@@ -53,36 +53,36 @@ func VerifySignature(message, armored []byte, allowed string) error {
 	}
 	block, _ := pem.Decode(armored)
 	if block == nil || block.Type != "SSH SIGNATURE" {
-		return fmt.Errorf("%w: not an SSH signature", ErrBadSignature)
+		return fmt.Errorf("%w: not an SSH signature", errBadSignature)
 	}
 	r := sshReader{b: block.Bytes}
 	if magic := r.raw(6); string(magic) != "SSHSIG" {
-		return fmt.Errorf("%w: bad magic", ErrBadSignature)
+		return fmt.Errorf("%w: bad magic", errBadSignature)
 	}
 	if v := r.uint32(); v != 1 {
-		return fmt.Errorf("%w: unsupported version %d", ErrBadSignature, v)
+		return fmt.Errorf("%w: unsupported version %d", errBadSignature, v)
 	}
 	pubBlob := r.str()
 	namespace, reserved, hashAlg := r.str(), r.str(), r.str()
 	sigBlob := r.str()
 	if r.err != nil || len(r.b) != 0 {
-		return fmt.Errorf("%w: malformed", ErrBadSignature)
+		return fmt.Errorf("%w: malformed", errBadSignature)
 	}
-	if string(namespace) != SignatureNamespace {
-		return fmt.Errorf("%w: namespace %q", ErrBadSignature, namespace)
+	if string(namespace) != signatureNamespace {
+		return fmt.Errorf("%w: namespace %q", errBadSignature, namespace)
 	}
 	if string(hashAlg) != "sha512" {
-		return fmt.Errorf("%w: hash %q", ErrBadSignature, hashAlg)
+		return fmt.Errorf("%w: hash %q", errBadSignature, hashAlg)
 	}
 	pr := sshReader{b: pubBlob}
 	if string(pr.str()) != "ssh-ed25519" {
-		return fmt.Errorf("%w: only ed25519 keys are accepted", ErrBadSignature)
+		return fmt.Errorf("%w: only ed25519 keys are accepted", errBadSignature)
 	}
 	pub := pr.str()
 	sr := sshReader{b: sigBlob}
 	algo, sig := sr.str(), sr.str()
 	if pr.err != nil || sr.err != nil || string(algo) != "ssh-ed25519" || len(pub) != ed25519.PublicKeySize {
-		return fmt.Errorf("%w: malformed key or signature", ErrBadSignature)
+		return fmt.Errorf("%w: malformed key or signature", errBadSignature)
 	}
 	trusted := false
 	for _, k := range keys {
@@ -91,7 +91,7 @@ func VerifySignature(message, armored []byte, allowed string) error {
 		}
 	}
 	if !trusted {
-		return fmt.Errorf("%w: signed by an unknown key", ErrBadSignature)
+		return fmt.Errorf("%w: signed by an unknown key", errBadSignature)
 	}
 	digest := sha512.Sum512(message)
 	var signed bytes.Buffer
@@ -100,7 +100,7 @@ func VerifySignature(message, armored []byte, allowed string) error {
 		writeString(&signed, f)
 	}
 	if !ed25519.Verify(pub, signed.Bytes(), sig) {
-		return ErrBadSignature
+		return errBadSignature
 	}
 	return nil
 }

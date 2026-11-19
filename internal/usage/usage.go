@@ -32,7 +32,7 @@ type Spend struct {
 	Period   string    `json:"period,omitempty"`
 }
 
-// Snapshot is what is known about one account. An observation is a Snapshot too: Merge folds
+// Snapshot is what is known about one account. An observation is a Snapshot too: merge folds
 // it into the stored one.
 type Snapshot struct {
 	Five       *Window   `json:"five_hour,omitempty"`
@@ -126,10 +126,10 @@ func (s Snapshot) Effective(now time.Time) State {
 	return OK
 }
 
-// Merge folds the observation obs into the stored snapshot old. The newer observation's windows
+// merge folds the observation obs into the stored snapshot old. The newer observation's windows
 // win; an older one only fills windows the newer lacks and that have not reset. A limit stays
 // recorded until a later observation shows every reported window below 100%.
-func Merge(old, obs Snapshot) Snapshot {
+func merge(old, obs Snapshot) Snapshot {
 	newer, older := obs, old
 	if obs.ObservedAt.Before(old.ObservedAt) {
 		newer, older = old, obs
@@ -173,8 +173,8 @@ func belowLimit(s Snapshot) bool {
 	return true
 }
 
-// SameValues reports whether two snapshots differ only in when they were observed.
-func SameValues(a, b Snapshot) bool {
+// sameValues reports whether two snapshots differ only in when they were observed.
+func sameValues(a, b Snapshot) bool {
 	a.ObservedAt, b.ObservedAt = time.Time{}, time.Time{}
 	return equalWindow(a.Five, b.Five) && equalWindow(a.Seven, b.Seven) && equalSpend(a.Spend, b.Spend) &&
 		a.Session == b.Session && a.Cwd == b.Cwd &&

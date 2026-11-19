@@ -20,10 +20,10 @@ import (
 	"github.com/squadrn/squadrn/internal/proc"
 )
 
-// Names are the hooks shimmed. Hooks git runs on hot paths (reference-transaction on every ref
+// names are the hooks shimmed. Hooks git runs on hot paths (reference-transaction on every ref
 // update, post-index-change, fsmonitor-watchman) are left out: a repository's own hook of those
 // names does not run inside squadrn sessions.
-var Names = []string{
+var names = []string{
 	"applypatch-msg", "pre-applypatch", "post-applypatch",
 	"pre-commit", "pre-merge-commit", "prepare-commit-msg", "commit-msg", "post-commit",
 	"pre-rebase", "post-checkout", "post-merge", "pre-push", "post-rewrite",
@@ -42,7 +42,7 @@ func Install(dir, binary, configFile string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	for _, n := range Names {
+	for _, n := range names {
 		if err := fsx.WriteBytes(filepath.Join(dir, n), shim(n, binary, configFile), 0o755); err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func Install(dir, binary, configFile string) error {
 		return err
 	}
 	for _, e := range entries {
-		if slices.Contains(Names, e.Name()) {
+		if slices.Contains(names, e.Name()) {
 			continue
 		}
 		p := filepath.Join(dir, e.Name())
@@ -74,7 +74,7 @@ const ConfigFlag = "--config"
 // Installed reports whether dir holds exactly the current shims for binary and configFile, each
 // runnable by git.
 func Installed(dir, binary, configFile string) bool {
-	for _, n := range Names {
+	for _, n := range names {
 		p := filepath.Join(dir, n)
 		b, err := os.ReadFile(p)
 		if err != nil || !bytes.Equal(b, shim(n, binary, configFile)) {

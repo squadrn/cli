@@ -222,7 +222,7 @@ func provisionFixture(t *testing.T) (Store, Account, *fakeClaude, Provisioner) {
 	must(t, os.MkdirAll(filepath.Join(main, "agents"), 0o755))
 	must(t, os.MkdirAll(filepath.Join(main, "skills", "find-skills"), 0o755))
 	must(t, os.MkdirAll(filepath.Join(main, "skills", "synced"), 0o755))
-	must(t, os.WriteFile(s.MCPConfig(provider.Claude), []byte(`{"mcpServers":{
+	must(t, os.WriteFile(s.mcpConfig(provider.Claude), []byte(`{"mcpServers":{
 		"codegraph":{"command":"codegraph","args":["serve"]},
 		"figwright":{"command":"node","env":{}},
 		"secret":{"command":"x","env":{"TOKEN":"t"}},

@@ -73,7 +73,7 @@ func TestGitHub(t *testing.T) {
 	if _, err := g.Release(ctx, "o/limited", "v1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing tag, list failing: %v", err)
 	}
-	if _, err := g.Releases(ctx, "o/limited"); !errors.Is(err, ErrRateLimited) || !strings.Contains(err.Error(), "GH_TOKEN") {
+	if _, err := g.Releases(ctx, "o/limited"); !errors.Is(err, errRateLimited) || !strings.Contains(err.Error(), "GH_TOKEN") {
 		t.Fatalf("rate limited: %v", err)
 	}
 	if _, err := g.Releases(ctx, "o/broken"); err == nil || !strings.Contains(err.Error(), "unexpected answer") {

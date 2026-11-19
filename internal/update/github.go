@@ -21,7 +21,7 @@ const DefaultAPI = "https://api.github.com"
 
 var (
 	ErrNotFound    = errors.New("not found")
-	ErrRateLimited = errors.New("GitHub API rate limit reached")
+	errRateLimited = errors.New("GitHub API rate limit reached")
 )
 
 // GitHub reads releases through the REST API. The zero value uses DefaultAPI without a token
@@ -173,7 +173,7 @@ func statusError(resp *http.Response) error {
 				msg = " until " + time.Unix(unix, 0).Format("15:04")
 			}
 		}
-		return fmt.Errorf("%w%s (set GH_TOKEN or GITHUB_TOKEN to raise it)", ErrRateLimited, msg)
+		return fmt.Errorf("%w%s (set GH_TOKEN or GITHUB_TOKEN to raise it)", errRateLimited, msg)
 	}
 	return fmt.Errorf("%s: HTTP %d", resp.Request.URL.Host, resp.StatusCode)
 }

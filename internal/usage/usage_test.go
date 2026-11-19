@@ -95,7 +95,7 @@ func TestMerge(t *testing.T) {
 	t.Run("newer wins per window", func(t *testing.T) {
 		old := Snapshot{Five: w(10, time.Hour), Seven: w(5, 48*time.Hour), ObservedAt: t0, Session: "s0", Cwd: "/r"}
 		obs := Snapshot{Five: w(20, time.Hour), ObservedAt: t1}
-		m := Merge(old, obs)
+		m := merge(old, obs)
 		if m.Five.UsedPct != 20 || m.Seven.UsedPct != 5 || m.Session != "s0" || !m.ObservedAt.Equal(t1) {
 			t.Fatalf("merge = %+v", m)
 		}
@@ -103,57 +103,57 @@ func TestMerge(t *testing.T) {
 	t.Run("older observation only fills gaps", func(t *testing.T) {
 		old := Snapshot{Five: w(30, time.Hour), ObservedAt: t1}
 		obs := Snapshot{Five: w(10, time.Hour), Seven: w(7, time.Hour), ObservedAt: t0}
-		m := Merge(old, obs)
+		m := merge(old, obs)
 		if m.Five.UsedPct != 30 || m.Seven.UsedPct != 7 || !m.ObservedAt.Equal(t1) {
 			t.Fatalf("merge = %+v", m)
 		}
 	})
 	t.Run("reset window is not carried over", func(t *testing.T) {
 		old := Snapshot{Five: &Window{UsedPct: 90, ResetsAt: t0.Add(time.Minute)}, ObservedAt: t0}
-		m := Merge(old, Snapshot{ObservedAt: t1})
+		m := merge(old, Snapshot{ObservedAt: t1})
 		if m.Five != nil {
 			t.Fatalf("five kept: %+v", m.Five)
 		}
 	})
 	t.Run("spend kept", func(t *testing.T) {
-		m := Merge(Snapshot{Spend: &Spend{UsedPct: 5}, ObservedAt: t0}, Snapshot{ObservedAt: t1})
+		m := merge(Snapshot{Spend: &Spend{UsedPct: 5}, ObservedAt: t0}, Snapshot{ObservedAt: t1})
 		if m.Spend == nil {
 			t.Fatal("spend dropped")
 		}
 	})
 	limited := Snapshot{Five: w(100, time.Hour), ObservedAt: t0, LimitedAt: t0, LimitedSession: "s", LimitedCwd: "/r", ResetEstimate: now.Add(time.Hour)}
 	t.Run("limit recorded", func(t *testing.T) {
-		m := Merge(Snapshot{Five: w(90, time.Hour), ObservedAt: now.Add(-time.Hour)}, limited)
+		m := merge(Snapshot{Five: w(90, time.Hour), ObservedAt: now.Add(-time.Hour)}, limited)
 		if !m.LimitedAt.Equal(t0) || m.LimitedSession != "s" || m.Five.UsedPct != 100 {
 			t.Fatalf("merge = %+v", m)
 		}
 	})
 	t.Run("limit kept while full", func(t *testing.T) {
-		m := Merge(limited, Snapshot{Five: w(100, time.Hour), ObservedAt: t1})
+		m := merge(limited, Snapshot{Five: w(100, time.Hour), ObservedAt: t1})
 		if m.LimitedAt.IsZero() {
 			t.Fatal("limit cleared")
 		}
 	})
 	t.Run("limit kept when no window reported", func(t *testing.T) {
-		m := Merge(limited, Snapshot{ObservedAt: t1, Session: "x"})
+		m := merge(limited, Snapshot{ObservedAt: t1, Session: "x"})
 		if m.LimitedAt.IsZero() {
 			t.Fatal("limit cleared")
 		}
 	})
 	t.Run("limit cleared below 100", func(t *testing.T) {
-		m := Merge(limited, Snapshot{Five: w(3, 5*time.Hour), ObservedAt: t1})
+		m := merge(limited, Snapshot{Five: w(3, 5*time.Hour), ObservedAt: t1})
 		if !m.LimitedAt.IsZero() || m.LimitedSession != "" || !m.ResetEstimate.IsZero() {
 			t.Fatalf("limit kept: %+v", m)
 		}
 	})
 	t.Run("earlier observation does not clear", func(t *testing.T) {
-		m := Merge(limited, Snapshot{Five: w(3, 5*time.Hour), ObservedAt: t0.Add(-time.Minute)})
+		m := merge(limited, Snapshot{Five: w(3, 5*time.Hour), ObservedAt: t0.Add(-time.Minute)})
 		if m.LimitedAt.IsZero() {
 			t.Fatal("limit cleared by an older observation")
 		}
 	})
 	t.Run("older limit ignored", func(t *testing.T) {
-		m := Merge(limited, Snapshot{LimitedAt: t0.Add(-time.Hour), LimitedSession: "old"})
+		m := merge(limited, Snapshot{LimitedAt: t0.Add(-time.Hour), LimitedSession: "old"})
 		if m.LimitedSession != "s" {
 			t.Fatalf("merge = %+v", m)
 		}
@@ -164,7 +164,7 @@ func TestSameValues(t *testing.T) {
 	a := Snapshot{Five: w(1, time.Hour), Spend: &Spend{UsedPct: 1, UsedUSD: new(1.5)}, ObservedAt: now}
 	b := a
 	b.ObservedAt = now.Add(time.Minute)
-	if !SameValues(a, b) {
+	if !sameValues(a, b) {
 		t.Fatal("observed time alone counts as a change")
 	}
 	for _, mut := range []func(*Snapshot){
@@ -178,7 +178,7 @@ func TestSameValues(t *testing.T) {
 	} {
 		c := a
 		mut(&c)
-		if SameValues(a, c) {
+		if sameValues(a, c) {
 			t.Errorf("change not seen: %+v", c)
 		}
 	}
@@ -269,12 +269,12 @@ func TestStore(t *testing.T) {
 	if _, wrote, _ := s.Record("claude", "work", obs); wrote {
 		t.Fatal("unchanged observation written within a minute")
 	}
-	obs.ObservedAt = now.Add(WriteEvery)
+	obs.ObservedAt = now.Add(writeEvery)
 	if _, wrote, _ := s.Record("claude", "work", obs); !wrote {
 		t.Fatal("unchanged observation not refreshed after a minute")
 	}
 	obs.Five = w(11, time.Hour)
-	obs.ObservedAt = now.Add(WriteEvery + time.Second)
+	obs.ObservedAt = now.Add(writeEvery + time.Second)
 	snap, wrote, err := s.Record("claude", "work", obs)
 	if !wrote || err != nil || snap.Five.UsedPct != 11 {
 		t.Fatalf("changed value: wrote=%v err=%v snap=%+v", wrote, err, snap)

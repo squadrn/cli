@@ -12,8 +12,8 @@ import (
 // BinaryName is the executable inside a release and in the data dir.
 const BinaryName = "squadrn"
 
-// ExecutableName is the file name of command name in the bin dir.
-func ExecutableName(name string) string { return name }
+// executableName is the file name of command name in the bin dir.
+func executableName(name string) string { return name }
 
 // LinkCommands makes every name in names a link to the binary in BinDir and removes links to the
 // binary whose name is no longer wanted. A file that is not such a link is moved aside instead

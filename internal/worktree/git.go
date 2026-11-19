@@ -22,14 +22,14 @@ import (
 
 var ErrInvalidName = errors.New("invalid worktree name")
 
-// NamePattern is <type>-<slug>; Claude Code turns <name> into branch worktree-<name>.
-var NamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,47}$`)
+// namePattern is <type>-<slug>; Claude Code turns <name> into branch worktree-<name>.
+var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,47}$`)
 
 // reservedNames are `wt` subcommands.
 var reservedNames = []string{"ls", "rm"}
 
 func ValidateName(name string) error {
-	if !NamePattern.MatchString(name) {
+	if !namePattern.MatchString(name) {
 		return fmt.Errorf("%w %q (expected <type>-<slug>, e.g. feat-login)", ErrInvalidName, name)
 	}
 	if slices.Contains(reservedNames, name) {

@@ -69,7 +69,7 @@ func TestPickerFiltersAndMapsBackToItemIndex(t *testing.T) {
 
 func TestPickerBackspaceAndNoMatch(t *testing.T) {
 	m := press(newPicker("›", items()), "zz")
-	if len(m.visible()) != 0 || !strings.Contains(m.View(), "no match") {
+	if len(m.visible()) != 0 || !strings.Contains(m.view(), "no match") {
 		t.Fatal("expected no match")
 	}
 	m = press(m, enter)
@@ -91,7 +91,7 @@ func TestPickerCancels(t *testing.T) {
 }
 
 func TestPickerView(t *testing.T) {
-	v := newPicker("›", items()).View()
+	v := newPicker("›", items()).view()
 	for _, want := range []string{"claude/main", "a@example.com", "not logged in", "+ add a new account"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q:\n%s", want, v)
@@ -102,8 +102,8 @@ func TestPickerView(t *testing.T) {
 	}
 	m := newPicker("›", items())
 	m.color = true
-	if !strings.Contains(m.View(), "\033[1;94m▌ ") {
-		t.Errorf("colored cursor missing:\n%q", m.View())
+	if !strings.Contains(m.view(), "\033[1;94m▌ ") {
+		t.Errorf("colored cursor missing:\n%q", m.view())
 	}
 }
 
@@ -114,12 +114,12 @@ func TestPickerScrollsInSmallTerminal(t *testing.T) {
 	}
 	m := newPicker("›", many)
 	m.height = 8
-	if strings.Contains(m.View(), "claude/a10") || !strings.Contains(m.View(), "15 more") {
-		t.Fatalf("view does not fit:\n%s", m.View())
+	if strings.Contains(m.view(), "claude/a10") || !strings.Contains(m.view(), "15 more") {
+		t.Fatalf("view does not fit:\n%s", m.view())
 	}
 	m = press(m, "\x1b[F")
-	if !strings.Contains(m.View(), "claude/a19") || m.offset != 15 {
-		t.Fatalf("end not scrolled into view (offset %d):\n%s", m.offset, m.View())
+	if !strings.Contains(m.view(), "claude/a19") || m.offset != 15 {
+		t.Fatalf("end not scrolled into view (offset %d):\n%s", m.offset, m.view())
 	}
 	m = press(m, "\x1b[5~", "\x1b[H", "\n")
 	if m.cursor != 1 || m.offset != 0 {

@@ -1,5 +1,5 @@
 // Package update decides when to look for a new release and whether to mention one. Checks run
-// in the background at most once per Interval and are cached; a notice never blocks or forces.
+// in the background at most once per interval and are cached; a notice never blocks or forces.
 package update
 
 import (
@@ -12,8 +12,8 @@ import (
 	"github.com/squadrn/squadrn/internal/release"
 )
 
-// Interval between background checks; failures retry after the same interval.
-const Interval = 24 * time.Hour
+// interval between background checks; failures retry after the same interval.
+const interval = 24 * time.Hour
 
 // State is the cached result of the last check.
 type State struct {
@@ -43,7 +43,7 @@ func Save(path string, s State) {
 // Due reports whether a new background check should start for channel: never checked, the
 // interval has passed, or the cached result belongs to another channel.
 func Due(s State, now time.Time, channel string) bool {
-	return now.Sub(s.CheckedAt) >= Interval || (s.Latest != "" && s.Channel != channel)
+	return now.Sub(s.CheckedAt) >= interval || (s.Latest != "" && s.Channel != channel)
 }
 
 // Newest picks the highest version on channel. Drafts and unparsable tags are ignored.

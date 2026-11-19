@@ -145,8 +145,8 @@ func NewStore() (Store, error) {
 // MainDir is the main account dir of a provider (~/.claude for claude).
 func (s Store) MainDir(spec provider.Spec) string { return filepath.Join(s.Home, spec.MainDir) }
 
-// MCPConfig is the provider's main-account file holding user-scope MCP servers.
-func (s Store) MCPConfig(spec provider.Spec) string { return filepath.Join(s.Home, spec.MCPConfig) }
+// mcpConfig is the provider's main-account file holding user-scope MCP servers.
+func (s Store) mcpConfig(spec provider.Spec) string { return filepath.Join(s.Home, spec.MCPConfig) }
 
 func (s Store) account(spec provider.Spec, name string) Account {
 	dir := filepath.Join(s.Home, spec.DirPrefix+name)

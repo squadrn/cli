@@ -28,8 +28,8 @@ var secretPatterns = []struct {
 	{regexp.MustCompile(`(?i)\b(bearer\s+)[^\s"']+`), "${1}***"},
 }
 
-// Mask hides credentials in a command line.
-func Mask(cmd string) string {
+// mask hides credentials in a command line.
+func mask(cmd string) string {
 	for _, p := range secretPatterns {
 		cmd = p.re.ReplaceAllString(cmd, p.repl)
 	}
@@ -60,5 +60,5 @@ func (l Log) Record(now time.Time, layer string, d Decision, cwd, cmd string) {
 	defer func() { _ = f.Close() }()
 	oneLine := strings.NewReplacer("\n", "⏎", "\t", " ")
 	_, _ = fmt.Fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\n",
-		now.Format(time.RFC3339), d.Verdict, layer, cwd, oneLine.Replace(d.Reason), oneLine.Replace(Mask(cmd)))
+		now.Format(time.RFC3339), d.Verdict, layer, cwd, oneLine.Replace(d.Reason), oneLine.Replace(mask(cmd)))
 }

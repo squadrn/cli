@@ -50,7 +50,7 @@ func TestAuthAllRunsConcurrentlyAndKeepsOrder(t *testing.T) {
 	r := &fakeRunner{delay: 100 * time.Millisecond, reply: loggedInAs}
 	dirs := targets("", "/h/.claude-a", "/h/.claude-b", "/h/.claude-c")
 	start := time.Now()
-	res := AuthAll(context.Background(), r, dirs, time.Second)
+	res := authAll(context.Background(), r, dirs, time.Second)
 	if elapsed := time.Since(start); elapsed > 300*time.Millisecond {
 		t.Errorf("took %v; lookups are not concurrent", elapsed)
 	}
@@ -63,7 +63,7 @@ func TestAuthAllRunsConcurrentlyAndKeepsOrder(t *testing.T) {
 
 func TestAuthAllAppliesTimeout(t *testing.T) {
 	r := &fakeRunner{delay: time.Second, reply: loggedInAs}
-	res := AuthAll(context.Background(), r, targets("/slow"), 50*time.Millisecond)
+	res := authAll(context.Background(), r, targets("/slow"), 50*time.Millisecond)
 	if !errors.Is(res[0].Err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v", res[0].Err)
 	}
@@ -130,7 +130,7 @@ func TestAuthAllLimitsConcurrency(t *testing.T) {
 		cur.Add(-1)
 		return []byte(`{"loggedIn":true}`), nil
 	}}
-	AuthAll(context.Background(), r, targets("1", "2", "3", "4", "5", "6", "7", "8", "9"), time.Second)
+	authAll(context.Background(), r, targets("1", "2", "3", "4", "5", "6", "7", "8", "9"), time.Second)
 	if p := peak.Load(); p > maxConcurrentAuth {
 		t.Fatalf("peak concurrency %d > %d", p, maxConcurrentAuth)
 	}

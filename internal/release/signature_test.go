@@ -48,7 +48,7 @@ func TestVerifySignature(t *testing.T) {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(msg)
-	sig := sshSign(t, key, SignatureNamespace, msg)
+	sig := sshSign(t, key, signatureNamespace, msg)
 
 	if err := VerifySignature(body, sig, "# comment\n\n"+pub); err != nil {
 		t.Fatalf("valid signature: %v", err)
@@ -56,20 +56,20 @@ func TestVerifySignature(t *testing.T) {
 	if err := VerifySignature(body, sig, otherPub+pub); err != nil {
 		t.Fatalf("rotation (two keys): %v", err)
 	}
-	if err := VerifySignature(append(body, 'x'), sig, pub); !errors.Is(err, ErrBadSignature) {
+	if err := VerifySignature(append(body, 'x'), sig, pub); !errors.Is(err, errBadSignature) {
 		t.Errorf("tampered message: %v", err)
 	}
-	if err := VerifySignature(body, sig, otherPub); !errors.Is(err, ErrBadSignature) || !strings.Contains(err.Error(), "unknown key") {
+	if err := VerifySignature(body, sig, otherPub); !errors.Is(err, errBadSignature) || !strings.Contains(err.Error(), "unknown key") {
 		t.Errorf("unknown key: %v", err)
 	}
 	if err := VerifySignature(body, sig, ""); !errors.Is(err, ErrNoSigners) {
 		t.Errorf("no signers: %v", err)
 	}
-	if err := VerifySignature(body, []byte("junk"), pub); !errors.Is(err, ErrBadSignature) {
+	if err := VerifySignature(body, []byte("junk"), pub); !errors.Is(err, errBadSignature) {
 		t.Errorf("junk: %v", err)
 	}
 	other := sshSign(t, key, "git", msg)
-	if err := VerifySignature(body, other, pub); !errors.Is(err, ErrBadSignature) || !strings.Contains(err.Error(), "namespace") {
+	if err := VerifySignature(body, other, pub); !errors.Is(err, errBadSignature) || !strings.Contains(err.Error(), "namespace") {
 		t.Errorf("wrong namespace: %v", err)
 	}
 	for _, bad := range []string{"ssh-rsa AAAA x", "ssh-ed25519 !!!", "ssh-ed25519"} {
@@ -85,7 +85,7 @@ func TestVerifySignature(t *testing.T) {
 	if err := os.WriteFile(allowed, []byte("squadrn "+pub), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("ssh-keygen", "-Y", "verify", "-f", allowed, "-I", "squadrn", "-n", SignatureNamespace, "-s", msg+".sig")
+	cmd := exec.Command("ssh-keygen", "-Y", "verify", "-f", allowed, "-I", "squadrn", "-n", signatureNamespace, "-s", msg+".sig")
 	cmd.Stdin = strings.NewReader(string(body))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("ssh-keygen -Y verify: %v\n%s", err, out)
@@ -93,11 +93,11 @@ func TestVerifySignature(t *testing.T) {
 }
 
 func TestEmbeddedSignersParse(t *testing.T) {
-	if _, err := parseSigners(Signers()); err != nil {
+	keys, err := parseSigners(signers)
+	if err != nil {
 		t.Fatal(err)
 	}
-	keys, _ := parseSigners(Signers())
-	if HasSigners() != (len(keys) > 0) {
-		t.Fatal("HasSigners")
+	if (Signers() != "") != (len(keys) > 0) {
+		t.Fatalf("Signers = %q with %d keys", Signers(), len(keys))
 	}
 }

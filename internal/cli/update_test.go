@@ -37,7 +37,7 @@ func TestVerifyRelease(t *testing.T) {
 	write(asset, "archive")
 	sum := sha256.Sum256([]byte("archive"))
 	write(release.ChecksumsName, hex.EncodeToString(sum[:])+"  "+asset+"\n")
-	if b, err := exec.Command("ssh-keygen", "-Y", "sign", "-q", "-f", key, "-n", release.SignatureNamespace, filepath.Join(dir, release.ChecksumsName)).CombinedOutput(); err != nil {
+	if b, err := exec.Command("ssh-keygen", "-Y", "sign", "-q", "-f", key, "-n", "squadrn-release", filepath.Join(dir, release.ChecksumsName)).CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, b)
 	}
 	fakeGH := filepath.Join(dir, "gh")

@@ -55,8 +55,8 @@ func startDir(dir string) string { return strings.ReplaceAll(dir, "#", "##") }
 
 var unsafeSessionChars = regexp.MustCompile(`[^A-Za-z0-9_-]`)
 
-// SessionName is the preferred name of a repository's grid session: <prefix>-<repo dir name>.
-func SessionName(prefix, root string) string {
+// sessionName is the preferred name of a repository's grid session: <prefix>-<repo dir name>.
+func sessionName(prefix, root string) string {
 	return prefix + "-" + unsafeSessionChars.ReplaceAllString(filepath.Base(root), "-")
 }
 
@@ -226,7 +226,7 @@ func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows in
 			}
 			return session, nil
 		}
-		name := SessionName(prefix, root)
+		name := sessionName(prefix, root)
 		if attempt > 0 {
 			name = fmt.Sprintf("%s-%d", name, attempt+1)
 		}

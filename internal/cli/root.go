@@ -30,12 +30,7 @@ import (
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
 // test binary replaces it, so script tests can sign their own fake releases.
-var buildSigners = func() string {
-	if release.HasSigners() {
-		return release.Signers()
-	}
-	return ""
-}
+var buildSigners = release.Signers
 
 // Version is set at build time with -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=…".
 var Version = "dev"
