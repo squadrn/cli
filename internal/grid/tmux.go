@@ -61,18 +61,18 @@ func sessionName(prefix, root string) string {
 }
 
 type Pane struct {
-	ID      string
-	Session string
-	Account string
-	Name    string
-	Command string
+	ID      string `json:"id"`
+	Session string `json:"session"`
+	Account string `json:"account"`
+	Name    string `json:"name"`
+	Command string `json:"command"`
 }
 
 type Session struct {
-	Name     string
-	Repo     string
-	Panes    int
-	Attached bool
+	Name     string `json:"name"`
+	Repo     string `json:"repo"`
+	Panes    int    `json:"panes"`
+	Attached bool   `json:"attached"`
 }
 
 // ErrNoServer means no tmux server is running, so there are no grids.

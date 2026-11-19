@@ -31,12 +31,16 @@ stdout '^srn-repo +claude/personal +fix-b '
 stdout '^srn-repo +claude/main +chore-c '
 
 exec squadrn ps --json
-stdout '"Name": "fix-b"'
+stdout '"name": "fix-b"'
+stdout '"account": "claude/personal"'
+! stdout '"[A-Z]'
 exec squadrn grid ls
 stdout '^SESSION +REPO +PANES +ATTACHED$'
 stdout '^srn-repo +.*/repo +3 +no$'
 exec squadrn grid ls --json
-stdout '"Repo": ".*/repo"'
+stdout '"repo": ".*/repo"'
+stdout '"attached": false'
+! stdout '"[A-Z]'
 exitcode 2 squadrn grid stop repo
 exec git -C repo worktree add -q -b worktree-feat-a .claude/worktrees/feat-a
 cd repo
