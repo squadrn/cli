@@ -193,13 +193,6 @@ func SameFile(a, b string) bool {
 	return os.SameFile(fa, fb)
 }
 
-// MoveAside renames path to <path>.old-<time>, which CleanOld deletes once nothing runs it.
-func MoveAside(path string) error { return os.Rename(path, asideName(path)) }
-
-func asideName(path string) string { return path + ".old-" + stamp() }
-
-func stamp() string { return time.Now().Format("20060102-150405.000000000") }
-
 // BackupName is where an unrelated file at path is moved before squadrn takes its name.
 func BackupName(path string, now time.Time) string {
 	return path + ".bak-" + now.Format("20060102-150405")

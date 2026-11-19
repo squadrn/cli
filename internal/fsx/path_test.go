@@ -38,18 +38,8 @@ func TestPaths(t *testing.T) {
 	}
 }
 
-func TestMoveAsideAndBackupName(t *testing.T) {
-	dir := t.TempDir()
-	p := filepath.Join(dir, "srn")
-	if err := os.WriteFile(p, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := MoveAside(p); err != nil {
-		t.Fatal(err)
-	}
-	if left := Leftovers(dir, []string{"srn"}, time.Now()); len(left) != 1 {
-		t.Fatalf("moved aside: %v", left)
-	}
+func TestBackupName(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "srn")
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	if got := BackupName(p, now); got != p+".bak-20260102-030405" {
 		t.Fatalf("BackupName = %s", got)

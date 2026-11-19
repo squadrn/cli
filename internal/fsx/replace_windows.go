@@ -69,3 +69,10 @@ func CleanOld(dir string, names []string) {
 		_ = os.Remove(p)
 	}
 }
+
+// MoveAside renames path to <path>.old-<time>, which CleanOld deletes once nothing runs it.
+func MoveAside(path string) error { return os.Rename(path, asideName(path)) }
+
+func asideName(path string) string { return path + ".old-" + stamp() }
+
+func stamp() string { return time.Now().Format("20060102-150405.000000000") }
