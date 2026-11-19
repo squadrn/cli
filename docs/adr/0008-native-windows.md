@@ -1,6 +1,6 @@
 # 0008 — Native Windows
 
-Status: accepted (v1.0.0); Windows is a beta until the open items below are done
+Status: accepted (v1.0.0)
 
 ## Context
 
@@ -188,6 +188,8 @@ platform.
   touch Windows code; kept in `docs/maintaining.md`.
 
 ## Open items (Windows beta → general availability)
+
+Windows ships as a beta until these are done.
 
 1. **Real-machine checks** that need a logged-in Claude Code on Windows:
    - S1: the exec-form hook through `cmd.exe` (quoting, `${CLAUDE_PLUGIN_ROOT}` expansion);

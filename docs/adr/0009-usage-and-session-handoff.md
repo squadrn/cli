@@ -1,6 +1,6 @@
 # 0009 — Usage limits and session handoff
 
-Status: accepted (v1.0.0); U1 and S1 implemented, S2 later
+Status: accepted (v1.0.0)
 
 ## Context
 
