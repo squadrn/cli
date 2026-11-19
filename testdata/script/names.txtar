@@ -44,7 +44,46 @@ grep '^aliases = \["squadrn"\]' old/.config/squadrn/config.toml
 exec sh -c 'readlink old/.local/bin/srn && readlink old/.local/bin/squadrn'
 stdout -count=2 'old/.local/share/squadrn/bin/squadrn$'
 
+# Re-running the installer on such an install with --command srn swaps the names too.
+env HOME=$WORK/flag
+env XDG_CONFIG_HOME=$WORK/flag/.config
+env XDG_DATA_HOME=$WORK/flag/.local/share
+env XDG_STATE_HOME=$WORK/flag/.local/state
+env XDG_CACHE_HOME=$WORK/flag/.cache
+mkdir flag/.claude flag/.config/squadrn
+cp old.toml flag/.config/squadrn/config.toml
+exec squadrn self-install rel
+exec squadrn self-install rel --command srn
+stdout '^command: squadrn → srn \(aliases: squadrn\)$'
+stdout 'next: srn doctor'
+grep '^command = "srn"' flag/.config/squadrn/config.toml
+grep '^aliases = \["squadrn"\]' flag/.config/squadrn/config.toml
+exec sh -c 'readlink flag/.local/bin/srn && readlink flag/.local/bin/squadrn'
+stdout -count=2 'flag/.local/share/squadrn/bin/squadrn$'
+
+# The same at the installer's prompt: answering srn offers the old command as the alias.
+env HOME=$WORK/tty
+env XDG_CONFIG_HOME=$WORK/tty/.config
+env XDG_DATA_HOME=$WORK/tty/.local/share
+env XDG_STATE_HOME=$WORK/tty/.local/state
+env XDG_CACHE_HOME=$WORK/tty/.cache
+mkdir tty/.claude tty/.config/squadrn
+cp old.toml tty/.config/squadrn/config.toml
+exec squadrn self-install rel
+env SQUADRN_TEST_TTY=$WORK/srn-answers
+exec squadrn self-install rel --interactive
+stderr 'Command name \[squadrn\]: '
+stderr 'Short alias \[squadrn\] '
+! stderr 'must differ'
+stdout '^command: squadrn → srn \(aliases: squadrn\)$'
+grep '^command = "srn"' tty/.config/squadrn/config.toml
+grep '^aliases = \["squadrn"\]' tty/.config/squadrn/config.toml
+env SQUADRN_TEST_TTY=
+
 -- old.toml --
 schema = 1
 command = "squadrn"
 aliases = ["srn"]
+-- srn-answers --
+srn
+

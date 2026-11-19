@@ -61,6 +61,16 @@ func (c Config) CommandName() string {
 	return c.Command
 }
 
+// SetCommand makes name the command. Promoting an alias swaps the names: the old command takes
+// the alias's place.
+func (c *Config) SetCommand(name string) {
+	if i := slices.Index(c.Aliases, name); i >= 0 && c.Command != "" {
+		c.Aliases = slices.Clone(c.Aliases)
+		c.Aliases[i] = c.Command
+	}
+	c.Command = name
+}
+
 // GitHooksEnabled reports whether the git-level guard is on (the default).
 func (c Config) GitHooksEnabled() bool { return c.GitHooks == nil || *c.GitHooks }
 
@@ -270,12 +280,7 @@ func (c *Config) Set(key, value string) error {
 	}
 	switch key {
 	case "command":
-		// Promoting an alias swaps the names: the old command takes the alias's place.
-		if i := slices.Index(c.Aliases, value); i >= 0 && c.Command != "" {
-			c.Aliases = slices.Clone(c.Aliases)
-			c.Aliases[i] = c.Command
-		}
-		c.Command = value
+		c.SetCommand(value)
 	case "aliases":
 		c.Aliases = list()
 	case "default_provider":

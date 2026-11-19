@@ -4,8 +4,9 @@
 
 - **Breaking:** the default command is now `srn`, with `squadrn` as its alias (was `squadrn` with
   the alias `srn`); the installers and `self-install --interactive` offer the new defaults. Existing
-  installs keep their configured names; to switch, run `squadrn config set command srn` (an alias
-  promoted to command swaps places with it), then `srn config set aliases squadrn`.
+  installs keep their configured names; to switch, run `squadrn config set command srn`, then
+  `srn config set aliases squadrn`. Making an alias the command (`config set command`, the
+  installer's `--command` or its prompt) swaps the two names instead of failing.
 
 ## 1.0.0-rc.1
 

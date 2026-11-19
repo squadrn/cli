@@ -43,6 +43,7 @@ func TestNamePrompt(t *testing.T) {
 			[]string{"taken is already a command (/usr/bin/taken). Use it anyway? [y/N] "},
 		},
 		{"alias listed twice", "\nsx,sx\nsx\n", "srn", []string{"sx"}, nil, []string{"sx is listed twice"}},
+		{"an alias as command swaps them", "squadrn\n\n", "squadrn", []string{"srn"}, nil, []string{"Short alias [srn] ('-' for none): "}},
 		{"no more input keeps the defaults", "", "srn", []string{"squadrn"}, nil, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

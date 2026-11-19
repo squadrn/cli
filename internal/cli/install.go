@@ -81,7 +81,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	accepted := install.Names(cfg)
 	oldCmd, oldAliases := cfg.Command, cfg.Aliases
 	if nc.command != "" {
-		cfg.Command = nc.command
+		cfg.SetCommand(nc.command)
 	}
 	if cfg.Command == "" {
 		cfg.Command = config.DefaultCommand
