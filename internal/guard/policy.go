@@ -6,7 +6,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/proc"
@@ -83,7 +82,6 @@ func parseConfigList(out []byte) map[string][]string {
 // factsCache memoises Facts per directory within one decision.
 type factsCache struct {
 	git Git
-	mu  sync.Mutex
 	m   map[string]factsResult
 }
 
@@ -97,8 +95,6 @@ func newFactsCache(g Git) *factsCache {
 }
 
 func (c *factsCache) get(ctx context.Context, dir string) (Facts, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if r, ok := c.m[dir]; ok {
 		return r.f, r.err
 	}

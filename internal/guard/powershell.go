@@ -20,13 +20,6 @@ func (g Guard) DecidePowerShell(ctx context.Context, cmd, cwd string) Decision {
 	return g.verdict(ctx, e)
 }
 
-// psWord is one word of a statement. dynamic: its value is only known at runtime (variables,
-// subexpressions, escapes, splatting, script blocks).
-type psWord struct {
-	val     string
-	dynamic bool
-}
-
 // psExecutors run programs, code or scripts that the analyser cannot follow.
 var psExecutors = map[string]string{
 	"iex": "Invoke-Expression", "invoke-expression": "Invoke-Expression",
@@ -73,11 +66,11 @@ func normalizePS(s string) string {
 
 func containsFold(s, sub string) bool { return strings.Contains(strings.ToLower(s), sub) }
 
-func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
+func (e *extractor) psStatement(words []arg, dir *string, depth int) {
 	if len(words) == 0 {
 		return
 	}
-	text := joinPS(words)
+	text := joinVals(words)
 	first := words[0]
 
 	// Assignment: $x = <pipeline>. The right side runs like any statement; $env:GIT_DIR and the
@@ -120,7 +113,7 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 	}
 
 	name := cmdBase(first.val)
-	args := psArgs(words[1:])
+	args := words[1:]
 	switch {
 	case name == "git-bash" || name == "bash" || name == "sh":
 		e.psShell(name, words[1:], *dir, depth)
@@ -148,7 +141,7 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 			e.flag(Ask, what+" can run git in a way that cannot be checked")
 			return
 		}
-		if strings.Contains(strings.ToLower(text), "setenvironmentvariable") && containsFold(text, "git_") {
+		if containsFold(text, "setenvironmentvariable") && containsFold(text, "git_") {
 			e.flag(Ask, "changing GIT_* environment variables can disable the git-level guard")
 			return
 		}
@@ -156,18 +149,10 @@ func (e *extractor) psStatement(words []psWord, dir *string, depth int) {
 			e.flag(Ask, name+" looks like an alias for git push, which cannot be checked")
 			return
 		}
-		if !psInert(name) && slices.ContainsFunc(words[1:], func(w psWord) bool { return containsFold(w.val, "push") }) {
+		if !psInert(name) && slices.ContainsFunc(words[1:], func(w arg) bool { return containsFold(w.val, "push") }) {
 			e.flag(Ask, "an unrecognised command with push in its arguments (an alias for git?)")
 		}
 	}
-}
-
-func psArgs(words []psWord) []arg {
-	out := make([]arg, len(words))
-	for i, w := range words {
-		out[i] = arg(w)
-	}
-	return out
 }
 
 // psEnvName returns the variable name of $env:X, env:X, env:\X or env:/X (any case).
@@ -207,15 +192,12 @@ func isAssign(v string) bool {
 }
 
 // psGit judges a literal git invocation; any word known only at runtime asks.
-func (e *extractor) psGit(callee psWord, args []psWord, dir string, depth int) {
-	argv := make([]arg, 0, len(args))
-	for _, w := range args {
-		if w.dynamic {
-			e.flag(Ask, "a git argument is only known at runtime")
-			return
-		}
-		argv = append(argv, arg{val: w.val})
+func (e *extractor) psGit(callee arg, args []arg, dir string, depth int) {
+	if slices.ContainsFunc(args, isDynamic) {
+		e.flag(Ask, "a git argument is only known at runtime")
+		return
 	}
+	argv := args
 	name := cmdBase(callee.val)
 	if strings.HasPrefix(name, "git-") {
 		_ = e.gitSub(strings.TrimPrefix(name, "git-"), argv, dir, nil, false, depth, false)
@@ -225,7 +207,7 @@ func (e *extractor) psGit(callee psWord, args []psWord, dir string, depth int) {
 }
 
 // psShell follows bash/sh -c '<script>' with the shell parser; anything else asks if git may run.
-func (e *extractor) psShell(name string, args []psWord, dir string, depth int) {
+func (e *extractor) psShell(name string, args []arg, dir string, depth int) {
 	for i, w := range args {
 		if !w.dynamic && w.val == "-c" && i+1 < len(args) {
 			if args[i+1].dynamic {
@@ -245,7 +227,7 @@ func (e *extractor) psShell(name string, args []psWord, dir string, depth int) {
 
 // psNested follows pwsh/powershell -Command '<code>'; encoded commands ask, -File scripts are
 // left to the git-level guard. Parameters may be abbreviated and written with / on Windows.
-func (e *extractor) psNested(args []psWord, dir string, depth int) {
+func (e *extractor) psNested(args []arg, dir string, depth int) {
 	prefix := func(opt, full string, min int) bool { return len(opt) >= min && strings.HasPrefix(full, opt) }
 	for i, w := range args {
 		v := strings.ToLower(w.val)
@@ -270,7 +252,7 @@ func (e *extractor) psNested(args []psWord, dir string, depth int) {
 }
 
 // psEnvWrite reports Remove-Item/Set-Item/Clear-Item on Env:GIT_* (and their aliases).
-func psEnvWrite(name string, args []psWord) bool {
+func psEnvWrite(name string, args []arg) bool {
 	switch name {
 	case "remove-item", "ri", "rm", "del", "erase", "rd", "rmdir", "set-item", "si", "clear-item", "cli", "new-item", "ni":
 	default:
@@ -285,7 +267,7 @@ func psEnvWrite(name string, args []psWord) bool {
 }
 
 // psOperand returns the value of one of the named parameters, else the first positional word.
-func psOperand(words []psWord, params ...string) *psWord {
+func psOperand(words []arg, params ...string) *arg {
 	for i := 0; i < len(words); i++ {
 		v := strings.ToLower(words[i].val)
 		if slices.Contains(params, v) && i+1 < len(words) {
@@ -298,26 +280,18 @@ func psOperand(words []psWord, params ...string) *psWord {
 	return nil
 }
 
-func joinPS(words []psWord) string {
-	vals := make([]string, len(words))
-	for i, w := range words {
-		vals[i] = w.val
-	}
-	return strings.Join(vals, " ")
-}
-
 // splitPS tokenises src into statements of words. Statements end at ; | && || and newlines
 // outside quotes; # starts a comment. Single quotes are literal (” is a quote); double quotes
 // and here-strings are dynamic when they interpolate ($, backtick). Unquoted $, @, (, ), {, },
 // [, ], backticks and commas make a word dynamic.
-func splitPS(src string) [][]psWord {
-	var stmts [][]psWord
-	var cur []psWord
+func splitPS(src string) [][]arg {
+	var stmts [][]arg
+	var cur []arg
 	var w strings.Builder
 	inWord, dyn := false, false
 	flushWord := func() {
 		if inWord {
-			cur = append(cur, psWord{val: w.String(), dynamic: dyn})
+			cur = append(cur, arg{val: w.String(), dynamic: dyn})
 		}
 		w.Reset()
 		inWord, dyn = false, false
@@ -401,7 +375,7 @@ func splitPS(src string) [][]psWord {
 			flushWord()
 		case c == '&' && !inWord:
 			if len(cur) == 0 {
-				cur = append(cur, psWord{val: "&"}) // call operator
+				cur = append(cur, arg{val: "&"}) // call operator
 			} else {
 				flushStmt() // background operator ends the pipeline
 			}

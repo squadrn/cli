@@ -23,6 +23,11 @@ type arg struct {
 	dynamic bool
 }
 
+func isDynamic(a arg) bool { return a.dynamic }
+
+// dynamicOverride keys -c overrides whose name is only known at runtime.
+const dynamicOverride = "\x00dynamic"
+
 // gitCall is one git invocation a command line would run.
 type gitCall struct {
 	dir string
@@ -194,11 +199,7 @@ func (e *extractor) call(argv []arg, redirs []*syntax.Redirect, dir *string, dep
 	case e.names[base]:
 		e.self(argv[1:])
 	case base == "pwsh" || base == "powershell":
-		words := make([]psWord, len(argv)-1)
-		for i, a := range argv[1:] {
-			words[i] = psWord(a)
-		}
-		e.psNested(words, *dir, depth)
+		e.psNested(argv[1:], *dir, depth)
 	case base == "wsl" || base == "winpty":
 		rest := wslCommand(argv)
 		if len(rest) == 0 {
@@ -386,7 +387,7 @@ func (e *extractor) gitSub(sub string, args []arg, dir string, overrides map[str
 	case knownGitCommand(sub):
 	case call.configEnv:
 		e.flag(Ask, "git config is injected through the environment, so git "+sub+" may be an alias")
-	case overrides["\x00dynamic"] != nil:
+	case overrides[dynamicOverride] != nil:
 		e.flag(Ask, "a git -c setting is only known at runtime, so git "+sub+" may be an alias")
 	default:
 		return e.alias(sub, call, depth)
@@ -423,7 +424,7 @@ func (e *extractor) alias(sub string, call gitCall, depth int) error {
 		src := strings.TrimPrefix(value, "!") + " " + joinVals(call.args)
 		return e.script(src, call.dir, depth+1)
 	}
-	expanded := words(nil)
+	var expanded []arg
 	for _, w := range strings.Fields(value) {
 		expanded = append(expanded, arg{val: w})
 	}
@@ -476,7 +477,7 @@ func (e *extractor) interpreter(argv []arg, redirs []*syntax.Redirect) {
 		return
 	}
 	for _, c := range code {
-		if c.dynamic || strings.Contains(strings.ToLower(c.val), "git") {
+		if c.dynamic || containsFold(c.val, "git") {
 			e.flag(Ask, argv[0].val+" runs inline code that may run git; confirm it does not push to a protected branch")
 			return
 		}
@@ -637,7 +638,7 @@ func skipOptions(argv []arg, withValue map[string]bool) []arg {
 
 func isShell(base string) bool {
 	switch base {
-	case "sh", "bash", "zsh", "dash", "ksh", "mksh", "fish", "ash", "git-bash":
+	case "sh", "bash", "zsh", "dash", "ksh", "mksh", "fish", "ash":
 		return true
 	}
 	return false
@@ -739,18 +740,10 @@ func cmdRuns(args []arg) bool {
 	return false
 }
 
-// isGitConfigEnv reports environment variables that inject git configuration or programs.
-func isGitConfigEnv(name string) bool {
-	name = strings.ToUpper(name) // Windows environment names are case-insensitive
-	return name == "GIT_CONFIG_COUNT" || name == "GIT_CONFIG_PARAMETERS" || name == "GIT_EXEC_PATH" ||
-		name == "GIT_CONFIG" || name == "GIT_CONFIG_GLOBAL" || name == "GIT_CONFIG_SYSTEM" ||
-		strings.HasPrefix(name, "GIT_CONFIG_KEY_") || strings.HasPrefix(name, "GIT_CONFIG_VALUE_")
-}
-
 func addOverride(overrides map[string][]string, a arg) {
 	k, v, _ := strings.Cut(a.val, "=")
 	if a.dynamic {
-		k = "\x00dynamic"
+		k = dynamicOverride
 	}
 	k = strings.ToLower(k)
 	overrides[k] = append(overrides[k], v)
@@ -916,7 +909,7 @@ func unescape(s string) string {
 
 func anyContainsFold(argv []arg, s string) bool {
 	for _, a := range argv {
-		if strings.Contains(strings.ToLower(a.val), s) {
+		if containsFold(a.val, s) {
 			return true
 		}
 	}

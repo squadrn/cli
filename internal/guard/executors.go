@@ -10,15 +10,20 @@ import (
 // riskyEnv reports environment variables that redirect git to another repository or
 // configuration, switch off the git-level guard, or name a program git runs.
 func riskyEnv(name string) bool {
-	switch n := strings.ToUpper(name); n {
-	case "GIT_CONFIG", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM",
-		"GIT_CONFIG_NOSYSTEM", "GIT_DIR", "GIT_WORK_TREE", "GIT_EXEC_PATH", "GIT_TEMPLATE_DIR",
-		"GIT_SSH", "GIT_SSH_COMMAND", "GIT_EDITOR", "GIT_SEQUENCE_EDITOR", "GIT_PAGER", "GIT_ASKPASS",
-		"GIT_EXTERNAL_DIFF", "GIT_PROXY_COMMAND":
+	switch strings.ToUpper(name) {
+	case "GIT_CONFIG_NOSYSTEM", "GIT_DIR", "GIT_WORK_TREE", "GIT_TEMPLATE_DIR", "GIT_SSH", "GIT_SSH_COMMAND",
+		"GIT_EDITOR", "GIT_SEQUENCE_EDITOR", "GIT_PAGER", "GIT_ASKPASS", "GIT_EXTERNAL_DIFF", "GIT_PROXY_COMMAND":
 		return true
-	default:
-		return strings.HasPrefix(n, "GIT_CONFIG_KEY_") || strings.HasPrefix(n, "GIT_CONFIG_VALUE_")
 	}
+	return isGitConfigEnv(name)
+}
+
+// isGitConfigEnv reports environment variables that inject git configuration or programs.
+func isGitConfigEnv(name string) bool {
+	name = strings.ToUpper(name) // Windows environment names are case-insensitive
+	return name == "GIT_CONFIG_COUNT" || name == "GIT_CONFIG_PARAMETERS" || name == "GIT_EXEC_PATH" ||
+		name == "GIT_CONFIG" || name == "GIT_CONFIG_GLOBAL" || name == "GIT_CONFIG_SYSTEM" ||
+		strings.HasPrefix(name, "GIT_CONFIG_KEY_") || strings.HasPrefix(name, "GIT_CONFIG_VALUE_")
 }
 
 // envWrite flags setting, exporting or unsetting a variable that changes what git does.
