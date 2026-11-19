@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/release"
 )
 
 // Interval between background checks; failures retry after the same interval.

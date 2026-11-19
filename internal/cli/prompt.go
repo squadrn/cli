@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"sprawling-agents/internal/install"
+	"github.com/squadrn/cli/internal/install"
 )
 
 // namePrompt asks for the command name and aliases at install time (self-install --interactive).

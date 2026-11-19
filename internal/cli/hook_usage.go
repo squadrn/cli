@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/provider/claude"
-	"sprawling-agents/internal/usage"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/provider/claude"
+	"github.com/squadrn/cli/internal/usage"
 )
 
 // thenDeadline bounds the wrapped status line command; Claude Code cancels it sooner when a

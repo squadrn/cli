@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/install"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/install"
+	"github.com/squadrn/cli/internal/release"
 )
 
 func TestNamePrompt(t *testing.T) {

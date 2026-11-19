@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // The status line is configured in settings.json (documented):

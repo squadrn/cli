@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 func alive(pid int) bool {

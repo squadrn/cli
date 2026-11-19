@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // WriteEvery is how often an unchanged observation is written again, to keep ObservedAt fresh.

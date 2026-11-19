@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/githook"
-	"sprawling-agents/internal/guard"
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/githook"
+	"github.com/squadrn/cli/internal/guard"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/release"
 )
 
 // hookDeadline bounds a pre-tool decision; the plugin gives the hook 5 seconds.

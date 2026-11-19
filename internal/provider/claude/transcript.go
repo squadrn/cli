@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Claude Code stores each conversation at <config dir>/projects/<project folder>/<session>.jsonl,

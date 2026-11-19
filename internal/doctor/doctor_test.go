@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/githook"
-	"sprawling-agents/internal/gitver"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/githook"
+	"github.com/squadrn/cli/internal/gitver"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/release"
 )
 
 type fakeAgent struct {

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 // markInUse records the session about to start in the account's config dir and in the worktree

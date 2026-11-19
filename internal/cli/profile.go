@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // profileLine is the line install.ps1 adds to a PowerShell profile to load completion. It

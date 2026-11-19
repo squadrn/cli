@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Handoff is one conversation moved between accounts.

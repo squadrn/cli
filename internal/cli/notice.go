@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"sprawling-agents/internal/update"
+	"github.com/squadrn/cli/internal/update"
 )
 
 // noticeEvery limits how often the same update notice is shown.

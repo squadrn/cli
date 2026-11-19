@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // Min is the oldest Git sprawl supports: worktree.Open relies on

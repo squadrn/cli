@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/install"
-	"sprawling-agents/internal/ui"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/install"
+	"github.com/squadrn/cli/internal/ui"
 )
 
 func table(interactive bool) routeTable {

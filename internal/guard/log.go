@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/config"
+	"github.com/squadrn/cli/internal/config"
 )
 
 // secretPatterns mask credentials that commonly appear in agent commands before they are logged.

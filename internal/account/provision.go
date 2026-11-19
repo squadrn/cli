@@ -12,8 +12,8 @@ import (
 	"slices"
 	"strings"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 const (

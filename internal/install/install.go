@@ -12,11 +12,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/release"
 )
 
 var (

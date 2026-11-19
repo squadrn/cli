@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 func TestExtract(t *testing.T) {

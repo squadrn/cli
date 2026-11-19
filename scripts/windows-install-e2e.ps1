@@ -28,7 +28,7 @@ $fakebin = Join-Path $root "fakebin"
 New-Item -ItemType Directory -Force -Path $pub, "$rel\plugin\hooks", "$rel\.claude-plugin", $fakebin | Out-Null
 
 # The release: what goreleaser puts into the Windows zip, built from this checkout.
-& go build -trimpath -ldflags "-X sprawling-agents/internal/cli.Version=$version" -o "$rel\sprawl.exe" ./cmd/sprawl
+& go build -trimpath -ldflags "-X github.com/squadrn/cli/internal/cli.Version=$version" -o "$rel\sprawl.exe" ./cmd/sprawl
 if ($LASTEXITCODE -ne 0) { throw "go build failed" }
 Copy-Item -Recurse -Force plugin\.claude-plugin, plugin\agents, plugin\bin, plugin\README.md "$rel\plugin\"
 Copy-Item -Force scripts\hooks.windows.json "$rel\plugin\hooks\hooks.json"

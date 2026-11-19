@@ -27,9 +27,9 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/githook"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/githook"
 )
 
 // AssetName is the archive goreleaser publishes for one platform.

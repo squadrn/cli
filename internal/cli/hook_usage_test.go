@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/account"
+	"github.com/squadrn/cli/internal/account"
 )
 
 // A legacy account (plugin installed, no marker) is recognised by hooks as by commands.

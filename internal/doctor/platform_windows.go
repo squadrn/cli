@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // executable: Windows has no execute bit; the extension decides (PATHEXT).

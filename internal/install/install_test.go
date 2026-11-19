@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/release"
 )
 
 func write(t *testing.T, path, body string) {

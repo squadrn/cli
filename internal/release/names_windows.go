@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // BinaryName is the executable inside a release and in the data dir.

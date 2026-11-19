@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // Names are the hooks shimmed. Hooks git runs on hot paths (reference-transaction on every ref

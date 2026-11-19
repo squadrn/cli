@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"sprawling-agents/internal/cli"
+	"github.com/squadrn/cli/internal/cli"
 )
 
 func main() {

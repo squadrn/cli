@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/install"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/install"
 )
 
 func (a *app) selfUninstallCmd() *cobra.Command {

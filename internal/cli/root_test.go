@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/account"
+	"github.com/squadrn/cli/internal/account"
 )
 
 func TestBannerAndPickerNeedATerminalNotColors(t *testing.T) {

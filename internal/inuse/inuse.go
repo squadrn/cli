@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Dir is the registry directory inside a used directory. It is a fixed identifier.

@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Without Developer Mode (or admin rights) Windows refuses symbolic links. link then falls back

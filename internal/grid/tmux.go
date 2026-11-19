@@ -12,7 +12,7 @@ import (
 	"strings"
 	"syscall"
 
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // Sessions and panes are identified by tmux user options, never by their names, so renaming

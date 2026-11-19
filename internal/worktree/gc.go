@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 type Action string

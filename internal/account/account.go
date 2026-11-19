@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 const Main = "main"

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 func newStore(t *testing.T, accounts ...string) Store {

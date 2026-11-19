@@ -17,18 +17,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/doctor"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/gitver"
-	"sprawling-agents/internal/install"
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/release"
-	"sprawling-agents/internal/update"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/doctor"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/gitver"
+	"github.com/squadrn/cli/internal/install"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/cli/internal/update"
 )
 
 // Repo is the GitHub repository releases come from, set at build time with
-// -ldflags "-X sprawling-agents/internal/cli.Repo=owner/sprawling-agents". Only the --repo flag
+// -ldflags "-X github.com/squadrn/cli/internal/cli.Repo=owner/sprawling-agents". Only the --repo flag
 // overrides it: an environment variable could be planted to redirect updates.
 var Repo = ""
 

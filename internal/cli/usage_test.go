@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/usage"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/usage"
 )
 
 func TestUnwrapStatusLine(t *testing.T) {

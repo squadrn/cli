@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 const configDirEnv = "CLAUDE_CONFIG_DIR"

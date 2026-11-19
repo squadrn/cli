@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/inuse"
+	"github.com/squadrn/cli/internal/inuse"
 )
 
 func revParse(t *testing.T, dir, rev string) string {

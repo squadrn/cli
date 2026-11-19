@@ -7,7 +7,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
-	"sprawling-agents/internal/githook"
+	"github.com/squadrn/cli/internal/githook"
 )
 
 // policyKeys are the settings that weaken the guard; only the user changes them, in a terminal.

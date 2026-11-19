@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 // Relocate fixes a config dir that was moved from oldDir to newDir. Claude Code records

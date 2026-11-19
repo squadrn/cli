@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 func TestAssign(t *testing.T) {

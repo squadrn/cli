@@ -18,14 +18,14 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/githook"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/provider/claude"
-	"sprawling-agents/internal/release"
-	"sprawling-agents/internal/ui"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/githook"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/provider/claude"
+	"github.com/squadrn/cli/internal/release"
+	"github.com/squadrn/cli/internal/ui"
 )
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
@@ -37,7 +37,7 @@ var buildSigners = func() string {
 	return ""
 }
 
-// Version is set at build time with -ldflags "-X sprawling-agents/internal/cli.Version=…".
+// Version is set at build time with -ldflags "-X github.com/squadrn/cli/internal/cli.Version=…".
 var Version = "dev"
 
 const (

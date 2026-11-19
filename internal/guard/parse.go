@@ -10,7 +10,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
-	"sprawling-agents/internal/config"
+	"github.com/squadrn/cli/internal/config"
 )
 
 // maxDepth bounds recursion through nested shells, eval, aliases and here-documents.

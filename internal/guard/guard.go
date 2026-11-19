@@ -11,7 +11,7 @@ import (
 	"context"
 	"fmt"
 
-	"sprawling-agents/internal/config"
+	"github.com/squadrn/cli/internal/config"
 )
 
 type Verdict int

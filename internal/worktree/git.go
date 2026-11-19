@@ -15,9 +15,9 @@ import (
 	"slices"
 	"strings"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 var ErrInvalidName = errors.New("invalid worktree name")

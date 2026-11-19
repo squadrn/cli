@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 var ErrInvalidSpec = errors.New("invalid agent spec")

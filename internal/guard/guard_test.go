@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/config"
+	"github.com/squadrn/cli/internal/config"
 )
 
 type repos struct {

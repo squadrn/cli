@@ -12,15 +12,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/grid"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/provider/claude"
-	"sprawling-agents/internal/ui"
-	"sprawling-agents/internal/usage"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/grid"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/provider/claude"
+	"github.com/squadrn/cli/internal/ui"
+	"github.com/squadrn/cli/internal/usage"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 // stopWait is how long a stopped session gets to exit before the next step.

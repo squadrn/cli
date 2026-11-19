@@ -16,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/githook"
-	"sprawling-agents/internal/gitver"
-	"sprawling-agents/internal/proc"
-	"sprawling-agents/internal/provider"
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/githook"
+	"github.com/squadrn/cli/internal/gitver"
+	"github.com/squadrn/cli/internal/proc"
+	"github.com/squadrn/cli/internal/provider"
+	"github.com/squadrn/cli/internal/release"
 )
 
 type Status int

@@ -15,10 +15,10 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/grid"
-	"sprawling-agents/internal/inuse"
-	"sprawling-agents/internal/worktree"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/grid"
+	"github.com/squadrn/cli/internal/inuse"
+	"github.com/squadrn/cli/internal/worktree"
 )
 
 func (a *app) requireTmux(what string) error {

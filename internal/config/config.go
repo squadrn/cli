@@ -15,8 +15,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"sprawling-agents/internal/fsx"
-	"sprawling-agents/internal/provider"
+	"github.com/squadrn/cli/internal/fsx"
+	"github.com/squadrn/cli/internal/provider"
 )
 
 // Slug names every fixed on-disk identifier: dirs, env vars, plugin id, git config keys.

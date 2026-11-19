@@ -20,9 +20,9 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/release"
 
-	"sprawling-agents/internal/fsx"
+	"github.com/squadrn/cli/internal/fsx"
 )
 
 func TestMain(m *testing.M) {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"sprawling-agents/internal/config"
-	"sprawling-agents/internal/proc"
+	"github.com/squadrn/cli/internal/config"
+	"github.com/squadrn/cli/internal/proc"
 )
 
 // Facts is what the guard needs to know about one repository, read once per decision.

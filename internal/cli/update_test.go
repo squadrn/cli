@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"sprawling-agents/internal/release"
+	"github.com/squadrn/cli/internal/release"
 )
 
 func TestVerifyRelease(t *testing.T) {

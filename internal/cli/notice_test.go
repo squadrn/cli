@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"sprawling-agents/internal/account"
-	"sprawling-agents/internal/update"
+	"github.com/squadrn/cli/internal/account"
+	"github.com/squadrn/cli/internal/update"
 )
 
 func TestUpdateNotice(t *testing.T) {

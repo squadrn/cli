@@ -18,7 +18,7 @@ builds:
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X sprawling-agents/internal/cli.Version={{ .Version }} -X sprawling-agents/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+      - -s -w -X github.com/squadrn/cli/internal/cli.Version={{ .Version }} -X github.com/squadrn/cli/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
 
   - id: windows
     main: ./cmd/sprawl
@@ -30,7 +30,7 @@ builds:
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X sprawling-agents/internal/cli.Version={{ .Version }} -X sprawling-agents/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
+      - -s -w -X github.com/squadrn/cli/internal/cli.Version={{ .Version }} -X github.com/squadrn/cli/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
 archives:
   - id: unix
     ids: [unix]
