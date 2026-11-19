@@ -32,6 +32,21 @@ stdout '"version": "dev"'
 exec squadrn config get update_channel --json
 stdout '"key": "update_channel"'
 stdout '"value": "stable"'
+exec squadrn config get protected_branches --json
+stdout '"value": \[\n +"main",'
+exec squadrn config --json
+stdout '"git_hooks": true,'
+stdout '"update_check": true'
+stdout '"aliases": \[\],'
+stdout '"protected_branches": \[\n +"main",'
+
+# config set prints what applies, defaults included.
+exec squadrn config set protected_branches main,prod
+stdout '^protected_branches = main,prod$'
+exec squadrn config set protected_branches ''
+stdout '^protected_branches = main,master,develop,release/\* \(default\)$'
+exec squadrn config set git_hooks true
+stdout '^git_hooks = true$'
 
 # Values an environment variable overrides are marked.
 env SQUADRN_SHARED_MCP='a b'

@@ -139,6 +139,11 @@ exec squadrn usage setup --undo solo -y
 ! grep 'statusLine' home/.claude-solo/settings.json
 exitcode 2 squadrn account add solo --usage --no-usage
 
+# --all asks once and names every settings file with the accounts it covers.
+! exec squadrn usage setup --all
+stderr 'record usage limits through the status line of ~/.claude/settings.json \(claude/main, claude/work\); ~/.claude-solo/settings.json \(claude/solo\); re-run with --yes'
+! grep 'hook statusline' home/.claude/settings.json
+
 # self-uninstall puts every status line back.
 exec squadrn usage setup --all -y
 exec squadrn self-uninstall --yes

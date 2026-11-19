@@ -27,13 +27,16 @@ func (a *app) configCmd() *cobra.Command {
 				return a.cfgErr
 			}
 			path, _ := config.Path()
+			if asJSON {
+				values := map[string]any{"file": path}
+				for _, k := range config.Keys {
+					values[k], _ = a.cfg.Value(k)
+				}
+				return a.printJSON(values)
+			}
 			values := map[string]string{}
 			for _, k := range config.Keys {
 				values[k], _ = a.cfg.Get(k)
-			}
-			if asJSON {
-				values["file"] = path
-				return a.printJSON(values)
 			}
 			a.out("%-19s %s\n", "file", a.tilde(path))
 			env := config.EnvOverrides()
@@ -58,12 +61,16 @@ func (a *app) configCmd() *cobra.Command {
 			if a.cfgErr != nil {
 				return a.cfgErr
 			}
+			if getJSON {
+				v, err := a.cfg.Value(args[0])
+				if err != nil {
+					return err
+				}
+				return a.printJSON(map[string]any{"key": args[0], "value": v})
+			}
 			v, err := a.cfg.Get(args[0])
 			if err != nil {
 				return err
-			}
-			if getJSON {
-				return a.printJSON(map[string]string{"key": args[0], "value": v})
 			}
 			a.out("%s\n", v)
 			return nil
@@ -109,7 +116,10 @@ protected_branches. Changing command or aliases relinks them in the bin dir.`,
 				return err
 			}
 			if !relink {
-				v, _ := cfg.Get(args[0])
+				v, _ := cfg.WithDefaults().Get(args[0])
+				if raw, _ := cfg.Get(args[0]); raw != v {
+					v += " (default)"
+				}
 				a.out("%s = %s\n", args[0], v)
 				return nil
 			}

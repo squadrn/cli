@@ -12,6 +12,7 @@ import (
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/usage"
 )
 
@@ -373,6 +374,30 @@ func (a *app) usageSetup(target string, all, undo, yes bool) error {
 	groups, err := a.settingsGroups(targets)
 	if err != nil {
 		return err
+	}
+	if len(groups) > 1 && !yes {
+		// One question for all of them, naming every settings file and the accounts it covers.
+		var pending []string
+		for _, g := range groups {
+			cmd, has, err := claude.StatusLineCommand(g.path)
+			if err != nil {
+				return err
+			}
+			_, ours := unwrapStatusLine(cmd)
+			if on := has && ours; on == undo {
+				pending = append(pending, a.groupWhere(g))
+			}
+		}
+		if len(pending) > 0 {
+			what := "Record usage limits through the status line of "
+			if undo {
+				what = "Restore the previous status line in "
+			}
+			if err := a.confirm(false, "%s%s", what, strings.Join(pending, "; ")); err != nil {
+				return err
+			}
+		}
+		yes = true
 	}
 	for _, g := range groups {
 		if err := a.setupGroup(g, undo, yes); err != nil {

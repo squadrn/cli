@@ -90,8 +90,13 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 	return groups, nil
 }
 
+// groupWhere names a settings file and the accounts that use it.
+func (a *app) groupWhere(g settingsGroup) string {
+	return fmt.Sprintf("%s (%s)", a.tilde(fsx.Real(g.path)), strings.Join(g.accounts, ", "))
+}
+
 func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
-	where := fmt.Sprintf("%s (%s)", a.tilde(fsx.Real(g.path)), strings.Join(g.accounts, ", "))
+	where := a.groupWhere(g)
 	cmd, has, err := claude.StatusLineCommand(g.path)
 	if err != nil {
 		return err
