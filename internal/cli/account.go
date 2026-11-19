@@ -194,7 +194,7 @@ func (a *app) accountAdd(input string, trackUsage *bool, relink, yes bool) error
 		return err
 	}
 	if fi, err := os.Stat(acct.Dir); err == nil && fi.IsDir() && !a.store.Managed(acct) {
-		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), config.Slug, a.cmd, acct.Label())
+		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), config.Slug, a.cmd, input)
 	}
 	ag, err := a.agent(acct.Spec)
 	if err != nil {

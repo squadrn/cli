@@ -51,8 +51,13 @@ exec squadrn account ls
 stdout '^unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)$'
 ! stdout '^claude/tool '
 exitcode 2 squadrn tool
+! exec squadrn tool
+stderr 'to make the existing dir an account: srn account adopt tool'
+! stderr 'account add'
+! exec squadrn -a claude/tool
+stderr 'account not found: claude/tool; its dir exists but is not a squadrn account \(run: srn account adopt claude/tool\)'
 ! exec squadrn account add tool
-stderr 'exists but is not a squadrn account'
+stderr 'exists but is not a squadrn account .*run: srn account adopt tool$'
 exitcode 2 squadrn account adopt tool
 exec squadrn account adopt tool --yes
 stdout 'adopted claude/tool'

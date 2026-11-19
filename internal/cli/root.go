@@ -88,12 +88,19 @@ func Run(args []string) int {
 	var nf account.NotFoundError
 	switch {
 	case err == nil, silent(err):
+	case errors.As(err, &nf) && unmanaged(nf.Ref.String()):
+		_, _ = fmt.Fprintf(os.Stderr, "%s: %s; its dir exists but is not a %s account (run: %s account adopt %s)\n", name, err, config.Slug, name, nf.Ref)
 	case errors.As(err, &nf):
 		_, _ = fmt.Fprintf(os.Stderr, "%s: %s (run: %s account add %s)\n", name, err, name, nf.Ref)
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", name, err)
 	}
 	return exitCode(err)
+}
+
+func unmanaged(ref string) bool {
+	s, err := account.NewStore()
+	return err == nil && s.IsUnmanaged(ref)
 }
 
 func isTerminal(f *os.File) bool { return term.IsTerminal(f.Fd()) }
@@ -171,6 +178,7 @@ func (a *app) routeTable() routeTable {
 	}
 	return routeTable{
 		isAccount:   a.store.Exists,
+		isUnmanaged: a.store.IsUnmanaged,
 		subcommands: subs,
 		passthrough: func(w string) bool {
 			for _, spec := range provider.All() {
