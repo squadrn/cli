@@ -89,7 +89,7 @@ type Env struct {
 // Run performs every check. Account checks run concurrently.
 func Run(ctx context.Context, e Env) []Check {
 	var checks []Check
-	checks = append(checks, e.install()...)
+	checks = append(checks, e.install(ctx)...)
 	checks = append(checks, e.versions(ctx)...)
 	checks = append(checks, e.guard(ctx)...)
 	checks = append(checks, e.settings()...)
@@ -127,7 +127,7 @@ func (e Env) gitCheck(ctx context.Context) Check {
 	return ok(g, "git "+v.String())
 }
 
-func (e Env) install() []Check {
+func (e Env) install(ctx context.Context) []Check {
 	const g = "install"
 	var out []Check
 	if e.ConfigErr != nil {
@@ -178,7 +178,7 @@ func (e Env) install() []Check {
 		case err != nil:
 			out = append(out, bad(g, t.status, t.name+" missing ("+t.why+")", "install "+t.name))
 		case t.name == "git":
-			out = append(out, e.gitCheck(context.Background()))
+			out = append(out, e.gitCheck(ctx))
 		default:
 			out = append(out, ok(g, t.name))
 		}
@@ -525,7 +525,7 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 		out = append(out, ok(g, "logged in as "+s.Email))
 	}
 	if a.Spec.Caps.Plugins {
-		out = append(out, e.plugin(ctx, ag, a, g)...)
+		out = append(out, e.plugin(ctx, ag, a, g))
 	}
 	if e.Usage != nil && a.Spec.Caps.UsageReport {
 		if e.Usage(a) {
@@ -543,17 +543,16 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 	return out
 }
 
-func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g string) []Check {
+func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g string) Check {
 	b, err := ag.Output(ctx, a.ConfigDir(), "plugin", "list", "--json")
 	if err != nil {
-		return []Check{bad(g, Warn, "cannot list plugins", "")}
+		return bad(g, Warn, "cannot list plugins", "")
 	}
 	var plugins []struct {
 		ID      string `json:"id"`
 		Enabled bool   `json:"enabled"`
 	}
 	_ = json.Unmarshal(b, &plugins)
-	var out []Check
 	status := bad(g, Fail, "squadrn plugin not installed (no git push guard)", e.Command+" account add "+a.Label())
 	if a.IsMain() {
 		status.Fix = reinstallHint
@@ -566,7 +565,7 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 			}
 		}
 	}
-	return append(out, status)
+	return status
 }
 
 func (e Env) links(a account.Account, g string) []Check {
@@ -601,8 +600,7 @@ func (e Env) expand(p string) string {
 	return strings.Trim(p, `"'`)
 }
 
-// onPath lists distinct executables named name across PATH.
-
+// resolve follows symlinks; p itself when that fails.
 func resolve(p string) string {
 	if real, err := filepath.EvalSymlinks(p); err == nil {
 		return real

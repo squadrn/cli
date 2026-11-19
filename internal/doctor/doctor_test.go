@@ -340,11 +340,11 @@ func TestPathFixNamesTheDirectory(t *testing.T) {
 func TestConfigAndInstalledRelease(t *testing.T) {
 	e := env(t, fakeAgent{}, nil)
 	e.ConfigErr = errors.New("config x: unknown key")
-	if c, _ := find(e.install(), "config invalid: config x: unknown key"); c.Status != Fail || !strings.Contains(c.Fix, "squadrn doctor") {
+	if c, _ := find(e.install(context.Background()), "config invalid: config x: unknown key"); c.Status != Fail || !strings.Contains(c.Fix, "squadrn doctor") {
 		t.Fatalf("config check: %+v", c)
 	}
 	e.ConfigErr = nil
-	if _, found := find(e.install(), "installed release"); found {
+	if _, found := find(e.install(context.Background()), "installed release"); found {
 		t.Fatal("no install: nothing to compare")
 	}
 	bin := e.Layout.Binary()
@@ -361,19 +361,19 @@ func TestConfigAndInstalledRelease(t *testing.T) {
 		}
 	}
 	e.Self, e.Version = bin, "1.2.0"
-	if c, _ := find(e.install(), "installed release is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
+	if c, _ := find(e.install(context.Background()), "installed release is incomplete"); c.Status != Fail || c.Fix != "squadrn self-update" {
 		t.Fatalf("mismatch: %+v", c)
 	}
 	e.Version = "v1.1.0"
-	if c, _ := find(e.install(), "installed release 1.1.0"); c.Status != OK {
+	if c, _ := find(e.install(context.Background()), "installed release 1.1.0"); c.Status != OK {
 		t.Fatalf("match: %+v", c)
 	}
 	e.Version = "dev"
-	if _, found := find(e.install(), "installed release"); found {
+	if _, found := find(e.install(context.Background()), "installed release"); found {
 		t.Fatal("a development build is not compared")
 	}
 	e.Version, e.Self = "1.2.0", filepath.Join(t.TempDir(), "other")
-	if _, found := find(e.install(), "installed release"); found {
+	if _, found := find(e.install(context.Background()), "installed release"); found {
 		t.Fatal("another binary is not compared")
 	}
 }
