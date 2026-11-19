@@ -286,12 +286,3 @@ func (Tmux) Attach(session string) error {
 	}
 	return syscall.Exec(bin, args, os.Environ())
 }
-
-// ShellQuote renders argv as one POSIX shell command line (tmux runs pane commands via a shell).
-func ShellQuote(argv ...string) string {
-	quoted := make([]string, len(argv))
-	for i, a := range argv {
-		quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
-	}
-	return strings.Join(quoted, " ")
-}

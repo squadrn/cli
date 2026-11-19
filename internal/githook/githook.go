@@ -65,7 +65,7 @@ func Install(dir, binary, configFile string) error {
 
 func shim(name, binary, configFile string) []byte {
 	return fmt.Appendf(nil, "#!/bin/sh\n%s: runs the push check, then the repository's own %s hook.\nexec %s hook git %s %s %s \"$@\"\n",
-		marker, name, shellQuote(filepath.ToSlash(binary)), ConfigFlag, shellQuote(filepath.ToSlash(configFile)), name)
+		marker, name, proc.ShellQuote(filepath.ToSlash(binary)), ConfigFlag, proc.ShellQuote(filepath.ToSlash(configFile)), name)
 }
 
 // ConfigFlag passes the config file baked into a shim to `squadrn hook git`.
@@ -166,5 +166,3 @@ func expandHome(p string) string {
 	}
 	return p
 }
-
-func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

@@ -18,6 +18,7 @@ import (
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/grid"
+	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/worktree"
 )
 
@@ -149,7 +150,7 @@ func (a *app) startGrid(ctx context.Context, repo worktree.Repo, agents []grid.A
 			a.warnf("%q is already running in %s; skipped", ag.Name, session)
 			continue
 		}
-		command := grid.ShellQuote(selfPath(), "-a", ag.Account, "wt", ag.Name)
+		command := proc.ShellQuote(selfPath(), "-a", ag.Account, "wt", ag.Name)
 		if session, err = t.Start(ctx, a.cmd, repo.Root, repo.Root, cols, rows, ag, command); err != nil {
 			return "", err
 		}

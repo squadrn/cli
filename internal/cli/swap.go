@@ -185,7 +185,7 @@ func (a *app) swap(o swapOptions) error {
 		a.banner(*to)
 		return a.session(ag, *to, ag.ResumeArgs(src.session.ID))
 	}
-	command := grid.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(src.session.ID)...)...)
+	command := proc.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ag.ResumeArgs(src.session.ID)...)...)
 	if err := (grid.Tmux{}).Respawn(context.Background(), pane, src.cwd, grid.Agent{Account: to.Label(), Name: src.worktree}, command); err != nil {
 		return err
 	}

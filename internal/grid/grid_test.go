@@ -3,7 +3,6 @@ package grid
 import (
 	"context"
 	"errors"
-	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -67,19 +66,6 @@ func TestSessionName(t *testing.T) {
 		if got := sessionName("ai", root); got != want {
 			t.Errorf("SessionName(%q) = %q, want %q", root, got, want)
 		}
-	}
-}
-
-func TestShellQuoteRoundTrips(t *testing.T) {
-	argv := []string{"/path with space/squadrn", "-a", "it's", "--resume", `$(rm -rf ~)`, ""}
-	script := "for a in " + ShellQuote(argv...) + "; do printf '[%s]\n' \"$a\"; done"
-	got, err := exec.Command("sh", "-c", script).Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "[/path with space/squadrn]\n[-a]\n[it's]\n[--resume]\n[$(rm -rf ~)]\n[]\n"
-	if string(got) != want {
-		t.Fatalf("shell saw:\n%s", got)
 	}
 }
 

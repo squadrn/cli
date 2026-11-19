@@ -5,6 +5,8 @@ package cli
 import (
 	"os"
 	"strings"
+
+	"github.com/squadrn/squadrn/internal/proc"
 )
 
 // statusLineWord quotes s as one word for the shell Claude Code runs status line commands in.
@@ -12,7 +14,7 @@ func statusLineWord(s, _ string) (string, error) {
 	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:@%+=,-") == "" {
 		return s, nil
 	}
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'", nil
+	return proc.ShellQuote(s), nil
 }
 
 // statusLineShell runs a status line command the way Claude Code does: through the user's shell.

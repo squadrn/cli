@@ -66,3 +66,12 @@ func ExitCode(err error) int {
 	}
 	return -1
 }
+
+// ShellQuote renders args as one POSIX shell command line, each word in single quotes.
+func ShellQuote(args ...string) string {
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+	}
+	return strings.Join(quoted, " ")
+}
