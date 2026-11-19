@@ -1,0 +1,46 @@
+[windows] skip 'Unix script: symlinks'
+# A fresh machine has no ~/.claude/settings.json: account add creates it ({}) so the account links
+# to it, and usage setup writes through the link instead of giving the account its own file.
+! exists home/.claude/settings.json
+exec squadrn account add work --no-usage
+stdout 'linked ~/.claude-work/settings.json'
+grep '^\{\}$' home/.claude/settings.json
+exec squadrn usage setup work -y
+exec sh -c 'test -L home/.claude-work/settings.json && echo link'
+stdout '^link$'
+grep 'hook statusline' home/.claude/settings.json
+exec sh -c 'squadrn doctor; true'
+! stdout 'settings.json is not linked'
+
+# An existing main settings.json is never rewritten.
+cp own.json home/.claude/settings.json
+exec squadrn account add other --no-usage
+cmp home/.claude/settings.json own.json
+
+# An account with its own settings.json keeps it; doctor, the session warning and account add all
+# point at --relink, which moves it aside (a backup, never deleted) and links main's.
+rm home/.claude-work/settings.json
+cp own.json home/.claude-work/settings.json
+exec squadrn account add work --no-usage
+stdout 'kept ~/.claude-work/settings.json \(exists and is not a link to main; to link it: srn account add claude/work --relink\)'
+! exec squadrn doctor
+stdout 'settings.json is not linked to main  → srn account add claude/work --relink'
+exec squadrn work -- hi
+stderr 'settings.json was replaced in claude/work, so it no longer follows the main account; to link it again \(keeps a backup\): srn account add claude/work --relink'
+exitcode 2 squadrn account add work --relink
+! exec squadrn account add work --relink
+stderr 'move ~/.claude-work/settings.json aside \(.bak-<time>\) and link to the main account.s; re-run with --yes'
+exec sh -c 'test ! -L home/.claude-work/settings.json && ls home/.claude-work'
+! stdout bak
+exec squadrn account add work --relink -y
+stdout 'moved ~/.claude-work/settings.json aside to ~/.claude-work/settings.json.bak-[0-9]{8}-[0-9]{6}'
+stdout 'linked ~/.claude-work/settings.json'
+exec sh -c 'test -L home/.claude-work/settings.json && cat home/.claude-work/settings.json.bak-*'
+stdout '"own": true'
+
+# Nothing to relink: --relink is a plain repair and asks nothing.
+exec squadrn account add work --relink
+! stdout 'moved'
+
+-- own.json --
+{"own": true}

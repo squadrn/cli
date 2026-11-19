@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -438,10 +439,10 @@ func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt
 	a.banner(acct)
 	r := a.store.RefreshShared(acct)
 	for _, c := range r.Conflicts {
-		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+		a.warnf("%s was edited in %s, so it no longer follows the main account; to link it again (keeps a backup): %s", a.tilde(c), acct.Label(), a.relinkHint(acct))
 	}
 	for _, c := range r.Replaced {
-		a.warnf("%s was replaced in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
+		a.warnf("%s was replaced in %s, so it no longer follows the main account; to link it again (keeps a backup): %s", a.tilde(c), acct.Label(), a.relinkHint(acct))
 	}
 	if a.cfgErr != nil && !a.cfgWarned {
 		a.cfgWarned = true
@@ -450,6 +451,11 @@ func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt
 	a.layout.CleanOld(append([]string{a.cmd}, a.cfg.Aliases...))
 	defer a.markInUse(acct, wt)()
 	return ag.Exec(acct.ConfigDir(), args)
+}
+
+// relinkHint is the command that links an account's own copies of shared files to main again.
+func (a *app) relinkHint(acct account.Account) string {
+	return a.cmd + " account add " + acct.Label() + " --relink"
 }
 
 func (a *app) tilde(path string) string {
@@ -604,13 +610,26 @@ func (a *app) marketplaceDir() string {
 	return a.layout.Marketplace()
 }
 
+func (a *app) provisioner(ag provider.Agent) account.Provisioner {
+	return account.Provisioner{Store: a.store, Agent: ag, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
+}
+
 func (a *app) provision(acct account.Account, ag provider.Agent) error {
+	return a.provisionWith(acct, ag, false)
+}
+
+// provisionWith creates or repairs acct; relink moves its own copies of shared files aside.
+func (a *app) provisionWith(acct account.Account, ag provider.Agent, relink bool) error {
 	if a.cfgErr != nil {
 		return a.cfgErr
 	}
-	p := account.Provisioner{Store: a.store, Agent: ag, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
+	p := a.provisioner(ag)
+	p.Relink = relink
 	rep, err := p.Provision(context.Background(), acct)
 	a.out("account %s → %s\n", acct.Label(), a.tilde(acct.Dir))
+	for _, dst := range slices.Sorted(maps.Keys(rep.Backups)) {
+		a.out("  moved %s aside to %s\n", a.tilde(dst), a.tilde(rep.Backups[dst]))
+	}
 	for _, l := range rep.Linked {
 		a.out("  linked %s\n", a.tilde(l))
 	}
@@ -618,7 +637,7 @@ func (a *app) provision(acct account.Account, ag provider.Agent) error {
 		a.out("  removed stale link %s\n", a.tilde(l))
 	}
 	for _, c := range rep.Conflicts {
-		a.out("  kept %s (exists and is not a link to main)\n", a.tilde(c))
+		a.out("  kept %s (exists and is not a link to main; to link it: %s)\n", a.tilde(c), a.relinkHint(acct))
 	}
 	for _, m := range rep.MCPAdded {
 		a.out("  mcp added %s\n", m)

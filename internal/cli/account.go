@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 func (a *app) accountCmd() *cobra.Command {
@@ -161,11 +163,11 @@ func (a *app) accountList(asJSON bool) error {
 }
 
 func (a *app) accountAddCmd() *cobra.Command {
-	var track, noTrack bool
+	var track, noTrack, relink, yes bool
 	cmd := &cobra.Command{
 		Use:     "add [<provider>/]<name>",
 		Short:   "Create or repair an account (shared links, allowlisted MCP, plugin)",
-		Example: fmt.Sprintf("  %[1]s account add work\n  %[1]s account add claude/work", a.cmd),
+		Example: fmt.Sprintf("  %[1]s account add work\n  %[1]s account add claude/work\n  %[1]s account add work --relink   link files the account has its own copy of (keeps a backup)", a.cmd),
 		Args:    oneArg,
 		RunE: func(_ *cobra.Command, args []string) error {
 			if track && noTrack {
@@ -175,16 +177,18 @@ func (a *app) accountAddCmd() *cobra.Command {
 			if track || noTrack {
 				choice = &track
 			}
-			return a.accountAdd(args[0], choice)
+			return a.accountAdd(args[0], choice, relink, yes)
 		},
 		ValidArgsFunction: cobra.NoFileCompletions,
 	}
 	cmd.Flags().BoolVar(&track, "usage", false, "track usage limits in the status line without asking")
 	cmd.Flags().BoolVar(&noTrack, "no-usage", false, "do not track usage limits and do not ask")
+	cmd.Flags().BoolVar(&relink, "relink", false, "move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation with --relink")
 	return cmd
 }
 
-func (a *app) accountAdd(input string, trackUsage *bool) error {
+func (a *app) accountAdd(input string, trackUsage *bool, relink, yes bool) error {
 	acct, err := a.store.Define(input)
 	if err != nil {
 		return err
@@ -196,7 +200,12 @@ func (a *app) accountAdd(input string, trackUsage *bool) error {
 	if err != nil {
 		return err
 	}
-	if err := a.provision(acct, ag); err != nil {
+	if relink {
+		if relink, err = a.confirmRelink(acct, ag, yes); err != nil {
+			return err
+		}
+	}
+	if err := a.provisionWith(acct, ag, relink); err != nil {
 		return err
 	}
 	a.cache.Forget(acct.Label())
@@ -207,6 +216,20 @@ func (a *app) accountAdd(input string, trackUsage *bool) error {
 		a.out("next: %s account login %s\n", a.cmd, acct.Label())
 	}
 	return nil
+}
+
+// confirmRelink asks before moving the account's own copies of shared files aside; false means
+// there is nothing to relink.
+func (a *app) confirmRelink(acct account.Account, ag provider.Agent, yes bool) (bool, error) {
+	conflicts := a.provisioner(ag).Conflicts(acct)
+	if len(conflicts) == 0 {
+		return false, nil
+	}
+	names := make([]string, len(conflicts))
+	for i, c := range conflicts {
+		names[i] = a.tilde(c)
+	}
+	return true, a.confirm(yes, "Move %s aside (.bak-<time>) and link to the main account's", strings.Join(names, ", "))
 }
 
 func (a *app) accountLogin(input string) error {

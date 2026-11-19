@@ -50,6 +50,38 @@ func WriteBytes(path string, b []byte, perm fs.FileMode) error {
 	return WriteFile(path, bytes.NewReader(b), perm)
 }
 
+// CreateExclusive creates path with the contents b unless it exists; an existing file is left
+// as it is (no error). The content appears at once: it is written to a temporary file that is
+// then hard-linked to path, which fails rather than replaces when path exists.
+func CreateExclusive(path string, b []byte, perm fs.FileMode) error {
+	if _, err := os.Lstat(path); err == nil {
+		return nil
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	_, err = tmp.Write(b)
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(tmp.Name(), perm)
+	}
+	if err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	if err := os.Link(tmp.Name(), path); err != nil && !errors.Is(err, fs.ErrExist) {
+		return err
+	}
+	return nil
+}
+
 // AppendLine appends b and a newline to path in one write, creating the file (and its
 // directory, mode 0o700) when missing. Lines appended concurrently by separate writers do not
 // interleave on local filesystems.

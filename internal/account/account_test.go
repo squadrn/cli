@@ -336,6 +336,56 @@ func TestProvisionReportsConflicts(t *testing.T) {
 	}
 }
 
+func TestProvisionRelinkKeepsABackup(t *testing.T) {
+	s, a, _, p := provisionFixture(t)
+	own := filepath.Join(a.Dir, "settings.json")
+	must(t, os.MkdirAll(a.Dir, 0o700))
+	must(t, os.WriteFile(own, []byte(`{"own":true}`), 0o600))
+	if c := p.Conflicts(a); !slices.Equal(c, []string{own}) {
+		t.Fatalf("Conflicts = %v", c)
+	}
+	p.Relink = true
+	p.Now = time.Date(2026, 11, 19, 10, 0, 0, 0, time.UTC)
+	r, err := p.Provision(context.Background(), a)
+	must(t, err)
+	bak := own + ".bak-20261119-100000"
+	if r.Backups[own] != bak || len(r.Conflicts) != 0 {
+		t.Fatalf("report = %+v", r)
+	}
+	if b, err := os.ReadFile(bak); err != nil || string(b) != `{"own":true}` {
+		t.Fatalf("backup = %q, %v", b, err)
+	}
+	if !LinksTo(own, filepath.Join(s.MainDir(provider.Claude), "settings.json")) {
+		t.Fatal("settings.json not linked after relink")
+	}
+	if c := p.Conflicts(a); len(c) != 0 {
+		t.Fatalf("Conflicts after relink = %v", c)
+	}
+	// A backup with the same name is never overwritten.
+	must(t, os.Remove(own))
+	must(t, os.WriteFile(own, []byte("again"), 0o600))
+	if _, err := p.Provision(context.Background(), a); err == nil {
+		t.Fatal("relink overwrote an existing backup")
+	}
+	if b, _ := os.ReadFile(bak); string(b) != `{"own":true}` {
+		t.Fatalf("backup changed: %q", b)
+	}
+}
+
+func TestProvisionCreatesMainSettings(t *testing.T) {
+	s, a, _, p := provisionFixture(t)
+	main := filepath.Join(s.MainDir(provider.Claude), "settings.json")
+	must(t, os.Remove(main))
+	r, err := p.Provision(context.Background(), a)
+	must(t, err)
+	if b, err := os.ReadFile(main); err != nil || string(b) != "{}\n" {
+		t.Fatalf("main settings = %q, %v", b, err)
+	}
+	if !slices.Contains(r.Linked, filepath.Join(a.Dir, "settings.json")) {
+		t.Fatalf("Linked = %v", r.Linked)
+	}
+}
+
 func TestProvisionWithoutMarketplaceSkipsPlugin(t *testing.T) {
 	_, a, f, p := provisionFixture(t)
 	p.Marketplace = ""

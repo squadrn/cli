@@ -579,7 +579,7 @@ func (e Env) links(a account.Account, g string) []Check {
 			continue
 		}
 		if !account.LinksTo(filepath.Join(a.Dir, item), src) {
-			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account add "+a.Label()))
+			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account add "+a.Label()+" --relink"))
 		}
 	}
 	return out

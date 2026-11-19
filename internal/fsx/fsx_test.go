@@ -266,3 +266,25 @@ func TestMoveDir(t *testing.T) {
 		t.Fatal("a missing source must fail and keep dst")
 	}
 }
+
+func TestCreateExclusive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d", "settings.json")
+	if err := CreateExclusive(path, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != "{}\n" {
+		t.Fatalf("content = %q", b)
+	}
+	if err := os.WriteFile(path, []byte("mine"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := CreateExclusive(path, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != "mine" {
+		t.Fatalf("an existing file was replaced: %q", b)
+	}
+	if entries, _ := os.ReadDir(filepath.Dir(path)); len(entries) != 1 {
+		t.Fatalf("temporary files left: %v", entries)
+	}
+}

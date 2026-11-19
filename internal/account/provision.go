@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
@@ -23,10 +24,17 @@ type Provisioner struct {
 	SharedMCP []string
 	// Marketplace is the local dir holding the squadrn plugin marketplace; "" skips the plugin.
 	Marketplace string
+	// Relink moves shared items the account has its own copy of aside (<name>.bak-<stamp>) and
+	// links them to main. Nothing is deleted.
+	Relink bool
+	// Now stamps the backups; zero means time.Now.
+	Now time.Time
 }
 
 type Report struct {
-	Linked          []string
+	Linked []string
+	// Backups maps each item Relink moved aside to its backup.
+	Backups         map[string]string
 	Unlinked        []string
 	Conflicts       []string
 	MCPAdded        []string
@@ -46,6 +54,11 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 			return r, err
 		}
 		if err := Mark(a); err != nil {
+			return r, err
+		}
+	}
+	if !a.IsMain() {
+		if err := ensureSettings(p.Store.MainDir(a.Spec), a.Spec); err != nil {
 			return r, err
 		}
 	}
@@ -69,24 +82,74 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 	return r, nil
 }
 
+// ensureSettings creates main's settings file ({}) when it is missing, so every account links
+// to it rather than ending up with a settings file of its own. An existing file is never touched.
+func ensureSettings(main string, spec provider.Spec) error {
+	if spec.Settings == "" || !slices.Contains(spec.Shared, spec.Settings) {
+		return nil
+	}
+	return fsx.CreateExclusive(filepath.Join(main, spec.Settings), []byte("{}\n"), 0o644)
+}
+
 func (p Provisioner) linkShared(a Account, r *Report) error {
 	main := p.Store.MainDir(a.Spec)
+	l := linker{relink: p.Relink, now: p.Now}
+	if l.now.IsZero() {
+		l.now = time.Now()
+	}
 	for _, item := range a.Spec.Shared {
-		if err := linkOne(filepath.Join(main, item), filepath.Join(a.Dir, item), r); err != nil {
+		if err := l.one(filepath.Join(main, item), filepath.Join(a.Dir, item), r); err != nil {
 			return err
 		}
 	}
 	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
-		if err := linkEntries(filepath.Join(main, dir), filepath.Join(a.Dir, dir), a.Spec.SharedPerEntry[dir], r); err != nil {
+		if err := l.entries(filepath.Join(main, dir), filepath.Join(a.Dir, dir), a.Spec.SharedPerEntry[dir], r); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// Conflicts lists the shared items account a has its own file or dir for instead of a link to
+// main's: what Provision keeps and Relink moves aside. Nothing is changed.
+func (p Provisioner) Conflicts(a Account) []string {
+	var out []string
+	main := p.Store.MainDir(a.Spec)
+	check := func(src, dst string) {
+		if _, err := os.Stat(src); err != nil || linksTo(dst, src) {
+			return
+		}
+		if _, err := os.Lstat(dst); err == nil {
+			out = append(out, dst)
+		}
+	}
+	for _, item := range a.Spec.Shared {
+		check(filepath.Join(main, item), filepath.Join(a.Dir, item))
+	}
+	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
+		entries, _ := os.ReadDir(filepath.Join(main, dir))
+		for _, e := range entries {
+			if !slices.Contains(a.Spec.SharedPerEntry[dir], e.Name()) {
+				check(filepath.Join(main, dir, e.Name()), filepath.Join(a.Dir, dir, e.Name()))
+			}
+		}
+	}
+	return out
+}
+
+// linker links shared items; with relink it moves an account's own copy aside first.
+type linker struct {
+	relink bool
+	now    time.Time
+}
+
 // linkEntries links every entry of main's dir src into dst, except skip, and removes the links
 // it made to entries main no longer has (a deleted skill).
 func linkEntries(src, dst string, skip []string, r *Report) error {
+	return linker{}.entries(src, dst, skip, r)
+}
+
+func (l linker) entries(src, dst string, skip []string, r *Report) error {
 	entries, err := os.ReadDir(src)
 	if errors.Is(err, fs.ErrNotExist) {
 		entries = nil
@@ -102,7 +165,7 @@ func linkEntries(src, dst string, skip []string, r *Report) error {
 		if slices.Contains(skip, e.Name()) {
 			continue
 		}
-		if err := linkOne(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name()), r); err != nil {
+		if err := l.one(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name()), r); err != nil {
 			return err
 		}
 	}
@@ -129,7 +192,7 @@ func linkEntries(src, dst string, skip []string, r *Report) error {
 	return nil
 }
 
-func linkOne(src, dst string, r *Report) error {
+func (l linker) one(src, dst string, r *Report) error {
 	if _, err := os.Stat(src); errors.Is(err, fs.ErrNotExist) {
 		// main no longer has the item: drop the link we made to it rather than leave it dangling.
 		if linksTo(dst, src) {
@@ -146,8 +209,21 @@ func linkOne(src, dst string, r *Report) error {
 		return nil
 	}
 	if _, err := os.Lstat(dst); err == nil {
-		r.Conflicts = append(r.Conflicts, dst)
-		return nil
+		if !l.relink {
+			r.Conflicts = append(r.Conflicts, dst)
+			return nil
+		}
+		bak := fsx.BackupName(dst, l.now)
+		if _, err := os.Lstat(bak); err == nil {
+			return fmt.Errorf("move %s aside: %s already exists", dst, bak)
+		}
+		if err := os.Rename(dst, bak); err != nil {
+			return fmt.Errorf("move %s aside: %w", dst, err)
+		}
+		if r.Backups == nil {
+			r.Backups = map[string]string{}
+		}
+		r.Backups[dst] = bak
 	}
 	if err := link(src, dst); err != nil {
 		return fmt.Errorf("link %s: %w", dst, err)
