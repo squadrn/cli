@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Supersedes ADR 0003.
+Accepted (v1.0.0). Supersedes ADR 0003.
 
 ## Context
 

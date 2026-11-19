@@ -1,6 +1,6 @@
 # 0004 — User-chosen command and provider/name accounts
 
-Status: accepted
+Status: accepted (v1.0.0)
 
 ## Context
 

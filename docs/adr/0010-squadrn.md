@@ -1,6 +1,6 @@
 # 0010 — Product name Squadrn (`squadrn`, alias `sqd`)
 
-Status: accepted
+Status: accepted (v1.0.0)
 
 ## Context
 
