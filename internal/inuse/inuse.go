@@ -26,16 +26,6 @@ import (
 // Dir is the registry directory inside a used directory. It is a fixed identifier.
 const Dir = "." + config.Slug + "-inuse"
 
-// LegacyDirs are Dir under previous product names. Sessions an older release started still
-// record themselves there; Active reads them and moves live entries into Dir.
-func LegacyDirs() []string {
-	out := make([]string, len(config.PreviousNames))
-	for i, n := range config.PreviousNames {
-		out[i] = "." + n + "-inuse"
-	}
-	return out
-}
-
 // Entry is one running session.
 type Entry struct {
 	PID int `json:"pid"`
@@ -83,26 +73,11 @@ func Release(dir string) error {
 	return err
 }
 
-// Active returns the live entries of dir, sorted by pid. Stale entries are deleted; live ones
-// in a legacy registry are moved into Dir.
+// Active returns the live entries of dir, sorted by pid. Stale entries are deleted.
 func Active(dir string) []Entry {
-	for _, l := range LegacyDirs() {
-		migrate(dir, l)
-	}
 	out := active(filepath.Join(dir, Dir))
 	sort.Slice(out, func(i, j int) bool { return out[i].PID < out[j].PID })
 	return out
-}
-
-// migrate moves the live entries of dir's legacy registry into Dir and removes the legacy one.
-func migrate(dir, legacy string) {
-	entries := active(filepath.Join(dir, legacy))
-	if len(entries) > 0 && os.MkdirAll(filepath.Join(dir, Dir), 0o700) == nil {
-		for _, e := range entries {
-			_ = os.Rename(entryPath(dir, legacy, e.PID), entryPath(dir, Dir, e.PID))
-		}
-	}
-	_ = os.Remove(filepath.Join(dir, legacy)) // fails while entries a rename could not move remain
 }
 
 // active reads the live entries of one registry dir, deleting stale ones and the dir once empty.

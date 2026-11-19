@@ -46,9 +46,8 @@ func exe(dir, name string) string { return filepath.Join(dir, ExecutableName(nam
 
 // LinkCommands installs every name in names as a copy of the binary in BinDir (replacing older
 // copies even while they run) and removes the copies of names no longer wanted. A file that squadrn
-// did not install is moved aside rather than overwritten. ours are the binaries of previous
-// product names: the copies their manifests list count as installed here.
-func (l Layout) LinkCommands(names []string, ours []string, now time.Time) (LinkResult, error) {
+// did not install is moved aside rather than overwritten.
+func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) {
 	var res LinkResult
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		return res, err
@@ -57,14 +56,6 @@ func (l Layout) LinkCommands(names []string, ours []string, now time.Time) (Link
 		return res, err
 	}
 	prev := l.readCommands()
-	for _, o := range ours {
-		legacy := Layout{DataDir: filepath.Dir(filepath.Dir(o)), BinDir: l.BinDir}
-		for _, n := range legacy.readCommands() {
-			if !slices.Contains(prev, n) {
-				prev = append(prev, n)
-			}
-		}
-	}
 	for _, n := range names {
 		dst := exe(l.BinDir, n)
 		if _, err := os.Lstat(dst); err == nil && !slices.Contains(prev, n) && !fsx.SameFile(dst, l.Binary()) {

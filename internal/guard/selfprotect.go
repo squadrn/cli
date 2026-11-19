@@ -36,7 +36,7 @@ func (e *extractor) self(args []arg) {
 }
 
 // pathVerdict judges a write to p: the config file and the git hooks are denied, anything else
-// in squadrn's directories (or those of a previous product name) asks.
+// in squadrn's directories asks.
 func (e *extractor) pathVerdict(p arg, dir string) (Verdict, string) {
 	if e.dirs.Config == "" {
 		return Allow, ""
@@ -47,31 +47,23 @@ func (e *extractor) pathVerdict(p arg, dir string) (Verdict, string) {
 	)
 	if p.dynamic {
 		v := strings.ToLower(strings.ReplaceAll(p.val, `\`, "/"))
-		for _, n := range append([]string{config.Slug}, config.PreviousNames...) {
-			if strings.Contains(v, n+"/config.toml") || strings.Contains(v, n+"/git-hooks") {
-				return Deny, denied
-			}
-		}
-		for _, n := range append([]string{config.Slug}, config.PreviousNames...) {
-			if strings.Contains(v, "/"+n) {
-				return Ask, asked
-			}
+		switch {
+		case strings.Contains(v, config.Slug+"/config.toml") || strings.Contains(v, config.Slug+"/git-hooks"):
+			return Deny, denied
+		case strings.Contains(v, "/"+config.Slug):
+			return Ask, asked
 		}
 		return Allow, ""
 	}
 	target := e.resolve(dir, strings.ReplaceAll(p.val, `\`, "/"))
-	for _, d := range append([]config.Dirs{e.dirs}, e.legacyDirs...) {
-		for _, guarded := range []string{filepath.Join(d.Config, "config.toml"), githook.Dir(d.Data)} {
-			if within(target, guarded) || within(guarded, target) && (within(target, d.Config) || within(target, d.Data)) {
-				return Deny, denied
-			}
+	for _, guarded := range []string{filepath.Join(e.dirs.Config, "config.toml"), githook.Dir(e.dirs.Data)} {
+		if within(target, guarded) || within(guarded, target) && (within(target, e.dirs.Config) || within(target, e.dirs.Data)) {
+			return Deny, denied
 		}
 	}
-	for _, d := range append([]config.Dirs{e.dirs}, e.legacyDirs...) {
-		for _, sub := range []string{d.Config, d.Data, d.State} {
-			if within(target, sub) {
-				return Ask, asked
-			}
+	for _, d := range []string{e.dirs.Config, e.dirs.Data, e.dirs.State} {
+		if within(target, d) {
+			return Ask, asked
 		}
 	}
 	return Allow, ""

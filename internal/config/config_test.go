@@ -1,7 +1,6 @@
 package config
 
 import (
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -140,15 +139,6 @@ func TestSaveRoundTrip(t *testing.T) {
 	}
 }
 
-func TestLegacyPaths(t *testing.T) {
-	cfg := filepath.Join(t.TempDir(), "cfg")
-	t.Setenv("XDG_CONFIG_HOME", cfg)
-	p, err := LegacyPaths()
-	if err != nil || !slices.Equal(p, []string{filepath.Join(cfg, "sprawl", "config.toml"), filepath.Join(cfg, "squad", "config.toml")}) {
-		t.Fatalf("LegacyPaths() = %q, %v", p, err)
-	}
-}
-
 func TestGetSet(t *testing.T) {
 	var c Config
 	for _, k := range Keys {
@@ -213,51 +203,6 @@ func TestDirsFor(t *testing.T) {
 	d = DirsFor(home, "squadrn")
 	if d.Cache != j(cache, "squadrn") || d.Data != j(home, ".local", "share", "squadrn") {
 		t.Fatalf("XDG: %+v", d)
-	}
-}
-
-func TestMigrateNames(t *testing.T) {
-	for _, c := range []struct {
-		cmd, wantCmd   string
-		aliases, wantA []string
-	}{
-		{"sprawl", "squadrn", []string{"sra"}, []string{"sqd"}},
-		{"", "squadrn", nil, nil},
-		{"squad", "squadrn", []string{"sq"}, []string{"sqd"}},
-		{"ai", "ai", []string{"x", "sra", "sqd"}, []string{"x", "sqd"}},
-		{"ai", "ai", []string{"ai", "squadrn"}, []string{"squadrn"}},
-	} {
-		cmd, aliases := MigrateNames(c.cmd, c.aliases)
-		if cmd != c.wantCmd || !slices.Equal(aliases, c.wantA) {
-			t.Errorf("MigrateNames(%q, %q) = %q, %q", c.cmd, c.aliases, cmd, aliases)
-		}
-	}
-	if !slices.Equal(LegacyCommands(), []string{"sprawl", "sprawl-hook", "sra", "squad", "squad-hook", "sq"}) {
-		t.Errorf("LegacyCommands = %q", LegacyCommands())
-	}
-}
-
-func TestLegacyEnv(t *testing.T) {
-	env := map[string]string{"SPRAWL_SHARED_MCP": "a", "SQUAD_MARKETPLACE": "/m", "SPRAWL_NO_UPDATE_CHECK": "1", "SQUADRN_NO_UPDATE_CHECK": "1"}
-	get := func(k string) string { return env[k] }
-	if v, legacy := LookupEnv(get, "SHARED_MCP"); v != "a" || legacy != "SPRAWL_SHARED_MCP" {
-		t.Errorf("LookupEnv = %q, %q", v, legacy)
-	}
-	if v, legacy := LookupEnv(get, "NO_UPDATE_CHECK"); v != "1" || legacy != "" {
-		t.Errorf("the current name must win: %q, %q", v, legacy)
-	}
-	want := map[string]string{"SPRAWL_SHARED_MCP": "SQUADRN_SHARED_MCP", "SQUAD_MARKETPLACE": "SQUADRN_MARKETPLACE"}
-	if got := RenamedEnv(get); !maps.Equal(got, want) {
-		t.Errorf("RenamedEnv = %v", got)
-	}
-	t.Setenv("SQUADRN_SHARED_MCP", "")
-	t.Setenv("SPRAWL_SHARED_MCP", "x y")
-	if EnvOverrides()["shared_mcp"] != "SPRAWL_SHARED_MCP" {
-		t.Error("override by the previous name not reported")
-	}
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if c, err := load(path); err != nil || !slices.Equal(c.SharedMCP, []string{"x", "y"}) {
-		t.Errorf("load = %+v, %v", c.SharedMCP, err)
 	}
 }
 

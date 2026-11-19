@@ -117,23 +117,6 @@ type Store struct {
 // (~/.claude-<x>), so a matching dir alone is not an account. Main accounts need none.
 const Marker = "." + config.Slug + "-account"
 
-// legacyMarkers are Marker under previous product names; found ones are replaced by Marker.
-func legacyMarkers(dir string) []string {
-	out := make([]string, len(config.PreviousNames))
-	for i, n := range config.PreviousNames {
-		out[i] = filepath.Join(dir, "."+n+"-account")
-	}
-	return out
-}
-
-func hasLegacyMarker(dir string) bool { return slices.ContainsFunc(legacyMarkers(dir), isFile) }
-
-func removeLegacyMarkers(dir string) {
-	for _, p := range legacyMarkers(dir) {
-		_ = os.Remove(p)
-	}
-}
-
 func (s Store) providers() []provider.Spec {
 	if s.Providers != nil {
 		return s.Providers
@@ -185,11 +168,6 @@ func (s Store) exists(a Account) bool {
 	case !isDir(a.Dir):
 		return false
 	case isFile(filepath.Join(a.Dir, Marker)):
-		return true
-	case hasLegacyMarker(a.Dir):
-		if Mark(a) == nil {
-			removeLegacyMarkers(a.Dir)
-		}
 		return true
 	case s.HasPlugin != nil && s.HasPlugin(a.Spec, a.Dir):
 		return Mark(a) == nil

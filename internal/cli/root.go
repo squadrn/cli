@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -131,7 +130,6 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 		now: time.Now,
 	}
 	a.signers = buildSigners()
-	a.warnRenamedEnv(os.Getenv)
 	root := a.rootCmd()
 	r, err := parseRoute(args, a.routeTable())
 	if err != nil {
@@ -167,17 +165,12 @@ func newStore(cfg config.Config, cfgErr error) (account.Store, error) {
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
 	}
-	// Accounts provisioned before account markers carry squadrn's plugin (or a previous name's).
+	// Accounts provisioned before account markers carry squadrn's plugin.
 	store.HasPlugin = func(spec provider.Spec, dir string) bool {
 		if spec.ID != provider.Claude.ID {
 			return false
 		}
-		for _, id := range append([]string{account.PluginID}, account.LegacyPluginIDs()...) {
-			if claude.HasPlugin(dir, id) {
-				return true
-			}
-		}
-		return false
+		return claude.HasPlugin(dir, account.PluginID)
 	}
 	return store, nil
 }
@@ -312,15 +305,6 @@ func takesAccount(cmd *cobra.Command) bool {
 // out and errf print user-facing messages; a failed write to the terminal is not actionable.
 func (a *app) out(format string, args ...any)  { _, _ = fmt.Fprintf(a.stdout, format, args...) }
 func (a *app) errf(format string, args ...any) { _, _ = fmt.Fprintf(a.stderr, format, args...) }
-
-// warnRenamedEnv names environment variables still set under a previous product name. They are
-// honoured through 2.x; hooks never print this (their output is read by the agent CLI).
-func (a *app) warnRenamedEnv(getenv func(string) string) {
-	renamed := config.RenamedEnv(getenv)
-	for _, old := range slices.Sorted(maps.Keys(renamed)) {
-		a.warnf("%s is renamed to %s; set that instead", old, renamed[old])
-	}
-}
 
 func (a *app) warnf(format string, args ...any) {
 	a.errf("%s: %s\n", a.cmd, a.paint(a.colorErr, "33", "warning: ")+fmt.Sprintf(format, args...))
@@ -600,7 +584,7 @@ func (a *app) addInteractively() error {
 // marketplaceDir locates the local squadrn plugin marketplace: $SQUADRN_MARKETPLACE, else the
 // installed release dir. "" means no plugin is available to install.
 func (a *app) marketplaceDir() string {
-	if dir := config.Getenv("MARKETPLACE"); dir != "" {
+	if dir := os.Getenv("SQUADRN_MARKETPLACE"); dir != "" {
 		if _, err := os.Stat(filepath.Join(dir, ".claude-plugin", "marketplace.json")); err == nil {
 			return dir
 		}

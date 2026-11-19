@@ -353,43 +353,16 @@ func TestProvisionWithoutMarketplaceSkipsPlugin(t *testing.T) {
 	}
 }
 
-func TestRemoveLegacyPlugins(t *testing.T) {
-	_, a, f, p := provisionFixture(t)
-	f.plugins = `[{"id":"squad@squad"},{"id":"sprawl@sprawl"},{"id":"squadrn@squadrn"},{"id":"ccx@ccx"},{"id":"other@x"}]` // ccx is no longer a previous name
-	f.markets = `[{"name":"squad"},{"name":"sprawl"},{"name":"squadrn"},{"name":"ccx"},{"name":"other"}]`
-	removed, err := p.RemoveLegacyPlugins(context.Background(), a.ConfigDir())
-	if err != nil || !slices.Equal(removed, []string{"sprawl@sprawl", "squad@squad"}) {
-		t.Fatalf("RemoveLegacyPlugins = %v, %v", removed, err)
-	}
-	var mutations []string
-	for _, c := range f.calls {
-		if strings.Contains(c, "uninstall") || strings.Contains(c, "remove") {
-			mutations = append(mutations, strings.SplitN(c, "|", 2)[1])
-		}
-	}
-	want := []string{"plugin uninstall sprawl@sprawl", "plugin marketplace remove sprawl", "plugin uninstall squad@squad", "plugin marketplace remove squad"}
-	if !slices.Equal(mutations, want) {
-		t.Errorf("mutations = %v", mutations)
-	}
-	f.plugins, f.markets = `[]`, `[]`
-	if removed, _ := p.RemoveLegacyPlugins(context.Background(), a.ConfigDir()); len(removed) != 0 {
-		t.Error("nothing to remove must report nothing")
-	}
-	if !slices.Equal(LegacyPluginIDs(), []string{"sprawl@sprawl", "squad@squad"}) {
-		t.Errorf("LegacyPluginIDs = %v", LegacyPluginIDs())
-	}
-}
-
 func TestMarkerAdoptAndMigration(t *testing.T) {
 	s := newStore(t, "mine")
-	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-squad"), 0o755)) // another tool's dir
+	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-tool"), 0o755)) // another tool's dir
 	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-legacy"), 0o755))
-	if s.Exists("squad") || s.Exists("legacy") {
+	if s.Exists("tool") || s.Exists("legacy") {
 		t.Fatal("a dir without the marker is an account")
 	}
 	un, err := s.Unmanaged()
 	must(t, err)
-	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "squad" {
+	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "tool" {
 		t.Fatalf("Unmanaged = %+v", un)
 	}
 	// Dirs provisioned before markers carry the squadrn plugin: adopted on sight.
@@ -399,7 +372,7 @@ func TestMarkerAdoptAndMigration(t *testing.T) {
 	if len(got) != 3 || got[1].Name != "legacy" || !isFile(filepath.Join(s.Home, ".claude-legacy", Marker)) {
 		t.Fatalf("List = %+v", got)
 	}
-	a, err := s.Adopt("squad")
+	a, err := s.Adopt("tool")
 	must(t, err)
 	if !s.Managed(a) {
 		t.Fatal("adopted dir is not an account")
@@ -413,19 +386,6 @@ func TestMarkerAdoptAndMigration(t *testing.T) {
 	m, _ := s.Get("main")
 	if Mark(m) != nil || isFile(filepath.Join(m.Dir, Marker)) {
 		t.Fatal("main got a marker")
-	}
-}
-
-func TestLegacyMarkerIsRewritten(t *testing.T) {
-	s := newStore(t)
-	dir := filepath.Join(s.Home, ".claude-old")
-	must(t, os.MkdirAll(dir, 0o755))
-	must(t, os.WriteFile(filepath.Join(dir, ".sprawl-account"), nil, 0o600))
-	if !s.Exists("old") {
-		t.Fatal("an account with a previous product's marker is not an account")
-	}
-	if Marker != ".squadrn-account" || !isFile(filepath.Join(dir, Marker)) || isFile(filepath.Join(dir, ".sprawl-account")) {
-		t.Fatal("legacy marker not rewritten under the new name")
 	}
 }
 

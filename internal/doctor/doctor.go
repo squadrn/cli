@@ -560,9 +560,6 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 		status.Fix = "re-run install.sh"
 	}
 	for _, p := range plugins {
-		if slices.Contains(account.LegacyPluginIDs(), p.ID) {
-			out = append(out, bad(g, Warn, "old plugin "+p.ID+" still installed (guard runs twice)", a.Spec.Binary+" plugin uninstall "+p.ID))
-		}
 		if p.ID == account.PluginID {
 			status = ok(g, "squadrn plugin enabled")
 			if !p.Enabled {

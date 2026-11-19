@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/fsx"
 	"github.com/squadrn/cli/internal/release"
 )
@@ -91,9 +90,8 @@ func Available(current string, s State, channel string) (string, bool) {
 	return s.Latest, ok && c > 0
 }
 
-// Disabled reports whether checks are turned off by the environment: SQUADRN_NO_UPDATE_CHECK
-// (or its previous name), or running under CI.
+// Disabled reports whether checks are turned off by the environment: SQUADRN_NO_UPDATE_CHECK, or
+// running under CI.
 func Disabled(getenv func(string) string) bool {
-	v, _ := config.LookupEnv(getenv, "NO_UPDATE_CHECK")
-	return v != "" || getenv("CI") != ""
+	return getenv("SQUADRN_NO_UPDATE_CHECK") != "" || getenv("CI") != ""
 }

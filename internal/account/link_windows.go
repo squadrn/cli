@@ -16,7 +16,6 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/fsx"
 )
 
@@ -28,16 +27,7 @@ import (
 var symlink = os.Symlink
 
 // copiesFile records the shared files that are copies: name -> sha256 at copy time.
-// The file of a previous product name is read when this one is missing and replaced on write.
-const copiesFile = "." + config.Slug + "-copies.json"
-
-func legacyCopiesFiles(dir string) []string {
-	out := make([]string, len(config.PreviousNames))
-	for i, n := range config.PreviousNames {
-		out[i] = filepath.Join(dir, "."+n+"-copies.json")
-	}
-	return out
-}
+const copiesFile = ".squadrn-copies.json"
 
 func link(src, dst string) error {
 	err := symlink(src, dst)
@@ -131,15 +121,6 @@ func readCopies(dir string) map[string]string {
 	m := map[string]string{}
 	if b, err := os.ReadFile(filepath.Join(dir, copiesFile)); err == nil {
 		_ = json.Unmarshal(b, &m)
-		return m
-	}
-	for _, p := range legacyCopiesFiles(dir) {
-		if b, err := os.ReadFile(p); err == nil {
-			if json.Unmarshal(b, &m) == nil {
-				_ = writeCopies(dir, m)
-			}
-			break
-		}
 	}
 	return m
 }
@@ -149,13 +130,7 @@ func writeCopies(dir string, m map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if err := fsx.WriteBytes(filepath.Join(dir, copiesFile), b, 0o600); err != nil {
-		return err
-	}
-	for _, p := range legacyCopiesFiles(dir) {
-		_ = os.Remove(p)
-	}
-	return nil
+	return fsx.WriteBytes(filepath.Join(dir, copiesFile), b, 0o600)
 }
 
 func hashFile(p string) string {

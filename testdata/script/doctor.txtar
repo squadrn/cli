@@ -24,7 +24,6 @@ stdout '! ~/.claude-personal is readable by other users'
 stdout '^account claude/main$'
 stdout '✓ logged in as me@.claude'
 stdout '✓ squadrn plugin enabled'
-stdout '! old plugin squad@squad still installed \(guard runs twice\)'
 stdout '✓ squadrn on PATH'
 stdout '^account claude/personal$'
 stdout '✗ not logged in  → squadrn account login claude/personal'
@@ -44,7 +43,7 @@ exec sh -c 'chmod 700 home/.claude-personal'
 
 -- empty --
 -- plugins.json --
-[{"id":"squadrn@squadrn","enabled":true},{"id":"squad@squad","enabled":true}]
+[{"id":"squadrn@squadrn","enabled":true}]
 -- settings.json --
 {"hooks":{
   "PreToolUse":[{"hooks":[{"type":"command","command":"$HOME/missing-hook.sh"},{"type":"command","command":"$HOME/.claude/hooks/guard-git.sh"}]}],

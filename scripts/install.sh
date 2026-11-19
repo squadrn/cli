@@ -25,20 +25,13 @@ signers=$(
 __SQUADRN_SIGNERS__
 SIGNERS
 )
-die() { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
-
-# The SPRAWL_* names of the previous product still work through 2.x.
-for v in COMMAND ALIASES VERSION; do
-  if eval "[ -z \"\${SQUADRN_$v+x}\" ] && [ -n \"\${SPRAWL_$v+x}\" ]"; then
-    eval "SQUADRN_$v=\$SPRAWL_$v"
-    printf 'install.sh: warning: SPRAWL_%s is renamed to SQUADRN_%s; set that instead\n' "$v" "$v" >&2
-  fi
-done
 name=${SQUADRN_COMMAND:-}
 aliases=${SQUADRN_ALIASES-}
 alias_set=${SQUADRN_ALIASES+yes}
 tag=${SQUADRN_VERSION:-}
 force=""
+
+die() { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in

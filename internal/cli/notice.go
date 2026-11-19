@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/update"
 )
 
@@ -60,7 +59,7 @@ func startBackgroundCheck() {
 		return
 	}
 	cmd := exec.Command(self, "self-update", "--background")
-	cmd.Env = append(os.Environ(), config.EnvName("NO_UPDATE_CHECK")+"=1")
+	cmd.Env = append(os.Environ(), "SQUADRN_NO_UPDATE_CHECK=1")
 	if startDetached(cmd) == nil {
 		_ = cmd.Process.Release()
 	}

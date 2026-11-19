@@ -227,7 +227,7 @@ func Ignored(ctx context.Context, path string) (int, error) {
 	n := 0
 	for _, line := range strings.Split(status, "\n") {
 		p, ok := strings.CutPrefix(line, "!! ")
-		if d := strings.TrimSuffix(p, "/"); ok && d != inuse.Dir && !slices.Contains(inuse.LegacyDirs(), d) {
+		if ok && strings.TrimSuffix(p, "/") != inuse.Dir {
 			n++
 		}
 	}

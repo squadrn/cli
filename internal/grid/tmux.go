@@ -12,16 +12,15 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/proc"
 )
 
 // Sessions and panes are identified by tmux user options, never by their names, so renaming
 // the command (and with it new session names) never orphans a running grid.
 const (
-	optRepo    = "@" + config.Slug + "_repo" // session: repository root the grid belongs to
-	optAccount = "@" + config.Slug + "_acct" // pane: account label, e.g. claude/personal
-	optName    = "@" + config.Slug + "_name" // pane: worktree name
+	optRepo    = "@squadrn_repo" // session: repository root the grid belongs to
+	optAccount = "@squadrn_acct" // pane: account label, e.g. claude/personal
+	optName    = "@squadrn_name" // pane: worktree name
 	// fieldSep separates -F fields. Not a tab: tmux < 3.5 rewrites tabs in output to '_'.
 	// Fields that may contain it (paths, session names, commands) are printed with the q:
 	// modifier, which escapes it with a backslash; splitFields undoes that.
@@ -30,19 +29,6 @@ const (
 
 // q prints a format variable shell-escaped, so fieldSep inside it cannot split the line.
 func q(name string) string { return "#{q:" + name + "}" }
-
-// qOpt prints option opt like q, else the same option under a previous product name: grids an
-// older release started are still found.
-func qOpt(opt string) string {
-	key := strings.TrimPrefix(opt, "@"+config.Slug)
-	names := append([]string{config.Slug}, config.PreviousNames...)
-	out := q("@" + names[len(names)-1] + key)
-	for i := len(names) - 2; i >= 0; i-- {
-		o := "@" + names[i] + key
-		out = "#{?" + o + "," + q(o) + "," + out + "}"
-	}
-	return out
-}
 
 // splitFields splits a line of q-escaped fields at unescaped separators and unescapes them.
 func splitFields(line string) []string {
@@ -148,7 +134,7 @@ func (t Tmux) FindSession(ctx context.Context, root string) (string, error) {
 
 // Sessions lists grid sessions (those tagged with a repository). No server means none.
 func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
-	format := strings.Join([]string{q("session_name"), qOpt(optRepo), "#{session_attached}"}, fieldSep)
+	format := strings.Join([]string{q("session_name"), q(optRepo), "#{session_attached}"}, fieldSep)
 	out, err := t.run(ctx, "list-sessions", "-F", format)
 	if errors.Is(err, ErrNoServer) {
 		return nil, nil
@@ -182,7 +168,7 @@ func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
 
 // Panes lists squadrn agent panes, of one session or ("") of every session.
 func (t Tmux) Panes(ctx context.Context, session string) ([]Pane, error) {
-	format := strings.Join([]string{"#{pane_id}", q("session_name"), qOpt(optAccount), qOpt(optName), q("pane_current_command")}, fieldSep)
+	format := strings.Join([]string{"#{pane_id}", q("session_name"), q(optAccount), q(optName), q("pane_current_command")}, fieldSep)
 	args := []string{"list-panes", "-F", format}
 	if session == "" {
 		args = append(args, "-a")

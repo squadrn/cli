@@ -89,7 +89,6 @@ func TestInstall(t *testing.T) {
 func TestLinkCommands(t *testing.T) {
 	home := t.TempDir()
 	l := Layout{DataDir: filepath.Join(home, "data", "squadrn"), BinDir: filepath.Join(home, "bin")}
-	legacy := filepath.Join(home, "data", "squad", "bin", "squad")
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -99,18 +98,17 @@ func TestLinkCommands(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	link("squad", legacy)          // previous install: ours, replaced silently
 	link("other", "/usr/bin/true") // unrelated link: left alone
 	if err := os.WriteFile(filepath.Join(l.BinDir, "ai"), []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err) // unrelated file under a wanted name: moved aside
 	}
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
-	res, err := l.LinkCommands([]string{"squadrn", "ai", "squad"}, []string{legacy}, now)
+	res, err := l.LinkCommands([]string{"squadrn", "ai"}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range []string{"squadrn", "ai", "squad"} {
+	for _, n := range []string{"squadrn", "ai"} {
 		if target, _ := os.Readlink(filepath.Join(l.BinDir, n)); target != l.Binary() {
 			t.Errorf("%s → %q", n, target)
 		}
@@ -123,14 +121,14 @@ func TestLinkCommands(t *testing.T) {
 	}
 
 	// Rename: squadrn → ai only. Links of ours under dropped names are removed.
-	res, err = l.LinkCommands([]string{"ai"}, []string{legacy}, now)
+	res, err = l.LinkCommands([]string{"ai"}, now)
 	if err != nil || len(res.Created) != 0 {
 		t.Fatalf("relink: %+v, %v", res, err)
 	}
-	if len(res.Removed) != 2 {
+	if len(res.Removed) != 1 {
 		t.Errorf("Removed = %v", res.Removed)
 	}
-	for _, gone := range []string{"squadrn", "squad"} {
+	for _, gone := range []string{"squadrn"} {
 		if _, err := os.Lstat(filepath.Join(l.BinDir, gone)); !os.IsNotExist(err) {
 			t.Errorf("%s still linked", gone)
 		}
@@ -177,7 +175,7 @@ func TestSnapshotRollbackAndUnlink(t *testing.T) {
 		t.Fatalf("after rollback: %q %q", b, l.Version())
 	}
 
-	if _, err := l.LinkCommands([]string{"squadrn", "sqd"}, nil, time.Now()); err != nil {
+	if _, err := l.LinkCommands([]string{"squadrn", "sqd"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("/elsewhere", filepath.Join(l.BinDir, "other")); err != nil {

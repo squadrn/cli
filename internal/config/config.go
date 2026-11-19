@@ -27,103 +27,6 @@ const DefaultCommand = "squadrn"
 
 func DefaultAliases() []string { return []string{"sqd"} }
 
-// PreviousNames are earlier product names, newest first. Their config, data dirs, plugins,
-// markers, environment variables and git keys are migrated or still honoured; every legacy
-// identifier derives from this list.
-var PreviousNames = []string{"sprawl", "squad"}
-
-// previousAliases are the default aliases previous product names installed besides their own
-// name. A migrated config that still uses them gets today's defaults instead.
-var previousAliases = map[string][]string{"sprawl": {"sra"}, "squad": {"sq"}}
-
-// MigrateNames maps command names of a previous product's config to this product's: its default
-// names (the product name, its default aliases) become DefaultCommand and DefaultAliases, names
-// the user chose are kept. Duplicates are dropped.
-func MigrateNames(command string, aliases []string) (string, []string) {
-	isDefault := func(n string) bool {
-		if slices.Contains(PreviousNames, n) {
-			return true
-		}
-		for _, as := range previousAliases {
-			if slices.Contains(as, n) {
-				return true
-			}
-		}
-		return false
-	}
-	if command == "" || isDefault(command) {
-		command = DefaultCommand
-	}
-	seen := map[string]bool{command: true}
-	var out []string
-	add := func(n string) {
-		if !seen[n] {
-			seen[n] = true
-			out = append(out, n)
-		}
-	}
-	for _, a := range aliases {
-		if isDefault(a) {
-			for _, d := range DefaultAliases() {
-				add(d)
-			}
-			continue
-		}
-		add(a)
-	}
-	return command, out
-}
-
-// LegacyCommands are the names previous product names ran under by default, and their hook
-// binaries (<name>-hook).
-func LegacyCommands() []string {
-	var out []string
-	for _, n := range PreviousNames {
-		out = append(out, n, n+"-hook")
-		out = append(out, previousAliases[n]...)
-	}
-	return out
-}
-
-// EnvName is the environment variable for key (SHARED_MCP → SQUADRN_SHARED_MCP).
-func EnvName(key string) string { return strings.ToUpper(Slug) + "_" + key }
-
-// LookupEnv reads EnvName(key), else the same variable under a previous product name; legacy
-// names that variable when the value came from it.
-func LookupEnv(getenv func(string) string, key string) (value, legacy string) {
-	if v := getenv(EnvName(key)); v != "" {
-		return v, ""
-	}
-	for _, n := range PreviousNames {
-		name := strings.ToUpper(n) + "_" + key
-		if v := getenv(name); v != "" {
-			return v, name
-		}
-	}
-	return "", ""
-}
-
-// Getenv is LookupEnv on the process environment, without the legacy name.
-func Getenv(key string) string {
-	v, _ := LookupEnv(os.Getenv, key)
-	return v
-}
-
-// EnvKeys are the environment variables squadrn reads, without the prefix.
-var EnvKeys = []string{"SHARED_MCP", "NO_UPDATE_CHECK", "MARKETPLACE"}
-
-// RenamedEnv maps each variable set under a previous product name, whose current name is
-// unset, to its current name.
-func RenamedEnv(getenv func(string) string) map[string]string {
-	out := map[string]string{}
-	for _, k := range EnvKeys {
-		if _, legacy := LookupEnv(getenv, k); legacy != "" {
-			out[legacy] = EnvName(k)
-		}
-	}
-	return out
-}
-
 // DefaultProtectedBranches applies when the config file names none.
 func DefaultProtectedBranches() []string { return []string{"main", "master", "develop", "release/*"} }
 
@@ -215,19 +118,6 @@ func Path() (string, error) {
 	return filepath.Join(DirsFor(home, Slug).Config, "config.toml"), nil
 }
 
-// LegacyPaths are the config files of previous product names, newest first.
-func LegacyPaths() ([]string, error) {
-	home, err := Home()
-	if err != nil {
-		return nil, err
-	}
-	paths := make([]string, len(PreviousNames))
-	for i, n := range PreviousNames {
-		paths[i] = filepath.Join(DirsFor(home, n).Config, "config.toml")
-	}
-	return paths, nil
-}
-
 // Load reads the config (a missing file yields defaults) and applies SQUADRN_SHARED_MCP.
 // Unknown keys and invalid values are errors so mistakes never silently change behaviour.
 func Load() (Config, error) {
@@ -244,7 +134,7 @@ func load(path string) (Config, error) {
 		return Config{}, err
 	}
 	// An empty variable counts as unset, so a stray `export SQUADRN_SHARED_MCP=` cannot wipe the list.
-	if v := Getenv("SHARED_MCP"); strings.TrimSpace(v) != "" {
+	if v := os.Getenv("SQUADRN_SHARED_MCP"); strings.TrimSpace(v) != "" {
 		c.SharedMCP = strings.Fields(v)
 	}
 	if len(c.ProtectedBranches) == 0 {
@@ -259,11 +149,8 @@ func load(path string) (Config, error) {
 // EnvOverrides maps the settings an environment variable currently overrides to that variable.
 func EnvOverrides() map[string]string {
 	out := map[string]string{}
-	if v, legacy := LookupEnv(os.Getenv, "SHARED_MCP"); strings.TrimSpace(v) != "" {
-		out["shared_mcp"] = EnvName("SHARED_MCP")
-		if legacy != "" {
-			out["shared_mcp"] = legacy
-		}
+	if strings.TrimSpace(os.Getenv("SQUADRN_SHARED_MCP")) != "" {
+		out["shared_mcp"] = "SQUADRN_SHARED_MCP"
 	}
 	return out
 }

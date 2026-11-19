@@ -411,18 +411,14 @@ func (a *app) selfInstallCmd() *cobra.Command {
 	return cmd
 }
 
-// installRelease places the release, links the command names, migrates installs of previous
-// product names once, and installs or refreshes the plugin in every account.
+// installRelease places the release, links the command names and installs or refreshes the
+// plugin in every account.
 func (a *app) installRelease(src, version string, nc nameChoice) error {
 	cfgPath, err := config.Path()
 	if err != nil {
 		return err
 	}
-	legacy, err := config.LegacyPaths()
-	if err != nil {
-		return err
-	}
-	cfg, migratedFrom, fresh, err := install.LoadConfig(cfgPath, legacy)
+	cfg, fresh, err := install.LoadConfig(cfgPath)
 	if err != nil {
 		return err
 	}
@@ -431,16 +427,6 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	accepted := install.Names(cfg)
 	oldCmd, oldAliases := cfg.Command, cfg.Aliases
-	if migratedFrom != "" {
-		// Names the previous product chose for the user are new here: check them like any other.
-		delete(accepted, config.DefaultCommand)
-		for _, n := range config.DefaultAliases() {
-			delete(accepted, n)
-		}
-		if old, err := config.Read(migratedFrom); err == nil {
-			oldCmd, oldAliases = old.Command, old.Aliases
-		}
-	}
 	if nc.command != "" {
 		cfg.Command = nc.command
 	}
@@ -450,7 +436,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	switch {
 	case nc.aliasSet:
 		cfg.Aliases = nc.aliases
-	case fresh && migratedFrom == "":
+	case fresh:
 		cfg.Aliases = config.DefaultAliases()
 	}
 	if nc.interactive && nc.command == "" && !nc.aliasSet {
@@ -500,26 +486,16 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	a.cmd, a.cfg, a.cfgErr = cfg.Command, cfg, nil
 	a.out("installed squadrn %s → %s\n", version, a.tilde(a.layout.Binary()))
-	if migratedFrom != "" {
-		a.out("  settings migrated from %s\n", a.tilde(migratedFrom))
-	}
 	if beta {
 		a.out("  pre-release: following the beta channel (back to stable: %s config set update_channel stable)\n", cfg.Command)
 	}
 	if err := a.linkNames(cfg); err != nil {
 		return err
 	}
-	if (!fresh || migratedFrom != "") && oldCmd != "" {
+	if !fresh && oldCmd != "" {
 		if msg := renameSummary(oldCmd, oldAliases, cfg.Command, cfg.Aliases); msg != "" {
 			a.out("%s\n", msg)
 		}
-	}
-	moved, errs := install.MigrateLegacy(a.store.Home, a.now())
-	for _, m := range moved {
-		a.out("  previous %s files moved to %s\n", m.Name, a.tilde(m.Backup))
-	}
-	for _, e := range errs {
-		a.warnf("%v", e)
 	}
 	a.installPlugins()
 	// An update must never be blocked by Git (that would strand users on old releases); say it.
@@ -543,11 +519,7 @@ func (a *app) nameCheck(accepted map[string]bool, force bool) install.NameCheck 
 
 func (a *app) linkNames(cfg config.Config) error {
 	names := append([]string{cfg.Command}, cfg.Aliases...)
-	var ours []string
-	for _, l := range release.Legacies(a.store.Home) {
-		ours = append(ours, l.Binary)
-	}
-	res, err := a.layout.LinkCommands(names, ours, a.now())
+	res, err := a.layout.LinkCommands(names, a.now())
 	if err != nil {
 		return err
 	}
@@ -673,9 +645,6 @@ func (a *app) installPlugins() {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		for _, r := range install.Plugins(ctx, same, a.store, ag, a.layout.DataDir) {
-			for _, id := range r.Removed {
-				a.out("  %s: removed plugin %s\n", r.Account.Label(), id)
-			}
 			if r.Action == install.PluginFailed {
 				a.errf("  %s: plugin update failed: %v\n", r.Account.Label(), r.Err)
 				continue

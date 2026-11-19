@@ -93,8 +93,8 @@ jobs:
         run: |
           prev=$(gh release list --repo "$RELEASES_REPO" --limit 100 --json tagName,isPrerelease,isDraft |
             jq -r -f scripts/previous-release.jq)
-          # Releases before the rename to squadrn (sprawl_* assets, another signature namespace) are
-          # not an upgrade path (ADR 0010); the first Windows release has no Windows predecessor.
+          # Only releases with squadrn_* assets are an upgrade path (earlier names: ADR 0010); the
+          # first Windows release has no Windows predecessor.
           if [ -n "$prev" ]; then
             ext=.tar.gz
             [ "$RUNNER_OS" = Windows ] && ext=.zip

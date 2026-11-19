@@ -46,18 +46,18 @@ exec squadrn account --json
 stdout '"account": "claude/main"'
 
 # Dirs named like accounts but not made by squadrn are not accounts; adopt makes them one.
-mkdir home/.claude-squad
+mkdir home/.claude-tool
 exec squadrn account ls
-stdout '^unmanaged: ~/.claude-squad \(squadrn account adopt claude/squad\)$'
-! stdout '^claude/squad '
-exitcode 2 squadrn squad
-! exec squadrn account add squad
+stdout '^unmanaged: ~/.claude-tool \(squadrn account adopt claude/tool\)$'
+! stdout '^claude/tool '
+exitcode 2 squadrn tool
+! exec squadrn account add tool
 stderr 'exists but is not a squadrn account'
-exitcode 2 squadrn account adopt squad
-exec squadrn account adopt squad --yes
-stdout 'adopted claude/squad'
-exists home/.claude-squad/.squadrn-account
-exec squadrn account adopt squad
+exitcode 2 squadrn account adopt tool
+exec squadrn account adopt tool --yes
+stdout 'adopted claude/tool'
+exists home/.claude-tool/.squadrn-account
+exec squadrn account adopt tool
 stdout 'already an account'
 exitcode 1 squadrn account adopt ghost --yes
 exec squadrn account ls

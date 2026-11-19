@@ -70,17 +70,11 @@ func (g Guard) newExtractor(ctx context.Context) *extractor {
 	if dirs.Config == "" && g.Home != "" {
 		dirs = config.DirsFor(g.Home, config.Slug)
 	}
-	var legacy []config.Dirs
-	if g.Home != "" {
-		for _, n := range config.PreviousNames {
-			legacy = append(legacy, config.DirsFor(g.Home, n))
-		}
-	}
 	names := map[string]bool{config.DefaultCommand: true, config.Slug + "-hook": true}
-	for _, n := range append(append(config.DefaultAliases(), config.LegacyCommands()...), g.Names...) {
+	for _, n := range append(config.DefaultAliases(), g.Names...) {
 		names[cmdBase(n)] = true
 	}
-	return &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git), dirs: dirs, legacyDirs: legacy, names: names}
+	return &extractor{ctx: ctx, home: g.Home, facts: newFactsCache(g.Git), dirs: dirs, names: names}
 }
 
 // verdict combines what the analysis found: the most severe finding or push decision wins, and

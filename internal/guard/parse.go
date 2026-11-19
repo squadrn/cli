@@ -58,9 +58,7 @@ type extractor struct {
 	// pushConfigChanged is set once the command line writes configuration git push reads.
 	pushConfigChanged bool
 	dirs              config.Dirs
-	// legacyDirs are the directories of previous product names, guarded like dirs.
-	legacyDirs []config.Dirs
-	// names are the lower-cased command names that run squadrn, now or under a previous name.
+	// names are the lower-cased command names that run squadrn.
 	names map[string]bool
 }
 

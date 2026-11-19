@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/squadrn/cli/internal/config"
 	"github.com/squadrn/cli/internal/provider"
 )
 
@@ -248,44 +247,6 @@ func (p Provisioner) InstallPlugin(ctx context.Context, configDir string) (bool,
 		return false, err
 	}
 	return true, nil
-}
-
-// LegacyPluginIDs are the plugins previous product names installed (<name>@<name>).
-func LegacyPluginIDs() []string {
-	ids := make([]string, len(config.PreviousNames))
-	for i, n := range config.PreviousNames {
-		ids[i] = n + "@" + n
-	}
-	return ids
-}
-
-// RemoveLegacyPlugins uninstalls plugins and marketplaces of previous product names and
-// returns the plugin ids it removed.
-func (p Provisioner) RemoveLegacyPlugins(ctx context.Context, configDir string) ([]string, error) {
-	plugins, err := listNames(ctx, p.Runner, configDir, "id", "plugin", "list", "--json")
-	if err != nil {
-		return nil, err
-	}
-	markets, err := listNames(ctx, p.Runner, configDir, "name", "plugin", "marketplace", "list", "--json")
-	if err != nil {
-		return nil, err
-	}
-	var removed []string
-	for _, n := range config.PreviousNames {
-		id := n + "@" + n
-		if plugins[id] {
-			if _, err := p.Runner.Output(ctx, configDir, "plugin", "uninstall", id); err != nil {
-				return removed, err
-			}
-			removed = append(removed, id)
-		}
-		if markets[n] {
-			if _, err := p.Runner.Output(ctx, configDir, "plugin", "marketplace", "remove", n); err != nil {
-				return removed, err
-			}
-		}
-	}
-	return removed, nil
 }
 
 // UpdatePlugin refreshes the marketplace and plugin after the files on disk changed.

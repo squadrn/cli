@@ -17,7 +17,7 @@ import (
 )
 
 type repos struct {
-	root, feat, main, prod, squad, sprawl, remotePush, matching, upstream, alias string
+	root, feat, main, prod, remotePush, matching, upstream, alias string
 }
 
 func isolateGit(t testing.TB) {
@@ -29,11 +29,6 @@ func isolateGit(t testing.TB) {
 	}
 	for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 		t.Setenv(k, "t@t")
-	}
-	// Directories of previous product names resolve under the fixture's home (CI runners set
-	// XDG_CONFIG_HOME).
-	for _, k := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
-		t.Setenv(k, "")
 	}
 }
 
@@ -54,8 +49,6 @@ func newRepos(t testing.TB) repos {
 	r.feat = mk("feat", "feat-x")
 	r.main = mk("on-main", "main")
 	r.prod = mk("prod", "feat-x", RepoConfigKey, "production, staging")
-	r.squad = mk("squad", "feat-x", "squad.protectedBranches", "staging")
-	r.sprawl = mk("sprawl", "feat-x", "sprawl.protectedBranches", "prod")
 	r.remotePush = mk("remote-push", "feat-x", "remote.origin.push", "HEAD:refs/heads/main")
 	r.matching = mk("matching", "feat-x", "push.default", "matching")
 	r.upstream = mk("upstream", "feat-x", "push.default", "upstream", "branch.feat-x.remote", "origin", "branch.feat-x.merge", "refs/heads/main")
@@ -245,11 +238,6 @@ var decideCases = []decideCase{
 	{Deny, "prod", `git push origin production`},
 	{Deny, "prod", `git push origin staging`},
 	{Deny, "prod", `git push origin main`},
-	{Deny, "squad", `git push origin staging`},
-	{Deny, "sprawl", `git push origin prod`},
-	{Deny, "sprawl", `git push origin HEAD:refs/heads/Prod`},
-	{Allow, "sprawl", `git push origin feat-x`},
-	{Deny, "feat", `git config sprawl.protectedBranches none && git push origin main`},
 	{Deny, "feat", `git config squadrn.protectedBranches none && git push origin main`},
 
 	// Allowed: feature branches, tags, review refs and commands that only mention push.
@@ -315,15 +303,6 @@ var decideCases = []decideCase{
 	// G3: agents cannot lower the guard's policy.
 	{Deny, "feat", `squadrn config set protected_branches none`},
 	{Deny, "feat", `sqd config set git_hooks false`},
-	{Deny, "feat", `sprawl config set protected_branches none`},
-	{Deny, "feat", `sra config set git_hooks false`},
-	{Deny, "feat", `squad config set protected_branches none`},
-	{Ask, "feat", `sprawl-hook config "$OP" protected_branches x`},
-	{Deny, "feat", `echo x >> ~/.config/sprawl/config.toml`},
-	{Deny, "feat", `rm -rf ~/.local/share/sprawl/git-hooks`},
-	{Ask, "feat", `echo x > ~/.local/state/sprawl/guard.log`},
-	{Deny, "feat", `cp x "$D/sprawl/config.toml"`},
-	{Ask, "feat", `cp x "$D/.local/share/sprawl/x"`},
 	{Deny, "feat", `~/.local/bin/ai config set protected_branches x`},
 	{Deny, "feat", `env FOO=1 squadrn config set --force protected_branches x`},
 	{Ask, "feat", `squadrn config "$OP" protected_branches x`},
@@ -451,7 +430,7 @@ var decideCases = []decideCase{
 
 func decideDirs(r repos) map[string]string {
 	return map[string]string{
-		"feat": r.feat, "main": r.main, "prod": r.prod, "squad": r.squad, "sprawl": r.sprawl, "remote-push": r.remotePush,
+		"feat": r.feat, "main": r.main, "prod": r.prod, "remote-push": r.remotePush,
 		"matching": r.matching, "upstream": r.upstream, "alias": r.alias,
 	}
 }

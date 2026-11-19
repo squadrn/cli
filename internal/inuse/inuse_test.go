@@ -101,31 +101,3 @@ func TestLock(t *testing.T) {
 		t.Fatal("Lock in a missing dir succeeded")
 	}
 }
-
-func TestActiveMovesLegacyEntries(t *testing.T) {
-	dir := t.TempDir()
-	legacy := filepath.Join(dir, ".sprawl-inuse")
-	if err := os.MkdirAll(legacy, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	self := os.Getpid()
-	for name, e := range map[string]Entry{itoa(self) + ".json": {PID: self, Account: "claude/x"}, "999999999.json": {PID: 999999999}} {
-		b, _ := json.Marshal(e)
-		if err := os.WriteFile(filepath.Join(legacy, name), b, 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	got := Active(dir)
-	if len(got) != 1 || got[0].PID != self || got[0].Account != "claude/x" {
-		t.Fatalf("Active = %+v", got)
-	}
-	if _, err := os.Stat(filepath.Join(dir, Dir, itoa(self)+".json")); err != nil {
-		t.Fatal("live legacy entry not moved into Dir")
-	}
-	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
-		t.Fatal("legacy registry left behind")
-	}
-	if Dir != ".squadrn-inuse" || LegacyDirs()[0] != ".sprawl-inuse" {
-		t.Fatalf("Dir = %q, LegacyDirs = %q", Dir, LegacyDirs())
-	}
-}

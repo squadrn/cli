@@ -246,23 +246,6 @@ func DefaultLayout(home string) Layout {
 	return Layout{DataDir: config.DirsFor(home, config.Slug).Data, BinDir: filepath.Join(home, ".local", "bin")}
 }
 
-// Legacy is an install left behind by a previous product name.
-type Legacy struct {
-	Name    string
-	DataDir string
-	Binary  string
-}
-
-// Legacies lists where previous product names installed themselves, newest first.
-func Legacies(home string) []Legacy {
-	out := make([]Legacy, len(config.PreviousNames))
-	for i, n := range config.PreviousNames {
-		dir := config.DirsFor(home, n).Data
-		out[i] = Legacy{Name: n, DataDir: dir, Binary: filepath.Join(dir, "bin", ExecutableName(n))}
-	}
-	return out
-}
-
 func (l Layout) Binary() string { return filepath.Join(l.DataDir, "bin", BinaryName) }
 
 // CleanOld removes executables earlier updates moved aside (Windows): the binary's and those of

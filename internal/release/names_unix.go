@@ -15,25 +15,15 @@ const BinaryName = "squadrn"
 // ExecutableName is the file name of command name in the bin dir.
 func ExecutableName(name string) string { return name }
 
-// LinkCommands makes every name in names a link to the binary in BinDir and removes links of
-// ours (to the binary, or to any path in ours) whose name is no longer wanted. A file that is
-// not ours is moved aside instead of overwritten.
-func (l Layout) LinkCommands(names []string, ours []string, now time.Time) (LinkResult, error) {
+// LinkCommands makes every name in names a link to the binary in BinDir and removes links to the
+// binary whose name is no longer wanted. A file that is not such a link is moved aside instead
+// of overwritten.
+func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) {
 	var res LinkResult
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		return res, err
 	}
-	isOurs := func(target string) bool {
-		if target == l.Binary() {
-			return true
-		}
-		for _, o := range ours {
-			if target == o {
-				return true
-			}
-		}
-		return false
-	}
+	isOurs := func(target string) bool { return target == l.Binary() }
 	want := map[string]bool{}
 	for _, n := range names {
 		want[n] = true

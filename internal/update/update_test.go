@@ -78,8 +78,4 @@ func TestDisabled(t *testing.T) {
 	if !Disabled(get) {
 		t.Fatal("opt-out")
 	}
-	env = map[string]string{"SPRAWL_NO_UPDATE_CHECK": "1"}
-	if !Disabled(get) {
-		t.Fatal("opt-out under the previous name")
-	}
 }
