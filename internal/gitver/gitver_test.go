@@ -2,7 +2,6 @@ package gitver
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 )
@@ -68,15 +67,15 @@ func TestUpgradeHint(t *testing.T) {
 }
 
 func TestRequireAndError(t *testing.T) {
-	if err := Require(context.Background(), "darwin"); err != nil {
+	if err := Require(context.Background()); err != nil {
 		t.Fatalf("the git running the tests is too old? %v", err)
 	}
-	e := TooOldError{Have: Version{2, 30, 2}, Hint: "brew install git"}
-	if !errors.Is(e, ErrTooOld) || !strings.Contains(e.Error(), "git 2.30.2 is too old; squadrn needs git 2.31 or newer (upgrade: brew install git)") {
+	e := tooOld(Version{2, 30, 2}, "brew install git")
+	if e.Error() != "git 2.30.2 is too old; squadrn needs git 2.31 or newer (upgrade: brew install git)" {
 		t.Fatalf("error = %v", e)
 	}
 	t.Setenv("PATH", "")
-	if _, err := Detect(context.Background()); err == nil || errors.Is(err, ErrTooOld) {
+	if _, err := Detect(context.Background()); err == nil || strings.Contains(err.Error(), "too old") {
 		t.Fatalf("missing git: %v", err)
 	}
 }

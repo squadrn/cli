@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ func (a *app) doctorCmd() *cobra.Command {
 				Version:   Version,
 				Signed:    a.signers != "",
 				Git:       gitver.Detect,
-				GitHint:   gitver.Hint(runtime.GOOS),
+				GitHint:   gitver.Hint(),
 				ConfigErr: a.cfgErr,
 				Usage:     a.usageTracking,
 			}

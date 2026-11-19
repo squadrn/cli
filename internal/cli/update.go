@@ -481,7 +481,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	a.installPlugins()
 	// An update must never be blocked by Git (that would strand users on old releases); say it.
-	if err := gitver.Require(context.Background(), runtime.GOOS); err != nil {
+	if err := gitver.Require(context.Background()); err != nil {
 		a.warnf("%v", err)
 	}
 	if !onPATH(a.layout.BinDir) {

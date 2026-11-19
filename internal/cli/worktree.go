@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ func (a *app) repoHere(ctx context.Context, spec provider.Spec) (worktree.Repo, 
 // an old Git gets an upgrade command instead of a raw git error.
 func (a *app) openRepo(ctx context.Context, dir, subdir string) (worktree.Repo, error) {
 	if !a.gitChecked {
-		if err := gitver.Require(ctx, runtime.GOOS); err != nil {
+		if err := gitver.Require(ctx); err != nil {
 			return worktree.Repo{}, err
 		}
 		a.gitChecked = true

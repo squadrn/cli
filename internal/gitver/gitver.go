@@ -4,10 +4,10 @@ package gitver
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -62,30 +62,20 @@ func Detect(ctx context.Context) (Version, error) {
 	return Parse(string(out))
 }
 
-// ErrTooOld is wrapped by TooOldError.
-var ErrTooOld = errors.New("git is too old")
-
-type TooOldError struct {
-	Have Version
-	Hint string // command that upgrades Git on this system
-}
-
-func (e TooOldError) Error() string {
-	return fmt.Sprintf("git %s is too old; squadrn needs git %d.%d or newer (upgrade: %s)", e.Have, Min.Major, Min.Minor, e.Hint)
-}
-
-func (e TooOldError) Unwrap() error { return ErrTooOld }
-
-// Require returns a TooOldError when the installed Git is older than Min.
-func Require(ctx context.Context, goos string) error {
+// Require fails when the installed Git is older than Min, naming the command that upgrades it.
+func Require(ctx context.Context) error {
 	v, err := Detect(ctx)
 	if err != nil {
 		return err
 	}
 	if !v.AtLeast(Min) {
-		return TooOldError{Have: v, Hint: Hint(goos)}
+		return tooOld(v, Hint())
 	}
 	return nil
+}
+
+func tooOld(have Version, hint string) error {
+	return fmt.Errorf("git %s is too old; squadrn needs git %d.%d or newer (upgrade: %s)", have, Min.Major, Min.Minor, hint)
 }
 
 // UpgradeHint is the command that installs a current Git on the given system. osRelease is the
@@ -120,7 +110,7 @@ func UpgradeHint(goos, osRelease string) string {
 }
 
 // Hint is UpgradeHint for the system squadrn runs on.
-func Hint(goos string) string { return UpgradeHint(goos, readOSRelease()) }
+func Hint() string { return UpgradeHint(runtime.GOOS, readOSRelease()) }
 
 func readOSRelease() string {
 	b, err := os.ReadFile("/etc/os-release")
