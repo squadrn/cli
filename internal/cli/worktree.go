@@ -76,8 +76,7 @@ func (a *app) wtCmd() *cobra.Command {
 			if err := os.Chdir(repo.Root); err != nil {
 				return err
 			}
-			a.banner(acct)
-			return a.sessionIn(ag, acct, ag.WorktreeArgs(args[0]), args[0])
+			return a.session(ag, acct, ag.WorktreeArgs(args[0]), args[0])
 		},
 	}
 	cmd.AddCommand(a.wtLsCmd(), a.wtRmCmd())

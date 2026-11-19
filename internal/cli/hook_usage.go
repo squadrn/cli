@@ -3,10 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -60,7 +58,7 @@ func (h hookEnv) statusline(args []string) int {
 		_, _ = fmt.Fprintln(h.stderr, hookUsage)
 		return exitUsage
 	}
-	raw, _ := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
+	raw, _ := h.readInput()
 	name, snap := h.recordStatus(raw)
 	if then != "" {
 		bin, argv := statusLineShell(then)
@@ -120,18 +118,10 @@ func compactUsage(name string, s usage.Snapshot, now time.Time) string {
 // limit records a turn that stopped on a usage limit (StopFailure, matcher rate_limit) and
 // tells the user which command moves the session to another account.
 func (h hookEnv) limit() int {
-	raw, _ := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
-	msg := h.recordLimit(raw)
-	if msg == "" {
-		return exitOK
+	raw, _ := h.readInput()
+	if msg := h.recordLimit(raw); msg != "" {
+		desktopNotify("Claude: usage limit", msg)
 	}
-	argv := notifyCommand(runtime.GOOS, "Claude: usage limit", msg)
-	if argv == nil {
-		return exitOK
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, _ = proc.Output(ctx, proc.Options{}, argv[0], argv[1:]...)
 	return exitOK
 }
 

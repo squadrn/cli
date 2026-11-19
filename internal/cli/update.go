@@ -580,22 +580,12 @@ func (a *app) installPlugins() {
 		a.warnf("%v", err)
 		return
 	}
-	bySpec := map[string]bool{}
-	for _, acct := range accts {
-		if bySpec[acct.Provider] {
-			continue
-		}
-		bySpec[acct.Provider] = true
-		ag, err := a.agent(acct.Spec)
+	for _, idx := range byProvider(accts) {
+		same := pick(accts, idx)
+		ag, err := a.agent(same[0].Spec)
 		if err != nil {
 			a.warnf("%v; install the plugin later by re-running install.sh", err)
 			continue
-		}
-		same := accts[:0:0]
-		for _, x := range accts {
-			if x.Provider == acct.Provider {
-				same = append(same, x)
-			}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		for _, r := range install.Plugins(ctx, same, a.store, ag, a.layout.DataDir) {

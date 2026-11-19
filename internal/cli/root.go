@@ -401,8 +401,7 @@ func (a *app) runAgent(accountInput string, args []string) error {
 	if err != nil {
 		return err
 	}
-	a.banner(acct)
-	return a.session(ag, acct, args)
+	return a.session(ag, acct, args, "")
 }
 
 func (a *app) resolve(input string) (account.Account, error) {
@@ -423,15 +422,12 @@ func (a *app) banner(acct account.Account) {
 	}
 }
 
-// session starts an interactive agent session as acct: shared-file copies are refreshed first
-// (Windows without links) and executables left over from earlier updates are cleaned up.
-func (a *app) session(ag provider.Agent, acct account.Account, args []string) error {
-	return a.sessionIn(ag, acct, args, "")
-}
-
-// sessionIn is session for `wt <name>`: the session is recorded as using that worktree, which
-// the agent CLI may only create once it runs.
-func (a *app) sessionIn(ag provider.Agent, acct account.Account, args []string, wt string) error {
+// session starts an interactive agent session as acct after naming it: shared-file copies are
+// refreshed first (Windows without links) and executables left over from earlier updates are
+// cleaned up. wt names the worktree of `wt <name>`, recorded as in use although the agent CLI may
+// only create it once it runs.
+func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt string) error {
+	a.banner(acct)
 	r := a.store.RefreshShared(acct)
 	for _, c := range r.Conflicts {
 		a.warnf("%s was edited in %s, so it no longer follows the main account; remove it and run: %s account add %s", a.tilde(c), acct.Label(), a.cmd, acct.Label())
@@ -464,14 +460,35 @@ func (a *app) accountNames() []string {
 	return names
 }
 
+// byProvider groups the indexes of accts by provider, in order of first appearance.
+func byProvider(accts []account.Account) [][]int {
+	var groups [][]int
+	pos := map[string]int{}
+	for i, acct := range accts {
+		g, ok := pos[acct.Provider]
+		if !ok {
+			g = len(groups)
+			pos[acct.Provider] = g
+			groups = append(groups, nil)
+		}
+		groups[g] = append(groups[g], i)
+	}
+	return groups
+}
+
+// pick returns the accounts at idx.
+func pick(accts []account.Account, idx []int) []account.Account {
+	out := make([]account.Account, len(idx))
+	for j, i := range idx {
+		out[j] = accts[i]
+	}
+	return out
+}
+
 // statuses queries login status for accts, grouped per provider. refresh bypasses the cache.
 func (a *app) statuses(accts []account.Account, refresh bool) []provider.AuthResult {
 	results := make([]provider.AuthResult, len(accts))
-	bySpec := map[string][]int{}
-	for i, acct := range accts {
-		bySpec[acct.Provider] = append(bySpec[acct.Provider], i)
-	}
-	for _, idx := range bySpec {
+	for _, idx := range byProvider(accts) {
 		spec := accts[idx[0]].Spec
 		ag, err := a.agent(spec)
 		if err != nil {
@@ -539,13 +556,12 @@ func (a *app) pick() error {
 	if statuses[choice].Err == nil && !statuses[choice].Status.LoggedIn {
 		if err := a.confirm(false, "%s is not logged in. Log in now", acct.Label()); err == nil {
 			a.cache.Forget(acct.Label())
-			return a.session(ag, acct, ag.LoginArgs())
+			return a.session(ag, acct, ag.LoginArgs(), "")
 		} else if !errors.Is(err, errAborted) {
 			return err
 		}
 	}
-	a.banner(acct)
-	return a.session(ag, acct, nil)
+	return a.session(ag, acct, nil, "")
 }
 
 func (a *app) addInteractively() error {
@@ -566,7 +582,7 @@ func (a *app) addInteractively() error {
 		return err
 	}
 	a.cache.Forget(acct.Label())
-	return a.session(ag, acct, ag.LoginArgs())
+	return a.session(ag, acct, ag.LoginArgs(), "")
 }
 
 // marketplaceDir locates the local squadrn plugin marketplace: $SQUADRN_MARKETPLACE, else the

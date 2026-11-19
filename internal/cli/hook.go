@@ -49,6 +49,14 @@ type hookEnv struct {
 	now            func() time.Time
 }
 
+// maxHookInput bounds what a hook reads from the agent CLI.
+const maxHookInput = 4 << 20
+
+// readInput reads the JSON the agent CLI passes a hook on stdin.
+func (h hookEnv) readInput() ([]byte, error) {
+	return io.ReadAll(io.LimitReader(h.stdin, maxHookInput))
+}
+
 const hookUsage = "usage: squadrn hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit"
 
 // runHook handles `squadrn hook …` and returns the exit code.
@@ -147,7 +155,7 @@ func (h hookEnv) guardGit() {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), hookDeadline)
 	defer cancel()
-	raw, err := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
+	raw, err := h.readInput()
 	if err != nil {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "guard could not read the hook input"}
 		return
@@ -268,14 +276,19 @@ func (h hookEnv) gitFail(name string, err error) int {
 // notify shows a desktop notification titled "Claude: <title>" with the project name.
 // It is fire-and-forget: a missing notifier is not an error.
 func (h hookEnv) notify(title string) {
-	raw, _ := io.ReadAll(io.LimitReader(h.stdin, 4<<20))
+	raw, _ := h.readInput()
 	var in hookInput
 	_ = json.Unmarshal(raw, &in)
 	project := in.Cwd
 	if project == "" {
 		project, _ = os.Getwd()
 	}
-	argv := notifyCommand(runtime.GOOS, "Claude: "+title, filepath.Base(project))
+	desktopNotify("Claude: "+title, filepath.Base(project))
+}
+
+// desktopNotify shows a desktop notification where the platform has a notifier; best effort.
+func desktopNotify(title, body string) {
+	argv := notifyCommand(runtime.GOOS, title, body)
 	if argv == nil {
 		return
 	}
