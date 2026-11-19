@@ -268,6 +268,9 @@ func (a *app) accountRename(input, newName string, force bool) error {
 	if err != nil {
 		return err
 	}
+	if err := usageStore(a.store.Home).Rename(acct.Provider, acct.Name, to.Name); err != nil {
+		a.warnf("could not move the usage record of %s: %v", acct.Label(), err)
+	}
 	if r, ok := ag.(relocator); ok {
 		if err := r.Relocate(acct.Dir, to.Dir); err != nil {
 			a.warnf("could not update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
@@ -312,6 +315,9 @@ func (a *app) accountRmCmd() *cobra.Command {
 					return fmt.Errorf("%s was logged out, but its dir stays in place: %w", acct.Label(), err)
 				}
 				return err
+			}
+			if err := usageStore(a.store.Home).Remove(acct.Provider, acct.Name); err != nil {
+				a.warnf("could not remove the usage record of %s: %v", acct.Label(), err)
 			}
 			a.out("removed account %s (moved to %s)\n", acct.Label(), a.tilde(dst))
 			return nil

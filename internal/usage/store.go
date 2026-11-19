@@ -64,9 +64,18 @@ func (s Store) Record(providerID, name string, obs Snapshot) (Snapshot, bool, er
 	return merged, true, s.Save(providerID, name, merged)
 }
 
-// Remove forgets an account (e.g. after it is removed or renamed).
+// Remove forgets a removed account.
 func (s Store) Remove(providerID, name string) error {
 	err := os.Remove(s.path(providerID, name))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
+// Rename moves what is known about a renamed account to its new name.
+func (s Store) Rename(providerID, oldName, newName string) error {
+	err := os.Rename(s.path(providerID, oldName), s.path(providerID, newName))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}

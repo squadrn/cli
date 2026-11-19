@@ -298,6 +298,18 @@ func TestStore(t *testing.T) {
 		t.Fatalf("corrupt file not replaced: %v", err)
 	}
 
+	if err := s.Rename("claude", "work", "job"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok, _ := s.Load("claude", "job"); !ok || got.Five.UsedPct != 11 {
+		t.Fatalf("renamed snapshot: %+v ok=%v", got, ok)
+	}
+	if err := s.Rename("claude", "ghost", "other"); err != nil {
+		t.Fatalf("rename of nothing: %v", err)
+	}
+	if err := s.Rename("claude", "job", "work"); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.Remove("claude", "work"); err != nil {
 		t.Fatal(err)
 	}

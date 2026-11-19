@@ -94,16 +94,21 @@ exists home/.claude-work
 mkdir home/.claude-work/plugins
 exec sh -c 'printf "{\"installPath\":\"%s/.claude-work/plugins/cache/x\"}" "$HOME" > home/.claude-work/plugins/installed_plugins.json'
 cp empty home/.claude-work/.loggedin
+mkdir home/.local/state/squadrn/usage
+cp settings.json home/.local/state/squadrn/usage/claude-work.json
 exec squadrn account rename work job
 stdout 'renamed claude/work → claude/job \(~/.claude-job\), logged out'
 stdout 'next: squadrn account login claude/job'
 ! exists home/.claude-work
 ! exists home/.claude-job/.loggedin
 grep '.claude-job/plugins/cache/x' home/.claude-job/plugins/installed_plugins.json
+exists home/.local/state/squadrn/usage/claude-job.json
+! exists home/.local/state/squadrn/usage/claude-work.json
 exitcode 2 squadrn account rename job grid
 exitcode 2 squadrn account rename main x2
 exitcode 1 squadrn account rename ghost x3
 exec squadrn account rename job work
+exists home/.local/state/squadrn/usage/claude-work.json
 
 # Validation: invalid and reserved names are usage errors (2).
 exitcode 2 squadrn account add Bad
@@ -119,6 +124,7 @@ exitcode 2 squadrn account rm main --yes
 exec squadrn account rm claude/work --yes
 stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'
 ! exists home/.claude-work
+! exists home/.local/state/squadrn/usage/claude-work.json
 exec sh -c 'cat home/.local/share/Trash/info/.claude-work-*.trashinfo'
 stdout '^\[Trash Info\]$'
 stdout '^Path=/.*/home/.claude-work$'
