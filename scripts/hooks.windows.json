@@ -7,10 +7,10 @@
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook notify \"Cần input\""], "async": true }] }
+      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook notify \"Needs input\""], "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook notify \"Xong việc\""], "async": true }] }
+      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook notify \"Done\""], "async": true }] }
     ],
     "StopFailure": [
       { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook limit"], "async": true }] }

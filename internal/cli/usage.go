@@ -228,7 +228,7 @@ func (a *app) usageTable(rep usageReport) {
 	_, _ = fmt.Fprintln(w, "ACCOUNT\tPLAN\tORG\t5H\tRESETS\t7D\tRESETS\tSTATE\tSEEN")
 	for _, r := range rep.Accounts {
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.Account, dash(r.Plan), dash(r.Org),
-			a.pct(r.FiveHour, now), resets(r.FiveHour, now), a.pct(r.SevenDay, now), resets(r.SevenDay, now),
+			a.pct(r.FiveHour, usage.HighFive, now), resets(r.FiveHour, now), a.pct(r.SevenDay, usage.HighSeven, now), resets(r.SevenDay, now),
 			a.state(r.State), ago(r.ObservedAt, now))
 	}
 	_ = w.Flush()
@@ -262,8 +262,8 @@ func (a *app) usageDetails(r usageRow, rep usageReport) {
 	a.out("plan      %s\n", dash(r.Plan))
 	a.out("org       %s\n", dash(r.Org))
 	a.out("state     %s\n", a.state(r.State))
-	a.out("5 hours   %s (resets %s)\n", a.pct(r.FiveHour, now), resets(r.FiveHour, now))
-	a.out("7 days    %s (resets %s)\n", a.pct(r.SevenDay, now), resets(r.SevenDay, now))
+	a.out("5 hours   %s (resets %s)\n", a.pct(r.FiveHour, usage.HighFive, now), resets(r.FiveHour, now))
+	a.out("7 days    %s (resets %s)\n", a.pct(r.SevenDay, usage.HighSeven, now), resets(r.SevenDay, now))
 	if s := r.Spend; s != nil {
 		line := fmt.Sprintf("%.0f%%", s.UsedPct)
 		if s.UsedUSD != nil && s.LimitUSD != nil {
@@ -309,7 +309,7 @@ func live(w *usage.Window, now time.Time) bool {
 	return w != nil && (w.ResetsAt.IsZero() || w.ResetsAt.After(now))
 }
 
-func (a *app) pct(w *usage.Window, now time.Time) string {
+func (a *app) pct(w *usage.Window, high float64, now time.Time) string {
 	if !live(w, now) {
 		return "-"
 	}
@@ -323,7 +323,7 @@ func (a *app) pct(w *usage.Window, now time.Time) string {
 	switch {
 	case w.UsedPct >= 100:
 		code = "31"
-	case w.UsedPct >= usage.HighFive:
+	case w.UsedPct >= high:
 		code = "33"
 	}
 	return fmt.Sprintf("%4s ", s) + a.paint(true, code, strings.Repeat("█", n)) + strings.Repeat("░", width-n)

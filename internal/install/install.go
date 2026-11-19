@@ -1,5 +1,5 @@
-// Package install places releases on disk: command names, migration from previous product
-// names, and the plugin in every account. It returns what it did; cli reports it.
+// Package install checks command names and installs or removes the squadrn plugin in every
+// account. It returns what it did; cli reports it.
 package install
 
 import (

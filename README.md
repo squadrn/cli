@@ -101,7 +101,7 @@ Completions for zsh (`~/.zsh/completions`), bash (`~/.local/share/bash-completio
 and fish (`~/.config/fish/completions`) are written when those directories exist; otherwise
 `squadrn completion zsh|bash|fish` prints them.
 
-Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`/`swap`.
+Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`.
 Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`, build provenance).
 Updates read the public GitHub API; set `GH_TOKEN` or `GITHUB_TOKEN` (or log in with `gh`) only if
 you hit its rate limit. Examples below use `squadrn`; `sqd` works the same.

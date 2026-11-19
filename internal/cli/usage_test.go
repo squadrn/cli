@@ -67,17 +67,20 @@ func TestUsageFormatting(t *testing.T) {
 	}
 	w := &usage.Window{UsedPct: 85, ResetsAt: now.Add(time.Hour)}
 	plain := &app{}
-	if got := plain.pct(w, now); got != "85%" {
+	if got := plain.pct(w, usage.HighFive, now); got != "85%" {
 		t.Errorf("pct = %q", got)
 	}
 	color := &app{colorOut: true}
-	if got := color.pct(w, now); !strings.Contains(got, "████") || !strings.Contains(got, "\033[33m") {
+	if got := color.pct(w, usage.HighFive, now); !strings.Contains(got, "████") || !strings.Contains(got, "\033[33m") {
 		t.Errorf("bar = %q", got)
 	}
-	if got := color.pct(&usage.Window{UsedPct: 140}, now); !strings.Contains(got, "\033[31m█████\033[0m") {
+	if got := color.pct(w, usage.HighSeven, now); !strings.Contains(got, "\033[32m") {
+		t.Errorf("85%% of the weekly window is not high yet: %q", got)
+	}
+	if got := color.pct(&usage.Window{UsedPct: 140}, usage.HighFive, now); !strings.Contains(got, "\033[31m█████\033[0m") {
 		t.Errorf("full bar = %q", got)
 	}
-	if plain.pct(nil, now) != "-" || resets(nil, now) != "-" || resets(&usage.Window{UsedPct: 1}, now) != "-" {
+	if plain.pct(nil, usage.HighFive, now) != "-" || resets(nil, now) != "-" || resets(&usage.Window{UsedPct: 1}, now) != "-" {
 		t.Error("missing window")
 	}
 	if got := color.state(usage.Limited); !strings.Contains(got, "\033[31m") {
