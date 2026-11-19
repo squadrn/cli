@@ -3,7 +3,10 @@
 // provider's own package implements (internal/provider/claude).
 package provider
 
-import "context"
+import (
+	"context"
+	"strconv"
+)
 
 type Caps struct {
 	// Worktree: the CLI creates git worktrees itself (claude --worktree).
@@ -61,29 +64,7 @@ type AuthStatus struct {
 // (Windows): the agent CLI exited with Code, which squadrn passes on as its own exit status.
 type ExitStatus struct{ Code int }
 
-func (e ExitStatus) Error() string { return "exit status " + itoa(e.Code) }
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
-}
+func (e ExitStatus) Error() string { return "exit status " + strconv.Itoa(e.Code) }
 
 // Runner runs the CLI non-interactively. configDir "" selects the main account. A non-zero exit
 // returns whatever stdout was produced together with the error.

@@ -3,12 +3,8 @@
 package cli
 
 import (
-	"errors"
 	"syscall"
 )
-
-// errNoInterrupt: the platform cannot ask a session to stop, only terminate it.
-var errNoInterrupt = errors.New("cannot interrupt another console's process")
 
 // stopProcess sends pid SIGINT, the signal of ctrl-c, which lets the session save and exit; force
 // sends SIGTERM.

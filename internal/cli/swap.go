@@ -427,6 +427,9 @@ func (a *app) holders(src swapSource, from account.Account, accts []account.Acco
 
 // quiesce stops every holder (asking first) so the conversation never has two writers: an
 // interrupt, then — asked again — termination; it refuses when one is still alive.
+// errNoInterrupt: the platform cannot ask a session to stop, only terminate it.
+var errNoInterrupt = errors.New("cannot interrupt another console's process")
+
 func (a *app) quiesce(hs []holder, yes bool) error {
 	for _, h := range hs {
 		if !inuse.Live(h.pid, h.started) {
