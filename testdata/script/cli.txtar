@@ -40,6 +40,12 @@ stdout '"update_check": true'
 stdout '"aliases": \[\],'
 stdout '"protected_branches": \[\n +"main",'
 
+# Invalid names are reported once, without repeated context.
+! exec squadrn config set command Bad
+stderr '^srn: invalid command name "Bad" \(expected '
+! exec squadrn config set aliases ok,Bad
+stderr '^srn: invalid command name "Bad" \(expected '
+
 # config set prints what applies, defaults included.
 exec squadrn config set protected_branches main,prod
 stdout '^protected_branches = main,prod$'

@@ -238,12 +238,12 @@ func Read(path string) (Config, error) {
 func (c Config) validate() error {
 	if c.Command != "" {
 		if err := ValidateCommand(c.Command); err != nil {
-			return fmt.Errorf("command: %w", err)
+			return err
 		}
 	}
 	for _, a := range c.Aliases {
 		if err := ValidateCommand(a); err != nil {
-			return fmt.Errorf("aliases: %w", err)
+			return err
 		}
 	}
 	if c.DefaultProvider != "" {
