@@ -1,5 +1,5 @@
 version: 2
-project_name: sprawl
+project_name: squadrn
 
 # Releases are published to a separate repository holding binaries only (ADR 0007):
 # SPRAWL_RELEASES_OWNER/SPRAWL_RELEASES_NAME. Users get read access to it, never to the source.
@@ -9,8 +9,8 @@ before:
 
 builds:
   - id: unix
-    main: ./cmd/sprawl
-    binary: sprawl
+    main: ./cmd/squadrn
+    binary: squadrn
     env: [CGO_ENABLED=0]
     goos: [linux, darwin]
     goarch: [amd64, arm64]
@@ -21,8 +21,8 @@ builds:
       - -s -w -X github.com/squadrn/cli/internal/cli.Version={{ .Version }} -X github.com/squadrn/cli/internal/cli.Repo={{ .Env.SPRAWL_RELEASES_OWNER }}/{{ .Env.SPRAWL_RELEASES_NAME }}
 
   - id: windows
-    main: ./cmd/sprawl
-    binary: sprawl
+    main: ./cmd/squadrn
+    binary: squadrn
     env: [CGO_ENABLED=0]
     goos: [windows]
     goarch: [amd64, arm64]
@@ -59,7 +59,7 @@ archives:
         dst: plugin/README.md
         info: *fileinfo
 
-  # Windows: a zip with sprawl.exe, the same plugin files, and hooks that run through cmd.exe so
+  # Windows: a zip with squadrn.exe, the same plugin files, and hooks that run through cmd.exe so
   # a binary that cannot start blocks the tool call (ADR 0008).
   - id: windows
     ids: [windows]
@@ -99,7 +99,7 @@ checksum:
     - glob: build/install.sh
     - glob: build/install.ps1
 
-# checksums.txt.sig: SSH signature (namespace sprawl-release) that self-update and install.sh
+# checksums.txt.sig: SSH signature (namespace squadrn-release) that self-update and install.sh
 # verify against the keys in internal/release/signers.pub.
 signs:
   - id: release

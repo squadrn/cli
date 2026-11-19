@@ -1,4 +1,4 @@
-// Command sprawl runs coding agents across multiple accounts and parallel worktrees.
+// Command squadrn runs coding agents across multiple accounts and parallel worktrees.
 package main
 
 import (

@@ -27,7 +27,7 @@ jobs:
         with:
           version: v2.15
       - name: shellcheck
-        run: sudo apt-get install -y -qq shellcheck && shellcheck -s sh plugin/bin/sprawl-hook scripts/*.sh .githooks/*
+        run: sudo apt-get install -y -qq shellcheck && shellcheck -s sh plugin/bin/squadrn-hook scripts/*.sh .githooks/*
       - name: go mod tidy
         run: go mod tidy -diff
       # Windows-only files are compiled and linted on every change, without a Windows runner.
@@ -102,7 +102,7 @@ jobs:
       - name: Coverage gates
         run: make cover-gates
 
-  # The oldest supported Git is 2.31; Debian 11 ships 2.30. sprawl must say so and name the
+  # The oldest supported Git is 2.31; Debian 11 ships 2.30. squadrn must say so and name the
   # upgrade, not fail with a raw git error.
   git-floor:
     runs-on: ubuntu-latest
@@ -113,19 +113,19 @@ jobs:
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
-      - run: CGO_ENABLED=0 go build -o sprawl ./cmd/sprawl
+      - run: CGO_ENABLED=0 go build -o squadrn ./cmd/squadrn
       - name: Debian 11 (Git 2.30) gets the upgrade message
         run: |
-          docker run --rm -v "$PWD/sprawl:/usr/local/bin/sprawl:ro" debian:11 sh -ec '
+          docker run --rm -v "$PWD/squadrn:/usr/local/bin/squadrn:ro" debian:11 sh -ec '
             # Debian 11 is end of life: its packages live on archive.debian.org.
             printf "%s\n" "deb http://archive.debian.org/debian bullseye main" \
               "deb http://archive.debian.org/debian-security bullseye-security main" >/etc/apt/sources.list
             apt-get -o Acquire::Check-Valid-Until=false update -qq && apt-get install -y -qq git >/dev/null
             git version
             git init -q /tmp/r && cd /tmp/r
-            if sprawl wt ls 2>/tmp/err; then echo "expected a refusal"; exit 1; fi
+            if squadrn wt ls 2>/tmp/err; then echo "expected a refusal"; exit 1; fi
             cat /tmp/err
-            grep -q "is too old; sprawl needs git 2.31 or newer" /tmp/err
+            grep -q "is too old; squadrn needs git 2.31 or newer" /tmp/err
             grep -q "bullseye-backports" /tmp/err'
 
   windows:
@@ -156,7 +156,7 @@ jobs:
           fixture="$RUNNER_TEMP/ps1-fixture"
           mkdir -p "$fixture"
           ssh-keygen -q -t ed25519 -N '' -C test -f "$fixture/key"
-          sh scripts/render-install.sh test/sprawl-releases v1.2.0-rc.99 "$fixture/key.pub"
+          sh scripts/render-install.sh test/squadrn-releases v1.2.0-rc.99 "$fixture/key.pub"
           pwsh -NoProfile -File scripts/windows-install-e2e.ps1 -Fixture "$(cygpath -w "$fixture")" -Tag v1.2.0-rc.99
       - name: install.ps1 parses in Windows PowerShell 5.1 and PowerShell 7
         run: |

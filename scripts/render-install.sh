@@ -12,8 +12,8 @@ mkdir -p build
 grep '^ssh-ed25519 ' "$keys" >build/signers || : >build/signers
 for f in install.sh install.ps1; do
   awk -v repo="$repo" -v tag="$tag" '
-    $0 == "__SPRAWL_SIGNERS__" { while ((getline line < "build/signers") > 0) print line; close("build/signers"); next }
-    { gsub(/__SPRAWL_REPO__/, repo); gsub(/__SPRAWL_VERSION__/, tag); print }
+    $0 == "__SQUADRN_SIGNERS__" { while ((getline line < "build/signers") > 0) print line; close("build/signers"); next }
+    { gsub(/__SQUADRN_REPO__/, repo); gsub(/__SQUADRN_VERSION__/, tag); print }
   ' "scripts/$f" >"build/$f"
 done
 rm -f build/signers

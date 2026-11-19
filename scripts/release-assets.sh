@@ -6,9 +6,9 @@
 set -eu
 export LC_ALL=C
 dist=${1:-dist}
-for a in "$dist"/sprawl_*.tar.gz "$dist"/sprawl_*.zip; do
+for a in "$dist"/squadrn_*.tar.gz "$dist"/squadrn_*.zip; do
   [ -e "$a" ] || continue
-  name=$(basename "$a" | sed -E 's/^sprawl_[^_]+_/sprawl_VERSION_/')
+  name=$(basename "$a" | sed -E 's/^squadrn_[^_]+_/squadrn_VERSION_/')
   echo "$name"
   case "$a" in
     *.tar.gz) tar -tzf "$a" ;;

@@ -1,11 +1,11 @@
-BIN     := bin/sprawl
+BIN     := bin/squadrn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/squadrn/cli/internal/cli.Version=$(VERSION)
 
 .PHONY: build test race cover cover-gates vuln lint fmt check validate hooks clean
 
 build:
-	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/sprawl
+	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/squadrn
 
 test:
 	go test ./...
@@ -30,7 +30,7 @@ vuln:
 
 lint:
 	golangci-lint run ./...
-	shellcheck -s sh plugin/bin/sprawl-hook scripts/*.sh .githooks/*
+	shellcheck -s sh plugin/bin/squadrn-hook scripts/*.sh .githooks/*
 	actionlint .github/workflows/*.yml
 
 fmt:

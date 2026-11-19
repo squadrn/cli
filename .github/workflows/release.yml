@@ -56,7 +56,7 @@ jobs:
         env:
           # Fine-grained token with contents:write on the releases repository only.
           GITHUB_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
-          SPRAWL_SIGNING_KEY: ${{ secrets.SPRAWL_SIGNING_KEY }}
+          SQUADRN_SIGNING_KEY: ${{ secrets.SQUADRN_SIGNING_KEY }}
       # Provenance where GitHub supports it (public repositories, Enterprise Cloud); the signature
       # above is what installs rely on.
       - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
@@ -82,7 +82,7 @@ jobs:
       GH_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
       RELEASES_REPO: ${{ vars.SPRAWL_RELEASES_REPO }}
       TAG: ${{ github.ref_name }}
-      SPRAWL_NO_UPDATE_CHECK: "1"
+      SQUADRN_NO_UPDATE_CHECK: "1"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -93,10 +93,13 @@ jobs:
         run: |
           prev=$(gh release list --repo "$RELEASES_REPO" --limit 100 --json tagName,isPrerelease,isDraft |
             jq -r -f scripts/previous-release.jq)
-          # The first Windows release has no Windows predecessor to update from.
-          if [ -n "$prev" ] && [ "$RUNNER_OS" = Windows ]; then
-            zips=$(gh release view "$prev" --repo "$RELEASES_REPO" --json assets --jq '[.assets[].name | select(endswith(".zip"))] | length')
-            [ "$zips" -gt 0 ] || prev=""
+          # Releases before the rename to squadrn (sprawl_* assets, another signature namespace) are
+          # not an upgrade path (ADR 0010); the first Windows release has no Windows predecessor.
+          if [ -n "$prev" ]; then
+            ext=.tar.gz
+            [ "$RUNNER_OS" = Windows ] && ext=.zip
+            ours=$(gh release view "$prev" --repo "$RELEASES_REPO" --json assets --jq "[.assets[].name | select(startswith(\"squadrn_\") and endswith(\"$ext\"))] | length")
+            [ "$ours" -gt 0 ] || prev=""
           fi
           echo "tag=$prev" >>"$GITHUB_OUTPUT"
           echo "previous release: ${prev:-none}"
@@ -106,16 +109,16 @@ jobs:
           PREV: ${{ steps.prev.outputs.tag }}
         run: |
           gh release download "$TAG" -R "$RELEASES_REPO" -p install.sh -O install.sh
-          sh install.sh --version "$PREV" --name sprawl --alias ''
+          sh install.sh --version "$PREV" --name squadrn --alias ''
           export PATH="$HOME/.local/bin:$PATH"
-          sprawl version
-          sprawl self-update --version "$TAG"
-          test "$(sprawl version)" = "sprawl ${TAG#v}"
-          sprawl doctor --json >/dev/null || true
-          sprawl self-update --rollback
-          test "$(sprawl version)" = "sprawl ${PREV#v}"
-          sprawl self-update --rollback
-          test "$(sprawl version)" = "sprawl ${TAG#v}"
+          squadrn version
+          squadrn self-update --version "$TAG"
+          test "$(squadrn version)" = "squadrn ${TAG#v}"
+          squadrn doctor --json >/dev/null || true
+          squadrn self-update --rollback
+          test "$(squadrn version)" = "squadrn ${PREV#v}"
+          squadrn self-update --rollback
+          test "$(squadrn version)" = "squadrn ${TAG#v}"
       - name: Install the previous release and update (Windows)
         if: steps.prev.outputs.tag != '' && runner.os == 'Windows'
         shell: pwsh
@@ -123,12 +126,12 @@ jobs:
           PREV: ${{ steps.prev.outputs.tag }}
         run: |
           gh release download $env:TAG -R $env:RELEASES_REPO -p install.ps1 -O install.ps1
-          ./install.ps1 -Version $env:PREV -Name sprawl -Alias ''
+          ./install.ps1 -Version $env:PREV -Name squadrn -Alias ''
           if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed" }
-          $sprawl = Join-Path $env:USERPROFILE ".local\bin\sprawl.exe"
-          & $sprawl version
-          & $sprawl self-update --version $env:TAG
-          if ((& $sprawl version) -ne "sprawl $($env:TAG.TrimStart('v'))") { throw "self-update did not reach $env:TAG" }
+          $squadrn = Join-Path $env:USERPROFILE ".local\bin\squadrn.exe"
+          & $squadrn version
+          & $squadrn self-update --version $env:TAG
+          if ((& $squadrn version) -ne "squadrn $($env:TAG.TrimStart('v'))") { throw "self-update did not reach $env:TAG" }
 
   # Only a release whose upgrade path works becomes visible to users.
   publish:
@@ -150,15 +153,15 @@ jobs:
       GH_TOKEN: ${{ secrets.SPRAWL_RELEASES_TOKEN }}
       RELEASES_REPO: ${{ vars.SPRAWL_RELEASES_REPO }}
       TAG: ${{ github.ref_name }}
-      SPRAWL_NO_UPDATE_CHECK: "1"
+      SQUADRN_NO_UPDATE_CHECK: "1"
     steps:
       - name: self-update --check sees the release on its channel
         run: |
           gh release download "$TAG" -R "$RELEASES_REPO" -p install.sh -O install.sh
-          sh install.sh --name sprawl --alias ''
+          sh install.sh --name squadrn --alias ''
           export PATH="$HOME/.local/bin:$PATH"
           case $TAG in *-*) want=beta ;; *) want=stable ;; esac
-          test "$(sprawl config get update_channel)" = "$want"
-          sprawl self-update --check --json | tee check.json
+          test "$(squadrn config get update_channel)" = "$want"
+          squadrn self-update --check --json | tee check.json
           test "$(jq -r .latest check.json)" = "$TAG"
           test "$(jq -r .channel check.json)" = "$want"

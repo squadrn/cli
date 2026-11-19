@@ -37,19 +37,19 @@ jobs:
             echo "::error::SPRAWL_RELEASES_TOKEN expires in $days days; renew it (docs/maintaining.md)"
             exit 1
           fi
-      - name: SPRAWL_SIGNING_KEY matches a key in signers.pub
+      - name: SQUADRN_SIGNING_KEY matches a key in signers.pub
         env:
-          SPRAWL_SIGNING_KEY: ${{ secrets.SPRAWL_SIGNING_KEY }}
+          SQUADRN_SIGNING_KEY: ${{ secrets.SQUADRN_SIGNING_KEY }}
         run: |
-          [ -n "$SPRAWL_SIGNING_KEY" ] || { echo "::error::secret SPRAWL_SIGNING_KEY is not set (docs/maintaining.md)"; exit 1; }
+          [ -n "$SQUADRN_SIGNING_KEY" ] || { echo "::error::secret SQUADRN_SIGNING_KEY is not set (docs/maintaining.md)"; exit 1; }
           umask 077
           key=$(mktemp)
           trap 'rm -f "$key"' EXIT
-          printf '%s\n' "$SPRAWL_SIGNING_KEY" >"$key"
-          pub=$(ssh-keygen -y -f "$key" | awk '{print $2}') || { echo "::error::SPRAWL_SIGNING_KEY is not a valid private key"; exit 1; }
+          printf '%s\n' "$SQUADRN_SIGNING_KEY" >"$key"
+          pub=$(ssh-keygen -y -f "$key" | awk '{print $2}') || { echo "::error::SQUADRN_SIGNING_KEY is not a valid private key"; exit 1; }
           if awk '$1 == "ssh-ed25519" {print $2}' internal/release/signers.pub | grep -qxF "$pub"; then
             echo "signing key matches internal/release/signers.pub"
           else
-            echo "::error::SPRAWL_SIGNING_KEY is not in internal/release/signers.pub; releases would be refused (docs/maintaining.md)"
+            echo "::error::SQUADRN_SIGNING_KEY is not in internal/release/signers.pub; releases would be refused (docs/maintaining.md)"
             exit 1
           fi
