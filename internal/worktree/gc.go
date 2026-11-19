@@ -98,8 +98,9 @@ func (r Repo) Classify(ctx context.Context, base string, squashed SquashMerged) 
 
 // RemoveAll removes the classified worktrees and their branches, then prunes stale metadata.
 // force lets git remove worktrees it otherwise refuses (those containing submodules); gc only
-// marks clean worktrees, so nothing uncommitted is lost.
-func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (removed int, errs []error) {
+// marks clean worktrees, so nothing uncommitted is lost. removed names the worktrees that are
+// gone, including those whose unmerged branch was kept (reported in errs).
+func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (removed []string, errs []error) {
 	for _, c := range cands {
 		if c.Action == Keep {
 			continue
@@ -108,11 +109,14 @@ func (r Repo) RemoveAll(ctx context.Context, cands []Candidate, force bool) (rem
 			errs = append(errs, fmt.Errorf("%s: %w by pid %d", c.Path, ErrInUse, used[0].PID))
 			continue
 		}
-		if err := r.Remove(ctx, c.Worktree, force, c.Action == RemoveSquashed); err != nil {
+		err := r.Remove(ctx, c.Worktree, force, c.Action == RemoveSquashed)
+		if err != nil {
 			errs = append(errs, err)
-			continue
 		}
-		removed++
+		if err == nil || errors.Is(err, ErrUnmerged) {
+			name, _ := r.Name(c.Worktree)
+			removed = append(removed, name)
+		}
 	}
 	if _, err := git(ctx, r.Root, "worktree", "prune"); err != nil {
 		errs = append(errs, err)

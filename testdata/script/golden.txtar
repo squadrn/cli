@@ -455,7 +455,7 @@ Usage:
 Flags:
   -f, --force   let git remove clean worktrees it refuses (those containing submodules)
   -h, --help    help for gc
-      --json    print the plan as JSON
+      --json    print JSON (with --yes: also what was removed)
   -y, --yes     remove instead of only listing
 
 Global Flags:

@@ -189,8 +189,8 @@ func TestGCKeepsInUseAndForeignBranches(t *testing.T) {
 	// Marked for removal, then a session starts: RemoveAll re-checks.
 	forced := []Candidate{{Worktree: got["feat-used"].Worktree, Action: Remove}, got["feat-mine"]}
 	removed, errs := repo.RemoveAll(ctx, forced, false)
-	if removed != 1 || len(errs) != 1 || !errors.Is(errs[0], ErrInUse) {
-		t.Fatalf("RemoveAll = %d, %v", removed, errs)
+	if len(removed) != 1 || len(errs) != 1 || !errors.Is(errs[0], ErrInUse) {
+		t.Fatalf("RemoveAll = %v, %v", removed, errs)
 	}
 	if err := exec.Command("git", "-C", root, "rev-parse", "--verify", "-q", "refs/heads/mine").Run(); err != nil {
 		t.Fatal("a branch not named worktree-<name> was deleted")
