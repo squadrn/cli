@@ -102,3 +102,28 @@ func TestRelocate(t *testing.T) {
 		t.Fatalf("relocated:\n%s\nwant\n%s", b, want)
 	}
 }
+
+func TestUnwrapStatusLine(t *testing.T) {
+	tests := []struct {
+		cmd, old string
+		ours     bool
+	}{
+		{"/x/squadrn hook statusline", "", true},
+		{"'/a b/squadrn' hook statusline --then 'echo hi'", "echo hi", true},
+		{"~/.local/share/squadrn/bin/squadrn.exe hook statusline --then 'x'", "x", true},
+		{"/x/squadrn hook statusline --then 'a'\\''b'", "a'b", true},
+		{"/x/squadrn hook statusline --then 'unterminated", "", false},
+		{"/x/squadrn hook statusline --then 'a' extra", "", false},
+		{"/x/squadrn hook statusline --other", "", false},
+		{"/x/squadrn hook statuslinex", "", false},
+		{"~/statusline.sh", "", false},
+		{"'unterminated hook statusline", "", false},
+		{"", "", false},
+	}
+	for _, tt := range tests {
+		old, ours := UnwrapStatusLine(tt.cmd, "hook statusline")
+		if old != tt.old || ours != tt.ours {
+			t.Errorf("%q: got %q %v, want %q %v", tt.cmd, old, ours, tt.old, tt.ours)
+		}
+	}
+}

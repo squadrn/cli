@@ -1,6 +1,6 @@
 //go:build windows
 
-package cli
+package claude
 
 import "testing"
 
@@ -22,12 +22,12 @@ func TestStatusLineWordWindows(t *testing.T) {
 			t.Errorf("%q: got %q, %v; want %q", tt.in, got, err, tt.want)
 		}
 		if tt.ok {
-			if old, ours := unwrapStatusLine("x" + statusLineHook + " --then " + got); !ours || (old != tt.in && old != tt.want) {
+			if old, ours := UnwrapStatusLine("x hook statusline --then "+got, "hook statusline"); !ours || (old != tt.in && old != tt.want) {
 				t.Errorf("%q: unwrap = %q %v", tt.in, old, ours)
 			}
 		}
 	}
-	if sh, args := statusLineShell("true"); sh == "" || len(args) != 2 {
+	if sh, args := StatusLineShell("true"); sh == "" || len(args) != 2 {
 		t.Errorf("shell = %s %v", sh, args)
 	}
 }

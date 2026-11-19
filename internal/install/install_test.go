@@ -10,6 +10,7 @@ import (
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/release"
 )
 
@@ -74,26 +75,31 @@ func TestNameCheck(t *testing.T) {
 	}
 }
 
-type fakeRunner struct {
-	plugins string
-	fail    string
-	calls   []string
+type fakeAgent struct {
+	provider.Agent
+	installed bool
+	fail      string
+	calls     []string
 }
 
-func (f *fakeRunner) Output(_ context.Context, _ string, args ...string) ([]byte, error) {
-	cmd := strings.Join(args, " ")
-	f.calls = append(f.calls, cmd)
-	if f.fail != "" && strings.HasPrefix(cmd, f.fail) {
-		return nil, errors.New("boom")
+func (f *fakeAgent) step(name string) error {
+	f.calls = append(f.calls, name)
+	if f.fail == name {
+		return errors.New("boom")
 	}
-	switch cmd {
-	case "plugin list --json":
-		return []byte(f.plugins), nil
-	case "plugin marketplace list --json":
-		return []byte(`[{"name":"squadrn"}]`), nil
-	}
-	return nil, nil
+	return nil
 }
+
+func (f *fakeAgent) InstallPlugin(_ context.Context, _ string, dir string) (bool, error) {
+	if err := f.step("install " + dir); err != nil {
+		return false, err
+	}
+	return !f.installed, nil
+}
+
+func (f *fakeAgent) UpdatePlugin(context.Context, string) error { return f.step("update") }
+
+func (f *fakeAgent) RemovePlugin(context.Context, string) error { return f.step("remove") }
 
 func TestPlugins(t *testing.T) {
 	home := t.TempDir()
@@ -107,22 +113,19 @@ func TestPlugins(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	r := &fakeRunner{plugins: `[]`}
-	res := Plugins(ctx, accts, store, r, "/m")
-	if len(res) != 1 || res[0].Action != PluginInstalled {
-		t.Fatalf("install: %+v (%v)", res, r.calls)
+	f := &fakeAgent{}
+	if res := Plugins(ctx, accts, f, "/m"); len(res) != 1 || res[0].Action != PluginInstalled || strings.Join(f.calls, ";") != "install /m" {
+		t.Fatalf("install: %+v (%v)", res, f.calls)
 	}
-	r = &fakeRunner{plugins: `[{"id":"squadrn@squadrn"}]`}
-	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginUpdated || res[0].Err != nil {
-		t.Fatalf("update: %+v", res)
+	f = &fakeAgent{installed: true}
+	if res := Plugins(ctx, accts, f, "/m"); res[0].Action != PluginUpdated || res[0].Err != nil || strings.Join(f.calls, ";") != "install /m;update" {
+		t.Fatalf("update: %+v (%v)", res, f.calls)
 	}
-	r = &fakeRunner{plugins: `[{"id":"squadrn@squadrn"}]`, fail: "plugin update"}
-	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginFailed {
+	if res := Plugins(ctx, accts, &fakeAgent{installed: true, fail: "update"}, "/m"); res[0].Action != PluginFailed {
 		t.Fatalf("update failure: %+v", res)
 	}
-	r = &fakeRunner{fail: "plugin list"}
-	if res := Plugins(ctx, accts, store, r, "/m"); res[0].Action != PluginFailed {
-		t.Fatalf("list failure: %+v", res)
+	if res := Plugins(ctx, accts, &fakeAgent{fail: "install /m"}, "/m"); res[0].Action != PluginFailed {
+		t.Fatalf("install failure: %+v", res)
 	}
 }
 
@@ -133,13 +136,10 @@ func TestRemovePlugins(t *testing.T) {
 		t.Fatal(err)
 	}
 	accts, _ := store.List()
-	r := &fakeRunner{}
-	errs := RemovePlugins(context.Background(), accts, r)
-	if errs["claude/main"] != nil || strings.Join(r.calls, ";") != "plugin uninstall squadrn@squadrn;plugin marketplace remove squadrn" {
-		t.Fatalf("RemovePlugins = %v, calls %v", errs, r.calls)
+	if errs := RemovePlugins(context.Background(), accts, &fakeAgent{}); len(errs) != 1 || errs["claude/main"] != nil {
+		t.Fatalf("RemovePlugins = %v", errs)
 	}
-	r = &fakeRunner{fail: "plugin uninstall"}
-	if errs := RemovePlugins(context.Background(), accts, r); errs["claude/main"] == nil {
+	if errs := RemovePlugins(context.Background(), accts, &fakeAgent{fail: "remove"}); errs["claude/main"] == nil {
 		t.Fatal("error not reported")
 	}
 }

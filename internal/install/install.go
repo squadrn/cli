@@ -113,15 +113,14 @@ type PluginResult struct {
 }
 
 // Plugins installs or refreshes the plugin in every account whose provider supports it.
-func Plugins(ctx context.Context, accts []account.Account, store account.Store, r provider.Runner, marketplace string) []PluginResult {
-	p := account.Provisioner{Store: store, Runner: r, Marketplace: marketplace}
+func Plugins(ctx context.Context, accts []account.Account, ag provider.Agent, marketplace string) []PluginResult {
 	var out []PluginResult
 	for _, acct := range accts {
 		if !acct.Spec.Caps.Plugins {
 			continue
 		}
 		res := PluginResult{Account: acct}
-		installed, err := p.InstallPlugin(ctx, acct.ConfigDir())
+		installed, err := ag.InstallPlugin(ctx, acct.ConfigDir(), marketplace)
 		switch {
 		case err != nil:
 			res.Action, res.Err = PluginFailed, err
@@ -129,7 +128,7 @@ func Plugins(ctx context.Context, accts []account.Account, store account.Store, 
 			res.Action = PluginInstalled
 		default:
 			res.Action = PluginUpdated
-			if err := p.UpdatePlugin(ctx, acct.ConfigDir()); err != nil {
+			if err := ag.UpdatePlugin(ctx, acct.ConfigDir()); err != nil {
 				res.Action, res.Err = PluginFailed, err
 			}
 		}
@@ -140,18 +139,13 @@ func Plugins(ctx context.Context, accts []account.Account, store account.Store, 
 
 // RemovePlugins uninstalls the squadrn plugin and its marketplace from every account whose
 // provider supports plugins. Errors are per account; a missing plugin is not an error.
-func RemovePlugins(ctx context.Context, accts []account.Account, r provider.Runner) map[string]error {
+func RemovePlugins(ctx context.Context, accts []account.Account, ag provider.Agent) map[string]error {
 	errs := map[string]error{}
 	for _, acct := range accts {
 		if !acct.Spec.Caps.Plugins {
 			continue
 		}
-		var err error
-		if _, e := r.Output(ctx, acct.ConfigDir(), "plugin", "uninstall", account.PluginID); e != nil {
-			err = e
-		}
-		_, _ = r.Output(ctx, acct.ConfigDir(), "plugin", "marketplace", "remove", account.MarketplaceName)
-		errs[acct.Label()] = err
+		errs[acct.Label()] = ag.RemovePlugin(ctx, acct.ConfigDir())
 	}
 	return errs
 }

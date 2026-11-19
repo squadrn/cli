@@ -45,68 +45,16 @@ func (a *app) statusLineBinary() string {
 	return exe
 }
 
-const statusLineHook = " hook statusline"
+// statusLineHook is what the status line runs squadrn with.
+const statusLineHook = "hook statusline"
 
 // wrapStatusLine is the status line command that records usage and then runs old ("" for none).
 func (a *app) wrapStatusLine(old string) (string, error) {
-	bin, err := statusLineWord(a.statusLineBinary(), a.store.Home)
-	if err != nil {
-		return "", err
-	}
-	cmd := bin + statusLineHook
-	if old != "" {
-		q, err := statusLineWord(old, a.store.Home)
-		if err != nil {
-			return "", err
-		}
-		cmd += " --then " + q
-	}
-	return cmd, nil
+	return claude.WrapStatusLine(a.statusLineBinary(), statusLineHook, old, a.store.Home)
 }
 
-// unwrapStatusLine recognises a command made by wrapStatusLine and returns the wrapped one.
 func unwrapStatusLine(cmd string) (old string, ours bool) {
-	_, rest, ok := shellWord(cmd)
-	if !ok || !strings.HasPrefix(rest, statusLineHook) {
-		return "", false
-	}
-	rest = strings.TrimPrefix(rest, statusLineHook)
-	if rest == "" {
-		return "", true
-	}
-	if !strings.HasPrefix(rest, " --then ") {
-		return "", false
-	}
-	old, rest, ok = shellWord(strings.TrimPrefix(rest, " --then "))
-	if !ok || rest != "" {
-		return "", false
-	}
-	return old, true
-}
-
-// shellWord splits off the first word: plain characters and '…' quoted runs (with '\” for a
-// quote), as statusLineWord writes them.
-func shellWord(s string) (word, rest string, ok bool) {
-	var b strings.Builder
-	i := 0
-	for i < len(s) && s[i] != ' ' {
-		switch {
-		case s[i] == '\'':
-			j := strings.IndexByte(s[i+1:], '\'')
-			if j < 0 {
-				return "", "", false
-			}
-			b.WriteString(s[i+1 : i+1+j])
-			i += j + 2
-		case s[i] == '\\' && i+1 < len(s) && s[i+1] == '\'':
-			b.WriteByte('\'')
-			i += 2
-		default:
-			b.WriteByte(s[i])
-			i++
-		}
-	}
-	return b.String(), s[i:], i > 0
+	return claude.UnwrapStatusLine(cmd, statusLineHook)
 }
 
 // settingsGroup is one settings file and the accounts that use it (through links to main's).

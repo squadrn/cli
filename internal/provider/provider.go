@@ -5,8 +5,11 @@ package provider
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Caps struct {
@@ -45,6 +48,10 @@ type Spec struct {
 	// Subcommands of the agent CLI: `squadrn <account> <subcommand>` passes them through, and
 	// they cannot be account names.
 	Subcommands []string
+	// SessionID is the form of a conversation's ID (Caps.SessionTransfer).
+	SessionID *regexp.Regexp
+	// Plugin is the squadrn plugin's ID in the CLI.
+	Plugin string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
 	InstallHint  string
 	NativeMarker string
@@ -66,6 +73,31 @@ func (s AuthStatus) Metered() bool {
 	m := strings.ToLower(s.AuthMethod)
 	return s.LoggedIn && s.SubscriptionType == "" && (strings.Contains(m, "api") || strings.Contains(m, "key"))
 }
+
+// Session is a stored conversation. Owner is the index of the config dir holding it, in the list
+// given to the lookup.
+type Session struct {
+	ID      string
+	Path    string
+	ModTime time.Time
+	Owner   int
+}
+
+// LiveSession is a running session of the agent CLI; Owner as in Session.
+type LiveSession struct {
+	PID       int
+	SessionID string
+	Cwd       string
+	Owner     int
+}
+
+var (
+	ErrNoSession    = errors.New("no conversation found")
+	ErrBadSessionID = errors.New("not a session ID (expected a UUID)")
+	// ErrDiverged: the target account holds a version of the conversation that is not a prefix
+	// of the source's, so copying would lose what was said there.
+	ErrDiverged = errors.New("the conversation differs in the target account")
+)
 
 // ExitStatus is returned by Agent.Exec on platforms where the session runs as a child process
 // (Windows): the agent CLI exited with Code, which squadrn passes on as its own exit status.
@@ -91,6 +123,31 @@ type Agent interface {
 	LogoutArgs() []string
 	WorktreeArgs(name string) []string
 	ResumeArgs(session string) []string
+
+	// The squadrn plugin (Caps.Plugins), installed from the local marketplace dir. InstallPlugin
+	// reports whether it installed it (false: it was there already).
+	InstallPlugin(ctx context.Context, configDir, marketplace string) (bool, error)
+	UpdatePlugin(ctx context.Context, configDir string) error
+	RemovePlugin(ctx context.Context, configDir string) error
+	PluginState(ctx context.Context, configDir string) (installed, enabled bool, err error)
+	EnablePluginArgs() []string
+
+	// Conversations (Caps.SessionTransfer), looked up across the given config dirs.
+	FindSession(configDirs []string, id string) (Session, error)
+	// LatestSessionIn is the most recent conversation started in dir.
+	LatestSessionIn(configDirs []string, dir string) (Session, error)
+	RunningSessions(configDirs []string, alive func(pid int) bool) []LiveSession
+	// SessionCwd is the directory s was started in; "" when unknown.
+	SessionCwd(s Session) string
+	// TransferSession copies s into targetConfigDir so that account can resume it. Unless force,
+	// a copy there must be a prefix of s (else ErrDiverged).
+	TransferSession(s Session, targetConfigDir string, force bool) error
+	// UnavailableModel is the model s uses when target's plan may not include it; "" otherwise.
+	UnavailableModel(s Session, target AuthStatus) string
+
+	// User-scope MCP servers (Caps.SharedMCP); config is a server's JSON definition.
+	HasMCP(ctx context.Context, configDir, name string) bool
+	AddMCP(ctx context.Context, configDir, name string, config []byte) error
 }
 
 var Claude = Spec{
@@ -110,6 +167,8 @@ var Claude = Spec{
 		"agents", "attach", "auth", "auto-mode", "doctor", "gateway", "import", "install", "logs", "mcp",
 		"migrate-installer", "plugin", "plugins", "purge", "respawn", "setup-token", "update",
 	},
+	SessionID:    regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
+	Plugin:       "squadrn@squadrn",
 	InstallHint:  "curl -fsSL https://claude.ai/install.sh | bash",
 	NativeMarker: "/.local/share/claude/versions/",
 	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},

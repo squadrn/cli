@@ -185,37 +185,31 @@ func TestMoveToTrash(t *testing.T) {
 	}
 }
 
-type fakeClaude struct {
-	calls   []string
-	mcp     map[string]bool // servers present in the target account
-	markets string
-	plugins string
+type fakeAgent struct {
+	provider.Agent
+	calls     []string
+	mcp       map[string]bool // servers present in the target account
+	installed bool
 }
 
-func (f *fakeClaude) Output(_ context.Context, configDir string, args ...string) ([]byte, error) {
-	call := strings.Join(args, " ")
-	f.calls = append(f.calls, configDir+"|"+call)
-	switch {
-	case strings.HasPrefix(call, "mcp get "):
-		if f.mcp[args[2]] {
-			return nil, nil
-		}
-		return nil, errors.New("not found")
-	case strings.HasPrefix(call, "mcp add-json"):
-		f.mcp[args[4]] = true
-	case call == "plugin marketplace list --json":
-		return []byte(f.markets), nil
-	case call == "plugin list --json":
-		return []byte(f.plugins), nil
-	case strings.HasPrefix(call, "plugin marketplace add"):
-		f.markets = `[{"name":"squadrn"}]`
-	case strings.HasPrefix(call, "plugin install"):
-		f.plugins = `[{"id":"squadrn@squadrn"}]`
+func (f *fakeAgent) HasMCP(_ context.Context, _ string, name string) bool { return f.mcp[name] }
+
+func (f *fakeAgent) AddMCP(_ context.Context, _ string, name string, _ []byte) error {
+	f.calls = append(f.calls, "add mcp "+name)
+	f.mcp[name] = true
+	return nil
+}
+
+func (f *fakeAgent) InstallPlugin(_ context.Context, _ string, dir string) (bool, error) {
+	f.calls = append(f.calls, "plugin "+dir)
+	if f.installed {
+		return false, nil
 	}
-	return nil, nil
+	f.installed = true
+	return true, nil
 }
 
-func provisionFixture(t *testing.T) (Store, Account, *fakeClaude, Provisioner) {
+func provisionFixture(t *testing.T) (Store, Account, *fakeAgent, Provisioner) {
 	t.Helper()
 	s := newStore(t, "work")
 	main := s.MainDir(provider.Claude)
@@ -228,8 +222,8 @@ func provisionFixture(t *testing.T) (Store, Account, *fakeClaude, Provisioner) {
 		"figwright":{"command":"node","env":{}},
 		"secret":{"command":"x","env":{"TOKEN":"t"}},
 		"hdr":{"type":"http","url":"u","headers":{"Authorization":"b"}}}}`), 0o600))
-	f := &fakeClaude{mcp: map[string]bool{}, markets: `[{"name":"other"}]`, plugins: `[]`}
-	p := Provisioner{Store: s, Runner: f, SharedMCP: []string{"codegraph", "figwright", "secret", "hdr", "absent"}, Marketplace: "/repo"}
+	f := &fakeAgent{mcp: map[string]bool{}}
+	p := Provisioner{Store: s, Agent: f, SharedMCP: []string{"codegraph", "figwright", "secret", "hdr", "absent"}, Marketplace: "/repo"}
 	a, _ := s.Get("work")
 	return s, a, f, p
 }
@@ -305,7 +299,7 @@ func TestProvisionIsIdempotent(t *testing.T) {
 		t.Errorf("second run changed things: %+v", r)
 	}
 	for _, c := range f.calls[before:] {
-		if strings.Contains(c, "add") || strings.Contains(c, "install") {
+		if strings.HasPrefix(c, "add") {
 			t.Errorf("second run mutated: %s", c)
 		}
 	}

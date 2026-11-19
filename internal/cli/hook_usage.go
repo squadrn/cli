@@ -41,7 +41,7 @@ func (h hookEnv) statusline(args []string) int {
 	raw, _ := h.readInput()
 	name, snap := h.recordStatus(raw)
 	if then != "" {
-		bin, argv := statusLineShell(then)
+		bin, argv := claude.StatusLineShell(then)
 		ctx, cancel := context.WithTimeout(context.Background(), thenDeadline)
 		defer cancel()
 		out, err := proc.Output(ctx, proc.Options{Stdin: strings.NewReader(string(raw))}, bin, argv...)

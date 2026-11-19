@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -19,18 +20,13 @@ import (
 )
 
 type fakeAgent struct {
+	provider.Agent
 	loggedIn bool
 	authErr  error
 	plugins  string
 }
 
 func (f fakeAgent) Output(_ context.Context, _ string, args ...string) ([]byte, error) {
-	if strings.Join(args, " ") == "plugin list --json" {
-		if f.plugins == "" {
-			return nil, errors.New("no plugins")
-		}
-		return []byte(f.plugins), nil
-	}
 	if len(args) == 1 && args[0] == "--version" && f.loggedIn {
 		return []byte("2.1.0 (Claude Code)\n"), nil
 	}
@@ -40,11 +36,27 @@ func (f fakeAgent) Output(_ context.Context, _ string, args ...string) ([]byte, 
 func (f fakeAgent) Auth(context.Context, string) (provider.AuthStatus, error) {
 	return provider.AuthStatus{LoggedIn: f.loggedIn, Email: "me@x"}, f.authErr
 }
-func (fakeAgent) Exec(string, []string) error  { return nil }
-func (fakeAgent) LoginArgs() []string          { return nil }
-func (fakeAgent) LogoutArgs() []string         { return nil }
-func (fakeAgent) WorktreeArgs(string) []string { return nil }
-func (fakeAgent) ResumeArgs(string) []string   { return nil }
+
+func (f fakeAgent) PluginState(context.Context, string) (installed, enabled bool, err error) {
+	if f.plugins == "" {
+		return false, false, errors.New("no plugins")
+	}
+	var ps []struct {
+		ID      string `json:"id"`
+		Enabled bool   `json:"enabled"`
+	}
+	_ = json.Unmarshal([]byte(f.plugins), &ps)
+	for _, p := range ps {
+		if p.ID == provider.Claude.Plugin {
+			return true, p.Enabled, nil
+		}
+	}
+	return false, false, nil
+}
+
+func (fakeAgent) EnablePluginArgs() []string {
+	return []string{"plugin", "enable", provider.Claude.Plugin}
+}
 
 func find(checks []Check, substr string) (Check, bool) {
 	for _, c := range checks {

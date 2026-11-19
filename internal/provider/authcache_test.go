@@ -12,6 +12,7 @@ import (
 )
 
 type fakeRunner struct {
+	Agent
 	calls atomic.Int32
 	delay time.Duration
 	reply func(configDir string, args []string) ([]byte, error)
@@ -35,12 +36,6 @@ func (f *fakeRunner) Auth(ctx context.Context, configDir string) (AuthStatus, er
 	var s AuthStatus
 	return s, json.Unmarshal(out, &s)
 }
-
-func (f *fakeRunner) Exec(string, []string) error  { return nil }
-func (f *fakeRunner) LoginArgs() []string          { return nil }
-func (f *fakeRunner) LogoutArgs() []string         { return nil }
-func (f *fakeRunner) WorktreeArgs(string) []string { return nil }
-func (f *fakeRunner) ResumeArgs(string) []string   { return nil }
 
 func loggedInAs(configDir string, _ []string) ([]byte, error) {
 	return []byte(`{"loggedIn":true,"email":"u@` + filepath.Base(configDir+"main") + `"}`), nil

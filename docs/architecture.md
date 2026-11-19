@@ -66,16 +66,17 @@ and `wt rm`, `account rm` and `account rename` refuse (unless `--force`), what a
 folder encodes the working directory; long ones are shortened by an undocumented rule), with a
 `<session>/` dir (subagents, tool results) and checkpoints in `<config>/file-history/<session>/`.
 `swap` finds a conversation by session ID with a glob over every account of the provider
-(`claude.FindSession`), or, with `--worktree <name>`, the newest one of that worktree.
+(`Agent.FindSession`), or, with `--worktree <name>`, the newest one of that worktree.
 Without `--session` the candidates come from the usage store (the last limit hit in or below the
 working directory, unless the ledger shows it moved since) and from Claude Code's session registry
 `<config>/sessions/<pid>.json` (read as a hint). Before copying, every live holder is stopped
 (a grid pane is respawned; otherwise the registry and the in-use records name the process, which
 gets an interrupt, then — asked again — termination, through the `cli/stop_unix.go` /
-`stop_windows.go` pair). `claude.TransferSession` copies under the same folder name, refuses a
+`stop_windows.go` pair). `Agent.TransferSession` (`provider/claude`) copies under the same folder name, refuses a
 target copy that is not a prefix of the source (`--force` overrides), verifies size and SHA-256
 and renames the transcript into place last. The handoff is appended to the state dir's
-`handoffs.jsonl` (`usage.Ledger`). Only `provider/claude` knows the layout.
+`handoffs.jsonl` (`usage.Ledger`). Only `provider/claude` knows the layout; `cli` reaches it
+through `provider.Agent`.
 
 **Usage.** Claude Code's status line runs `squadrn hook statusline --then '<old command>'` once
 `usage setup` has wrapped `statusLine.command` in the account's `settings.json`. The hook parses

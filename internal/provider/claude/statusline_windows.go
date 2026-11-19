@@ -1,6 +1,6 @@
 //go:build windows
 
-package cli
+package claude
 
 import (
 	"fmt"
@@ -29,9 +29,9 @@ func statusLineWord(s, home string) (string, error) {
 	return "'" + s + "'", nil
 }
 
-// statusLineShell runs a status line command the way Claude Code does: Git Bash when Git for
+// StatusLineShell runs a status line command the way Claude Code does: Git Bash when Git for
 // Windows provides it, PowerShell otherwise.
-func statusLineShell(command string) (string, []string) {
+func StatusLineShell(command string) (string, []string) {
 	if git, err := exec.LookPath("git"); err == nil {
 		root := filepath.Dir(filepath.Dir(git))
 		for _, c := range []string{filepath.Join(root, "bin", "bash.exe"), filepath.Join(root, "usr", "bin", "bash.exe")} {
