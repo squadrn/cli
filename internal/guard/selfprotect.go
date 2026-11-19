@@ -204,7 +204,7 @@ func (e *extractor) psFileWrite(name string, words []arg, dir string) {
 			dest = &positional[len(positional)-1]
 		}
 		if dest != nil {
-			e.writeTo(arg(*dest), dir)
+			e.writeTo(*dest, dir)
 		}
 		return
 	case "set-content", "sc", "add-content", "ac", "out-file", "clear-content", "clc", "tee-object", "tee":
@@ -215,7 +215,7 @@ func (e *extractor) psFileWrite(name string, words []arg, dir string) {
 		positional = append(positional, *dest)
 	}
 	for _, p := range positional {
-		e.writeTo(arg(p), dir)
+		e.writeTo(p, dir)
 	}
 }
 

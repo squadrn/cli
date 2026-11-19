@@ -67,7 +67,7 @@ type Account struct {
 func (a Account) IsMain() bool { return a.Name == Main }
 
 // Label is how the account is shown and can be typed: claude/personal.
-func (a Account) Label() string { return a.Ref.String() }
+func (a Account) Label() string { return a.String() }
 
 // ConfigDir is the value for Spec.ConfigEnv; "" for main, which must run with it unset.
 func (a Account) ConfigDir() string {
