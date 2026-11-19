@@ -17,12 +17,12 @@ macOS and Linux (needs `curl` or `wget`, `git` 2.31+ and `ssh-keygen`; no GitHub
 curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
 ```
 
-This installs the latest stable release. The installer installs the release it was downloaded
-from, so for another one (a pre-release included; see
-[releases](https://github.com/squadrn/squadrn/releases)) take that release's installer:
+`latest` points to the newest stable release; GitHub skips pre-releases there. Until a stable
+release exists, or for any other release, take that release's installer (it installs the release
+it was downloaded from; see [releases](https://github.com/squadrn/squadrn/releases)):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/download/vX.Y.Z/install.sh | sh
+curl -fsSL https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.sh | sh
 ```
 
 The default command is **`squadrn`** with the short alias **`sqd`**. At a terminal the installer
@@ -44,6 +44,12 @@ Requires [Git for Windows](https://git-scm.com/download/win) 2.31+. In PowerShel
 
 ```powershell
 irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex
+```
+
+`latest` is the newest stable release; for a pre-release, or any other release, use its own installer:
+
+```powershell
+irm https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.ps1 | iex
 ```
 
 `| iex` cannot pass options: set `$env:SQUADRN_COMMAND`, `$env:SQUADRN_ALIASES` or
