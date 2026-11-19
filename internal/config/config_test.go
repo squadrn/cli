@@ -173,6 +173,16 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
+func TestSetCommandPromotesAlias(t *testing.T) {
+	c := Config{Command: "squadrn", Aliases: []string{"x", "srn"}}
+	if err := c.Set("command", "srn"); err != nil {
+		t.Fatal(err)
+	}
+	if c.Command != "srn" || !slices.Equal(c.Aliases, []string{"x", "squadrn"}) {
+		t.Fatalf("after promoting srn: %+v", c)
+	}
+}
+
 func TestSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "c.toml")
 	if err := Save(path, Config{Command: "ai"}); err != nil {

@@ -270,6 +270,11 @@ func (c *Config) Set(key, value string) error {
 	}
 	switch key {
 	case "command":
+		// Promoting an alias swaps the names: the old command takes the alias's place.
+		if i := slices.Index(c.Aliases, value); i >= 0 && c.Command != "" {
+			c.Aliases = slices.Clone(c.Aliases)
+			c.Aliases[i] = c.Command
+		}
 		c.Command = value
 	case "aliases":
 		c.Aliases = list()

@@ -22,3 +22,29 @@ mkdir bare/.claude
 exec squadrn self-install rel --alias ''
 stdout 'linked ~/.local/bin/srn'
 ! stdout 'local/bin/squadrn'
+
+# An install from before srn was the default keeps its names; the documented commands switch them.
+env HOME=$WORK/old
+env XDG_CONFIG_HOME=$WORK/old/.config
+env XDG_DATA_HOME=$WORK/old/.local/share
+env XDG_STATE_HOME=$WORK/old/.local/state
+env XDG_CACHE_HOME=$WORK/old/.cache
+mkdir old/.claude old/.config/squadrn
+cp old.toml old/.config/squadrn/config.toml
+exec squadrn self-install rel
+stdout 'linked ~/.local/bin/squadrn'
+stdout 'next: squadrn doctor'
+exec squadrn config set command srn
+stdout '^command: squadrn → srn \(aliases: squadrn\)$'
+
+exec squadrn config set aliases squadrn
+! stdout .
+grep '^command = "srn"' old/.config/squadrn/config.toml
+grep '^aliases = \["squadrn"\]' old/.config/squadrn/config.toml
+exec sh -c 'readlink old/.local/bin/srn && readlink old/.local/bin/squadrn'
+stdout -count=2 'old/.local/share/squadrn/bin/squadrn$'
+
+-- old.toml --
+schema = 1
+command = "squadrn"
+aliases = ["srn"]
