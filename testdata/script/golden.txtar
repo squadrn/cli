@@ -221,6 +221,7 @@ Usage:
 Flags:
   -f, --force   rename even if a session seems to use the account
   -h, --help    help for rename
+  -y, --yes     do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -536,7 +537,7 @@ Usage:
   squadrn config set <key> <value> [flags]
 
 Flags:
-      --force   use a command name even if another program on PATH has it
+  -f, --force   use a command name even if another program on PATH has it
   -h, --help    help for set
 
 Global Flags:
@@ -561,7 +562,7 @@ Flags:
       --json              with --check: print JSON (current, latest, channel, available, notes)
       --repo string       GitHub repository to update from (owner/name)
       --rollback          reinstall the release that was installed before this one
-      --version string    install this release tag instead of the newest
+      --tag string        install this release (v1.2.3) instead of the newest
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)

@@ -67,7 +67,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 			}
 			if o.rollback {
 				if o.check || o.tag != "" {
-					return usagef("--rollback cannot be combined with --check or --version")
+					return usagef("--rollback cannot be combined with --check or --tag")
 				}
 				return a.rollback()
 			}
@@ -75,7 +75,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&o.check, "check", false, "only report whether an update is available, with its release notes")
-	cmd.Flags().StringVar(&o.tag, "version", "", "install this release tag instead of the newest")
+	cmd.Flags().StringVar(&o.tag, "tag", "", "install this release (v1.2.3) instead of the newest")
 	cmd.Flags().StringVar(&o.repo, "repo", "", "GitHub repository to update from (owner/name)")
 	cmd.Flags().BoolVar(&o.allowDowngrade, "allow-downgrade", false, "install a release older than the running one")
 	cmd.Flags().BoolVar(&o.rollback, "rollback", false, "reinstall the release that was installed before this one")

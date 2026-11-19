@@ -14,7 +14,7 @@ chmod 755 bin/gh
 env SQUADRN_INSTALL_BASE=$WORK/pub
 
 # Its own release, names from flags; the signature is verified.
-exec sh install.sh --name ai --alias ''
+exec sh install.sh --command ai --alias ''
 stdout 'verified release signature'
 stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
 stdout 'linked ~/.local/bin/ai'
@@ -34,11 +34,11 @@ env SQUADRN_ALIASES=
 stderr 'cannot download the signature of v7.7.7'
 cp pub/v9.9.9/checksums.txt good.txt
 exec sh -c 'cd pub/v9.9.9 && sed "s/^[0-9a-f]\{8\}/00000000/" checksums.txt > c && mv c checksums.txt'
-! exec sh install.sh --name ai
+! exec sh install.sh --command ai
 stderr 'the release signature is not valid; refusing to install'
 cp good.txt pub/v9.9.9/checksums.txt
 rm pub/v9.9.9/checksums.txt.sig
-! exec sh install.sh --name ai
+! exec sh install.sh --command ai
 stderr 'cannot download the signature of v9.9.9'
 
 -- fakegh --

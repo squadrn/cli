@@ -108,9 +108,9 @@ grep '"channel":"stable"' home/.cache/squadrn/update.json
 exitcode 2 squadrn self-update --json
 
 # A tag without its v, and one that does not exist.
-exec squadrn self-update --repo me/squadrn --check --version 9.9.9
+exec squadrn self-update --repo me/squadrn --check --tag 9.9.9
 stdout '^update available: vdev → v9.9.9$'
-! exec squadrn self-update --repo me/squadrn --version v7.7.7
+! exec squadrn self-update --repo me/squadrn --tag v7.7.7
 stderr 'cannot install v7.7.7: release v7.7.7 not found in me/squadrn'
 
 # The beta channel also sees pre-releases.
@@ -167,12 +167,12 @@ grep '^9.9.9$' home/.local/share/squadrn/VERSION
 # Same version, but an install that stopped half way: self-update repairs it instead of saying
 # up to date.
 env SQUADRN_TEST_VERSION=9.9.9
-exec squadrn self-update --repo me/squadrn --version v9.9.9
+exec squadrn self-update --repo me/squadrn --tag v9.9.9
 stdout 'squadrn v9.9.9 is up to date'
 exec sh -c 'echo 9.9.8 > home/.local/share/squadrn/VERSION'
-exec squadrn self-update --repo me/squadrn --check --version v9.9.9
+exec squadrn self-update --repo me/squadrn --check --tag v9.9.9
 stdout 'is incomplete; repair it with: taken self-update'
-exec squadrn self-update --repo me/squadrn --version v9.9.9
+exec squadrn self-update --repo me/squadrn --tag v9.9.9
 stdout 'the installed copy of v9.9.9 is incomplete \(VERSION "9.9.8"\); reinstalling it'
 grep '^9.9.9$' home/.local/share/squadrn/VERSION
 

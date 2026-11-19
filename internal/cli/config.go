@@ -121,7 +121,7 @@ func (a *app) configCmd() *cobra.Command {
 			return nil
 		},
 	}
-	set.Flags().BoolVar(&force, "force", false, "use a command name even if another program on PATH has it")
+	set.Flags().BoolVarP(&force, "force", "f", false, "use a command name even if another program on PATH has it")
 	cmd.AddCommand(set)
 	return cmd
 }

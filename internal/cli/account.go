@@ -52,14 +52,15 @@ func (a *app) accountCmd() *cobra.Command {
 }
 
 func (a *app) accountRenameCmd() *cobra.Command {
-	var force bool
+	var force, yes bool
 	cmd := &cobra.Command{
 		Use:               "rename <account> <new-name>",
 		Short:             "Rename an account (logs it out first; log in again afterwards)",
 		Args:              exactArgs(2),
-		RunE:              func(_ *cobra.Command, args []string) error { return a.accountRename(args[0], args[1], force) },
+		RunE:              func(_ *cobra.Command, args []string) error { return a.accountRename(args[0], args[1], force, yes) },
 		ValidArgsFunction: a.completeAccounts,
 	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "rename even if a session seems to use the account")
 	return cmd
 }
@@ -242,7 +243,7 @@ type relocator interface {
 	Relocate(oldDir, newDir string) error
 }
 
-func (a *app) accountRename(input, newName string, force bool) error {
+func (a *app) accountRename(input, newName string, force, yes bool) error {
 	acct, err := a.store.Get(input)
 	if err != nil {
 		return err
@@ -250,7 +251,11 @@ func (a *app) accountRename(input, newName string, force bool) error {
 	if err := a.checkAccountFree(acct, force); err != nil {
 		return err
 	}
-	if _, err := a.store.RenameTarget(acct, newName); err != nil {
+	to, err := a.store.RenameTarget(acct, newName)
+	if err != nil {
+		return err
+	}
+	if err := a.confirm(yes, "Rename %s to %s; it is logged out and has to log in again", acct.Label(), to.Label()); err != nil {
 		return err
 	}
 	ag, err := a.agent(acct.Spec)
@@ -263,7 +268,7 @@ func (a *app) accountRename(input, newName string, force bool) error {
 	if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
 		a.warnf("could not log %s out before renaming: %v", acct.Label(), err)
 	}
-	to, err := a.store.Rename(acct, newName)
+	to, err = a.store.Rename(acct, newName)
 	if err != nil {
 		return err
 	}

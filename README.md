@@ -30,7 +30,7 @@ asks for other names (Enter keeps the default); or pass them up front (`--alias 
 alias; `SQUADRN_COMMAND`, `SQUADRN_ALIASES` and `SQUADRN_VERSION` work too):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --name ai --alias ''
+curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --command ai --alias ''
 ```
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
@@ -78,6 +78,7 @@ it checks in the background (never delaying a command) and, at a terminal, shows
 squadrn self-update --check       # what is new (release notes)
 squadrn self-update               # install it: signature, checksum, then the plugin in every account
 squadrn self-update --rollback    # back to the release installed before (run again to go forward)
+squadrn self-update --tag v1.2.0  # a specific release
 squadrn config set update_channel beta    # also pre-releases; stable is the default
 squadrn config set update_check false     # no checks, no notices (also: SQUADRN_NO_UPDATE_CHECK=1)
 ```
