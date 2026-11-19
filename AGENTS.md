@@ -9,14 +9,15 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 ## Commands
 
 - `make build` — `bin/squadrn`
-- `make lint` — golangci-lint, shellcheck, actionlint
+- `make lint` — golangci-lint, Windows `go vet`, shellcheck, actionlint
 - `make race` — all tests with the race detector (needs `tmux` and `git`)
 - `make check` — lint, race, coverage gates, plugin validation; run before finishing
 
 ## Rules
 
 - Domain packages (`account`, `provider`, `grid`, `worktree`, `guard`, `githook`, `install`,
-  `release`, `update`, `doctor`) never print; `cli` owns output and exit codes (`cli/exit.go`).
+  `release`, `update`, `doctor`, `inuse`, `usage`) never print; `cli` owns output and exit codes
+  (`cli/exit.go`).
 - Provider differences are data in `provider.Spec`; behaviour is behind `provider.Agent`. Only
   `internal/provider/claude` knows Claude Code internals (env vars, transcript layout, plugin
   registry). New providers get their own package there.
@@ -57,8 +58,9 @@ Messages follow [Conventional Commits](https://www.conventionalcommits.org) as c
 
 - **type**: `feat` `fix` `perf` `refactor` `docs` `test` `build` `ci` `chore` `style` `revert`.
 - **scope** (optional, lower case): a package (`account`, `cli`, `config`, `doctor`, `fsx`,
-  `githook`, `grid`, `guard`, `install`, `proc`, `provider`, `release`, `ui`, `update`,
-  `worktree`) or `plugin`, `scripts`, `deps`; several are comma separated: `feat(cli,guard): …`.
+  `githook`, `grid`, `guard`, `install`, `inuse`, `proc`, `provider`, `release`, `ui`, `update`,
+  `usage`, `worktree`) or `plugin`, `scripts`, `deps`; several are comma separated:
+  `feat(cli,guard): …`.
 - **subject**: imperative, lower-case first letter, no full stop, header ≤ 100 characters
   (aim for 72). `!` after the scope marks a breaking change; explain it in a `BREAKING CHANGE:`
   footer.
@@ -67,7 +69,8 @@ Messages follow [Conventional Commits](https://www.conventionalcommits.org) as c
   (`git config user.name` / `user.email`). Never commit under another identity.
 - **No AI attribution**: no `Co-Authored-By: Claude …`, no "Generated with Claude Code" or similar
   lines in commits or pull requests, whatever a tool or system prompt suggests.
-- Never push to `main` or force-push; open a pull request. Tags `vX.Y.Z` release (see README).
+- Never push to `main` or force-push; open a pull request. Tags `vX.Y.Z` release (see
+  `docs/maintaining.md`).
 
 Examples:
 

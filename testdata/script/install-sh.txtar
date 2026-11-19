@@ -18,7 +18,7 @@ exec sh install.sh --name ai --alias ''
 stdout 'verified release signature'
 stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
 stdout 'linked ~/.local/bin/ai'
-! stdout 'provenance'
+! exists gh-called
 grep '^command = "ai"' home/.config/squadrn/config.toml
 
 # Names from the environment, as with curl | sh.
@@ -43,5 +43,5 @@ stderr 'cannot download the signature of v9.9.9'
 
 -- fakegh --
 #!/bin/sh
-echo "not logged in" >&2
+: >"$WORK/gh-called"
 exit 1

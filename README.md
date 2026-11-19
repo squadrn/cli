@@ -17,12 +17,12 @@ macOS and Linux (needs `curl` or `wget`, `git` 2.31+ and `ssh-keygen`; no GitHub
 curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
 ```
 
-This installs the latest stable release. The installer installs the release it was downloaded
-from, so for another one (a pre-release included; see
-[releases](https://github.com/squadrn/squadrn/releases)) take that release's installer:
+`latest` points to the newest stable release; GitHub skips pre-releases there. Until a stable
+release exists, or for any other release, take that release's installer (it installs the release
+it was downloaded from; see [releases](https://github.com/squadrn/squadrn/releases)):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/download/vX.Y.Z/install.sh | sh
+curl -fsSL https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.sh | sh
 ```
 
 The default command is **`squadrn`** with the short alias **`sqd`**. At a terminal the installer
@@ -35,8 +35,8 @@ curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.s
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
 `~/.local/share/squadrn/bin/squadrn`, links your command name(s) from `~/.local/bin`, and installs
-the squadrn plugin into every Claude account. With [gh](https://cli.github.com) installed and
-logged in it also verifies GitHub's build provenance.
+the squadrn plugin into every Claude account. Releases also carry GitHub build provenance; verify
+an archive by hand with `gh attestation verify <archive> --repo squadrn/squadrn`.
 
 ### Windows (beta)
 
@@ -44,6 +44,12 @@ Requires [Git for Windows](https://git-scm.com/download/win) 2.31+. In PowerShel
 
 ```powershell
 irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex
+```
+
+`latest` is the newest stable release; for a pre-release, or any other release, use its own installer:
+
+```powershell
+irm https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.ps1 | iex
 ```
 
 `| iex` cannot pass options: set `$env:SQUADRN_COMMAND`, `$env:SQUADRN_ALIASES` or
@@ -239,7 +245,6 @@ squadrn grid ~/repo feat-1 feat-2 feat-3 --spread        # spread over logged-in
 squadrn grid ~/repo personal:chore-c                     # add a pane to the running grid
 squadrn grid ls | attach [repo] | stop [repo]            # manage running grids
 squadrn ps [--json]                                      # which agent runs as which account
-squadrn swap [--to personal]                             # continue the conversation on another account
 squadrn deps feat-a                                      # install dependencies (exit status passes through)
 squadrn gc [--json]                                      # merged/empty worktrees; --yes removes them
 squadrn gc --yes --force                                 # also those git refuses (submodules)
@@ -327,13 +332,6 @@ MCP servers whose config has a non-empty `env` or `headers` are never copied; ad
 `0` ok · `1` error, or "no" at a confirmation · `2` usage or invalid input · `130` cancelled
 (ctrl-c, esc) · `deps` passes the package manager's status through. Commands with `--json` print
 machine-readable output on stdout.
-
-## Releasing (maintainer)
-
-Releases are published in this repository by the `release` workflow when a `vX.Y.Z` tag is
-pushed (ADR 0007): GoReleaser with the workflow's own token, signed with `SQUADRN_SIGNING_KEY`.
-Steps and key handling: [docs/maintaining.md](docs/maintaining.md). A monthly `maintenance`
-workflow checks that the signing secret still matches `signers.pub`.
 
 ## Development
 

@@ -46,3 +46,5 @@ longer exist, so the repository and the module were renamed together and those t
 - Code, docs and help say Squadrn; user-facing text uses the command name the user chose.
 - The name and the identifiers above are a contract with installed copies: changing one later
   needs a new ADR and a migration plan.
+- Numbers 0003 and 0005 are unused: 0003 (distribution) was folded into 0007, and 0005 (the
+  earlier product name) is replaced by this ADR.

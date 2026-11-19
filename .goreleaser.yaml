@@ -16,7 +16,7 @@ builds:
     flags: [-trimpath]
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
-    ldflags:
+    ldflags: &ldflags
       - -s -w -X github.com/squadrn/squadrn/internal/cli.Version={{ .Version }} -X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn
 
   - id: windows
@@ -28,8 +28,7 @@ builds:
     flags: [-trimpath]
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
-    ldflags:
-      - -s -w -X github.com/squadrn/squadrn/internal/cli.Version={{ .Version }} -X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn
+    ldflags: *ldflags
 archives:
   - id: unix
     ids: [unix]
@@ -60,8 +59,8 @@ archives:
         dst: plugin/README.md
         info: *fileinfo
 
-  # Windows: a zip with squadrn.exe, the same plugin files, and hooks that run through cmd.exe so
-  # a binary that cannot start blocks the tool call (ADR 0008).
+  # Windows: a zip with squadrn.exe, the plugin without the sh shim, and hooks that run the binary
+  # through cmd.exe so a binary that cannot start blocks the tool call (ADR 0008).
   - id: windows
     ids: [windows]
     formats: [zip]
@@ -73,8 +72,6 @@ archives:
         info: &wininfo
           mtime: "{{ .CommitDate }}"
       - src: plugin/agents/*
-        info: *wininfo
-      - src: plugin/bin/*
         info: *wininfo
       - src: plugin/README.md
         dst: plugin/README.md
