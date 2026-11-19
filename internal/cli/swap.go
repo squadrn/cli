@@ -16,6 +16,7 @@ import (
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/grid"
 	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/ui"
@@ -289,7 +290,7 @@ func (a *app) swapCandidates(accts []account.Account, dirs []string, dir string)
 		}
 	}
 	var running []swapSource
-	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return inuse.Live(pid, "") }) {
+	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
 		if !within(ls.Cwd, dir) {
 			continue
 		}
@@ -401,7 +402,7 @@ func (a *app) holders(src swapSource, from account.Account, accts []account.Acco
 	var out []holder
 	seen := map[int]bool{os.Getpid(): true}
 	other := map[int]bool{}
-	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return inuse.Live(pid, "") }) {
+	for _, ls := range claude.RunningSessions(dirs, func(pid int) bool { return proc.Alive(pid, "") }) {
 		if ls.SessionID != src.session.ID {
 			other[ls.PID] = true
 			continue
@@ -432,7 +433,7 @@ var errNoInterrupt = errors.New("cannot interrupt another console's process")
 
 func (a *app) quiesce(hs []holder, yes bool) error {
 	for _, h := range hs {
-		if !inuse.Live(h.pid, h.started) {
+		if !proc.Alive(h.pid, h.started) {
 			continue // ended with another holder (Windows: squadrn and its claude child)
 		}
 		if err := a.confirm(yes, "Stop the %s that holds the conversation", h.desc); err != nil {
@@ -447,7 +448,7 @@ func (a *app) quiesce(hs []holder, yes bool) error {
 				return err
 			}
 		}
-		if err := stopProcess(h.pid, true); err != nil && inuse.Live(h.pid, h.started) {
+		if err := stopProcess(h.pid, true); err != nil && proc.Alive(h.pid, h.started) {
 			return fmt.Errorf("stop the %s: %w", h.desc, err)
 		}
 		if !a.waitGone(h) {
@@ -459,7 +460,7 @@ func (a *app) quiesce(hs []holder, yes bool) error {
 
 func (a *app) waitGone(h holder) bool {
 	deadline := time.Now().Add(stopWait)
-	for inuse.Live(h.pid, h.started) {
+	for proc.Alive(h.pid, h.started) {
 		if time.Now().After(deadline) {
 			return false
 		}

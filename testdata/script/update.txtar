@@ -177,10 +177,10 @@ stdout 'the installed copy of v9.9.9 is incomplete \(VERSION "9.9.8"\); reinstal
 grep '^9.9.9$' home/.local/share/squadrn/VERSION
 
 # Two installs never overlap: a live process holding the lock blocks, a dead one does not.
-exec sh -c 'echo $PPID > home/.local/share/squadrn/install.lock'
+exec sh -c 'printf "{\"pid\":%s}" $PPID > home/.local/share/squadrn/install.lock'
 ! exec squadrn self-install rel
-stderr 'another squadrn install or update is running \(pid [0-9]+\)'
-exec sh -c 'echo 999999 > home/.local/share/squadrn/install.lock'
+stderr 'another squadrn process \(pid [0-9]+\) holds .*install.lock; try again when it has finished'
+exec sh -c 'echo "{\"pid\":999999}" > home/.local/share/squadrn/install.lock'
 exec squadrn self-install rel
 ! exists home/.local/share/squadrn/install.lock
 env SQUADRN_TEST_VERSION=

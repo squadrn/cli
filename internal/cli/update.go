@@ -407,10 +407,10 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	if err := a.nameCheck(accepted, nc.force).Check(cfg); err != nil {
 		return err
 	}
-	unlock, err := fsx.Lock(a.installLockPath())
+	unlock, err := fsx.Lock(a.installLockPath(), 0)
 	var held fsx.LockedError
 	if errors.As(err, &held) {
-		return fmt.Errorf("another squadrn install or update is running (pid %d); try again when it has finished", held.PID)
+		return fmt.Errorf("%w; try again when it has finished", held)
 	} else if err != nil {
 		return err
 	}

@@ -16,8 +16,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/inuse"
 	"github.com/squadrn/squadrn/internal/worktree"
 )
 
@@ -107,7 +107,7 @@ func (a *app) grid(repoArg string, specs []string, acctInput string, spread bool
 	if err != nil {
 		return err
 	}
-	unlock, err := inuse.Lock(filepath.Join(common, "squadrn-grid.lock"), 30*time.Second)
+	unlock, err := fsx.Lock(filepath.Join(common, "squadrn-grid.lock"), 30*time.Second)
 	if err != nil {
 		return fmt.Errorf("another %s grid is starting agents in this repository: %w", a.cmd, err)
 	}
