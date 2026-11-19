@@ -158,11 +158,11 @@ squadrn usage work                   # details, including the last limit hit and
 squadrn usage --json                 # stable JSON (below)
 squadrn usage --refresh              # also re-query login, plan and organization
 squadrn usage --watch                # redraw every 5 seconds
-squadrn usage --setup [work|--all]   # record usage through the status line (asks; -y skips)
-squadrn usage --setup --undo         # restore the previous status line
+squadrn usage setup [work|--all]     # record usage through the status line (asks; -y skips)
+squadrn usage setup --undo           # restore the previous status line
 ```
 
-`--setup` wraps the status line command in `settings.json`: squadrn records what it receives, then
+`usage setup` wraps the status line command in `settings.json`: squadrn records what it receives, then
 runs your own command with the same input and shows its output unchanged (without one, it shows
 `work · 5h 42% · 7d 18%`). Accounts that share main's `settings.json` are all covered by one
 change. `account add` offers it once (`--usage`/`--no-usage` decide without asking);

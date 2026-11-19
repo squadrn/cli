@@ -242,7 +242,7 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 			a.account = acct
 		}
 		if a.account != "" && !takesAccount(cmd) {
-			return usagef("%s does not take an account", strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" "))
+			return usagef("%s does not take an account", commandName(cmd))
 		}
 		if dir != "" {
 			if err := os.Chdir(dir); err != nil {
@@ -627,9 +627,21 @@ func (a *app) provision(acct account.Account, r provider.Runner) error {
 	return err
 }
 
+// commandName is the command path without the program name, which error messages already carry.
+func commandName(cmd *cobra.Command) string {
+	return strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" ")
+}
+
 func noArgs(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
-		return usagef("%s takes no arguments", cmd.CommandPath())
+		return usagef("%s takes no arguments", commandName(cmd))
+	}
+	return nil
+}
+
+func optionalArg(cmd *cobra.Command, args []string) error {
+	if len(args) > 1 {
+		return usagef("usage: %s", cmd.UseLine())
 	}
 	return nil
 }

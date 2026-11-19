@@ -29,7 +29,7 @@ var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9]`)
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // ProjectKey encodes a working directory the way Claude Code names the project folders of short
-// paths. Only the legacy worktree lookup uses it; see LatestSessionIn.
+// paths. Only the worktree lookup uses it; see LatestSessionIn.
 func ProjectKey(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {

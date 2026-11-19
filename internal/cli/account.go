@@ -199,7 +199,7 @@ func (a *app) accountAdd(input string, trackUsage *bool) error {
 	}
 	a.cache.Forget(acct.Label())
 	if err := a.offerUsageTracking(acct, trackUsage); err != nil {
-		a.warnf("usage tracking: %v; run: %s usage --setup %s", err, a.cmd, acct.Label())
+		a.warnf("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
 	}
 	if s, err := ag.Auth(context.Background(), acct.ConfigDir()); err != nil || !s.LoggedIn {
 		a.out("next: %s account login %s\n", a.cmd, acct.Label())

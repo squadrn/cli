@@ -20,13 +20,14 @@ exec squadrn usage
 stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
 stdout '^claude/main +max +acme +- +- +- +- +nodata +-$'
 stdout '^claude/work +- +acme +- +- +- +- +nodata +-$'
-stdout 'not tracked: claude/main, claude/work \(run: squadrn usage --setup\)'
+stdout 'not tracked: claude/main, claude/work \(run: squadrn usage setup\)'
 
 # Setup asks first; without a terminal it needs --yes.
-exitcode 2 squadrn usage --setup
+exitcode 2 squadrn usage setup
 exitcode 2 squadrn usage --undo
-exitcode 2 squadrn usage --setup --all work
-exec squadrn usage --setup --all -y
+exitcode 2 squadrn usage setup a b
+exitcode 2 squadrn usage setup --all work
+exec squadrn usage setup --all -y
 stdout '^usage tracking on: ~/.claude/settings.json \(claude/main, claude/work\)$'
 ! stdout 'claude-work'
 grep '"command": ".*/squadrn hook statusline --then .echo mine; printf ' home/.claude/settings.json
@@ -36,10 +37,10 @@ exec sh -c 'test -L home/.claude-work/settings.json'
 
 # Setting it up again changes nothing.
 cp home/.claude/settings.json before.json
-exec squadrn usage --setup work
+exec squadrn usage setup work
 stdout '^usage tracking already on: ~/.claude/settings.json \(claude/main, claude/work\)$'
 cmp home/.claude/settings.json before.json
-exec squadrn usage --setup --all -y
+exec squadrn usage setup --all -y
 stdout 'already on'
 exec squadrn account add work
 ! stdout 'usage tracking'
@@ -119,11 +120,11 @@ exec sh -c 'squadrn doctor > doctor.txt || true'
 grep 'usage tracking: on' doctor.txt
 
 # --undo restores the previous command, once.
-exec squadrn usage --setup --undo -y
+exec squadrn usage setup --undo -y
 stdout '^usage tracking off: ~/.claude/settings.json \(claude/main, claude/work\)$'
 grep '"command": "echo mine; printf ''%s'' x"' home/.claude/settings.json
 ! grep 'hook statusline' home/.claude/settings.json
-exec squadrn usage --setup --undo -y
+exec squadrn usage setup --undo -y
 stdout 'not set up'
 
 # An account with its own settings and no status line gets one; undo removes it again.
@@ -134,12 +135,12 @@ exec squadrn account add solo --usage
 stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
 grep '"command": ".* hook statusline"' home/.claude-solo/settings.json
 ! grep 'then' home/.claude-solo/settings.json
-exec squadrn usage --setup --undo solo -y
+exec squadrn usage setup --undo solo -y
 ! grep 'statusLine' home/.claude-solo/settings.json
 exitcode 2 squadrn account add solo --usage --no-usage
 
 # self-uninstall puts every status line back.
-exec squadrn usage --setup --all -y
+exec squadrn usage setup --all -y
 exec squadrn self-uninstall --yes
 stdout 'restored the status line in ~/.claude/settings.json'
 grep '"command": "echo mine; printf ''%s'' x"' home/.claude/settings.json

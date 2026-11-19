@@ -18,7 +18,7 @@ import (
 const watchEvery = 5 * time.Second
 
 func (a *app) usageCmd() *cobra.Command {
-	var asJSON, refresh, watch, setup, undo, all, yes bool
+	var asJSON, refresh, watch bool
 	cmd := &cobra.Command{
 		Use:   "usage [<account>]",
 		Short: "Show each account's usage limits and which one to use next",
@@ -26,12 +26,12 @@ func (a *app) usageCmd() *cobra.Command {
 7-day windows), when it last hit a limit, and the best account to continue with in this repository.
 
 Usage is recorded by the status line, so it needs a one-time setup per settings file:
-%[1]s usage --setup wraps the status line command (your own one keeps running and showing).`, a.cmd),
+%[1]s usage setup wraps the status line command (your own one keeps running and showing).`, a.cmd),
 		Example: fmt.Sprintf(`  %[1]s usage                 all accounts
   %[1]s usage work            details of claude/work
-  %[1]s usage --setup --all   record usage for every account
-  %[1]s usage --setup --undo  restore the previous status line`, a.cmd),
-		Args:              cobra.MaximumNArgs(1),
+  %[1]s usage setup --all     record usage for every account
+  %[1]s usage setup --undo    restore the previous status line`, a.cmd),
+		Args:              optionalArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
 			target := ""
@@ -39,14 +39,6 @@ Usage is recorded by the status line, so it needs a one-time setup per settings 
 				target = args[0]
 			}
 			switch {
-			case undo && !setup:
-				return usagef("--undo goes with --setup")
-			case all && !setup:
-				return usagef("--all goes with --setup")
-			case setup && all && target != "":
-				return usagef("give an account or --all, not both")
-			case setup:
-				return a.usageSetup(target, all, undo, yes)
 			case watch && asJSON:
 				return usagef("--watch and --json cannot be combined")
 			case watch:
@@ -68,10 +60,34 @@ Usage is recorded by the status line, so it needs a one-time setup per settings 
 	f.BoolVar(&asJSON, "json", false, "print JSON")
 	f.BoolVar(&refresh, "refresh", false, "query login status, plan and organisation again")
 	f.BoolVar(&watch, "watch", false, "redraw every 5 seconds")
-	f.BoolVar(&setup, "setup", false, "record usage through the account's status line")
-	f.BoolVar(&undo, "undo", false, "with --setup: restore the previous status line")
-	f.BoolVar(&all, "all", false, "with --setup: every account")
-	f.BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.AddCommand(a.usageSetupCmd())
+	return cmd
+}
+
+func (a *app) usageSetupCmd() *cobra.Command {
+	var undo, all, yes bool
+	cmd := &cobra.Command{
+		Use:   "setup [<account>]",
+		Short: "Record an account's usage through its status line",
+		Long: `Record an account's usage through its status line: the status line command in the account's
+settings.json is wrapped, so squadrn sees what Claude Code reports while your own command keeps
+running and showing. Accounts that share a settings file are set up together.`,
+		Args:              optionalArg,
+		ValidArgsFunction: a.completeAccounts,
+		RunE: func(_ *cobra.Command, args []string) error {
+			target := ""
+			if len(args) == 1 {
+				target = args[0]
+			}
+			if all && target != "" {
+				return usagef("give an account or --all, not both")
+			}
+			return a.usageSetup(target, all, undo, yes)
+		},
+	}
+	cmd.Flags().BoolVar(&undo, "undo", false, "restore the previous status line")
+	cmd.Flags().BoolVar(&all, "all", false, "every account")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	return cmd
 }
 
@@ -224,7 +240,7 @@ func (a *app) usageTable(rep usageReport) {
 		a.out("every account is at its limit; the first resets at %s\n", clock(rep.NextReset, now))
 	}
 	if untracked := a.untracked(rep); untracked != "" {
-		a.out("not tracked: %s (run: %s usage --setup)\n", untracked, a.cmd)
+		a.out("not tracked: %s (run: %s usage setup)\n", untracked, a.cmd)
 	}
 }
 
@@ -275,7 +291,7 @@ func (a *app) usageDetails(r usageRow, rep usageReport) {
 	}
 	tracking := "on"
 	if !r.Tracking {
-		tracking = "off (run: " + a.cmd + " usage --setup " + r.Account + ")"
+		tracking = "off (run: " + a.cmd + " usage setup " + r.Account + ")"
 	}
 	a.out("tracking  %s\n", tracking)
 	if rep.Best != "" && rep.Best != r.Account {
@@ -344,9 +360,6 @@ func ago(t, now time.Time) string {
 func (a *app) usageTargets(target string, all bool) ([]account.Account, error) {
 	if all {
 		return a.store.List()
-	}
-	if target == "" {
-		target = a.account
 	}
 	acct, err := a.resolve(target)
 	if err != nil {

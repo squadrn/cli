@@ -531,7 +531,7 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 		if e.Usage(a) {
 			out = append(out, ok(g, "usage tracking: on"))
 		} else {
-			out = append(out, ok(g, "usage tracking: off ("+e.Command+" usage --setup "+a.Label()+")"))
+			out = append(out, ok(g, "usage tracking: off ("+e.Command+" usage setup "+a.Label()+")"))
 		}
 	}
 	if !a.IsMain() {

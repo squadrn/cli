@@ -246,31 +246,33 @@ Show what the status line last reported about each account's usage limits (5-hou
 7-day windows), when it last hit a limit, and the best account to continue with in this repository.
 
 Usage is recorded by the status line, so it needs a one-time setup per settings file:
-squadrn usage --setup wraps the status line command (your own one keeps running and showing).
+squadrn usage setup wraps the status line command (your own one keeps running and showing).
 
 Usage:
   squadrn usage [<account>] [flags]
+  squadrn usage [command]
 
 Examples:
   squadrn usage                 all accounts
   squadrn usage work            details of claude/work
-  squadrn usage --setup --all   record usage for every account
-  squadrn usage --setup --undo  restore the previous status line
+  squadrn usage setup --all     record usage for every account
+  squadrn usage setup --undo    restore the previous status line
+
+Available Commands:
+  setup       Record an account's usage through its status line
 
 Flags:
-      --all       with --setup: every account
   -h, --help      help for usage
       --json      print JSON
       --refresh   query login status, plan and organisation again
-      --setup     record usage through the account's status line
-      --undo      with --setup: restore the previous status line
       --watch     redraw every 5 seconds
-  -y, --yes       do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
+
+Use "squadrn usage [command] --help" for more information about a command.
 -- help-wt.txt --
 Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
 
@@ -420,23 +422,24 @@ A running session is stopped first (asks; in a grid its pane is restarted in pla
 conversation to an account of another organization asks first too. When the target account
 already holds the conversation and it went on there, the swap is refused unless --force.
 
-The legacy form <worktree> <account> moves the latest conversation of that worktree.
+--worktree <name> moves the latest conversation of that agent worktree instead.
 
 Usage:
-  squadrn swap [<worktree> <account>] [flags]
+  squadrn swap [flags]
 
 Examples:
-  squadrn swap                            the conversation that just hit its limit here
-  squadrn swap --to personal              the same, to claude/personal
-  squadrn swap feat-a personal            latest conversation of worktree feat-a
-  squadrn swap --session <id> --to work
+  squadrn swap                              the conversation that just hit its limit here
+  squadrn swap --to personal                the same, to claude/personal
+  squadrn swap --worktree feat-a --to work  latest conversation of worktree feat-a
+  squadrn swap --session <id> --to work     any conversation, by session ID
 
 Flags:
-      --force            overwrite the target's copy when it differs
-  -h, --help             help for swap
-      --session string   session ID of the conversation to move
-      --to string        account to move it to
-  -y, --yes              do not ask for confirmation
+  -f, --force             move it even if the target's copy went on and differs
+  -h, --help              help for swap
+      --session string    session ID of the conversation to move
+      --to string         account to move it to
+      --worktree string   move the latest conversation of this agent worktree
+  -y, --yes               do not ask for confirmation
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
