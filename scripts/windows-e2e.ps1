@@ -31,9 +31,10 @@ $data = Join-Path $env:USERPROFILE ".local\share\squadrn"
 
 & "$root\rel1\squadrn.exe" self-install "$root\rel1" --alias sx
 Check ($LASTEXITCODE -eq 0) "self-install 1.0.0"
-Check (Test-Path "$bin\squadrn.exe") "squadrn.exe copy in .local\bin"
+Check (Test-Path "$bin\srn.exe") "srn.exe copy in .local\bin"
+Check (-not (Test-Path "$bin\squadrn.exe")) "no squadrn.exe: --alias replaces the default alias"
 Check (Test-Path "$bin\sx.exe") "alias sx.exe"
-Check ((& "$bin\squadrn.exe" version) -eq "squadrn 1.0.0") "version through the copy"
+Check ((& "$bin\srn.exe" version) -eq "squadrn 1.0.0") "version through the copy"
 Check (Test-Path "$data\git-hooks\pre-push") "git hook shims"
 Check ((Get-Content "$data\plugin\hooks\hooks.json" -Raw) -match "cmd.exe") "windows hooks.json installed"
 
@@ -46,21 +47,21 @@ Check ($out -match '"permissionDecision":"ask"') "guard asks on Invoke-Expressio
 
 # Reinstall while the installed command runs: it reads the hook payload from a pipe that stays
 # open for about 15 seconds, like a long tool call.
-$running = Start-Process -FilePath "cmd.exe" -ArgumentList "/d", "/c", "ping -n 15 127.0.0.1 | `"$bin\squadrn.exe`" hook guard-git" -PassThru -WindowStyle Hidden
+$running = Start-Process -FilePath "cmd.exe" -ArgumentList "/d", "/c", "ping -n 15 127.0.0.1 | `"$bin\srn.exe`" hook guard-git" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 2
 & "$root\rel2\squadrn.exe" self-install "$root\rel2"
 Check ($LASTEXITCODE -eq 0) "self-install 1.1.0 while 1.0.0 runs"
-Check ((& "$bin\squadrn.exe" version) -eq "squadrn 1.1.0") "command copy updated"
+Check ((& "$bin\srn.exe" version) -eq "squadrn 1.1.0") "command copy updated"
 Check (-not $running.HasExited) "the old command was still running during the update"
 $running.WaitForExit(30000) | Out-Null
 
-& "$bin\squadrn.exe" self-update --rollback
+& "$bin\srn.exe" self-update --rollback
 Check ($LASTEXITCODE -eq 0) "rollback"
-Check ((& "$bin\squadrn.exe" version) -eq "squadrn 1.0.0") "rolled back to 1.0.0"
+Check ((& "$bin\srn.exe" version) -eq "squadrn 1.0.0") "rolled back to 1.0.0"
 
-& "$bin\squadrn.exe" self-uninstall --yes --purge
+& "$bin\srn.exe" self-uninstall --yes --purge
 Check ($LASTEXITCODE -eq 0) "self-uninstall"
 Start-Sleep -Seconds 6
-Check (-not (Test-Path "$bin\squadrn.exe")) "command removed"
+Check (-not (Test-Path "$bin\srn.exe")) "command removed"
 Check (-not (Test-Path $data)) "data dir removed (after exit)"
 Write-Host "windows e2e passed"
