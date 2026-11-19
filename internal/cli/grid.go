@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -21,16 +20,6 @@ import (
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/worktree"
 )
-
-func (a *app) requireTmux(what string) error {
-	if runtime.GOOS == "windows" {
-		return fmt.Errorf("%s is not available on Windows: it runs agents in tmux panes; start each agent in its own terminal with: %s wt <name>", what, a.cmd)
-	}
-	if _, err := exec.LookPath("tmux"); err != nil {
-		return fmt.Errorf("tmux is required for %s", what)
-	}
-	return nil
-}
 
 func (a *app) gridCmd() *cobra.Command {
 	var spread bool
@@ -339,7 +328,7 @@ func (a *app) psCmd() *cobra.Command {
 
 // panes lists agent panes of root's grid; none when tmux is missing or no grid runs.
 func (a *app) panes(root string) []grid.Pane {
-	if exec.Command("tmux", "-V").Run() != nil {
+	if !hasTmux() {
 		return nil
 	}
 	ctx := context.Background()
@@ -368,7 +357,7 @@ func (a *app) paneIn(dir, key string) string {
 
 // anyPane returns a pane of any grid running as account label.
 func (a *app) anyPane(label string) string {
-	if exec.Command("tmux", "-V").Run() != nil {
+	if !hasTmux() {
 		return ""
 	}
 	panes, _ := grid.Tmux{}.Panes(context.Background(), "")

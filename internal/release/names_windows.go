@@ -42,6 +42,14 @@ func executableName(name string) string {
 	return name + ".exe"
 }
 
+// CommandName is the command a file in the bin dir provides (sqd.exe → sqd).
+func CommandName(file string) string {
+	if strings.EqualFold(filepath.Ext(file), ".exe") {
+		return file[:len(file)-len(".exe")]
+	}
+	return file
+}
+
 func exe(dir, name string) string { return filepath.Join(dir, executableName(name)) }
 
 // LinkCommands installs every name in names as a copy of the binary in BinDir (replacing older

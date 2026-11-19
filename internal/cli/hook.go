@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -288,30 +287,11 @@ func (h hookEnv) notify(title string) {
 
 // desktopNotify shows a desktop notification where the platform has a notifier; best effort.
 func desktopNotify(title, body string) {
-	argv := notifyCommand(runtime.GOOS, title, body)
+	argv := notifyCommand(title, body)
 	if argv == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, _ = proc.Output(ctx, proc.Options{}, argv[0], argv[1:]...)
-}
-
-// notifyCommand passes text as arguments, never as script source, so titles cannot inject code.
-func notifyCommand(goos, title, body string) []string {
-	switch goos {
-	case "darwin":
-		return []string{
-			"osascript",
-			"-e", "on run argv",
-			"-e", `display notification (item 2 of argv) with title (item 1 of argv) sound name "Glass"`,
-			"-e", "end run",
-			title, body,
-		}
-	case "linux":
-		if path, err := exec.LookPath("notify-send"); err == nil {
-			return []string{path, "--app-name=Claude", title, body}
-		}
-	}
-	return nil
 }

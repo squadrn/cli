@@ -17,6 +17,9 @@ const BinaryName = "squadrn"
 // executableName is the file name of command name in the bin dir.
 func executableName(name string) string { return name }
 
+// CommandName is the command a file in the bin dir provides.
+func CommandName(file string) string { return file }
+
 // LinkCommands makes every name in names a link to the binary in BinDir and removes links to the
 // binary whose name is no longer wanted. A file that is not such a link is moved aside instead
 // of overwritten.
