@@ -67,7 +67,7 @@ type Account struct {
 func (a Account) IsMain() bool { return a.Name == Main }
 
 // Label is how the account is shown and can be typed: claude/personal.
-func (a Account) Label() string { return a.Provider + "/" + a.Name }
+func (a Account) Label() string { return a.String() }
 
 // ConfigDir is the value for Spec.ConfigEnv; "" for main, which must run with it unset.
 func (a Account) ConfigDir() string {
@@ -108,9 +108,6 @@ type Store struct {
 	DefaultProvider string
 	// Providers overrides the registry (tests); nil means provider.All().
 	Providers []provider.Spec
-	// HasPlugin reports whether the squadrn plugin is installed in a config dir. Dirs squadrn
-	// provisioned before it wrote Marker are recognised by it; nil adopts nothing.
-	HasPlugin func(spec provider.Spec, dir string) bool
 }
 
 // Marker marks a config dir as an account squadrn manages. Other tools use the same naming
@@ -148,8 +145,8 @@ func NewStore() (Store, error) {
 // MainDir is the main account dir of a provider (~/.claude for claude).
 func (s Store) MainDir(spec provider.Spec) string { return filepath.Join(s.Home, spec.MainDir) }
 
-// MCPConfig is the provider's main-account file holding user-scope MCP servers.
-func (s Store) MCPConfig(spec provider.Spec) string { return filepath.Join(s.Home, spec.MCPConfig) }
+// mcpConfig is the provider's main-account file holding user-scope MCP servers.
+func (s Store) mcpConfig(spec provider.Spec) string { return filepath.Join(s.Home, spec.MCPConfig) }
 
 func (s Store) account(spec provider.Spec, name string) Account {
 	dir := filepath.Join(s.Home, spec.DirPrefix+name)
@@ -160,19 +157,12 @@ func (s Store) account(spec provider.Spec, name string) Account {
 }
 
 // exists: the default provider's main always exists; another main needs its dir; every other
-// account needs its dir with Marker (written now for dirs squadrn provisioned before markers).
+// account needs its dir with Marker.
 func (s Store) exists(a Account) bool {
-	switch {
-	case a.IsMain():
+	if a.IsMain() {
 		return a.Provider == s.defaultProvider() || isDir(a.Dir)
-	case !isDir(a.Dir):
-		return false
-	case isFile(filepath.Join(a.Dir, Marker)):
-		return true
-	case s.HasPlugin != nil && s.HasPlugin(a.Spec, a.Dir):
-		return Mark(a) == nil
 	}
-	return false
+	return isDir(a.Dir) && isFile(filepath.Join(a.Dir, Marker))
 }
 
 // Mark records a's dir as managed by squadrn.
@@ -182,9 +172,6 @@ func Mark(a Account) error {
 	}
 	return fsx.WriteBytes(filepath.Join(a.Dir, Marker), []byte("This directory is an account managed by Squadrn.\n"), 0o600)
 }
-
-// ErrUnmanaged means a dir is named like an account but squadrn did not create it.
-var ErrUnmanaged = errors.New("not a squadrn account")
 
 // Unmanaged lists dirs named like accounts (~/.claude-<name>) that are not accounts: created by
 // another tool, or by hand. Adopt turns one into an account.
@@ -387,12 +374,6 @@ func (s Store) Rename(a Account, newName string) (Account, error) {
 		return Account{}, err
 	}
 	return to, nil
-}
-
-// TrashDir is ~/.Trash on macOS and the freedesktop trash's files dir elsewhere.
-func TrashDir(home string) string {
-	files, _ := trashDirs(home)
-	return files
 }
 
 // trashDirs returns where trashed files go and, for the freedesktop trash, where their

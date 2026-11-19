@@ -6,7 +6,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/proc"
@@ -83,7 +82,6 @@ func parseConfigList(out []byte) map[string][]string {
 // factsCache memoises Facts per directory within one decision.
 type factsCache struct {
 	git Git
-	mu  sync.Mutex
 	m   map[string]factsResult
 }
 
@@ -97,8 +95,6 @@ func newFactsCache(g Git) *factsCache {
 }
 
 func (c *factsCache) get(ctx context.Context, dir string) (Facts, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if r, ok := c.m[dir]; ok {
 		return r.f, r.err
 	}
@@ -110,14 +106,14 @@ func (c *factsCache) get(ctx context.Context, dir string) (Facts, error) {
 	return f, err
 }
 
-// RepoConfigKey lets a repository add protected branches without committing a file.
-const RepoConfigKey = config.Slug + ".protectedBranches"
+// repoConfigKey lets a repository add protected branches without committing a file.
+const repoConfigKey = config.Slug + ".protectedBranches"
 
 // protectedSet combines the user's list with branches a repository adds. A repository can only
 // add: an agent writing `git config squadrn.protectedBranches none` must not unprotect main.
 func protectedSet(user []string, f Facts) branchMatcher {
 	globs := append([]string(nil), user...)
-	for _, v := range f.Config[strings.ToLower(RepoConfigKey)] {
+	for _, v := range f.Config[strings.ToLower(repoConfigKey)] {
 		globs = append(globs, splitList(v)...)
 	}
 	return newBranchMatcher(globs)

@@ -31,10 +31,10 @@ func (f *fakeRunner) Output(ctx context.Context, configDir string, args ...strin
 
 func TestEnvSetsAndUnsetsConfigDir(t *testing.T) {
 	base := []string{"PATH=/bin", "CLAUDE_CONFIG_DIR=/old"}
-	if got := Env(base, ""); !slices.Equal(got, []string{"PATH=/bin"}) {
+	if got := withConfigDir(base, ""); !slices.Equal(got, []string{"PATH=/bin"}) {
 		t.Errorf("main account env = %v", got)
 	}
-	if got := Env(base, "/h/.claude-p"); !slices.Equal(got, []string{"PATH=/bin", "CLAUDE_CONFIG_DIR=/h/.claude-p"}) {
+	if got := withConfigDir(base, "/h/.claude-p"); !slices.Equal(got, []string{"PATH=/bin", "CLAUDE_CONFIG_DIR=/h/.claude-p"}) {
 		t.Errorf("named account env = %v", got)
 	}
 }
@@ -43,7 +43,7 @@ func TestAuthTrustsStdoutOnNonZeroExit(t *testing.T) {
 	r := &fakeRunner{reply: func(string, []string) ([]byte, error) {
 		return []byte(`{"loggedIn":false}`), errors.New("exit status 1")
 	}}
-	s, err := Auth(context.Background(), r, "/x")
+	s, err := auth(context.Background(), r, "/x")
 	if err != nil || s.LoggedIn {
 		t.Fatalf("got %+v, %v", s, err)
 	}
@@ -51,7 +51,7 @@ func TestAuthTrustsStdoutOnNonZeroExit(t *testing.T) {
 
 func TestAuthFailsWithoutOutput(t *testing.T) {
 	r := &fakeRunner{reply: func(string, []string) ([]byte, error) { return nil, errors.New("boom") }}
-	if _, err := Auth(context.Background(), r, "/x"); err == nil || !strings.Contains(err.Error(), "boom") {
+	if _, err := auth(context.Background(), r, "/x"); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -100,28 +100,5 @@ func TestRelocate(t *testing.T) {
 	b, _ := os.ReadFile(f)
 	if want := doc(newDir); string(b) != want {
 		t.Fatalf("relocated:\n%s\nwant\n%s", b, want)
-	}
-}
-
-func TestHasPlugin(t *testing.T) {
-	dir := t.TempDir()
-	if HasPlugin(dir, "squadrn@squadrn") {
-		t.Fatal("no registry: installed")
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "plugins"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	reg := filepath.Join(dir, "plugins", "installed_plugins.json")
-	for body, want := range map[string]bool{
-		`{"version":2,"plugins":{"squadrn@squadrn":[{"scope":"user"}]}}`: true,
-		`{"version":2,"plugins":{"other@x":[]}}`:                         false,
-		`not json`:                                                       false,
-	} {
-		if err := os.WriteFile(reg, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if got := HasPlugin(dir, "squadrn@squadrn"); got != want {
-			t.Errorf("%s: %v", body, got)
-		}
 	}
 }

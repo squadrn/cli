@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/squadrn/squadrn/internal/config"
 )
 
 func TestGitHub(t *testing.T) {
@@ -50,7 +52,7 @@ func TestGitHub(t *testing.T) {
 	g := GitHub{API: srv.URL, Token: "tok"}
 
 	rels, err := anon.Releases(ctx, "o/r")
-	if err != nil || len(rels) != 3 || Newest(rels, Stable) != "v1.0.0" || Newest(rels, Beta) != "v2.0.0-rc.1" {
+	if err != nil || len(rels) != 3 || Newest(rels, config.Stable) != "v1.0.0" || Newest(rels, config.Beta) != "v2.0.0-rc.1" {
 		t.Fatalf("Releases = %+v, %v", rels, err)
 	}
 	rel, err := anon.Release(ctx, "o/r", "v1.0.0")
@@ -71,7 +73,7 @@ func TestGitHub(t *testing.T) {
 	if _, err := g.Release(ctx, "o/limited", "v1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing tag, list failing: %v", err)
 	}
-	if _, err := g.Releases(ctx, "o/limited"); !errors.Is(err, ErrRateLimited) || !strings.Contains(err.Error(), "GH_TOKEN") {
+	if _, err := g.Releases(ctx, "o/limited"); !errors.Is(err, errRateLimited) || !strings.Contains(err.Error(), "GH_TOKEN") {
 		t.Fatalf("rate limited: %v", err)
 	}
 	if _, err := g.Releases(ctx, "o/broken"); err == nil || !strings.Contains(err.Error(), "unexpected answer") {

@@ -33,8 +33,6 @@ type Entry struct {
 	Started string `json:"started,omitempty"`
 	// Account is the account label the session runs as, e.g. claude/personal.
 	Account string `json:"account,omitempty"`
-	// Exe is the squadrn binary that started the session.
-	Exe string `json:"exe,omitempty"`
 	// Worktree names the agent worktree the session works in when it is recorded in the
 	// repository root because the worktree did not exist yet (wt <name> creates it).
 	Worktree string `json:"worktree,omitempty"`
@@ -44,15 +42,12 @@ func entryPath(dir, reg string, pid int) string {
 	return filepath.Join(dir, reg, strconv.Itoa(pid)+".json")
 }
 
-// Acquire records the current process in dir, dropping stale entries first. PID, Started and
-// Exe are filled in; e supplies Account and Worktree.
+// Acquire records the current process in dir, dropping stale entries first. PID and Started are
+// filled in; e supplies Account and Worktree.
 func Acquire(dir string, e Entry) error {
 	Active(dir)
 	e.PID = os.Getpid()
 	e.Started = startTime(e.PID)
-	if exe, err := os.Executable(); err == nil {
-		e.Exe = exe
-	}
 	b, err := json.Marshal(e)
 	if err != nil {
 		return err

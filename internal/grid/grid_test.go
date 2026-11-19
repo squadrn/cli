@@ -64,7 +64,7 @@ func TestSessionName(t *testing.T) {
 		"/x/next.js-app":    "ai-next-js-app",
 		"/x/a:b c":          "ai-a-b-c",
 	} {
-		if got := SessionName("ai", root); got != want {
+		if got := sessionName("ai", root); got != want {
 			t.Errorf("SessionName(%q) = %q, want %q", root, got, want)
 		}
 	}

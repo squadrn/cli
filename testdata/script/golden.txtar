@@ -1,5 +1,5 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
-# Golden outputs for macOS and Linux (ADR 0008: behaviour frozen across the Windows work).
+# Golden outputs pin macOS/Linux behaviour (ADR 0008).
 # After an intended change: go test ./internal/cli -run TestScript/golden -update, then review.
 
 # Help of every command.

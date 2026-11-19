@@ -19,7 +19,7 @@ func TestParseStatusLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Session != "abc" || s.Cwd != "/r" || s.Source != "statusline" || !s.ObservedAt.Equal(now) {
+	if s.Session != "abc" || s.Cwd != "/r" || !s.ObservedAt.Equal(now) {
 		t.Fatalf("meta = %+v", s)
 	}
 	if s.Five == nil || s.Five.UsedPct != 42.5 || !s.Five.ResetsAt.Equal(time.Unix(1800003600, 0)) {
@@ -54,7 +54,7 @@ func TestParseStopFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := f.Observation
-	if !f.Limited || f.Details != "429 Too Many Requests" || o.LimitedSession != "s1" || o.LimitedCwd != "/r" || !o.LimitedAt.Equal(now) || o.Source != "stopfailure" {
+	if !f.Limited || f.Details != "429 Too Many Requests" || o.LimitedSession != "s1" || o.LimitedCwd != "/r" || !o.LimitedAt.Equal(now) {
 		t.Fatalf("failure = %+v", f)
 	}
 	if want := time.Date(2026, 11, 18, 15, 45, 0, 0, loc); !o.ResetEstimate.Equal(want) {

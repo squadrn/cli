@@ -30,12 +30,7 @@ import (
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
 // test binary replaces it, so script tests can sign their own fake releases.
-var buildSigners = func() string {
-	if release.HasSigners() {
-		return release.Signers()
-	}
-	return ""
-}
+var buildSigners = release.Signers
 
 // Version is set at build time with -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=…".
 var Version = "dev"
@@ -164,13 +159,6 @@ func newStore(cfg config.Config, cfgErr error) (account.Store, error) {
 	}
 	if cfgErr == nil {
 		store.DefaultProvider = cfg.DefaultProvider
-	}
-	// Accounts provisioned before account markers carry squadrn's plugin.
-	store.HasPlugin = func(spec provider.Spec, dir string) bool {
-		if spec.ID != provider.Claude.ID {
-			return false
-		}
-		return claude.HasPlugin(dir, account.PluginID)
 	}
 	return store, nil
 }

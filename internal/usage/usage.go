@@ -32,10 +32,9 @@ type Spend struct {
 	Period   string    `json:"period,omitempty"`
 }
 
-// Snapshot is what is known about one account. An observation is a Snapshot too: Merge folds
+// Snapshot is what is known about one account. An observation is a Snapshot too: merge folds
 // it into the stored one.
 type Snapshot struct {
-	Account    string    `json:"account"`
 	Five       *Window   `json:"five_hour,omitempty"`
 	Seven      *Window   `json:"seven_day,omitempty"`
 	Spend      *Spend    `json:"spend,omitempty"`
@@ -49,7 +48,6 @@ type Snapshot struct {
 	LimitedCwd     string    `json:"limited_cwd,omitempty"`
 	// ResetEstimate is when that limit lifts, as far as is known.
 	ResetEstimate time.Time `json:"reset_estimate,omitzero"`
-	Source        string    `json:"source,omitempty"`
 }
 
 type State string
@@ -128,18 +126,15 @@ func (s Snapshot) Effective(now time.Time) State {
 	return OK
 }
 
-// Merge folds the observation obs into the stored snapshot old. The newer observation's windows
+// merge folds the observation obs into the stored snapshot old. The newer observation's windows
 // win; an older one only fills windows the newer lacks and that have not reset. A limit stays
 // recorded until a later observation shows every reported window below 100%.
-func Merge(old, obs Snapshot) Snapshot {
+func merge(old, obs Snapshot) Snapshot {
 	newer, older := obs, old
 	if obs.ObservedAt.Before(old.ObservedAt) {
 		newer, older = old, obs
 	}
 	m := newer
-	if m.Account == "" {
-		m.Account = older.Account
-	}
 	if m.Five == nil && live(older.Five, newer.ObservedAt) {
 		m.Five = older.Five
 	}
@@ -151,9 +146,6 @@ func Merge(old, obs Snapshot) Snapshot {
 	}
 	if m.Session == "" {
 		m.Session, m.Cwd = older.Session, older.Cwd
-	}
-	if m.Source == "" {
-		m.Source = older.Source
 	}
 	lim := old
 	if obs.LimitedAt.After(old.LimitedAt) {
@@ -181,11 +173,11 @@ func belowLimit(s Snapshot) bool {
 	return true
 }
 
-// SameValues reports whether two snapshots differ only in when they were observed.
-func SameValues(a, b Snapshot) bool {
+// sameValues reports whether two snapshots differ only in when they were observed.
+func sameValues(a, b Snapshot) bool {
 	a.ObservedAt, b.ObservedAt = time.Time{}, time.Time{}
 	return equalWindow(a.Five, b.Five) && equalWindow(a.Seven, b.Seven) && equalSpend(a.Spend, b.Spend) &&
-		a.Account == b.Account && a.Session == b.Session && a.Cwd == b.Cwd && a.Source == b.Source &&
+		a.Session == b.Session && a.Cwd == b.Cwd &&
 		a.LimitedAt.Equal(b.LimitedAt) && a.LimitedSession == b.LimitedSession && a.LimitedCwd == b.LimitedCwd &&
 		a.ResetEstimate.Equal(b.ResetEstimate)
 }
@@ -216,7 +208,6 @@ func equalFloat(a, b *float64) bool {
 type Candidate struct {
 	Account  string
 	Provider string
-	Org      string
 	LoggedIn bool
 	// Metered: billed per use (API key), so it has no subscription limits.
 	Metered bool
@@ -238,11 +229,6 @@ func (c Candidate) State(now time.Time) State {
 	return c.Snapshot.Effective(now)
 }
 
-type RankOptions struct {
-	// SameOrgOnly drops accounts of another organisation than the one swapped from.
-	SameOrgOnly bool
-}
-
 func group(s State) int {
 	switch s {
 	case Reset, OK:
@@ -258,7 +244,7 @@ func group(s State) int {
 // Rank orders the accounts a session on from could move to, best first. Logged-out and limited
 // accounts, from itself and other providers' accounts are dropped. When none is left, next is
 // the earliest time a limited account resets (zero if unknown).
-func Rank(cands []Candidate, from string, now time.Time, opts RankOptions) (ranked []Candidate, next time.Time) {
+func Rank(cands []Candidate, from string, now time.Time) (ranked []Candidate, next time.Time) {
 	var src *Candidate
 	for i := range cands {
 		if cands[i].Account == from {
@@ -269,7 +255,7 @@ func Rank(cands []Candidate, from string, now time.Time, opts RankOptions) (rank
 		if c.Account == from {
 			continue
 		}
-		if src != nil && (c.Provider != src.Provider || (opts.SameOrgOnly && c.Org != src.Org)) {
+		if src != nil && c.Provider != src.Provider {
 			continue
 		}
 		switch c.State(now) {

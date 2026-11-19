@@ -125,7 +125,7 @@ func (m picker) paint(code, s string) string {
 	return "\033[" + code + "m" + s + "\033[0m"
 }
 
-func (m picker) View() string {
+func (m picker) view() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s %s\n", m.paint("1", m.title), m.filter)
 	width := 0
@@ -208,7 +208,7 @@ func Pick(title string, items []Item, in io.Reader, out io.Writer, color bool) (
 	s := &screen{out: out}
 	_, _ = io.WriteString(out, "\033[?25l") // hide the cursor while the list is shown
 	defer func() { _, _ = io.WriteString(out, "\033[?25h") }()
-	s.draw(m.View())
+	s.draw(m.view())
 	buf := make([]byte, 256)
 	for {
 		n, err := in.Read(buf)
@@ -229,6 +229,6 @@ func Pick(title string, items []Item, in io.Reader, out io.Writer, color bool) (
 			return -1, fmt.Errorf("picker: %w", err)
 		}
 		measure()
-		s.draw(m.View())
+		s.draw(m.view())
 	}
 }

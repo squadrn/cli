@@ -124,7 +124,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 		rels, err := gh.Releases(ctx, repo)
 		if err != nil {
 			if o.background {
-				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel, Err: err.Error()})
+				update.Save(a.updateStatePath(), update.State{CheckedAt: a.now(), Channel: channel})
 				return nil
 			}
 			return fmt.Errorf("cannot list releases of %s: %s", repo, releaseFailure(err, repo, ""))
@@ -149,7 +149,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 	if !o.asJSON {
 		a.warnOutsideLayout()
 	}
-	current := "v" + strings.TrimPrefix(Version, "v")
+	current := release.Tag(Version)
 	cmp, comparable := release.Compare(tag, current)
 	upToDate := tag == current || (comparable && cmp == 0)
 	repair := upToDate && a.needsRepair(tag)
@@ -191,7 +191,7 @@ func (a *app) selfUpdate(o updateOptions) error {
 			return fmt.Errorf("download %s: %s", name, releaseFailure(err, repo, tag))
 		}
 	}
-	if err := a.verifyRelease(ctx, tmp, asset, repo); err != nil {
+	if err := a.verifyRelease(tmp, asset); err != nil {
 		return err
 	}
 	src := filepath.Join(tmp, "release")
@@ -261,10 +261,7 @@ func (a *app) isCommandCopy(path string) bool {
 
 // normalizeTag adds the v prefix release tags carry (1.2.0 → v1.2.0).
 func normalizeTag(tag string) string {
-	if tag == "" || strings.HasPrefix(tag, "v") {
-		return tag
-	}
-	if _, ok := release.Compare(tag, tag); ok {
+	if tag != "" && !strings.HasPrefix(tag, "v") && release.Valid(tag) {
 		return "v" + tag
 	}
 	return tag
@@ -281,9 +278,9 @@ func releaseFailure(err error, repo, tag string) string {
 	return err.Error()
 }
 
-// verifyRelease checks, in order: the signature of checksums.txt against the keys built into
-// this binary, the archive's checksum, and GitHub build provenance where it exists.
-func (a *app) verifyRelease(ctx context.Context, dir, asset, repo string) error {
+// verifyRelease checks the signature of checksums.txt against the keys built into this binary,
+// then the archive's checksum.
+func (a *app) verifyRelease(dir, asset string) error {
 	sums, err := os.ReadFile(filepath.Join(dir, release.ChecksumsName))
 	if err != nil {
 		return err
@@ -299,11 +296,7 @@ func (a *app) verifyRelease(ctx context.Context, dir, asset, repo string) error 
 	default:
 		a.out("verified release signature\n")
 	}
-	archive := filepath.Join(dir, asset)
-	if err := release.VerifyChecksum(filepath.Join(dir, release.ChecksumsName), archive); err != nil {
-		return err
-	}
-	return a.verifyAttestation(ctx, archive, repo)
+	return release.VerifyChecksum(filepath.Join(dir, release.ChecksumsName), filepath.Join(dir, asset))
 }
 
 // releaseNotes indents the first max lines of a release body.
@@ -326,30 +319,6 @@ func (a *app) rollback() error {
 	}
 	a.out("rolling back v%s → v%s\n", strings.TrimPrefix(a.layout.Version(), "v"), version)
 	return a.installRelease(prev, version, nameChoice{})
-}
-
-// verifyAttestation checks the build provenance GitHub attached to the archive, as an extra
-// when gh is installed; the signature is what installs rely on.
-func (a *app) verifyAttestation(ctx context.Context, archive, repo string) error {
-	bin, _ := exec.LookPath("gh")
-	if bin == "" {
-		return nil
-	}
-	owner, _, _ := strings.Cut(repo, "/")
-	out, err := proc.Output(ctx, proc.Options{}, bin, "attestation", "verify", archive, "--owner", owner)
-	if err == nil {
-		a.out("verified build provenance of %s\n", filepath.Base(archive))
-		return nil
-	}
-	msg := err.Error() + " " + string(out)
-	if strings.Contains(msg, "no attestations found") || strings.Contains(msg, "unknown command") || strings.Contains(msg, "HTTP 404") ||
-		strings.Contains(msg, "HTTP 403") || strings.Contains(msg, "gh auth login") || strings.Contains(msg, "not logged") {
-		if a.signers == "" {
-			a.warnf("%s has no build attestation; verified by checksum only", filepath.Base(archive))
-		}
-		return nil
-	}
-	return fmt.Errorf("build provenance check failed for %s: %w", filepath.Base(archive), err)
 }
 
 // nameChoice is what the user asked for at install; empty fields keep the configured names.
@@ -464,7 +433,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	beta := nc.selfInstall && cfg.UpdateChannel == "" && release.Prerelease(version)
 	if beta {
-		cfg.UpdateChannel = update.Beta
+		cfg.UpdateChannel = config.Beta
 	}
 	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
@@ -484,7 +453,7 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	}
 	a.installPlugins()
 	// An update must never be blocked by Git (that would strand users on old releases); say it.
-	if err := gitver.Require(context.Background(), runtime.GOOS); err != nil {
+	if err := gitver.Require(context.Background()); err != nil {
 		a.warnf("%v", err)
 	}
 	if !onPATH(a.layout.BinDir) {

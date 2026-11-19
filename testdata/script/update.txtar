@@ -11,7 +11,6 @@ stdout 'linked ~/.local/bin/sx'
 stdout 'claude/main: plugin installed'
 stdout 'claude/personal: plugin installed'
 stdout 'next: ai doctor'
-! stdout 'migrated'
 exists home/.local/share/squadrn/plugin/bin/squadrn-hook
 grep '"version": "dev"' home/.local/share/squadrn/plugin/.claude-plugin/plugin.json
 grep '^command = "ai"' home/.config/squadrn/config.toml
@@ -77,7 +76,7 @@ exitcode 2 squadrn self-update
 stderr 'no release repository configured; pass --repo owner/name'
 
 # A published release, served by a fake GitHub API ($SQUADRN_TEST_API): archive for this
-# platform plus checksums. No gh needed; a fake one only answers attestation and auth queries.
+# platform plus checksums. No gh needed; a fake one only answers auth queries.
 env SQUADRN_REPO=me/squadrn
 env COPYFILE_DISABLE=1
 exec sh -c 'os=$(uname -s | tr A-Z a-z); case $(uname -m) in x86_64|amd64) arch=amd64;; *) arch=arm64;; esac; mkdir -p pub && tar -czf "pub/squadrn_9.9.9_${os}_${arch}.tar.gz" -C rel . && cd pub && (sha256sum * 2>/dev/null || shasum -a 256 *) > checksums.txt'
@@ -241,7 +240,6 @@ env SQUADRN_TEST_VERSION=
 #!/bin/sh
 case "$1 $2" in
   "auth token") echo from-gh ;;
-  "attestation verify") echo "Error: no attestations found for subject" >&2; exit 1 ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
 -- releases.json --

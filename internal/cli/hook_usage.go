@@ -104,7 +104,6 @@ func (h hookEnv) recordStatus(raw []byte) (name string, snap usage.Snapshot) {
 	if !ok {
 		return "", snap
 	}
-	obs.Account = acct.Label()
 	if merged, _, err := usageStore(store.Home).Record(acct.Provider, acct.Name, obs); err == nil {
 		snap = merged
 	}
@@ -160,7 +159,6 @@ func (h hookEnv) recordLimit(raw []byte) (msg string) {
 	snap := f.Observation
 	if acct, ok := hookAccount(store, provider.Claude); ok {
 		label = acct.Label()
-		snap.Account = label
 		us := usageStore(store.Home)
 		if snap.ResetEstimate.IsZero() {
 			if old, ok, _ := us.Load(acct.Provider, acct.Name); ok && old.Five != nil && old.Five.ResetsAt.After(now) {

@@ -170,7 +170,7 @@ func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
 	if len(p.SharedMCP) == 0 || !a.Spec.Caps.SharedMCP {
 		return nil
 	}
-	servers, err := readMCPServers(p.Store.MCPConfig(a.Spec))
+	servers, err := readMCPServers(p.Store.mcpConfig(a.Spec))
 	if err != nil {
 		return err
 	}

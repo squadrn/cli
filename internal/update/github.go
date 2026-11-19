@@ -21,7 +21,7 @@ const DefaultAPI = "https://api.github.com"
 
 var (
 	ErrNotFound    = errors.New("not found")
-	ErrRateLimited = errors.New("GitHub API rate limit reached")
+	errRateLimited = errors.New("GitHub API rate limit reached")
 )
 
 // GitHub reads releases through the REST API. The zero value uses DefaultAPI without a token
@@ -40,8 +40,8 @@ type Asset struct {
 	APIURL string `json:"url"`
 }
 
-// ReleaseInfo is a release as the API describes it.
-type ReleaseInfo struct {
+// Release is one published release as the API describes it.
+type Release struct {
 	Tag        string  `json:"tag_name"`
 	Prerelease bool    `json:"prerelease"`
 	Draft      bool    `json:"draft"`
@@ -50,7 +50,7 @@ type ReleaseInfo struct {
 }
 
 // Asset returns the asset called name; ok is false when the release has none.
-func (r ReleaseInfo) Asset(name string) (Asset, bool) {
+func (r Release) Asset(name string) (Asset, bool) {
 	for _, a := range r.Assets {
 		if a.Name == name {
 			return a, true
@@ -75,32 +75,20 @@ func (g GitHub) api() string {
 
 // Releases lists the newest releases of repo (owner/name).
 func (g GitHub) Releases(ctx context.Context, repo string) ([]Release, error) {
-	list, err := g.list(ctx, repo)
-	if err != nil {
-		return nil, err
-	}
-	rels := make([]Release, len(list))
-	for i, r := range list {
-		rels[i] = Release{Tag: r.Tag, Prerelease: r.Prerelease, Draft: r.Draft}
-	}
-	return rels, nil
-}
-
-func (g GitHub) list(ctx context.Context, repo string) ([]ReleaseInfo, error) {
-	var list []ReleaseInfo
+	var list []Release
 	err := g.getJSON(ctx, "/repos/"+repo+"/releases?per_page=50", &list)
 	return list, err
 }
 
 // Release looks up one release of repo by tag. A draft is only listed, and only to a token
 // with push access (the release workflow tests its drafts this way).
-func (g GitHub) Release(ctx context.Context, repo, tag string) (ReleaseInfo, error) {
-	var r ReleaseInfo
+func (g GitHub) Release(ctx context.Context, repo, tag string) (Release, error) {
+	var r Release
 	err := g.getJSON(ctx, "/repos/"+repo+"/releases/tags/"+url.PathEscape(tag), &r)
 	if !errors.Is(err, ErrNotFound) || g.Token == "" {
 		return r, err
 	}
-	list, lerr := g.list(ctx, repo)
+	list, lerr := g.Releases(ctx, repo)
 	if lerr != nil {
 		return r, err
 	}
@@ -185,7 +173,7 @@ func statusError(resp *http.Response) error {
 				msg = " until " + time.Unix(unix, 0).Format("15:04")
 			}
 		}
-		return fmt.Errorf("%w%s (set GH_TOKEN or GITHUB_TOKEN to raise it)", ErrRateLimited, msg)
+		return fmt.Errorf("%w%s (set GH_TOKEN or GITHUB_TOKEN to raise it)", errRateLimited, msg)
 	}
 	return fmt.Errorf("%s: HTTP %d", resp.Request.URL.Host, resp.StatusCode)
 }

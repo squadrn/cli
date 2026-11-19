@@ -9,7 +9,7 @@ func isRunnable(_ string, fi fs.FileInfo) bool {
 	return !fi.IsDir() && fi.Mode().Perm()&0o111 != 0
 }
 
-// hookCommand runs the hook file directly; its #! line picks the interpreter.
-func hookCommand(path string, args []string) (string, []string) {
+// HookCommand runs the hook file directly; its #! line picks the interpreter.
+func HookCommand(path string, args []string) (string, []string) {
 	return path, args
 }

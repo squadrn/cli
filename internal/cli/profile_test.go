@@ -7,7 +7,7 @@ func TestWithoutProfileLines(t *testing.T) {
 	if got := profileLine(c); got != `if (Test-Path 'C:\Users\o''neil\.local\share\squadrn\completion.ps1') { . 'C:\Users\o''neil\.local\share\squadrn\completion.ps1' }` {
 		t.Fatalf("profileLine = %s", got)
 	}
-	in := "Import-Module posh-git\r\n" + `. "` + c + `"` + "\r\n" + profileLine(c) + "\n" +
+	in := "Import-Module posh-git\r\n" + profileLine(c) + "\n" +
 		`. "C:\elsewhere\completion.ps1"` + "\r\n# end"
 	got, removed := withoutProfileLines(in, c)
 	if want := "Import-Module posh-git\r\n" + `. "C:\elsewhere\completion.ps1"` + "\r\n# end"; !removed || got != want {

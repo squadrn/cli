@@ -10,9 +10,9 @@ import (
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
-// Auth reads `claude auth status`. Logged-out accounts print valid JSON but exit non-zero,
+// auth reads `claude auth status`. Logged-out accounts print valid JSON but exit non-zero,
 // so stdout is trusted whenever it is present.
-func Auth(ctx context.Context, r provider.Runner, configDir string) (provider.AuthStatus, error) {
+func auth(ctx context.Context, r provider.Runner, configDir string) (provider.AuthStatus, error) {
 	out, err := r.Output(ctx, configDir, "auth", "status")
 	if len(bytes.TrimSpace(out)) == 0 {
 		if err == nil {

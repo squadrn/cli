@@ -10,7 +10,6 @@ import (
 type pushOpt struct {
 	name     string
 	takesArg bool // the value may follow as the next word
-	optional bool // --opt or --opt=value
 	verdict  Verdict
 	reason   string
 	isDelete bool
@@ -25,7 +24,7 @@ var pushOpts = []pushOpt{
 	{name: "mirror", verdict: Deny, reason: "--mirror overwrites and deletes remote refs"},
 	{name: "prune", verdict: Deny, reason: "--prune can delete remote branches, including protected ones"},
 	{name: "force", verdict: Deny, reason: "force push is not allowed"},
-	{name: "force-with-lease", optional: true, verdict: Deny, reason: "force push is not allowed"},
+	{name: "force-with-lease", verdict: Deny, reason: "force push is not allowed"},
 	{name: "force-if-includes", verdict: Deny, reason: "force push is not allowed"},
 	{name: "no-verify", verdict: Deny, reason: "--no-verify skips the git-level guard and repository hooks"},
 	{name: "receive-pack", takesArg: true, verdict: Ask, reason: "a custom --receive-pack program can do anything on the remote"},
@@ -34,7 +33,7 @@ var pushOpts = []pushOpt{
 	{name: "repo", takesArg: true, isRepo: true},
 	{name: "push-option", takesArg: true},
 	{name: "recurse-submodules", takesArg: true},
-	{name: "signed", optional: true},
+	{name: "signed"},
 	{name: "tags"},
 	{name: "follow-tags"},
 	{name: "dry-run"},
@@ -103,7 +102,7 @@ func (g Guard) decidePush(ctx context.Context, c gitCall, facts *factsCache) Dec
 }
 
 func (g Guard) judgePush(ctx context.Context, c gitCall, facts *factsCache) Decision {
-	if c.configEnv || c.overrides["\x00dynamic"] != nil {
+	if c.configEnv || c.overrides[dynamicOverride] != nil {
 		return ask("git config is injected for this push (GIT_CONFIG_*, --exec-path or a runtime -c), so its target cannot be checked")
 	}
 	if c.overrides["core.hookspath"] != nil && g.GitHooks {
@@ -140,7 +139,7 @@ func (g Guard) judgePush(ctx context.Context, c gitCall, facts *factsCache) Deci
 			case o.isRepo && i+1 < len(c.args):
 				repo = &c.args[i+1]
 				i++
-			case o.takesArg && !hasValue && !o.optional:
+			case o.takesArg && !hasValue:
 				i++
 			}
 		case strings.HasPrefix(v, "-") && len(v) > 1:
@@ -185,7 +184,7 @@ func (g Guard) judgePush(ctx context.Context, c gitCall, facts *factsCache) Deci
 	if f.NotRepo {
 		// The directory may not exist yet (`cd x; git push …` runs git in the old directory when
 		// cd fails), so explicit refspecs are still judged against the user's list.
-		return g.decideRefspecs(refs, del, f, protected, nil)
+		return decideRefspecs(refs, del, f, protected, nil)
 	}
 	cfg := c.config(f)
 	remoteName := pushRemote(cfg, remote, f)
@@ -193,9 +192,9 @@ func (g Guard) judgePush(ctx context.Context, c gitCall, facts *factsCache) Deci
 		return deny(fmt.Sprintf("remote %q is a mirror (remote.%s.mirror), so this push overwrites and deletes its refs", remoteName, remoteName))
 	}
 	if len(refs) == 0 {
-		return g.decideImplicit(cfg, remoteName, f, protected)
+		return decideImplicit(cfg, remoteName, f, protected)
 	}
-	return g.decideRefspecs(refs, del, f, protected, pushMapper(cfg, remoteName))
+	return decideRefspecs(refs, del, f, protected, pushMapper(cfg, remoteName))
 }
 
 // config looks a setting up the way git would for this call: -c overrides, then the repository.
@@ -240,11 +239,14 @@ func pushMode(cfg func(string) []string) string {
 	return "simple"
 }
 
+// mapFunc maps a refspec without a colon to the destination git would push it to.
+type mapFunc func(src string) (dst string, force, ok bool)
+
 // pushMapper maps a refspec without a colon the way git's refspec_append_mapped does: through
 // remote.<name>.push, or to the upstream branch with push.default=upstream. ok is false when
 // git pushes the ref to the same name. Names are matched loosely (heads/x, refs/heads/x), which
 // can only make the guard stricter than git.
-func pushMapper(cfg func(string) []string, remote string) func(src string) (dst string, force, ok bool) {
+func pushMapper(cfg func(string) []string, remote string) mapFunc {
 	specs := cfg("remote." + strings.ToLower(remote) + ".push")
 	mode := pushMode(cfg)
 	return func(src string) (string, bool, bool) {
@@ -292,11 +294,8 @@ func matchRefPattern(src, ref, dst string) (string, bool) {
 	return strings.Replace(dst, "*", ref[len(pre):len(ref)-len(suf)], 1), true
 }
 
-// mapFunc maps a refspec without a colon to the destination git would push it to.
-type mapFunc func(src string) (dst string, force, ok bool)
-
 // decideRefspecs judges explicit refspecs.
-func (g Guard) decideRefspecs(refs []arg, del bool, f Facts, protected branchMatcher, mapDst mapFunc) Decision {
+func decideRefspecs(refs []arg, del bool, f Facts, protected branchMatcher, mapDst mapFunc) Decision {
 	worst := allow()
 	for i := 0; i < len(refs); i++ {
 		r := refs[i]
@@ -385,13 +384,13 @@ func branchName(dst string) (string, bool) {
 
 // decideImplicit judges `git push [remote]` without refspecs from the configuration git uses:
 // remote.<r>.push, push.default and the branch's upstream.
-func (g Guard) decideImplicit(cfg func(string) []string, remoteName string, f Facts, protected branchMatcher) Decision {
+func decideImplicit(cfg func(string) []string, remoteName string, f Facts, protected branchMatcher) Decision {
 	if specs := cfg("remote." + strings.ToLower(remoteName) + ".push"); len(specs) > 0 {
 		refs := make([]arg, len(specs))
 		for i, s := range specs {
 			refs[i] = arg{val: s}
 		}
-		return g.decideRefspecs(refs, false, f, protected, nil)
+		return decideRefspecs(refs, false, f, protected, nil)
 	}
 	mode := pushMode(cfg)
 	if mode == "matching" {

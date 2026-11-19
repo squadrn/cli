@@ -12,8 +12,8 @@ import (
 // BinaryName is the executable inside a release and in the data dir.
 const BinaryName = "squadrn"
 
-// ExecutableName is the file name of command name in the bin dir.
-func ExecutableName(name string) string { return name }
+// executableName is the file name of command name in the bin dir.
+func executableName(name string) string { return name }
 
 // LinkCommands makes every name in names a link to the binary in BinDir and removes links to the
 // binary whose name is no longer wanted. A file that is not such a link is moved aside instead
@@ -23,7 +23,6 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		return res, err
 	}
-	isOurs := func(target string) bool { return target == l.Binary() }
 	want := map[string]bool{}
 	for _, n := range names {
 		want[n] = true
@@ -32,18 +31,12 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 		if err == nil && target == l.Binary() {
 			continue
 		}
-		if _, lerr := os.Lstat(link); lerr == nil {
-			if err == nil && isOurs(target) {
-				if err := os.Remove(link); err != nil {
-					return res, err
-				}
-			} else {
-				backup := link + ".bak-" + now.Format("20060102-150405")
-				if err := os.Rename(link, backup); err != nil {
-					return res, err
-				}
-				res.BackedUp = append(res.BackedUp, backup)
+		if _, err := os.Lstat(link); err == nil {
+			backup := link + ".bak-" + now.Format("20060102-150405")
+			if err := os.Rename(link, backup); err != nil {
+				return res, err
 			}
+			res.BackedUp = append(res.BackedUp, backup)
 		}
 		if err := os.Symlink(l.Binary(), link); err != nil {
 			return res, err
@@ -59,7 +52,7 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 			continue
 		}
 		link := filepath.Join(l.BinDir, e.Name())
-		if target, err := os.Readlink(link); err == nil && isOurs(target) {
+		if target, err := os.Readlink(link); err == nil && target == l.Binary() {
 			if err := os.Remove(link); err != nil {
 				return res, err
 			}

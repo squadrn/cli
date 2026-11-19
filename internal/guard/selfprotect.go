@@ -18,7 +18,7 @@ var policyKeys = []string{"protected_branches", "git_hooks"}
 func (e *extractor) self(args []arg) {
 	key := -1
 	for i, a := range args {
-		if slices.ContainsFunc(policyKeys, func(k string) bool { return strings.Contains(strings.ToLower(a.val), k) }) {
+		if slices.ContainsFunc(policyKeys, func(k string) bool { return containsFold(a.val, k) }) {
 			key = i
 			break
 		}
@@ -30,7 +30,7 @@ func (e *extractor) self(args []arg) {
 		e.flag(Deny, "agents may not change the push guard's policy ("+args[key].val+"); the user changes it in a terminal")
 		return
 	}
-	if slices.ContainsFunc(args, func(a arg) bool { return a.dynamic }) {
+	if slices.ContainsFunc(args, isDynamic) {
 		e.flag(Ask, "a squadrn command built at runtime may change the push guard's policy")
 	}
 }
@@ -147,13 +147,13 @@ func (e *extractor) fileWrite(base string, args []arg, dir string) {
 }
 
 // psRedirects judges PowerShell output redirections: > file, >> file, 2> file, *>file.
-func (e *extractor) psRedirects(words []psWord, dir string) {
+func (e *extractor) psRedirects(words []arg, dir string) {
 	for i, w := range words {
 		j := strings.LastIndex(w.val, ">")
 		if j < 0 || w.dynamic && !strings.HasPrefix(w.val, ">") {
 			continue
 		}
-		target := psWord{val: w.val[j+1:], dynamic: w.dynamic}
+		target := arg{val: w.val[j+1:], dynamic: w.dynamic}
 		if target.val == "" {
 			if i+1 >= len(words) {
 				continue
@@ -163,7 +163,7 @@ func (e *extractor) psRedirects(words []psWord, dir string) {
 		if strings.HasPrefix(target.val, "&") {
 			continue // 2>&1
 		}
-		e.writeTo(arg(target), dir)
+		e.writeTo(target, dir)
 	}
 }
 
@@ -179,9 +179,9 @@ func psFileWriter(name string) bool {
 
 // psFileWrite judges cmdlets that write, move or delete files. Copies only write their
 // destination; the others touch every path they name.
-func (e *extractor) psFileWrite(name string, words []psWord, dir string) {
-	var positional []psWord
-	var dest *psWord
+func (e *extractor) psFileWrite(name string, words []arg, dir string) {
+	var positional []arg
+	var dest *arg
 	for i := 0; i < len(words); i++ {
 		v := strings.ToLower(words[i].val)
 		switch {
@@ -204,7 +204,7 @@ func (e *extractor) psFileWrite(name string, words []psWord, dir string) {
 			dest = &positional[len(positional)-1]
 		}
 		if dest != nil {
-			e.writeTo(arg(*dest), dir)
+			e.writeTo(*dest, dir)
 		}
 		return
 	case "set-content", "sc", "add-content", "ac", "out-file", "clear-content", "clc", "tee-object", "tee":
@@ -215,7 +215,7 @@ func (e *extractor) psFileWrite(name string, words []psWord, dir string) {
 		positional = append(positional, *dest)
 	}
 	for _, p := range positional {
-		e.writeTo(arg(p), dir)
+		e.writeTo(p, dir)
 	}
 }
 

@@ -222,7 +222,7 @@ func provisionFixture(t *testing.T) (Store, Account, *fakeClaude, Provisioner) {
 	must(t, os.MkdirAll(filepath.Join(main, "agents"), 0o755))
 	must(t, os.MkdirAll(filepath.Join(main, "skills", "find-skills"), 0o755))
 	must(t, os.MkdirAll(filepath.Join(main, "skills", "synced"), 0o755))
-	must(t, os.WriteFile(s.MCPConfig(provider.Claude), []byte(`{"mcpServers":{
+	must(t, os.WriteFile(s.mcpConfig(provider.Claude), []byte(`{"mcpServers":{
 		"codegraph":{"command":"codegraph","args":["serve"]},
 		"figwright":{"command":"node","env":{}},
 		"secret":{"command":"x","env":{"TOKEN":"t"}},
@@ -353,24 +353,17 @@ func TestProvisionWithoutMarketplaceSkipsPlugin(t *testing.T) {
 	}
 }
 
-func TestMarkerAdoptAndMigration(t *testing.T) {
+func TestMarkerAdopt(t *testing.T) {
 	s := newStore(t, "mine")
 	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-tool"), 0o755)) // another tool's dir
-	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-legacy"), 0o755))
-	if s.Exists("tool") || s.Exists("legacy") {
+	must(t, os.MkdirAll(filepath.Join(s.Home, ".claude-other"), 0o755))
+	if s.Exists("tool") || s.Exists("other") {
 		t.Fatal("a dir without the marker is an account")
 	}
 	un, err := s.Unmanaged()
 	must(t, err)
-	if len(un) != 2 || un[0].Name != "legacy" || un[1].Name != "tool" {
+	if len(un) != 2 || un[0].Name != "other" || un[1].Name != "tool" {
 		t.Fatalf("Unmanaged = %+v", un)
-	}
-	// Dirs provisioned before markers carry the squadrn plugin: adopted on sight.
-	s.HasPlugin = func(_ provider.Spec, dir string) bool { return filepath.Base(dir) == ".claude-legacy" }
-	got, err := s.List()
-	must(t, err)
-	if len(got) != 3 || got[1].Name != "legacy" || !isFile(filepath.Join(s.Home, ".claude-legacy", Marker)) {
-		t.Fatalf("List = %+v", got)
 	}
 	a, err := s.Adopt("tool")
 	must(t, err)

@@ -262,9 +262,9 @@ func TestRunningSessions(t *testing.T) {
 	got := RunningSessions([]string{a, b, filepath.Join(root, "missing")}, alive)
 	var desc []string
 	for _, s := range got {
-		desc = append(desc, fmt.Sprintf("%d:%d:%s:%s:%s", s.Owner, s.PID, s.SessionID, s.Cwd, s.Status))
+		desc = append(desc, fmt.Sprintf("%d:%d:%s:%s", s.Owner, s.PID, s.SessionID, s.Cwd))
 	}
-	want := []string{"0:10:s10:/r:busy", "1:3:s3:/q:"}
+	want := []string{"0:10:s10:/r", "1:3:s3:/q"}
 	if fmt.Sprint(desc) != fmt.Sprint(want) {
 		t.Fatalf("RunningSessions = %v, want %v", desc, want)
 	}

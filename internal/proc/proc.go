@@ -29,7 +29,7 @@ type Options struct {
 // Output runs name with args and returns stdout. On failure the error carries the trimmed
 // stderr, and whatever stdout was produced is still returned (some CLIs print JSON and exit 1).
 func Output(ctx context.Context, opts Options, name string, args ...string) ([]byte, error) {
-	cmd := Command(ctx, opts, name, args...)
+	cmd := command(ctx, opts, name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := run(cmd)
@@ -47,8 +47,8 @@ func Output(ctx context.Context, opts Options, name string, args ...string) ([]b
 	return stdout.Bytes(), err
 }
 
-// Command prepares a command whose cancellation kills its whole process tree.
-func Command(ctx context.Context, opts Options, name string, args ...string) *exec.Cmd {
+// command prepares a command whose cancellation kills its whole process tree.
+func command(ctx context.Context, opts Options, name string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = opts.Dir
 	cmd.Env = opts.Env

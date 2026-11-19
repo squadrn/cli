@@ -26,9 +26,9 @@ type AuthResult struct {
 // maxConcurrentAuth bounds parallel `claude auth status` processes (each is a node runtime).
 const maxConcurrentAuth = 4
 
-// AuthAll queries every target, at most maxConcurrentAuth at a time, each bounded by timeout.
+// authAll queries every target, at most maxConcurrentAuth at a time, each bounded by timeout.
 // Results keep input order.
-func AuthAll(ctx context.Context, ag Agent, targets []Target, timeout time.Duration) []AuthResult {
+func authAll(ctx context.Context, ag Agent, targets []Target, timeout time.Duration) []AuthResult {
 	results := make([]AuthResult, len(targets))
 	sem := make(chan struct{}, maxConcurrentAuth)
 	var wg sync.WaitGroup
@@ -117,7 +117,7 @@ func (c AuthCache) Statuses(ctx context.Context, ag Agent, targets []Target, tim
 	if len(missing) == 0 {
 		return results
 	}
-	for j, res := range AuthAll(ctx, ag, missing, timeout) {
+	for j, res := range authAll(ctx, ag, missing, timeout) {
 		results[missingIdx[j]] = res
 		c.store(entries, missing[j].Key, res)
 	}
@@ -127,7 +127,7 @@ func (c AuthCache) Statuses(ctx context.Context, ag Agent, targets []Target, tim
 
 // Refresh queries every target and replaces their cache entries.
 func (c AuthCache) Refresh(ctx context.Context, ag Agent, targets []Target, timeout time.Duration) []AuthResult {
-	results := AuthAll(ctx, ag, targets, timeout)
+	results := authAll(ctx, ag, targets, timeout)
 	entries := c.read()
 	for i, res := range results {
 		c.store(entries, targets[i].Key, res)

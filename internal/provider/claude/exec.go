@@ -13,8 +13,6 @@ import (
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
-const configDirEnv = "CLAUDE_CONFIG_DIR"
-
 var _ provider.Agent = CLI{}
 
 // CLI runs the installed claude binary.
@@ -35,18 +33,19 @@ func Find() (CLI, error) {
 
 var errNotInstalled = errors.New("claude is not installed or not on PATH (https://claude.ai/install.sh)")
 
-// Env returns environ with CLAUDE_CONFIG_DIR set to configDir, or removed when configDir is "".
-// The default account must run with the variable unset: Claude Code keys its credential
-// store to the variable, so an explicit ~/.claude reads a different (empty) login.
-func Env(environ []string, configDir string) []string {
+// withConfigDir returns environ with CLAUDE_CONFIG_DIR set to configDir, or removed when
+// configDir is "". The default account must run with the variable unset: Claude Code keys its
+// credential store to the variable, so an explicit ~/.claude reads a different (empty) login.
+func withConfigDir(environ []string, configDir string) []string {
+	key := provider.Claude.ConfigEnv
 	out := make([]string, 0, len(environ)+1)
 	for _, kv := range environ {
-		if !strings.HasPrefix(kv, configDirEnv+"=") {
+		if !strings.HasPrefix(kv, key+"=") {
 			out = append(out, kv)
 		}
 	}
 	if configDir != "" {
-		out = append(out, configDirEnv+"="+configDir)
+		out = append(out, key+"="+configDir)
 	}
 	return out
 }
@@ -62,7 +61,7 @@ func (c CLI) Output(ctx context.Context, configDir string, args ...string) ([]by
 // env is environ for configDir with ExtraEnv applied; ExtraEnv entries replace inherited ones,
 // because syscall.Exec, unlike os/exec, does not drop duplicate keys.
 func (c CLI) env(configDir string) []string {
-	base := Env(os.Environ(), configDir)
+	base := withConfigDir(os.Environ(), configDir)
 	if len(c.ExtraEnv) == 0 {
 		return base
 	}
@@ -81,7 +80,7 @@ func (c CLI) env(configDir string) []string {
 }
 
 func (c CLI) Auth(ctx context.Context, configDir string) (provider.AuthStatus, error) {
-	return Auth(ctx, c, configDir)
+	return auth(ctx, c, configDir)
 }
 
 func (CLI) LoginArgs() []string  { return []string{"auth", "login"} }

@@ -102,7 +102,6 @@ func TestDecidePowerShell(t *testing.T) {
 		{Allow, "feat", `$x = 1; $x -= 1`},
 		{Allow, "feat", `cd`},
 		{Allow, "feat", `&`},
-		// Hardening 2026-11 (G1-G15).
 		{Ask, "feat", `git config alias.pp push`},
 		{Ask, "feat", `git pp origin feat-x`},
 		{Ask, "feat", `git -c core.pager=x log`},
