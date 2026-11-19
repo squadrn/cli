@@ -234,19 +234,23 @@ func (a *app) usageTable(rep usageReport) {
 	case !rep.NextReset.IsZero():
 		a.out("every account is at its limit; the first resets at %s\n", clock(rep.NextReset, now))
 	}
-	if untracked := a.untracked(rep); untracked != "" {
-		a.out("not tracked: %s (run: %s usage setup)\n", untracked, a.cmd)
+	if untracked := a.untracked(rep); len(untracked) > 0 {
+		target := "--all"
+		if len(untracked) == 1 {
+			target = untracked[0]
+		}
+		a.out("not tracked: %s (run: %s usage setup %s)\n", strings.Join(untracked, ", "), a.cmd, target)
 	}
 }
 
-func (a *app) untracked(rep usageReport) string {
+func (a *app) untracked(rep usageReport) []string {
 	var out []string
 	for _, r := range rep.Accounts {
 		if !r.Tracking && r.State != usage.NA && r.State != usage.LoggedOut {
 			out = append(out, r.Account)
 		}
 	}
-	return strings.Join(out, ", ")
+	return out
 }
 
 func (a *app) usageDetails(r usageRow, rep usageReport) {

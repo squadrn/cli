@@ -20,12 +20,12 @@ exec squadrn usage
 stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
 stdout '^claude/main +max +acme +- +- +- +- +nodata +-$'
 stdout '^claude/work +- +acme +- +- +- +- +nodata +-$'
-stdout 'not tracked: claude/main, claude/work \(run: srn usage setup\)'
+stdout 'not tracked: claude/main, claude/work \(run: srn usage setup --all\)$'
 # A logged-out account is not listed as untracked.
 rm home/.claude-work/.loggedin
 exec squadrn usage --refresh
 stdout '^claude/work .*loggedout'
-stdout 'not tracked: claude/main \(run: srn usage setup\)'
+stdout 'not tracked: claude/main \(run: srn usage setup claude/main\)$'
 cp empty home/.claude-work/.loggedin
 exec squadrn usage --refresh
 
@@ -138,6 +138,7 @@ stdout 'not set up'
 mkdir home/.claude-solo
 cp emptyobj home/.claude-solo/settings.json
 exec squadrn account adopt solo --yes
+stdout 'link main.s settings with: srn account add claude/solo --relink$'
 exec squadrn account add solo --usage
 stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
 grep '"command": ".* hook statusline"' home/.claude-solo/settings.json
