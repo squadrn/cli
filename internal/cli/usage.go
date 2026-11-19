@@ -178,17 +178,11 @@ func (a *app) candidates(accts []account.Account, statuses []provider.AuthResult
 		st := statuses[i]
 		cands[i] = usage.Candidate{
 			Account: acct.Label(), Provider: acct.Provider,
-			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: metered(st.Status),
+			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: st.Status.Metered(),
 			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
 		}
 	}
 	return cands
-}
-
-// metered: logged in without a subscription, billed per use (no usage limits to track).
-func metered(s provider.AuthStatus) bool {
-	m := strings.ToLower(s.AuthMethod)
-	return s.LoggedIn && s.SubscriptionType == "" && (strings.Contains(m, "api") || strings.Contains(m, "key"))
 }
 
 func (a *app) usageShow(target string, asJSON, refresh bool) error {

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/usage"
 )
 
@@ -88,23 +87,5 @@ func TestUsageFormatting(t *testing.T) {
 	}
 	if got := color.state(usage.NoData); got != "nodata" {
 		t.Errorf("state = %q", got)
-	}
-}
-
-func TestMetered(t *testing.T) {
-	tests := []struct {
-		s    provider.AuthStatus
-		want bool
-	}{
-		{provider.AuthStatus{LoggedIn: true, AuthMethod: "api_key"}, true},
-		{provider.AuthStatus{LoggedIn: true, AuthMethod: "claude.ai", SubscriptionType: "max"}, false},
-		{provider.AuthStatus{LoggedIn: true, AuthMethod: "api_key", SubscriptionType: "pro"}, false},
-		{provider.AuthStatus{LoggedIn: true}, false},
-		{provider.AuthStatus{AuthMethod: "api_key"}, false},
-	}
-	for _, tt := range tests {
-		if got := metered(tt.s); got != tt.want {
-			t.Errorf("%+v: %v", tt.s, got)
-		}
 	}
 }
