@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted for P1 (revision 2, after a five-role design review: architecture, security, Windows
-platform, release/DevOps, QA); later phases start after the P0 spikes. Supersedes the "Linux and
-macOS only" rule in AGENTS.md once Windows support ships.
+Accepted (revision 2, after a five-role design review: architecture, security, Windows platform,
+release/DevOps, QA). P1–P4 are implemented; Windows ships as a beta from v1.0.0-rc.1. P5 (real-machine
+spikes S1–S3, S5, S13, code signing, general availability) is open. Supersedes the "Linux and macOS
+only" rule in AGENTS.md.
 
 ## Context
 
@@ -200,14 +201,14 @@ platform.
 | Phase | Work | Estimate |
 |---|---|---|
 | **P0 Spikes** | `scripts/windows-spike.ps1` writes one JSON record per check (versions, command, expected, observed). Runner-capable: S4 signature tools, S6 junction/rename/symlink as standard user, S7 hook chaining through `sh.exe`, S8 ctrl-c/break/close, S9 update while sessions and a hook run, S11 OpenSSH versions, S12 junction semantics on Go 1.27. Needs a logged-in Claude Code on a real machine: S1 exec-form hook through `cmd.exe`, S2 PowerShell tool payload, S3 `projects/` naming, S5 picker keys in Windows Terminal and conhost, S13 PowerShell session state. | 2–3 days |
-| **P1 Safety net and refactor → 1.1.0** | Golden tests, `.gitattributes`, Git 2.31 check with clear messages, `refactor:` move into `_unix.go` seams (no behaviour change), `fsx.SameFile`. Released to the beta channel first, then stable. | 3–4 days |
+| **P1 Safety net and refactor** | Golden tests, `.gitattributes`, Git 2.31 check with clear messages, `refactor:` move into `_unix.go` seams (no behaviour change), `fsx.SameFile`. No behaviour change on macOS or Linux. | 3–4 days |
 | **P2 Windows core** | Seams for Windows: proc Job Objects, interactive child, detach, `ReplaceExecutable`, link modes, VT; accounts and provisioning; doctor; `windows-latest` CI | 4–5 days |
 | **P3 Guard** | PowerShell allow-list analyser and tables; bash parser Windows forms; `tool_name`; Windows `hooks.json` (cmd.exe, fail closed); layer 2 through `sh.exe`; log via handle; junction-safe deletion | 4–5 days |
 | **P4 Distribution** | GoReleaser Windows zips (`format_overrides`), attestations for zips, `install.ps1`, update/rollback/uninstall on Windows, ACLs, PowerShell completion, post-release upgrade job | 3–4 days |
-| **P5 Beta → GA** | `1.2.0-rc.N` on the beta channel (each rc with its own CHANGELOG section), E2E checklist, code signing, docs (README, maintaining, AGENTS rule, ADR 0007 note), ADR accepted, `1.2.0` | 2–3 days |
+| **P5 Beta → GA** | Pre-releases on the beta channel (each with its own CHANGELOG section), real-machine spikes, E2E checklist, code signing, docs (README, maintaining, AGENTS rule), Windows out of beta | 2–3 days |
 
-Total: about 18–24 working days. Unix users see 1.1.0 (no behaviour change besides clearer Git
-errors); Windows is announced with 1.2.0.
+Total: about 18–24 working days. macOS and Linux behave as before the port (golden tests); Windows
+is a beta from v1.0.0-rc.1 until P5 is done.
 
 ## Open decisions
 
