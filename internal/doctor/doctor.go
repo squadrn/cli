@@ -192,7 +192,7 @@ func (e Env) install() []Check {
 		out = append(out, ok(g, "release signatures verified on update"))
 	}
 	if e.Layout.Marketplace() == "" {
-		out = append(out, bad(g, Warn, "squadrn plugin files not installed in "+e.tilde(e.Layout.DataDir), "re-run install.sh"))
+		out = append(out, bad(g, Warn, "squadrn plugin files not installed in "+e.tilde(e.Layout.DataDir), reinstallHint))
 	} else {
 		out = append(out, ok(g, "plugin marketplace"))
 	}
@@ -559,7 +559,7 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 	var out []Check
 	status := bad(g, Fail, "squadrn plugin not installed (no git push guard)", e.Command+" account add "+a.Label())
 	if a.IsMain() {
-		status.Fix = "re-run install.sh"
+		status.Fix = reinstallHint
 	}
 	for _, p := range plugins {
 		if p.ID == account.PluginID {

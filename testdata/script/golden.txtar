@@ -1503,10 +1503,10 @@ complete -k -c squadrn -n '__squadrn_requires_order_preservation && __squadrn_pr
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Cần input'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Needs input'", "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Xong việc'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Done'", "async": true }] }
     ],
     "StopFailure": [
       { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" limit", "async": true }] }

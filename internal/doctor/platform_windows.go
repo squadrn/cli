@@ -183,7 +183,7 @@ func (e Env) commandCopies(g string) []Check {
 	for _, n := range names {
 		p := filepath.Join(e.Layout.BinDir, n+".exe")
 		if got := sha(p); got == "" || got != want {
-			out = append(out, bad(g, Fail, e.tilde(p)+" is not the installed squadrn (stale or missing copy)", "close running sessions, then: squadrn self-install or re-run install.ps1"))
+			out = append(out, bad(g, Fail, e.tilde(p)+" is not the installed squadrn (stale or missing copy)", "close running sessions, then "+reinstallHint))
 		}
 	}
 	return out
