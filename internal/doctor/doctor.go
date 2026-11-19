@@ -461,9 +461,6 @@ func (e Env) settings() []Check {
 				if fi, err := os.Stat(exe); err != nil || !executable(exe, fi) {
 					out = append(out, bad(g, Fail, "hook not executable: "+e.tilde(exe), "fix or remove it in "+e.tilde(path)))
 				}
-				if strings.HasSuffix(exe, "guard-git.sh") {
-					out = append(out, bad(g, Warn, "legacy guard-git.sh hook in "+spec.Settings+"; the squadrn plugin provides the guard", "remove the guard-git.sh entry from "+e.tilde(path)))
-				}
 			}
 		}
 		for _, cmd := range slices.Sorted(maps.Keys(perEvent)) {

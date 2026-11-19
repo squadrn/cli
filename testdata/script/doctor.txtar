@@ -14,7 +14,6 @@ stdout '! squadrn plugin files not installed'
 stdout '^settings & hooks$'
 stdout '✓ settings.json valid'
 stdout '✗ hook not executable: .*/missing-hook.sh'
-stdout '! legacy guard-git.sh hook in settings.json'
 stdout '! Stop runs "notify" 2 times'
 stdout '^push guard$'
 stdout '✗ layer 1 \(pre-tool hook\): squadrn is not installed'
@@ -46,6 +45,6 @@ exec sh -c 'chmod 700 home/.claude-personal'
 [{"id":"squadrn@squadrn","enabled":true}]
 -- settings.json --
 {"hooks":{
-  "PreToolUse":[{"hooks":[{"type":"command","command":"$HOME/missing-hook.sh"},{"type":"command","command":"$HOME/.claude/hooks/guard-git.sh"}]}],
+  "PreToolUse":[{"hooks":[{"type":"command","command":"$HOME/missing-hook.sh"}]}],
   "Stop":[{"hooks":[{"type":"command","command":"notify"},{"type":"command","command":"notify"}]}]}}
 -- home/.claude-personal/.squadrn-account --

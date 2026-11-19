@@ -290,7 +290,7 @@ var unusableCommands = []string{
 	"for", "function", "getopts", "hash", "if", "in", "jobs", "kill", "let", "local", "printf", "pwd",
 	"read", "readonly", "return", "select", "set", "shift", "source", "test", "then", "time", "trap",
 	"true", "type", "typeset", "ulimit", "umask", "unalias", "unset", "until", "wait", "while",
-	"claude", "codex", "gemini", "opencode", "git", "tmux", "gh", "sa",
+	"claude", "codex", "gemini", "opencode", "git", "tmux", "gh",
 }
 
 // ValidateCommand checks a command or alias name. Collisions with other programs on PATH are

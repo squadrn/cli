@@ -14,16 +14,15 @@ func profileLine(completion string) string {
 	return "if (Test-Path " + q + ") { . " + q + " }"
 }
 
-// withoutProfileLines removes squadrn's completion lines for completion from a profile script:
-// the current guarded form and the unguarded one earlier installers wrote. Other lines stay
-// byte for byte.
+// withoutProfileLines removes squadrn's completion line for completion from a profile script.
+// Other lines stay byte for byte.
 func withoutProfileLines(content, completion string) (string, bool) {
-	ours := map[string]bool{profileLine(completion): true, `. "` + completion + `"`: true}
+	ours := profileLine(completion)
 	lines := strings.SplitAfter(content, "\n")
 	kept := lines[:0]
 	removed := false
 	for _, l := range lines {
-		if ours[strings.TrimSpace(l)] {
+		if strings.TrimSpace(l) == ours {
 			removed = true
 			continue
 		}

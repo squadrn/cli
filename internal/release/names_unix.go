@@ -23,7 +23,6 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 	if err := os.MkdirAll(l.BinDir, 0o755); err != nil {
 		return res, err
 	}
-	isOurs := func(target string) bool { return target == l.Binary() }
 	want := map[string]bool{}
 	for _, n := range names {
 		want[n] = true
@@ -32,18 +31,12 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 		if err == nil && target == l.Binary() {
 			continue
 		}
-		if _, lerr := os.Lstat(link); lerr == nil {
-			if err == nil && isOurs(target) {
-				if err := os.Remove(link); err != nil {
-					return res, err
-				}
-			} else {
-				backup := link + ".bak-" + now.Format("20060102-150405")
-				if err := os.Rename(link, backup); err != nil {
-					return res, err
-				}
-				res.BackedUp = append(res.BackedUp, backup)
+		if _, err := os.Lstat(link); err == nil {
+			backup := link + ".bak-" + now.Format("20060102-150405")
+			if err := os.Rename(link, backup); err != nil {
+				return res, err
 			}
+			res.BackedUp = append(res.BackedUp, backup)
 		}
 		if err := os.Symlink(l.Binary(), link); err != nil {
 			return res, err
@@ -59,7 +52,7 @@ func (l Layout) LinkCommands(names []string, now time.Time) (LinkResult, error) 
 			continue
 		}
 		link := filepath.Join(l.BinDir, e.Name())
-		if target, err := os.Readlink(link); err == nil && isOurs(target) {
+		if target, err := os.Readlink(link); err == nil && target == l.Binary() {
 			if err := os.Remove(link); err != nil {
 				return res, err
 			}
