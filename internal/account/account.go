@@ -203,6 +203,21 @@ func (s Store) Adopt(input string) (Account, error) {
 	return a, Mark(a)
 }
 
+// ByConfigDir is the account of spec whose config dir is dir, as the provider's ConfigEnv names
+// it; "" is the main account.
+func (s Store) ByConfigDir(spec provider.Spec, dir string) (Account, bool) {
+	accts, err := s.List()
+	if err != nil {
+		return Account{}, false
+	}
+	for _, a := range accts {
+		if a.Provider == spec.ID && (dir == "" && a.IsMain() || dir != "" && fsx.SamePath(a.Dir, dir)) {
+			return a, true
+		}
+	}
+	return Account{}, false
+}
+
 // Managed reports whether a's dir exists and is an account (false for an unmanaged dir).
 func (s Store) Managed(a Account) bool { return s.exists(a) }
 
