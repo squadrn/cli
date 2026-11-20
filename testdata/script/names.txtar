@@ -6,7 +6,7 @@ exec squadrn self-install rel
 stdout 'installed squadrn dev → ~/.local/share/squadrn/bin/squadrn'
 stdout 'linked ~/.local/bin/srn'
 stdout 'linked ~/.local/bin/squadrn'
-stdout 'next: srn doctor'
+stdout 'next: srn setup \(guided'
 grep '^command = "srn"' home/.config/squadrn/config.toml
 grep '^aliases = \["squadrn"\]' home/.config/squadrn/config.toml
 exec sh -c 'readlink home/.local/bin/srn && readlink home/.local/bin/squadrn'
