@@ -184,6 +184,8 @@ exists home/.local/state/squadrn/usage/claude-work.json
 
 # Validation: invalid and reserved names are usage errors (2).
 exitcode 2 squadrn account add Bad
+! exec squadrn account add Bad
+stderr '^srn: invalid account name "Bad": use 2 to 24 lower-case letters, digits and hyphens, starting with a letter$'
 exitcode 2 squadrn account add doctor
 exitcode 2 squadrn account add main
 exitcode 2 squadrn account add

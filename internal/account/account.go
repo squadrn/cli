@@ -79,7 +79,7 @@ func parseRef(input string) (providerID, name string) {
 
 func ValidateName(name string) error {
 	if !namePattern.MatchString(name) {
-		return fmt.Errorf("%w %q (expected %s)", ErrInvalidName, name, namePattern)
+		return fmt.Errorf("%w %q: use 2 to 24 lower-case letters, digits and hyphens, starting with a letter", ErrInvalidName, name)
 	}
 	if reserved(name) {
 		return fmt.Errorf("%w %q: it is a squadrn command", ErrReserved, name)
