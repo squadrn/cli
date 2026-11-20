@@ -48,7 +48,10 @@ func TestVersionNotesOnFailure(t *testing.T) {
 			t.Errorf("%s: %+v", v, got)
 		}
 	}
-	if got := versionNotes(provider.Spec{Binary: "codex"}, "0.1.0"); got != nil {
+	if got := versionNotes(provider.Spec{Binary: "codex"}, "0.171.0"); len(got) != 1 || !strings.Contains(got[0].Name, "fails open") {
+		t.Errorf("codex: %+v", got)
+	}
+	if got := versionNotes(provider.Spec{Binary: "other"}, "0.1.0"); got != nil {
 		t.Errorf("other provider: %+v", got)
 	}
 }

@@ -77,11 +77,13 @@ Every driver implements `Agent`; everything else is optional and found with a ty
 | `Authenticator` | `Auth` (normalised `AuthStatus`), `LoginArgs`, `LogoutArgs` | ✓ | ✓ |
 | `Agent` | `Launcher` + `Authenticator` | ✓ | ✓ |
 | `Worktrees` | `WorktreeArgs` | ✓ | — |
-| `SessionStore` | `ResumeArgs`, `FindSession`, `LatestSessionIn`, `RunningSessions`, `SessionCwd`, `TransferSession`, `UnavailableModel` | ✓ | ✓ |
+| `SessionStore` | `ResumeArgs`, `FindSession`, `LatestSessionIn`, `RunningSessions`, `SessionCwd`, `TransferSession`, `UnavailableModel` | ✓ | — (section 6) |
 | `GuardInstaller` | `InstallPlugin`, `UpdatePlugin`, `RemovePlugin`, `PluginState`, `EnablePluginArgs` (the layer-1 hook per CLI; layer 2, the git pre-push hook, is universal) | ✓ (plugin) | ✓ (hooks) |
 | `MCP` | `HasMCP`, `AddMCP` | ✓ | ✓ |
-| `Relocator` | `Relocate(oldDir, newDir)` | ✓ | as needed |
-| `SettingsFormat` (driver field) | `Decode`, `Encode`, `Deep` (section 2) | ✓ JSON | ✓ TOML |
+| `MCPLister` | `ListMCP`: main's servers when they are not in a JSON file (`Spec.MCPConfig` "") | — | ✓ (`codex mcp list --json`) |
+| `CredentialStore` | `CheckCredentials(configDir)`: the login stays in the account dir (doctor) | — | ✓ |
+| `Relocator` | `Relocate(oldDir, newDir)` | ✓ | ✓ (hook trust keys) |
+| `SettingsFormat` (driver field) | `Decode`, `Encode`, `Deep` (section 2); `PrivateSettings`: keys never taken from main | ✓ JSON | ✓ TOML |
 | `Profiler` (driver field) | `Profile(name, options, ProfileContext)`: the profile's settings document (section 3) | ✓ | ✓ |
 | `Seeder` (driver field) | `Seed(home, dir)`: onboarding state for a new account | ✓ | — |
 | `StatusLine` (driver field) | `Command`, `SetCommand`, `Wrap`, `Unwrap`, `Shell`, `Parse`, `ParseLimit` | ✓ | — |
@@ -102,7 +104,9 @@ credential store to it). Each provider names its credential-store policy in its 
 **Reserved account names are Squadrn's own commands only** (`account.Commands`). A provider
 subcommand is not reserved: `srn <account> <subcommand>` passes it through, and a bare
 `srn <subcommand>` still runs it for the main account unless an account has that name (accounts
-are matched before agent subcommands).
+are matched before agent subcommands). A word is passed through only when it is a subcommand of
+the account's own CLI (the default provider's without an account): `srn work resume <id>` for a
+Codex account, while a bare `srn resume` is not a Claude subcommand and is rejected.
 
 ### 2. Settings: per-account copies, merged
 
@@ -173,7 +177,13 @@ Codex (`config.toml`, implemented with the Codex provider):
 |---|---|
 | minimal | `cli_auth_credentials_store = "file"`; `[shell_environment_policy] ignore_default_excludes = false` (KEY/SECRET/TOKEN variables are not passed to commands). Codex has no per-path read rules: the `.env`/`~/.ssh` denials of minimal have no equivalent |
 | standard | minimal, plus `approval_policy = "on-request"`, `sandbox_mode = "workspace-write"`, `[sandbox_workspace_write] network_access = false`, `[shell_environment_policy] inherit = "core"` |
-| strict | standard with `sandbox_mode = "read-only"`, plus `rules/squadrn.rules` with `forbidden` prefix rules for `git push --force`, `git push -f`, `git reset --hard`, `rm -rf` |
+| strict | read-only workspace (use standard for daily work): standard with `sandbox_mode = "read-only"` |
+
+Codex strict adds no `rules/` file. Codex 0.171.0 loads every regular `*.rules` file in
+`$CODEX_HOME/rules/` (`core/src/exec_policy.rs`), but `rules/` is shared from `codex/main` as a
+link, so a squadrn file there would apply to main and every other account, and one that fails to
+parse makes Codex drop all rules files. Force pushes are already denied by the guard (layers 1
+and 2), and the read-only sandbox covers `git reset --hard` and `rm -rf` in the workspace.
 
 Never set by default: model, reasoning effort, the permission mode in `standard` (the CLI
 default stays), attribution.
@@ -198,19 +208,21 @@ touched unless `no-attribution` is chosen.
    usage tracking (naming the accounts it applies to), log in now.
 3. **Apply** with one line per step. A *new* account is built in a temp dir next to the target
    (`~/.codex-work.tmp-<pid>`) and renamed into place, so a failure leaves no half account.
-4. **Verify** and summarise:
+4. **Verify** and summarise: (Codex shown; it is not asked about usage tracking, since `srn usage` reads
+   its limits from the CLI):
 
 ```
 $ srn account add codex/work
 Codex CLI 0.171.0 · new account codex/work → ~/.codex-work
-  profile        standard (secrets denied, push guard, 30-day history)
-  shared         skills, agents, AGENTS.md from codex/main
-  usage limits   track for codex/work? [Y/n]
+  profiles       minimal   credentials per account, secret env vars not passed
+                 standard  workspace-write sandbox, no network, asks before leaving it
+                 strict    read-only workspace; use standard for daily work
+  profile        minimal / standard / strict [standard]:
+  shared         skills, AGENTS.md from codex/main
   log in now?    [Y/n]
-✓ created ~/.codex-work (credentials: file, private)
+✓ created ~/.codex-work (private)
 ✓ settings from codex/main + standard profile
 ✓ push guard: pre-tool hook + git pre-push
-✓ usage tracking on
 ↗ opening login…
 ✓ logged in as you@example.com (Pro)
 done in 1.2s · start: srn work · check: srn doctor codex/work
@@ -246,6 +258,88 @@ A guided first run, idempotent, every step skippable:
 The installer runs it after the **first** install only, and only when there is a terminal; never
 on `self-update`. Without a terminal the installer prints the detected CLIs, the existing
 accounts and the next steps instead.
+
+### 6. Codex CLI provider
+
+Verified against Codex CLI 0.171.0: its `--help` output, a sandboxed run (`CODEX_HOME` in a
+temp dir, a failing `security` first on PATH, never logged in), `codex app-server
+generate-json-schema`, and the source at tag `rust-v0.171.0` where the docs are silent.
+Package `internal/provider/codex`; `provider.Codex` is the spec.
+
+- **Isolation.** Accounts are `CODEX_HOME` dirs; main runs with `CODEX_HOME` unset (Codex's
+  default `~/.codex`). Before Codex runs for an account (session, login, any query) squadrn
+  makes sure its `config.toml` has `cli_auth_credentials_store = "file"`. It replaces only that
+  top-level line, or adds it at the top, and leaves a file that does not parse alone. The
+  keyring (`keyring`, or `auto` where one exists) would not follow the account's dir.
+  `doctor` checks the setting (`CredentialStore`). Shared from main: `AGENTS.md`, `rules/` and
+  `skills/` entry by entry, without `skills/.system`, which Codex installs and updates in every
+  `CODEX_HOME` itself.
+- **Settings.** `config.toml` is the account's own copy, merged from main's (section 2; TOML,
+  deep tables `features`, `model_providers`, `profiles`, `projects`, `sandbox_workspace_write`,
+  `shell_environment_policy`, `tools`, `tui`). Three top-level keys are never taken from main
+  (`provider.PrivateSettings`): `mcp_servers`, which may carry tokens (`shared_mcp` copies the
+  allowlisted ones with `codex mcp add`), `hooks`, whose definitions and trust are keyed by the
+  account's own `hooks.json`, and `cli_auth_credentials_store`, which squadrn sets.
+- **Auth.** `codex login status` prints on stderr, "Logged in using ChatGPT" (or "an API key -
+  sk-…", never kept) with exit 0, or "Not logged in" with exit 1. Output that is not recognised
+  falls back to the exit status. The email, plan and workspace come from the app server's
+  `account/read` (best effort, 5 s). Login and logout are `codex login` and `codex logout`.
+- **Push guard, layer 1.** A `PreToolUse` hook (matcher `Bash`) in `$CODEX_HOME/hooks.json`
+  runs `"<data dir>/plugin/bin/squadrn-hook" guard-git --no-ask`, the plugin's entry point, so
+  a missing squadrn still fails closed. Other hooks in the file are kept. Codex sends
+  `tool_name: "Bash"` and `tool_input.command` for shell and unified-exec calls (source:
+  `core/src/tools/hook_names.rs`, `handlers/unified_exec/exec_command.rs`), the same fields the
+  guard reads from Claude Code. Codex parses `permissionDecision: "ask"` but does not support
+  it: it fails the hook run and lets the call through. With `--no-ask` the guard therefore
+  **denies** what it would ask about, and its reason tells the user to run the command
+  themselves.
+- **Layer 1 on Windows.** Codex 0.171.0 runs a hook command through a shell: `$SHELL -lc
+  "<command>"` on Unix, `%COMSPEC% /C "<command>"` on Windows (`hooks/src/engine/command_runner.rs`;
+  the documented `commandWindows` override exists, the launch itself is not documented). The sh
+  shim cannot run under cmd.exe, so on Windows the command is `"<data dir>\bin\squadrn.exe" hook
+  guard-git --no-ask`, squadrn.exe started directly as the Claude Windows hooks do (#33); cmd.exe
+  drops the outer quotes `/C` adds, keeping the quoted path. A hook that cannot start, exits with
+  a code other than 0 or 2, or times out is a failed run and the tool call **goes through**
+  (`hooks/src/events/pre_tool_use.rs`; the docs leave it unstated), and Codex has no
+  fail-closed option like Claude Code's `onFailure: "block"`. On Unix a missing squadrn still
+  fails closed in the shim; on Windows layer 1 fails open, so `doctor` warns about it there:
+  layer 2 and the server's branch protection remain the boundary.
+- **Hook trust.** Codex runs a non-managed hook only once its exact definition is trusted.
+  Managed hooks in `requirements.toml` are trusted by policy, but they live in a system location
+  (root) and would apply to every account, so squadrn does not use them. Instead squadrn records
+  trust the way `/hooks` does, through the documented app server. `hooks/list` returns the
+  hook's `key` (`<CODEX_HOME>/hooks.json:pre_tool_use:<group>:<handler>`) and its `currentHash`.
+  `config/batchWrite` then upserts `hooks.state."<key>"` with `trusted_hash` and
+  `enabled = true` in the account's `config.toml`. The hash is always Codex's own; squadrn never
+  computes it. `doctor` reports a hook that is missing, untrusted or modified. `account add`, the
+  installer and `self-update` (`UpdatePlugin`) re-trust it, and `account rename` rewrites the
+  path-based keys (`Relocator`). We never use `--dangerously-bypass-hook-trust`.
+- **Layer 2** stays the universal git pre-push hook (`GIT_CONFIG_*` in the session's
+  environment).
+- **Worktrees.** `codex --worktree` takes no name and picks its own location, so `srn wt
+  <name>` and grid worktrees stay Claude-only (`Caps.Worktree` false). `srn <account> --worktree`
+  passes the flag through.
+- **Sessions.** Neither the transcript layout nor the session index is documented: Codex
+  0.171 is migrating "legacy local sessions to paginated thread history" (`codex
+  migrate-rollouts`, SQLite state). `Caps.SessionTransfer` is false and there is no
+  `SessionStore`, so `srn swap` says "Codex CLI cannot transfer conversations". Resume goes
+  through the CLI: `srn <account> resume <id>` or `resume --last`.
+- **MCP.** `HasMCP` uses `codex mcp get <name>`. `AddMCP` turns a shared definition (Claude's
+  `mcpServers` form) into `codex mcp add <name> [--env K=V]… -- <command> <args>…`, or
+  `--url` for HTTP. Headers cannot be passed, so such a server is refused. Main's servers come
+  from `codex mcp list --json` (`MCPLister`). As for Claude, entries carrying env or headers are
+  never copied.
+- **Usage.** `RateLimits` reads `account/rateLimits/read` from `codex app-server` over stdio
+  JSONL, after the `initialize`/`initialized` handshake. It reads the `codex` bucket of
+  `rateLimitsByLimitId`, else `rateLimits`. A window of at most a day maps to the five-hour
+  window and a longer one to the seven-day window. A logged-out account gets an
+  error ("authentication required"), which is reported as no data. The app server is stopped
+  when the replies are in, and a deadline kills its process tree (`proc.Options.Stdout` feeds
+  the client while the server runs).
+- **Not verified without a login**: the logged-in `account/read` and
+  `account/rateLimits/read` payloads (taken from the generated schema), and the hook against a
+  real model. The hook path was exercised end to end with Codex driving a local mock Responses
+  API: the hook ran trusted and blocked `git push origin "$BRANCH"`.
 
 ## Testing
 

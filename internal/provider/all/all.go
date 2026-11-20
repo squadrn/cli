@@ -3,4 +3,5 @@ package all
 
 import (
 	_ "github.com/squadrn/squadrn/internal/provider/claude"
+	_ "github.com/squadrn/squadrn/internal/provider/codex"
 )

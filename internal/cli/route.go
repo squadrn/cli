@@ -29,8 +29,9 @@ type routeTable struct {
 	// isUnmanaged reports a dir named like an account that is not one yet (account adopt).
 	isUnmanaged func(string) bool
 	subcommands map[string]bool
-	// passthrough reports agent CLI subcommands (claude mcp …).
-	passthrough func(string) bool
+	// passthrough reports subcommands of the agent CLI of an account ("" is the default
+	// account): claude mcp …, codex resume ….
+	passthrough func(account, word string) bool
 	// suggestions are offered for an unknown word.
 	suggestions func() []string
 	interactive bool
@@ -61,7 +62,7 @@ func parseRoute(args []string, t routeTable) (route, error) {
 			return r, nil
 		}
 	}
-	if v := rest[0]; t.passthrough(v) || strings.ContainsAny(v, " \t\n") {
+	if v := rest[0]; t.passthrough(r.account, v) || strings.ContainsAny(v, " \t\n") {
 		r.args = rest // an agent subcommand, or a quoted prompt
 		return r, nil
 	}

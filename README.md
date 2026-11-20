@@ -7,7 +7,8 @@ Squadrn — command `srn` (also `squadrn`).
 Run many coding agents in parallel on one machine — across several accounts and isolated git
 worktrees — with a guard that stops agents from force-pushing or pushing to protected branches.
 
-Providers: Claude Code today; the account model (`provider/name`) is ready for Codex and Gemini.
+Providers: Claude Code and OpenAI Codex CLI (`claude/…`, `codex/…` accounts); the account model
+is ready for more.
 Platforms: macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in beta, without
 `grid` (ADR 0008).
 
@@ -172,6 +173,35 @@ Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `acme-2`. squadrn's ow
 (`wt`, `grid`, …) are rejected; an agent subcommand name (`mcp`) is fine, and such an account is
 matched before the subcommand. Account dirs are created private (`0700`).
 
+### Several providers
+
+Every provider has its own accounts, dirs and CLI; `provider/name` picks one. Codex CLI
+accounts are `CODEX_HOME` dirs: `codex/main` is `~/.codex` (Codex's default, nothing set) and
+`codex/work` is `~/.codex-work`. Install Codex first (`npm install -g @openai/codex`); `doctor`
+only requires a provider's CLI once you have accounts for it.
+
+```sh
+srn account add codex/work       # ~/.codex-work, push guard hook, AGENTS.md/skills/rules from codex/main
+srn account login codex/work     # codex login with CODEX_HOME=~/.codex-work
+srn codex/work                   # start Codex as that account (srn work when the name is unique)
+srn work exec "fix the tests"    # codex subcommands pass through: exec, resume, mcp, review, …
+srn work resume <session-id>     # resume a conversation of that account
+srn doctor                       # login, guard hook trust and credential store per account
+```
+
+Each Codex account keeps its login in its own `auth.json`: squadrn sets
+`cli_auth_credentials_store = "file"` in the account's `config.toml` (the OS keyring would be
+shared) and restores it whenever it runs Codex for the account. MCP servers listed in
+`shared_mcp` are copied from `codex/main` with `codex mcp add`. Claude-only for now: `swap`
+(Codex's session store is not documented), `wt` and `grid` worktrees (`codex --worktree` takes
+no name), usage limits in the status line (`srn usage` asks Codex for them instead, at most every
+5 minutes unless `--refresh`).
+
+Codex profiles map to `config.toml`: `minimal` keeps credentials per account and secret
+environment variables out of commands; `standard` (default) adds a workspace-write sandbox without
+network that asks before leaving it; `strict` makes the workspace **read-only** — use it for
+review-only accounts, and `standard` for daily work.
+
 ## Usage limits
 
 Claude Code reports a subscription's 5-hour and 7-day usage to its status line, and runs a
@@ -281,8 +311,9 @@ Worktree names are `<type>-<slug>` (`feat-otp-login`, `fix-cart-total`); Claude 
 The guard is a safety net against agents' mistakes, not a sandbox: it does not contain a hostile
 process. Three layers keep agents from force-pushing or pushing to protected branches:
 
-1. **Pre-tool hook.** The squadrn plugin runs `squadrn hook guard-git` before every Bash command an
-   agent runs. It parses the command as shell — pipelines, `$(…)`, `bash -c`, `eval`, here-documents
+1. **Pre-tool hook.** The squadrn plugin (Claude Code), or a `PreToolUse` hook in
+   `$CODEX_HOME/hooks.json` that squadrn installs and marks trusted (Codex), runs
+   `squadrn hook guard-git` before every shell command an agent runs. It parses the command as shell — pipelines, `$(…)`, `bash -c`, `eval`, here-documents
    and here-strings, `sudo`/`env`/`timeout`/`script`/`watch`/`find -exec` wrappers, `cd`, `git -C`,
    quoting tricks (`pu''sh`), case (`GIT PUSH`), git's option prefixes (`--forc`), `-c alias.*` and
    repository aliases — and resolves a bare `git push` the way git does (`push.default`,
@@ -293,7 +324,11 @@ process. Three layers keep agents from force-pushing or pushing to protected bra
    **asks** when the target is only known at runtime (`$BRANCH`, `xargs`, `python -c …`, a shell
    reading stdin), for git aliases or subcommands it cannot see, settings or `GIT_*` variables that
    make git run a program or use another repository, and other GitHub writes; **allows** the
-   rest. Any failure or timeout asks, never allows.
+   rest. Any failure or timeout asks, never allows. Codex hooks cannot ask (Codex lets the
+   command run), so for Codex accounts the guard denies instead and tells you to run the command
+   yourself. On Windows Codex starts `squadrn.exe` through `cmd.exe` and lets the command run
+   when the hook cannot start or fails, so there layer 1 fails open for Codex (`doctor` says so);
+   layers 2 and 3 still hold.
 2. **git pre-push hook.** Sessions squadrn starts (`srn`, `wt`, `grid`, `swap`) get
    `core.hooksPath` pointed at `~/.local/share/squadrn/git-hooks` through `GIT_CONFIG_*`. Git's
    pre-push hook sees the exact refs, so pushes layer 1 cannot see (scripts, interpreters) are

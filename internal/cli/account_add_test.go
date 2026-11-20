@@ -18,16 +18,29 @@ func TestAskProfileAndYes(t *testing.T) {
 		"\n": provider.DefaultProfile, "strict\n": "strict", "mi\n": "minimal", "bogus\nst\n": "standard",
 		"": provider.DefaultProfile,
 	} {
-		got, err := a.askProfile(bufio.NewReader(strings.NewReader(input)), provider.DefaultProfile)
+		got, err := a.askProfile(bufio.NewReader(strings.NewReader(input)), provider.Claude, provider.DefaultProfile)
 		if err != nil || got != want {
 			t.Errorf("askProfile(%q) = %q, %v; want %q", input, got, err, want)
 		}
 	}
-	if _, err := a.askProfile(bufio.NewReader(strings.NewReader("bogus")), provider.DefaultProfile); err == nil {
+	if _, err := a.askProfile(bufio.NewReader(strings.NewReader("bogus")), provider.Claude, provider.DefaultProfile); err == nil {
 		t.Error("an unknown profile at EOF was accepted")
 	}
-	if !strings.Contains(errOut.String(), "profile        minimal / standard / strict [standard]: ") {
-		t.Errorf("prompt = %q", errOut.String())
+	for _, want := range []string{
+		"  profiles       minimal   secrets denied\n",
+		"                 standard  secrets denied, push guard, 30-day history\n",
+		"profile        minimal / standard / strict [standard]: ",
+	} {
+		if !strings.Contains(errOut.String(), want) {
+			t.Errorf("prompt %q lacks %q", errOut.String(), want)
+		}
+	}
+	errOut.Reset()
+	if got, err := a.askProfile(bufio.NewReader(strings.NewReader("\n")), provider.Codex, provider.DefaultProfile); err != nil || got != provider.DefaultProfile {
+		t.Errorf("codex askProfile = %q, %v", got, err)
+	}
+	if !strings.Contains(errOut.String(), "                 strict    read-only workspace; use standard for daily work\n") {
+		t.Errorf("codex prompt = %q", errOut.String())
 	}
 	for input, want := range map[string]bool{"\n": true, "y\n": true, "n\n": false, "No\n": false, "": true} {
 		if got, err := a.askYes(bufio.NewReader(strings.NewReader(input)), "log in now?", ""); err != nil || got != want {
@@ -37,8 +50,11 @@ func TestAskProfileAndYes(t *testing.T) {
 }
 
 func TestProfileDescriptions(t *testing.T) {
-	if got := profileDesc("standard", []string{"privacy"}); got != "standard (secrets denied, push guard, 30-day history) + privacy" {
+	if got := profileDesc(provider.Claude, "standard", []string{"privacy"}); got != "standard (secrets denied, push guard, 30-day history) + privacy" {
 		t.Errorf("profileDesc = %q", got)
+	}
+	if got := profileDesc(provider.Codex, "strict", nil); got != "strict (read-only workspace; use standard for daily work)" {
+		t.Errorf("codex profileDesc = %q", got)
 	}
 	if got := profileName("strict", nil); got != "strict profile" {
 		t.Errorf("profileName = %q", got)

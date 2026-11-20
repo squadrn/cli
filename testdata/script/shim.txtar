@@ -30,6 +30,11 @@ stdout '"permissionDecision":"ask"'
 stdin ls.json
 exec $SHIM guard-git
 ! stdout .
+# Codex hooks cannot ask (--no-ask): what would be asked about is denied.
+stdin status.json
+exec $SHIM guard-git --no-ask
+stdout '"permissionDecision":"deny"'
+stdout 'git commands cannot be checked'
 stdin force.json
 exec $SHIM notify Test
 ! stdout .

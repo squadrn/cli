@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strconv"
@@ -26,6 +27,8 @@ type Caps struct {
 	SharedMCP bool
 	// UsageReport: the CLI reports usage limits to squadrn (status line, limit hook).
 	UsageReport bool
+	// UsageQuery: squadrn reads usage limits from the CLI on request (RateLimiter).
+	UsageQuery bool
 }
 
 type Spec struct {
@@ -59,6 +62,8 @@ type Spec struct {
 	// Credentials is an account's credential file relative to its dir ("" when the CLI keeps
 	// it elsewhere only); other accounts' profiles deny reading it.
 	Credentials string
+	// ProfileSummaries describe the profiles where the shared summaries do not fit this CLI.
+	ProfileSummaries map[string]string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
 	InstallHint  string
 	NativeMarker string
@@ -181,6 +186,23 @@ type MCP interface {
 	AddMCP(ctx context.Context, configDir, name string, config []byte) error
 }
 
+// MCPLister lists an account's user-scope MCP servers, each as a JSON definition in Claude Code's
+// mcpServers form, for a CLI that keeps them elsewhere than a JSON file (Spec.MCPConfig "").
+type MCPLister interface {
+	ListMCP(ctx context.Context, configDir string) (map[string]json.RawMessage, error)
+}
+
+// RateLimiter reads an account's usage limits from the CLI on request (Caps.UsageQuery).
+type RateLimiter interface {
+	RateLimits(ctx context.Context, configDir string) (usage.Snapshot, error)
+}
+
+// CredentialStore checks that an account keeps its credentials in its own config dir (a CLI
+// that could store them elsewhere, e.g. the OS keyring). nil means they are.
+type CredentialStore interface {
+	CheckCredentials(configDir string) error
+}
+
 // Relocator fixes absolute config-dir paths the CLI recorded, after the dir moved.
 type Relocator interface {
 	Relocate(oldDir, newDir string) error
@@ -223,6 +245,12 @@ type SettingsFormat interface {
 	Deep() []string
 }
 
+// PrivateSettings is a SettingsFormat with top-level keys that stay per account: main's values
+// are never merged into an account's copy (Codex: MCP servers, hook trust).
+type PrivateSettings interface {
+	Private() []string
+}
+
 // Profiles an account is created with (ADR 0011); DefaultProfile when none is chosen.
 const (
 	ProfileMinimal  = "minimal"
@@ -252,6 +280,15 @@ func ProfileSummary(name string) string {
 		}
 	}
 	return ""
+}
+
+// ProfileSummary is the one-line description of a profile for this provider: its own when it
+// has one (ProfileSummaries), else the shared one.
+func (s Spec) ProfileSummary(name string) string {
+	if v, ok := s.ProfileSummaries[name]; ok {
+		return v
+	}
+	return ProfileSummary(name)
 }
 
 // ValidOption reports whether name is a known toggle.
@@ -327,7 +364,38 @@ var Claude = Spec{
 	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},
 }
 
-var registry = []Spec{Claude}
+// Codex is the OpenAI Codex CLI. Accounts are CODEX_HOME dirs; credentials are kept in each one's
+// auth.json (cli_auth_credentials_store = "file"), never in the OS keyring, so they stay per
+// account. Conversations cannot be transferred (the transcript layout is not documented) and
+// `codex --worktree` takes no name, so neither swap nor wt applies (ADR 0011).
+var Codex = Spec{
+	ID:        "codex",
+	Name:      "Codex CLI",
+	Binary:    "codex",
+	MainDir:   ".codex",
+	DirPrefix: ".codex-",
+	ConfigEnv: "CODEX_HOME",
+	Settings:  "config.toml",
+	Shared:    []string{"AGENTS.md", "rules"},
+	// skills/.system holds the skills Codex installs and updates itself in every CODEX_HOME.
+	SharedPerEntry: map[string][]string{"skills": {".system"}},
+	Subcommands: []string{
+		"a", "agents", "app", "app-server", "apply", "archive", "cloud", "debug", "delete", "e", "exec",
+		"exec-server", "features", "fork", "login", "logout", "mcp", "migrate-nfs-db", "migrate-rollouts",
+		"plugin", "queue", "remote-control", "resume", "review", "sandbox", "unarchive",
+	},
+	SessionID:   regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
+	Credentials: "auth.json",
+	ProfileSummaries: map[string]string{
+		ProfileMinimal:  "credentials per account, secret env vars not passed",
+		ProfileStandard: "workspace-write sandbox, no network, asks before leaving it",
+		ProfileStrict:   "read-only workspace; use standard for daily work",
+	},
+	InstallHint: "npm install -g @openai/codex",
+	Caps:        Caps{Plugins: true, SharedMCP: true, UsageQuery: true},
+}
+
+var registry = []Spec{Claude, Codex}
 
 // Default is used when an account ref names no provider and for the "main" shorthand.
 const Default = "claude"

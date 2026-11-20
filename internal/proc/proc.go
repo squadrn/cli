@@ -24,6 +24,9 @@ type Options struct {
 	Dir   string
 	Env   []string // nil inherits the current environment
 	Stdin io.Reader
+	// Stdout, when set, also receives stdout as it is produced (a client reading replies to what
+	// it writes on Stdin).
+	Stdout io.Writer
 }
 
 // Output runs name with args and returns stdout. On failure the error carries the trimmed
@@ -32,6 +35,9 @@ func Output(ctx context.Context, opts Options, name string, args ...string) ([]b
 	cmd := command(ctx, opts, name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if opts.Stdout != nil {
+		cmd.Stdout = io.MultiWriter(&stdout, opts.Stdout)
+	}
 	err := run(cmd)
 	if err != nil {
 		if ctx.Err() != nil {

@@ -179,8 +179,14 @@ func (a *app) routeTable() routeTable {
 		isAccount:   a.store.Exists,
 		isUnmanaged: a.store.IsUnmanaged,
 		subcommands: subs,
-		passthrough: func(w string) bool {
-			for _, spec := range provider.All() {
+		passthrough: func(acct, w string) bool {
+			specs := provider.All()
+			if acct == "" {
+				specs = []provider.Spec{a.defaultSpec()}
+			} else if x, err := a.store.Get(acct); err == nil {
+				specs = []provider.Spec{x.Spec}
+			}
+			for _, spec := range specs {
 				if slices.Contains(spec.Subcommands, w) {
 					return true
 				}

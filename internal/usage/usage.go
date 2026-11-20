@@ -5,6 +5,7 @@ package usage
 
 import (
 	"cmp"
+	"errors"
 	"slices"
 	"time"
 )
@@ -39,6 +40,8 @@ type Snapshot struct {
 	Seven      *Window   `json:"seven_day,omitempty"`
 	Spend      *Spend    `json:"spend,omitempty"`
 	ObservedAt time.Time `json:"observed_at,omitzero"`
+	// QueriedAt is when squadrn last asked the CLI for its limits, whether it reported any.
+	QueriedAt time.Time `json:"queried_at,omitzero"`
 	// Session and Cwd are where the latest observation came from.
 	Session string `json:"session,omitempty"`
 	Cwd     string `json:"cwd,omitempty"`
@@ -48,6 +51,17 @@ type Snapshot struct {
 	LimitedCwd     string    `json:"limited_cwd,omitempty"`
 	// ResetEstimate is when that limit lifts, as far as is known.
 	ResetEstimate time.Time `json:"reset_estimate,omitzero"`
+}
+
+// ErrNoLimits: asked for its usage limits, a CLI reported none (logged out, API key billing).
+var ErrNoLimits = errors.New("no usage limits reported")
+
+// Checked is when the account's limits were last observed or asked for.
+func (s Snapshot) Checked() time.Time {
+	if s.QueriedAt.After(s.ObservedAt) {
+		return s.QueriedAt
+	}
+	return s.ObservedAt
 }
 
 type State string
@@ -148,6 +162,9 @@ func merge(old, obs Snapshot) Snapshot {
 	if m.Session == "" {
 		m.Session, m.Cwd = older.Session, older.Cwd
 	}
+	if older.QueriedAt.After(m.QueriedAt) {
+		m.QueriedAt = older.QueriedAt
+	}
 	lim := old
 	if obs.LimitedAt.After(old.LimitedAt) {
 		lim = obs
@@ -177,7 +194,7 @@ func belowLimit(s Snapshot) bool {
 // sameValues reports whether two snapshots differ only in when they were observed.
 func sameValues(a, b Snapshot) bool {
 	a.ObservedAt, b.ObservedAt = time.Time{}, time.Time{}
-	return equalWindow(a.Five, b.Five) && equalWindow(a.Seven, b.Seven) && equalSpend(a.Spend, b.Spend) &&
+	return a.QueriedAt.Equal(b.QueriedAt) && equalWindow(a.Five, b.Five) && equalWindow(a.Seven, b.Seven) && equalSpend(a.Spend, b.Spend) &&
 		a.Session == b.Session && a.Cwd == b.Cwd &&
 		a.LimitedAt.Equal(b.LimitedAt) && a.LimitedSession == b.LimitedSession && a.LimitedCwd == b.LimitedCwd &&
 		a.ResetEstimate.Equal(b.ResetEstimate)

@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -128,6 +131,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	now := a.now()
 	stop := a.spin(fmt.Sprintf("checking %d account(s)…", len(accts)))
 	statuses := a.statuses(accts, refresh)
+	a.queryUsage(accts, statuses, refresh)
 	stop()
 	rep := usageReport{Accounts: make([]usageRow, len(accts))}
 	cands := a.candidates(accts, statuses)
@@ -137,7 +141,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 		st, c, snap := statuses[i], cands[i], cands[i].Snapshot
 		r := usageRow{
 			Account: acct.Label(), Plan: st.Status.SubscriptionType, Org: st.Status.OrgName, Email: st.Status.Email,
-			State: c.State(now), Tracking: a.usageTracking(acct),
+			State: c.State(now), Tracking: acct.Spec.Caps.UsageQuery || a.usageTracking(acct),
 			FiveHour: snap.Five, SevenDay: snap.Seven, Spend: snap.Spend, ObservedAt: snap.ObservedAt,
 		}
 		if c.Metered {
@@ -170,6 +174,51 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	return rep
 }
 
+const (
+	// usageQueryTimeout bounds reading one account's usage limits from its CLI.
+	usageQueryTimeout = 5 * time.Second
+	// usageQueryFresh: a recorded snapshot younger than this is shown without asking the CLI.
+	usageQueryFresh = 5 * time.Minute
+)
+
+// queryUsage reads the usage limits of logged-in accounts whose CLI reports them on request
+// (Caps.UsageQuery) and records them, unless the account was checked recently and refresh is
+// off. A CLI that reports no limits is recorded as asked (QueriedAt), so it is not asked again
+// for a while either; one that fails to answer keeps what was recorded and is asked next time.
+func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult, refresh bool) {
+	now := a.now()
+	var wg sync.WaitGroup
+	for i, acct := range accts {
+		st := statuses[i]
+		if !acct.Spec.Caps.UsageQuery || st.Err != nil || !st.Status.LoggedIn || st.Status.Metered() {
+			continue
+		}
+		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok && !refresh && now.Sub(snap.Checked()) < usageQueryFresh {
+			continue
+		}
+		ag, err := a.agent(acct.Spec)
+		rl, ok := ag.(provider.RateLimiter)
+		if err != nil || !ok {
+			continue
+		}
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), usageQueryTimeout)
+			defer cancel()
+			snap, err := rl.RateLimits(ctx, acct.ConfigDir())
+			switch {
+			case err == nil:
+				snap.QueriedAt = now
+			case errors.Is(err, usage.ErrNoLimits):
+				snap = usage.Snapshot{QueriedAt: now}
+			default:
+				return
+			}
+			_, _, _ = a.usageStore().Record(acct.Provider, acct.Name, snap)
+		})
+	}
+	wg.Wait()
+}
+
 // candidates describes accts, with their login statuses, for usage.Rank.
 func (a *app) candidates(accts []account.Account, statuses []provider.AuthResult) []usage.Candidate {
 	cands := make([]usage.Candidate, len(accts))
@@ -179,7 +228,7 @@ func (a *app) candidates(accts []account.Account, statuses []provider.AuthResult
 		cands[i] = usage.Candidate{
 			Account: acct.Label(), Provider: acct.Provider,
 			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: st.Status.Metered(),
-			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
+			Unsupported: !acct.Spec.Caps.UsageReport && !acct.Spec.Caps.UsageQuery, Snapshot: snap,
 		}
 	}
 	return cands

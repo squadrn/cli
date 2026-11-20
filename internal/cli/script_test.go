@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
-	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
+	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
 	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "FAKE_LOGIN_FAILS", "FAKE_VERSION", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
@@ -117,6 +117,20 @@ func TestScript(t *testing.T) {
 					return err
 				}
 			}
+			if runtime.GOOS != "windows" {
+				// codex is installed by the scripts that use it (cp $CODEX_FAKE bin/codex): without
+				// it on PATH, the optional provider stays out of every other script's output.
+				self, err := os.Executable()
+				if err != nil {
+					return err
+				}
+				fake := filepath.Join(env.WorkDir, "fake-codex")
+				wrapper := "#!/bin/sh\nFAKE_AGENT=codex exec '" + strings.ReplaceAll(self, "'", `'\''`) + "' \"$@\"\n"
+				if err := os.WriteFile(fake, []byte(wrapper), 0o755); err != nil {
+					return err
+				}
+				env.Setenv("CODEX_FAKE", fake)
+			}
 			shim, err := filepath.Abs(filepath.Join("..", "..", "plugin", "bin", "squadrn-hook"))
 			if err != nil {
 				return err
@@ -158,7 +172,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "GH_TOKEN", "GITHUB_TOKEN", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "GH_TOKEN", "GITHUB_TOKEN", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
 				env.Setenv(k, "")
 			}
 			return nil

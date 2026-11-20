@@ -124,13 +124,20 @@ func (a *app) setup(yes bool) error {
 		}
 	}
 	profile := cfg.ProfileName()
+	// The profile summaries are the default provider's.
+	spec, known := provider.Get(cfg.DefaultProvider)
+	if !known {
+		if spec, known = provider.Get(a.store.DefaultProvider); !known {
+			spec = found[0].spec
+		}
+	}
 	if ask {
 		var err error
-		if profile, err = a.askProfile(in, profile); err != nil {
+		if profile, err = a.askProfile(in, spec, profile); err != nil {
 			return err
 		}
 	} else {
-		a.out("   %-14s %s\n", "profile", profileDesc(profile, nil))
+		a.out("   %-14s %s\n", "profile", profileDesc(spec, profile, nil))
 	}
 	if profile != cfg.ProfileName() || cfg.DefaultProvider != a.cfg.DefaultProvider {
 		cfg.DefaultProfile = profile

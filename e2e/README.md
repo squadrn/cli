@@ -27,7 +27,8 @@ On Windows it uses Windows PowerShell for `install.ps1`. It takes about 10 secon
    summary, `srn setup` without a terminal and, on Unix, answered at a pseudo terminal through
    `script(1)`), help/version/
    completion, config and command rename, accounts (add, ls, login, rename, adopt, `--relink`,
-   rm), running as an account, worktrees (wt, deps, in-use refusal, wt rm, gc), grid/ps/stop
+   rm), running as an account, Codex accounts (add, login, run, subcommands, the guard hook,
+   layer 2), worktrees (wt, deps, in-use refusal, wt rm, gc), grid/ps/stop
    (Unix), usage (status line, limit hook, setup, undo), swap (no argument, `--session`,
    divergence, `--worktree`), the guard (layer 1 decisions; layer 2 with real pushes to the bare
    remote from a session: a feature branch goes through, `main` is denied by the pre-push hook),
@@ -66,7 +67,12 @@ registered fake into the sandbox's `fakebin/`: a wrapper script on Unix
 - `FAKE_LOGIN_FAILS=1` makes login leave the account logged out.
 - No network, no real credentials, no keychain.
 
-### Adding the fake of a new provider (e.g. Codex)
+`codex` (`fakeagent.Codex`) follows the same contract with `CODEX_HOME` (default `~/.codex`):
+`login status` prints on stderr like Codex, and `app-server` answers the stdio JSON-RPC methods
+squadrn uses (`account/read`, `account/rateLimits/read` from `.limits`, `hooks/list` and
+`config/batchWrite` for the guard hook's trust).
+
+### Adding the fake of a new provider
 
 1. Add `internal/fakeagent/codex.go` with `func Codex(args []string) int` implementing the
    contract for that CLI: its config-dir variable (`CODEX_HOME`, default `~/.codex`), its auth

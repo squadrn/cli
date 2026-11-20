@@ -5,7 +5,7 @@ mkdir home/.claude-tool
 
 # Without a terminal setup changes nothing and says what it found and what to run.
 exec squadrn setup
-stdout '^agent CLIs: Claude Code 2.1.329 \(.*/claude\)$'
+stdout '^agent CLIs: Claude Code 2.1.329 \(.*/claude\) · Codex CLI not found \(install: npm install -g @openai/codex\)$'
 stdout '^accounts: claude/main \(to adopt: ~/.claude-tool\)$'
 stdout '^next: srn setup \(guided'
 ! exists home/.config/squadrn/config.toml
@@ -14,6 +14,7 @@ stdout '^next: srn setup \(guided'
 exec squadrn setup -y
 stdout '^1. agent CLIs$'
 stdout '^   ✓ Claude Code 2.1.329'
+stdout '^   – Codex CLI not found'
 stdout '^   profile        standard'
 stdout '^   – skipped ~/.claude-tool \(later: srn account adopt claude/tool\)$'
 stdout '^   ✓ usage tracking on: claude/main$'
@@ -25,6 +26,14 @@ grep 'hook statusline' home/.claude/settings.json
 # It is idempotent.
 exec squadrn setup -y
 stdout '^   ✓ on for every account that reports usage$'
+
+# Codex on PATH and a codex dir named like an account are found too.
+cp $CODEX_FAKE bin/codex
+mkdir home/.codex-ci
+exec squadrn setup
+stdout '· Codex CLI 2.1.329 \(.*/codex\)$'
+stdout '^accounts: claude/main \(to adopt: ~/.claude-tool, ~/.codex-ci\)$'
+rm bin/codex
 
 # The first install runs it at a terminal (SQUADRN_TEST_TTY stands in for the controlling one):
 # strict as the default profile, adopt the dir.
@@ -39,6 +48,7 @@ release rel
 exec squadrn self-install rel --interactive --command srn
 stdout 'installed squadrn'
 stderr '^set up squadrn \(every step can be skipped'
+stderr '  profiles       minimal   secrets denied$'
 stderr 'profile        minimal / standard / strict \[standard\]: '
 stderr 'adopt ~/.claude-old as claude/old\? \(another tool may own it\) \[y/N\] '
 stderr '   ✓ new accounts get the strict profile$'

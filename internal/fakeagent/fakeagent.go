@@ -34,6 +34,7 @@ import (
 // agents maps an agent CLI's executable name to its fake.
 var agents = map[string]func(args []string) int{
 	"claude": Claude,
+	"codex":  Codex,
 }
 
 // Names lists the fakes, sorted.

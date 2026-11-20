@@ -357,3 +357,24 @@ func TestBestKeepsTheCurrentAccount(t *testing.T) {
 		t.Fatal("a limited current account is not the best")
 	}
 }
+
+func TestQueried(t *testing.T) {
+	s := Store{Dir: filepath.Join(t.TempDir(), "usage")}
+	seen := Snapshot{Five: w(10, time.Hour), ObservedAt: now, QueriedAt: now}
+	if _, wrote, err := s.Record("codex", "work", seen); !wrote || err != nil {
+		t.Fatalf("record: %v %v", wrote, err)
+	}
+	// A CLI that reports no limits: only QueriedAt moves, and that alone is written.
+	later := now.Add(10 * time.Second)
+	got, wrote, err := s.Record("codex", "work", Snapshot{QueriedAt: later})
+	if !wrote || err != nil || !got.QueriedAt.Equal(later) || !got.ObservedAt.Equal(now) || got.Five == nil {
+		t.Fatalf("no-limits record: %+v %v %v", got, wrote, err)
+	}
+	if !got.Checked().Equal(later) || !(Snapshot{ObservedAt: later, QueriedAt: now}).Checked().Equal(later) {
+		t.Fatal("Checked is not the later time")
+	}
+	// An older observation never moves QueriedAt back.
+	if m := merge(got, Snapshot{ObservedAt: now.Add(-time.Hour), QueriedAt: now}); !m.QueriedAt.Equal(later) {
+		t.Fatalf("merge: %v", m.QueriedAt)
+	}
+}

@@ -41,6 +41,7 @@ func TestE2E(t *testing.T) {
 		{"usage", testUsage},
 		{"swap", testSwap},
 		{"guard", testGuard},
+		{"codex", testCodex},
 		{"doctor", testDoctor},
 		{"update", testUpdate},
 		{"uninstall", testUninstall},
@@ -73,8 +74,8 @@ func testInstall(t *testing.T, s *sandbox) {
 	testSetupTTY(t, s)
 }
 
-// testSetupTTY answers srn setup at a pseudo terminal: strict as the default profile, the other
-// tool's dir and usage tracking skipped. The sandbox is put back for the later sections.
+// testSetupTTY answers srn setup at a pseudo terminal: claude as the default provider (Codex is
+// on PATH too), strict as the default profile, the other tool's dir and usage tracking skipped. The sandbox is put back for the later sections.
 func testSetupTTY(t *testing.T, s *sandbox) {
 	if runtime.GOOS == "windows" {
 		t.Log("srn setup at a terminal: skipped on Windows (no script(1))")
@@ -84,8 +85,10 @@ func testSetupTTY(t *testing.T, s *sandbox) {
 	if err := os.Mkdir(old, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	s.srnTTY(t, "strict\nn\nn\n", "setup").exit(0).out(
+	s.srnTTY(t, "\nstrict\nn\nn\n", "setup").exit(0).out(
 		`^1\. agent CLIs$`,
+		`default provider claude / codex \[claude\]: `,
+		`strict +sandboxed, reads limited to the project`,
 		`profile +minimal / standard / strict \[standard\]: `,
 		`✓ new accounts get the strict profile$`,
 		`adopt ~/\.claude-old as claude/old\? \(another tool may own it\) \[y/N\] `,
@@ -422,14 +425,56 @@ func testGuard(t *testing.T, s *sandbox) {
 	s.git(t, repo, "checkout", "-q", "main")
 }
 
+// testCodex drives codex/<name> accounts: CODEX_HOME dirs with their own credentials store, the
+// guard as a trusted hooks.json hook that cannot ask, codex subcommands and layer 2.
+func testCodex(t *testing.T, s *sandbox) {
+	dir := filepath.Join(s.home, ".codex-work")
+	s.srn(t, "account", "add", "codex/work").exit(0).
+		out(`^Codex CLI .*· new account codex/work → ~/.codex-work$`, `^✓ push guard: pre-tool hook \+ git pre-push$`, `log in: srn account login codex/work`)
+	s.srn(t, "account", "add", "codex/work").exit(0).out(`codex/work is up to date`).noOut(`✓ push guard`)
+	cfg, _ := os.ReadFile(filepath.Join(dir, "config.toml"))
+	s.check(t, strings.Contains(string(cfg), `cli_auth_credentials_store = "file"`), "config.toml does not keep credentials in the account:\n%s", cfg)
+	s.check(t, strings.Contains(string(cfg), "trusted_hash"), "the guard hook is not trusted:\n%s", cfg)
+	s.check(t, strings.Contains(string(cfg), `sandbox_mode = "workspace-write"`), "the standard profile did not reach config.toml:\n%s", cfg)
+	hooks, _ := os.ReadFile(filepath.Join(dir, "hooks.json"))
+	s.check(t, strings.Contains(string(hooks), "guard-git --no-ask"), "hooks.json has no guard hook:\n%s", hooks)
+	s.srn(t, "account", "ls").exit(0).out(`^codex/work +no +`)
+	s.srn(t, "account", "login", "codex/work").exit(0).out(`^logged in to codex/work as me@.codex-work$`)
+	s.srn(t, "usage").exit(0).out(`^codex/work .* nodata`)
+	write(t, filepath.Join(dir, ".limits"), `{"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300,"resetsAt":4102444800},"secondary":{"usedPercent":7,"windowDurationMins":10080,"resetsAt":4102444800}}}`)
+	s.srn(t, "usage", "--refresh").exit(0).out(`^codex/work +pro .* 42% .* 7% .* ok `)
+	s.srn(t, "codex/work", "--", "hi").exit(0).out(`^cfg=.*\.codex-work args=hi$`)
+	s.srn(t, "codex/work", "resume", sessionA).exit(0).out(`^cfg=.*\.codex-work args=resume ` + sessionA + `$`)
+	s.srn(t, "-a", "codex/work", "exec", "fix it").exit(0).out(`^cfg=.*\.codex-work args=exec fix it$`)
+	s.srn(t, "resume").exit(2)
+	s.srn(t, "swap", "--to", "codex/work").exit(1).err(`Codex CLI cannot transfer conversations`)
+
+	// Layer 1 as Codex runs it: what Claude Code would be asked about is denied.
+	repo := s.repo(t)
+	payload := fmt.Sprintf(`{"session_id":"s","transcript_path":null,"cwd":%q,"hook_event_name":"PreToolUse","model":"m","permission_mode":"default","turn_id":"t","tool_name":"Bash","tool_use_id":"c","tool_input":{"command":"git push origin \"$BRANCH\""}}`, strings.ReplaceAll(repo, `\`, `/`))
+	s.run(t, opt{stdin: payload}, "srn", "hook", "guard-git", "--no-ask").exit(0).out(`"permissionDecision":"deny"`, `cannot ask for confirmation`)
+	s.codexHook(t, dir, payload).exit(0).out(`"permissionDecision":"deny"`)
+
+	// Layer 2 holds in Codex sessions too.
+	s.git(t, repo, "checkout", "-q", "-b", "feat-codex")
+	s.git(t, repo, "commit", "-q", "--allow-empty", "-m", "codex")
+	defer s.git(t, repo, "checkout", "-q", "main")
+	r := s.run(t, opt{dir: repo, env: []string{`FAKE_EXEC=["git","push","origin","HEAD:main"]`}}, "srn", "codex/work", "--", "push")
+	s.check(t, r.code != 0, "a push to main from a codex session was not denied")
+	r.err(`squadrn guard: direct push to protected branch "main"`)
+}
+
 func testDoctor(t *testing.T, s *sandbox) {
 	s.srn(t, "doctor").exit(0).
 		out(`^install$`, `✓ installed release `+regexp.QuoteMeta(version), `✓ git`, `✓ layer 1 \(pre-tool hook\) denies force pushes`,
-			`✓ layer 2 \(git pre-push hook\) installed`, `^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`).
+			`✓ layer 2 \(git pre-push hook\) installed`, `^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`,
+			`^account codex/work$`, `✓ logged in as me@.codex-work`, `✓ push guard hook installed and trusted`, `✓ credentials kept in ~/.codex-work`).
 		noOut(`✗`)
 	s.srn(t, "doctor", "--json").out(`"group": "push guard"`)
-	s.srn(t, "doctor", "a", "b").exit(2)
-	s.srn(t, "setup", "-y").exit(0).out(`^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^5\. doctor$`, `^next: srn account add <name>`)
+	s.srn(t, "doctor", "codex/work").exit(0).out(`^account codex/work$`, `✓ push guard hook installed and trusted`).noOut(`^account claude/`)
+	s.srn(t, "doctor", "ghost").exit(1)
+	s.srn(t, "doctor", "work", "extra").exit(2)
+	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ Codex CLI 0\.171\.0 `, `^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^5\. doctor$`, `^next: srn account add <name>`)
 	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ on for every account that reports usage$`).noOut(`new accounts get`)
 }
 
@@ -468,6 +513,52 @@ func testUninstall(t *testing.T, s *sandbox) {
 	}
 	b, _ := os.ReadFile(filepath.Join(s.home, ".claude", ".plugins"))
 	s.check(t, !strings.Contains(string(b), "squadrn@squadrn"), "plugin still registered in claude/main")
+}
+
+// codexHook runs the guard hook of the Codex account in dir with stdin as Codex 0.171 does
+// (codex-rs/hooks/src/engine/command_runner.rs): $SHELL -lc "<command>" on Unix, and on Windows
+// %COMSPEC% /C followed by the command in quotes, passed raw (no argument quoting). The command must
+// start the installed squadrn: the sh shim on Unix, squadrn.exe on Windows.
+func (s *sandbox) codexHook(t *testing.T, dir, stdin string) *result {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, "hooks.json"))
+	if err != nil {
+		s.fail(t, "codex hooks.json: %v", err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Matcher string      `json:"matcher"`
+			Hooks   []guardHook `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		s.fail(t, "codex hooks.json: %v", err)
+	}
+	var command string
+	for _, grp := range doc.Hooks["PreToolUse"] {
+		for _, h := range grp.Hooks {
+			if strings.Contains(h.Command, "guard-git --no-ask") {
+				s.check(t, grp.Matcher == "Bash", "the codex guard hook does not match Bash: %q", grp.Matcher)
+				command = h.Command
+			}
+		}
+	}
+	if command == "" {
+		s.fail(t, "codex hooks.json has no guard hook:\n%s", b)
+	}
+	share := filepath.Join(s.home, ".local", "share", "squadrn")
+	if runtime.GOOS != "windows" {
+		shim := filepath.Join(share, "plugin", "bin", "squadrn-hook")
+		s.check(t, strings.Contains(command, shim), "the codex hook does not run the installed shim %s: %s", shim, command)
+		return s.run(t, opt{stdin: stdin}, "sh", "-lc", command)
+	}
+	exe := filepath.Join(share, "bin", "squadrn.exe")
+	s.check(t, strings.Contains(command, exe), "the codex hook does not start the installed %s: %s", exe, command)
+	comspec := os.Getenv("COMSPEC")
+	if comspec == "" {
+		comspec = "cmd.exe"
+	}
+	return s.run(t, opt{stdin: stdin, cmdLine: comspec + ` /C "` + command + `"`}, comspec)
 }
 
 // guardHook is the PreToolUse entry of the installed plugin's hooks.json that runs guard-git.

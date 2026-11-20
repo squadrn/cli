@@ -1,0 +1,217 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
+# Codex CLI accounts: CODEX_HOME dirs with credentials kept in their own auth.json, the push guard
+# as a trusted PreToolUse hook in hooks.json, and codex subcommands passed through.
+
+# Without codex on PATH and without codex accounts, codex stays out of the way.
+cp empty home/.claude/.loggedin
+! exec squadrn doctor
+! stdout 'codex not on PATH|✓ codex|^account codex'
+cp $CODEX_FAKE bin/codex
+
+# Main has a shared instruction file, a skill and user MCP servers.
+mkdir home/.codex/skills/review
+cp agents.md home/.codex/AGENTS.md
+cp mcplist.json home/.codex/.mcplist
+cp main-config.toml home/.codex/config.toml
+env SQUADRN_SHARED_MCP='docs secret absent'
+env SQUADRN_MARKETPLACE=$REPO_ROOT
+exec squadrn account add codex/work
+stdout '^Codex CLI .*· new account codex/work → ~/.codex-work$'
+stdout '^  profile +standard \(workspace-write sandbox, no network, asks before leaving it\)$'
+stdout '^  shared         skills, AGENTS.md from codex/main$'
+stdout '^✓ created ~/.codex-work \(private\)$'
+stdout '^✓ settings from codex/main \+ standard profile$'
+stdout '^✓ mcp docs from codex/main$'
+stdout '^! mcp secret not copied'
+stdout '^! mcp absent is not configured in codex/main$'
+stdout '^✓ push guard: pre-tool hook \+ git pre-push$'
+stdout 'log in: srn account login codex/work'
+exists home/.codex-work/.squadrn-account
+exec sh -c 'ls -a home | grep -c tmp- || true'
+stdout '^0$'
+# The hook was trusted in the temp dir the account was built in; the trust moved with it.
+grep 'hooks.state."[^"]*/.codex-work/hooks.json:pre_tool_use' home/.codex-work/config.toml
+! grep 'tmp-' home/.codex-work/config.toml
+exists home/.codex-work/AGENTS.md
+exists home/.codex-work/skills/review
+grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
+grep '"matcher": "Bash"' home/.codex-work/hooks.json
+grep 'plugin/bin/squadrn-hook\\" guard-git --no-ask' home/.codex-work/hooks.json
+grep 'trusted_hash = "sha256:' home/.codex-work/config.toml
+grep 'cfg=.*/home/.codex-work[^ ]* args=mcp add docs -- npx -y @acme/docs-mcp' home/calls.log
+# config.toml is the account's own copy, merged from main's: settings follow main, but MCP
+# servers, hooks and their trust, and the credentials store stay the account's.
+grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
+grep '^network_access = false$' home/.codex-work/config.toml
+# The standard profile: approval on request, a workspace-write sandbox, a core environment.
+grep '^approval_policy = "on-request"$' home/.codex-work/config.toml
+grep '^sandbox_mode = "workspace-write"$' home/.codex-work/config.toml
+grep '^inherit = "core"$' home/.codex-work/config.toml
+! grep 'mcp_servers|main-only|keyring|/.codex/hooks.json' home/.codex-work/config.toml
+exists home/.codex-work/.squadrn-managed.json
+! grep 'mcp add secret' home/calls.log
+
+# strict is a read-only workspace, and says so.
+exec squadrn account add codex/ro --profile strict -y
+stdout '^  profile +strict \(read-only workspace; use standard for daily work\)$'
+grep '^sandbox_mode = "read-only"$' home/.codex-ro/config.toml
+exec squadrn account rm codex/ro --yes
+
+# add is idempotent: nothing is re-installed or re-trusted.
+rm home/calls.log
+exec squadrn account add codex/work
+stdout 'codex/work is up to date'
+! exists home/calls.log
+
+# A user's own hooks are kept; a changed guard hook is trusted again.
+cp user-hooks.json home/.codex-work/hooks.json
+exec squadrn account add codex/work
+stdout '^✓ push guard: pre-tool hook \+ git pre-push$'
+grep 'my-linter' home/.codex-work/hooks.json
+grep 'squadrn-hook' home/.codex-work/hooks.json
+
+# Login, status and logout go through CODEX_HOME.
+exec squadrn account login codex/work
+stdout 'logged in to codex/work as me@.codex-work'
+grep 'cfg=.*/home/.codex-work args=login$' home/calls.log
+exec squadrn account ls
+stdout '^codex/work +yes +me@.codex-work +~/.codex-work$'
+
+# usage reads the limits from the app server; none reported (or logged out) is no data.
+rm home/calls.log
+exec squadrn usage
+stdout '^codex/work .* nodata +-$'
+grep 'cfg=.*/home/.codex-work args=app-server account/rateLimits/read' home/calls.log
+# "No limits reported" is remembered for 5 minutes too; --refresh asks again.
+rm home/calls.log
+exec squadrn usage
+stdout '^codex/work .* nodata +-$'
+! exists home/calls.log
+exec squadrn usage --refresh
+grep 'account/rateLimits/read' home/calls.log
+cp limits.json home/.codex-work/.limits
+exec squadrn usage --refresh
+stdout '^codex/work +.* 42% .* 7% .*'
+! stdout 'not tracked: .*codex'
+exec squadrn usage --json
+stdout '"account": "codex/work"'
+# A snapshot younger than 5 minutes is shown without asking codex again; --refresh asks.
+cp limits2.json home/.codex-work/.limits
+exec squadrn usage
+stdout '^codex/work +.* 42% .* just now$'
+exec squadrn usage --refresh
+stdout '^codex/work +.* 50% .* 9% .*'
+# An older snapshot is read again without --refresh.
+cp old-usage.json home/.local/state/squadrn/usage/codex-work.json
+exec squadrn usage
+stdout '^codex/work +.* 50% .* 9% .* just now$'
+
+# Sessions, resume and codex subcommands run as the account.
+exec squadrn codex/work
+stdout '^cfg=.*/home/.codex-work args=$'
+exec squadrn codex/work resume 0198e3a2-7c4b-7d10-9a55-1b2c3d4e5f60
+stdout '^cfg=.*/home/.codex-work args=resume 0198e3a2-7c4b-7d10-9a55-1b2c3d4e5f60$'
+exec squadrn -a codex/work exec 'fix the tests'
+stdout '^cfg=.*/home/.codex-work args=exec fix the tests$'
+exec squadrn work mcp list
+stdout '^cfg=.*/home/.codex-work args=mcp list$'
+# codex subcommands are not claude's: without a codex account they are not passed through.
+! exec squadrn resume
+stderr 'unknown'
+
+# Credentials always stay in the account: a session restores the setting if it was changed.
+cp keyring.toml home/.codex-work/config.toml
+! exec squadrn doctor
+! stdout 'credentials may be shared'
+grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
+grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
+
+# doctor checks the binary, login, guard hook trust and credentials store.
+exec squadrn account add codex/work
+! exec squadrn doctor
+stdout '✓ codex codex-cli 0.171.0'
+stdout '^account codex/work$'
+stdout '✓ logged in as me@.codex-work'
+stdout '✓ push guard hook installed and trusted'
+stdout '✓ credentials kept in ~/.codex-work'
+cp untrusted.toml home/.codex-work/config.toml
+! exec squadrn doctor
+stdout '✗ push guard hook not trusted by codex \(no git push guard\)  → srn account add codex/work'
+exec squadrn account add codex/work
+cp hooks-without-guard.json home/.codex-work/hooks.json
+! exec squadrn doctor
+stdout '✗ push guard hook not installed \(no git push guard\)  → srn account add codex/work'
+exec squadrn account add codex/work
+
+# The installed hook runs the guard in --no-ask mode: Codex cannot ask.
+exec sh -c 'sed -n "s/^ *\"command\": \"\\\\\"\(.*\)\\\\\" guard-git --no-ask\",*$/\1/p" home/.codex-work/hooks.json > hookpath.txt'
+grep 'plugin/bin/squadrn-hook$' hookpath.txt
+stdin push-var.json
+exec sh -c '"$(cat hookpath.txt)" guard-git --no-ask'
+stdout '"permissionDecision":"deny"'
+
+# swap and wt are Claude-only: Codex conversations cannot be transferred, worktrees not named.
+! exec squadrn swap --to codex/work
+stderr 'Codex CLI cannot transfer conversations'
+exec git init -q -b main repo
+cd repo
+! exec squadrn codex/work wt feat-a
+stderr 'codex/work: Codex CLI cannot create worktrees'
+cd $WORK
+
+# Rename keeps the guard trusted (hook trust is keyed by the hooks.json path).
+exec squadrn account rename codex/work job -y
+stdout 'renamed codex/work → codex/job'
+grep 'hooks.state."[^"]*/.codex-job/hooks.json:pre_tool_use' home/.codex-job/config.toml
+! grep '/.codex-work/hooks.json' home/.codex-job/config.toml
+
+exec squadrn account logout codex/job
+stdout 'logged out codex/job'
+grep 'cfg=.*/home/.codex-job args=logout$' home/calls.log
+
+-- empty --
+-- agents.md --
+# shared instructions
+-- mcplist.json --
+[{"name":"docs","enabled":true,"transport":{"type":"stdio","command":"npx","args":["-y","@acme/docs-mcp"],"env":null,"env_vars":[],"cwd":null}},
+ {"name":"secret","enabled":true,"transport":{"type":"stdio","command":"srv","args":[],"env":{"TOKEN":"x"},"env_vars":[],"cwd":null}}]
+-- limits.json --
+{"rateLimits":{"limitId":"codex","primary":{"usedPercent":42,"windowDurationMins":300,"resetsAt":4102444800},"secondary":{"usedPercent":7,"windowDurationMins":10080,"resetsAt":4102444800}},"rateLimitsByLimitId":null}
+-- limits2.json --
+{"rateLimits":{"primary":{"usedPercent":50,"windowDurationMins":300,"resetsAt":4102444800},"secondary":{"usedPercent":9,"windowDurationMins":10080,"resetsAt":4102444800}}}
+-- old-usage.json --
+{"five_hour":{"used_pct":10},"observed_at":"2020-01-01T00:00:00Z"}
+-- user-hooks.json --
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "apply_patch", "hooks": [{"type": "command", "command": "my-linter", "timeout": 5}]},
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "\"/old/plugin/bin/squadrn-hook\" guard-git --no-ask", "timeout": 10}]}
+    ]
+  }
+}
+-- hooks-without-guard.json --
+{"hooks": {"PreToolUse": [{"matcher": "apply_patch", "hooks": [{"type": "command", "command": "my-linter"}]}]}}
+-- main-config.toml --
+model = "gpt-5.5"
+cli_auth_credentials_store = "keyring"
+
+[sandbox_workspace_write]
+network_access = false
+
+[mcp_servers.main-only]
+command = "srv"
+env = { TOKEN = "x" }
+
+[hooks.state."/home/u/.codex/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:0"
+-- keyring.toml --
+model = "gpt-5.5"
+cli_auth_credentials_store = "keyring"
+
+[mcp_servers.docs]
+command = "npx"
+-- untrusted.toml --
+cli_auth_credentials_store = "file"
+-- push-var.json --
+{"session_id":"s","transcript_path":null,"cwd":".","hook_event_name":"PreToolUse","model":"m","permission_mode":"default","turn_id":"t","tool_name":"Bash","tool_use_id":"c","tool_input":{"command":"git push origin \"$BRANCH\""}}

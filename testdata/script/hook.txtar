@@ -1,7 +1,7 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # Hook usage names the installed binary the hooks run through.
 exec squadrn hook --help
-stdout '^usage: squadrn hook guard-git \| '
+stdout '^usage: squadrn hook guard-git \[--no-ask\] \| '
 stdout '^internal: the squadrn plugin \(squadrn-hook\) and git hooks run this through the installed binary$'
 exitcode 2 squadrn hook bogus
 
@@ -38,6 +38,21 @@ grep 'https://\*\*\*@github.com' home/.local/state/squadrn/guard.log
 stdin dynamic.json
 exec squadrn hook guard-git
 stdout '"permissionDecision":"ask"'
+
+# Codex's hooks cannot ask (--no-ask): the guard denies instead, and says how to proceed. Its
+# PreToolUse input carries the shell command as tool Bash, like Claude Code's.
+stdin codex-dynamic.json
+exec squadrn hook guard-git --no-ask
+stdout '"permissionDecision":"deny"'
+stdout 'cannot ask for confirmation: run the command yourself'
+stdin codex-force.json
+exec squadrn hook guard-git --no-ask
+stdout '"permissionDecision":"deny"'
+stdout 'force push is not allowed'
+stdin allow.json
+exec squadrn hook guard-git --no-ask
+! stdout .
+exitcode 2 squadrn hook guard-git --ask
 
 # A repo's own list only adds to the user's: main stays protected, production is too.
 stdin prod-main.json
@@ -169,6 +184,10 @@ protected_branches = ["feat-x"]
 {"cwd":"feat","tool_input":{"command":"git push -f origin feat-x"}}
 -- token.json --
 {"cwd":"feat","tool_input":{"command":"git push https://u:s3cr3t@github.com/o/r main"}}
+-- codex-dynamic.json --
+{"session_id":"0198e3a2-7c4b-7d10-9a55-1b2c3d4e5f60","transcript_path":null,"cwd":"feat","hook_event_name":"PreToolUse","model":"gpt-5.5","permission_mode":"default","turn_id":"t1","tool_name":"Bash","tool_use_id":"call_1","tool_input":{"command":"git push origin \"$BRANCH\""}}
+-- codex-force.json --
+{"session_id":"0198e3a2-7c4b-7d10-9a55-1b2c3d4e5f60","transcript_path":null,"cwd":"feat","hook_event_name":"PreToolUse","model":"gpt-5.5","permission_mode":"default","turn_id":"t1","tool_name":"Bash","tool_use_id":"call_2","tool_input":{"command":"git push -f origin feat-x"}}
 -- dynamic.json --
 {"cwd":"feat","tool_input":{"command":"git push origin \"$BRANCH\""}}
 -- prod-main.json --

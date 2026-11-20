@@ -202,3 +202,27 @@ func TestSyncSettingsSkipsMainAndBadFiles(t *testing.T) {
 		t.Error("broken record accepted")
 	}
 }
+
+// privateFormat keeps "mcpServers" per account.
+type privateFormat struct{ jsonFormat }
+
+func (privateFormat) Private() []string { return []string{"mcpServers"} }
+
+func TestSyncSettingsNeverTakesPrivateKeysFromMain(t *testing.T) {
+	s, a := settingsFixture(t, `{"model":"m","mcpServers":{"x":{"env":{"TOKEN":"t"}}}}`)
+	if _, err := s.SyncSettings(a, privateFormat{}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	doc := readDoc(t, a)
+	if doc["model"] != "m" || doc["mcpServers"] != nil {
+		t.Fatalf("got %v", doc)
+	}
+	doc["mcpServers"] = map[string]any{"own": map[string]any{}}
+	writeDoc(t, a, doc)
+	if _, err := s.SyncSettings(a, privateFormat{}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if readDoc(t, a)["mcpServers"] == nil {
+		t.Fatal("the account's own private key was removed")
+	}
+}

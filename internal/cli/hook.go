@@ -58,7 +58,7 @@ func (h hookEnv) readInput() ([]byte, error) {
 
 // hookUsage names the installed binary, not the user's command: the plugin (through squadrn-hook)
 // and the git hook shims run hooks through it, whatever the command is called.
-const hookUsage = "usage: squadrn hook guard-git | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change\n" +
+const hookUsage = "usage: squadrn hook guard-git [--no-ask] | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change\n" +
 	"internal: the squadrn plugin (squadrn-hook) and git hooks run this through the installed binary"
 
 // runHook handles `squadrn hook …` and returns the exit code.
@@ -69,12 +69,14 @@ func runHook(args []string, h hookEnv) int {
 	}
 	switch args[0] {
 	case "guard-git":
-		if len(args) != 1 {
-			// Exit 2 blocks the tool call in Claude Code, so a bad invocation still fails closed.
+		noAsk := len(args) == 2 && args[1] == "--no-ask"
+		if len(args) != 1 && !noAsk {
+			// Exit 2 blocks the tool call in Claude Code and Codex, so a bad invocation still
+			// fails closed.
 			_, _ = fmt.Fprintln(h.stderr, hookUsage)
 			return exitUsage
 		}
-		h.guardGit()
+		h.guardGit(noAsk)
 		return exitOK
 	case "notify":
 		if len(args) != 2 {
@@ -145,8 +147,9 @@ func hookGuard(cfgFile string) (guard.Guard, error) {
 }
 
 // guardGit is the pre-tool layer. Any failure becomes "ask": a hook that errors or prints
-// nothing lets the tool call through.
-func (h hookEnv) guardGit() {
+// nothing lets the tool call through. noAsk is for a CLI whose hooks cannot ask (Codex: "ask"
+// lets the call through), where asking becomes denying.
+func (h hookEnv) guardGit(noAsk bool) {
 	var d guard.Decision
 	cwd, cmd := "", ""
 	home, _ := config.Home()
@@ -156,6 +159,9 @@ func (h hookEnv) guardGit() {
 		}
 		if d.Verdict == guard.Allow {
 			return
+		}
+		if noAsk && d.Verdict == guard.Ask {
+			d = guard.Decision{Verdict: guard.Deny, Reason: d.Reason + " (this agent cannot ask for confirmation: run the command yourself if it is intended)"}
 		}
 		if home != "" {
 			guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-tool", d, cwd, cmd)
