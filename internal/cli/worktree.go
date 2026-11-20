@@ -92,11 +92,13 @@ func (a *app) wtCmd() *cobra.Command {
 }
 
 type worktreeRow struct {
-	Name    string `json:"name"`
-	Branch  string `json:"branch"`
-	Path    string `json:"path"`
-	Dirty   bool   `json:"dirty"`
-	Account string `json:"account,omitempty"` // running in a grid pane as this account
+	Name   string `json:"name"`
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+	Dirty  bool   `json:"dirty"`
+	// RunningAs is the account of the agent running in the worktree, in a grid pane or a
+	// terminal; "" when none runs.
+	RunningAs string `json:"running_as"`
 }
 
 func (a *app) wtLsCmd() *cobra.Command {
@@ -123,7 +125,14 @@ func (a *app) wtLsCmd() *cobra.Command {
 			for _, w := range wts {
 				name, _ := repo.Name(w)
 				dirty, _ := worktree.Dirty(ctx, w.Path)
-				rows = append(rows, worktreeRow{Name: name, Branch: w.Branch, Path: w.Path, Dirty: dirty, Account: running[name]})
+				as := running[name]
+				if used := repo.InUse(w); as == "" && len(used) > 0 {
+					as = used[0].Account
+					if as == "" {
+						as = a.sessionDesc(used[0])
+					}
+				}
+				rows = append(rows, worktreeRow{Name: name, Branch: w.Branch, Path: w.Path, Dirty: dirty, RunningAs: as})
 			}
 			if asJSON {
 				return a.printJSON(rows)
@@ -135,7 +144,7 @@ func (a *app) wtLsCmd() *cobra.Command {
 			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, "NAME\tBRANCH\tSTATE\tRUNNING AS")
 			for _, r := range rows {
-				state, as := "clean", r.Account
+				state, as := "clean", r.RunningAs
 				if r.Dirty {
 					state = "modified"
 				}
