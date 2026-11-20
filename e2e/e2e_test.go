@@ -96,8 +96,20 @@ func testConfig(t *testing.T, s *sandbox) {
 }
 
 func testAccounts(t *testing.T, s *sandbox) {
-	s.srn(t, "account", "add", "work").exit(0).out(`· new account claude/work → ~/.claude-work$`, `^✓ created ~/.claude-work \(private\)$`, `log in: srn account login claude/work`)
-	s.srn(t, "account", "add", "work").exit(0).out(`claude/work is up to date`).noOut(`✓ push guard`)
+	s.srn(t, "account", "add", "work").exit(0).out(
+		`^Claude Code .*· new account claude/work → ~/.claude-work$`,
+		`^  profile +standard \(secrets denied, push guard, 30-day history\)$`,
+		`^✓ created ~.\.claude-work \(private\)$`,
+		`^✓ settings from claude/main \+ standard profile$`,
+		`^✓ push guard: pre-tool hook \+ git pre-push$`,
+		`^done in [0-9.]+s · log in: srn account login claude/work · check: srn doctor claude/work$`)
+	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-work", "settings.json")), `Bash(git push *)`), "the standard profile did not reach claude/work's settings")
+	s.srn(t, "account", "add", "work").exit(0).out(`^✓ claude/work is up to date$`).noOut(`^✓ created`)
+	s.srn(t, "account", "add", "strictacct", "--profile", "strict", "--with", "privacy", "-y").exit(0).out(`^✓ settings from claude/main \+ strict profile \+ privacy$`)
+	strict := read(t, filepath.Join(s.home, ".claude-strictacct", "settings.json"))
+	s.check(t, strings.Contains(strict, `"blockReadsOutsideWorkingDirectories": true`) && strings.Contains(strict, `"DISABLE_TELEMETRY": "1"`) && strings.Contains(strict, `.claude-work/.credentials.json`), "strict profile settings missing")
+	s.srn(t, "doctor", "strictacct").exit(1).out(`^account claude/strictacct$`, `settings.json follows main \+ strict profile`).noOut(`^account claude/work$`)
+	s.srn(t, "account", "rm", "strictacct", "--yes").exit(0)
 	s.srn(t, "account", "ls").exit(0).out(`^claude/main +yes +me@.claude `, `^claude/work +no `)
 	s.srn(t, "account", "login", "work").exit(0).out(`^logged in to claude/work as me@.claude-work$`)
 	s.srn(t, "account", "rename", "work", "job", "-y").exit(0).out(`renamed claude/work → claude/job`)
@@ -107,13 +119,14 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.srn(t, "account", "add", "personal").exit(0)
 	s.srn(t, "account", "login", "personal").exit(0)
 
-	// A dir another tool made becomes an account by adopt; add (--relink) then sets it up from main.
-	write(t, filepath.Join(s.home, ".claude-tool", "settings.json"), "{}\n")
-	write(t, filepath.Join(s.home, ".claude", "settings.json"), "{}\n")
+	// A dir another tool made becomes an account by adopt; its own settings stay its own (ADR 0011).
+	write(t, filepath.Join(s.home, ".claude-tool", "settings.json"), `{"model":"haiku"}`+"\n")
+	write(t, filepath.Join(s.home, ".claude", "settings.json"), `{"model":"opus","theme":"dark"}`+"\n")
 	s.srn(t, "account", "ls").exit(0).out(`unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)`)
 	s.srn(t, "account", "adopt", "tool").exit(2)
-	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `· claude/tool → ~/.claude-tool$`)
-	s.srn(t, "account", "add", "tool", "--relink", "--yes").exit(0).out(`· claude/tool → ~/.claude-tool$`)
+	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`^adopted claude/tool`, `^! settings: kept your change to model`)
+	s.srn(t, "account", "add", "tool", "--yes").exit(0).out(`^✓ claude/tool is up to date$`)
+	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-tool", "settings.json")), `"theme": "dark"`), "main's settings did not reach the adopted account")
 	s.srn(t, "account", "rm", "tool").exit(2)
 	s.srn(t, "account", "rm", "main", "--yes").exit(2)
 	s.srn(t, "account", "rm", "tool", "--yes").exit(0).out(`removed account claude/tool`)
@@ -236,7 +249,7 @@ func testGrid(t *testing.T, s *sandbox) {
 func testUsage(t *testing.T, s *sandbox) {
 	s.srn(t, "usage").exit(0).out(`^ACCOUNT +PLAN`, `^claude/work .* nodata`, `not tracked: `)
 	s.srn(t, "usage", "setup").exit(2)
-	s.srn(t, "usage", "setup", "--all", "-y").exit(0).out(`^usage tracking on: ~/.claude-work/settings.json \(claude/work\)$`)
+	s.srn(t, "usage", "setup", "--all", "-y").exit(0).out(`^usage tracking on: ~/.claude/settings.json \(claude/main\)$`, `^usage tracking on: ~/.claude-work/settings.json \(claude/work\)$`)
 	s.srn(t, "usage", "setup", "work").exit(0).out(`already on`)
 
 	status := `{"session_id":"s1","cwd":"/repo","rate_limits":{"five_hour":{"used_percentage":42,"resets_at":4102444800},"seven_day":{"used_percentage":18.2,"resets_at":4102444800}}}`
