@@ -1,0 +1,65 @@
+[windows] skip 'Unix script: symlinks'
+# Every account gets its own settings.json, built from main's (ADR 0011); main is never written.
+! exists home/.claude/settings.json
+exec squadrn account add work --no-usage
+stdout 'settings ~/.claude-work/settings.json from main'
+! exists home/.claude/settings.json
+exec sh -c 'test -f home/.claude-work/settings.json && test ! -L home/.claude-work/settings.json && echo own'
+stdout '^own$'
+exists home/.claude-work/.squadrn-managed.json
+
+# Main's changes flow into the account at the next start.
+cp main1.json home/.claude/settings.json
+exec squadrn work -- hi
+grep '"model": "opus"' home/.claude-work/settings.json
+grep '"Read\(./.env\)"' home/.claude-work/settings.json
+! stderr 'kept your change'
+
+# A change made in the account (/model) is kept and reported once; main's other changes still flow.
+exec sh -c 'sed "s/\"opus\"/\"sonnet\"/" home/.claude-work/settings.json > x && mv x home/.claude-work/settings.json'
+cp main2.json home/.claude/settings.json
+exec squadrn work -- hi
+stderr 'claude/work: kept your change to model; it no longer follows the main account'
+grep '"model": "sonnet"' home/.claude-work/settings.json
+grep '"theme": "light"' home/.claude-work/settings.json
+exec squadrn work -- hi
+! stderr 'kept your change'
+exec sh -c 'squadrn doctor; true'
+stdout 'settings.json follows main; changed here: model'
+cmp home/.claude/settings.json main2.json
+
+# An rc.2 account linked to main's settings becomes a copy; the link is kept as a backup.
+exec squadrn account add old --no-usage
+rm home/.claude-old/settings.json home/.claude-old/.squadrn-managed.json
+symlink home/.claude-old/settings.json -> $WORK/home/.claude/settings.json
+exec sh -c 'squadrn doctor; true'
+stdout '! settings.json is still a link to main.s .*→ srn account add claude/old'
+exec squadrn old -- hi
+stderr 'claude/old now has its own settings file, kept in step with the main account.s \(the link was moved to ~/.claude-old/settings.json.bak-[0-9]{8}-[0-9]{6}\)'
+exec sh -c 'test ! -L home/.claude-old/settings.json && test -L home/.claude-old/settings.json.bak-* && echo migrated'
+stdout '^migrated$'
+grep '"theme": "light"' home/.claude-old/settings.json
+cmp home/.claude/settings.json main2.json
+
+# An account with settings of its own keeps them: they become the user's keys.
+mkdir home/.claude-mine
+cp own.json home/.claude-mine/settings.json
+exec squadrn account adopt mine -y
+exec squadrn account add mine --no-usage
+stdout 'settings kept your change to model \(it no longer follows main\)'
+grep '"model": "haiku"' home/.claude-mine/settings.json
+grep '"theme": "light"' home/.claude-mine/settings.json
+
+# A broken record is a doctor failure.
+cp bad home/.claude-mine/.squadrn-managed.json
+! exec squadrn doctor
+stdout '✗ .squadrn-managed.json unreadable'
+
+-- main1.json --
+{"model":"opus","permissions":{"deny":["Read(./.env)"]}}
+-- main2.json --
+{"model":"opus","theme":"light","permissions":{"deny":["Read(./.env)"]}}
+-- own.json --
+{"model":"haiku"}
+-- bad --
+x

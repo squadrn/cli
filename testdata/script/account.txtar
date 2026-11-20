@@ -2,6 +2,7 @@
 # Fixture: main has shared files, a per-account synced skills dir and user MCP servers.
 mkdir home/.claude/agents home/.claude/skills/find-skills home/.claude/skills/synced
 cp settings.json home/.claude/settings.json
+cp empty home/.claude/CLAUDE.md
 cp claude.json home/.claude.json
 cp empty home/.claude/.loggedin
 
@@ -9,7 +10,7 @@ cp empty home/.claude/.loggedin
 env SQUADRN_MARKETPLACE=$WORK/market
 exec squadrn account add claude/work
 stdout '^account claude/work → ~/.claude-work$'
-stdout 'linked ~/.claude-work/settings.json'
+stdout 'settings ~/.claude-work/settings.json from main'
 stdout 'linked ~/.claude-work/skills/find-skills'
 ! stdout 'synced'
 stdout 'mcp added codegraph'
@@ -61,7 +62,7 @@ stderr 'exists but is not a squadrn account .*run: srn account adopt tool$'
 exitcode 2 squadrn account adopt tool
 exec squadrn account adopt tool --yes
 stdout 'adopted claude/tool'
-stdout 'link main.s settings with: srn account add claude/tool$'
+stdout 'set it up from main with: srn account add claude/tool$'
 exists home/.claude-tool/.squadrn-account
 exec squadrn account adopt tool
 stdout 'already an account'
@@ -75,13 +76,13 @@ rm home/.claude/skills/find-skills
 exec squadrn work
 exists home/.claude-work/skills/new-skill
 ! exists home/.claude-work/skills/find-skills
-rm home/.claude-work/settings.json
-cp settings.json home/.claude-work/settings.json
+rm home/.claude-work/CLAUDE.md
+cp settings.json home/.claude-work/CLAUDE.md
 exec squadrn work
-stderr 'warning: ~/.claude-work/settings.json was replaced in claude/work, so it no longer follows the main account'
-rm home/.claude-work/settings.json
+stderr 'warning: ~/.claude-work/CLAUDE.md was replaced in claude/work, so it no longer follows the main account'
+rm home/.claude-work/CLAUDE.md
 exec squadrn account add work
-stdout 'linked ~/.claude-work/settings.json'
+stdout 'linked ~/.claude-work/CLAUDE.md'
 
 # A session in progress blocks rename and rm unless --force.
 mkdir home/.claude-work/.squadrn-inuse

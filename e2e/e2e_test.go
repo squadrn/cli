@@ -106,13 +106,14 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.srn(t, "account", "add", "personal").exit(0)
 	s.srn(t, "account", "login", "personal").exit(0)
 
-	// A dir another tool made becomes an account by adopt; --relink then links main's settings.
-	write(t, filepath.Join(s.home, ".claude-tool", "settings.json"), "{}\n")
-	write(t, filepath.Join(s.home, ".claude", "settings.json"), "{}\n")
+	// A dir another tool made becomes an account by adopt; its own settings stay its own (ADR 0011).
+	write(t, filepath.Join(s.home, ".claude-tool", "settings.json"), `{"model":"haiku"}`+"\n")
+	write(t, filepath.Join(s.home, ".claude", "settings.json"), `{"model":"opus","theme":"dark"}`+"\n")
 	s.srn(t, "account", "ls").exit(0).out(`unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)`)
 	s.srn(t, "account", "adopt", "tool").exit(2)
-	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `--relink`)
-	s.srn(t, "account", "add", "tool", "--relink", "--yes").exit(0).out(`settings.json`)
+	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `srn account add claude/tool`)
+	s.srn(t, "account", "add", "tool", "--yes").exit(0).out(`kept your change to model`)
+	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-tool", "settings.json")), `"theme": "dark"`), "main's settings did not reach the adopted account")
 	s.srn(t, "account", "rm", "tool").exit(2)
 	s.srn(t, "account", "rm", "main", "--yes").exit(2)
 	s.srn(t, "account", "rm", "tool", "--yes").exit(0).out(`removed account claude/tool`)
@@ -235,7 +236,7 @@ func testGrid(t *testing.T, s *sandbox) {
 func testUsage(t *testing.T, s *sandbox) {
 	s.srn(t, "usage").exit(0).out(`^ACCOUNT +PLAN`, `^claude/work .* nodata`, `not tracked: `)
 	s.srn(t, "usage", "setup").exit(2)
-	s.srn(t, "usage", "setup", "--all", "-y").exit(0).out(`^usage tracking on: ~/.claude/settings.json \(.*claude/work.*\)$`)
+	s.srn(t, "usage", "setup", "--all", "-y").exit(0).out(`^usage tracking on: ~/.claude/settings.json \(claude/main\)$`, `^usage tracking on: ~/.claude-work/settings.json \(claude/work\)$`)
 	s.srn(t, "usage", "setup", "work").exit(0).out(`already on`)
 
 	status := `{"session_id":"s1","cwd":"/repo","rate_limits":{"five_hour":{"used_percentage":42,"resets_at":4102444800},"seven_day":{"used_percentage":18.2,"resets_at":4102444800}}}`
