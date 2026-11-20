@@ -34,8 +34,8 @@ func (Settings) Encode(doc map[string]any) ([]byte, error) {
 // Deep: tables whose entries come from several sources, merged entry by entry.
 func (Settings) Deep() []string {
 	return []string{
-		"features", "model_providers", "profiles", "projects", "sandbox_workspace_write",
-		"shell_environment_policy", "tools", "tui",
+		"analytics", "features", "feedback", "model_providers", "profiles", "projects",
+		"sandbox_workspace_write", "shell_environment_policy", "tools", "tui",
 	}
 }
 

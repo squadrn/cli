@@ -367,6 +367,7 @@ var Codex = Spec{
 		"plugin", "queue", "remote-control", "resume", "review", "sandbox", "unarchive",
 	},
 	SessionID:   regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
+	Credentials: "auth.json",
 	InstallHint: "npm install -g @openai/codex",
 	Caps:        Caps{Plugins: true, SharedMCP: true},
 }

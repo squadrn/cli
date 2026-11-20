@@ -13,6 +13,7 @@ var (
 	_ provider.CredentialStore = CLI{}
 	_ provider.SettingsFormat  = Settings{}
 	_ provider.PrivateSettings = Settings{}
+	_ provider.Profiler        = Profiles{}
 )
 
 func init() {
@@ -26,5 +27,6 @@ func init() {
 			return c, nil
 		},
 		Settings: Settings{},
+		Profiles: Profiles{},
 	})
 }

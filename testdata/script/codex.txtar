@@ -42,6 +42,10 @@ grep 'cfg=.*/home/.codex-work[^ ]* args=mcp add docs -- npx -y @acme/docs-mcp' h
 # servers, hooks and their trust, and the credentials store stay the account's.
 grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
 grep '^network_access = false$' home/.codex-work/config.toml
+# The standard profile: approval on request, a workspace-write sandbox, a core environment.
+grep '^approval_policy = "on-request"$' home/.codex-work/config.toml
+grep '^sandbox_mode = "workspace-write"$' home/.codex-work/config.toml
+grep '^inherit = "core"$' home/.codex-work/config.toml
 ! grep 'mcp_servers|main-only|keyring|/.codex/hooks.json' home/.codex-work/config.toml
 exists home/.codex-work/.squadrn-managed.json
 ! grep 'mcp add secret' home/calls.log

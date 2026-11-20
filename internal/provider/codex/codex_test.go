@@ -358,3 +358,32 @@ func TestSettingsRoundTrip(t *testing.T) {
 		t.Fatal("private or deep keys")
 	}
 }
+
+func TestProfiles(t *testing.T) {
+	var p Profiles
+	minimal, err := p.Profile(provider.ProfileMinimal, nil, provider.ProfileContext{})
+	if err != nil || minimal[storeKey] != storeFile || minimal["sandbox_mode"] != nil {
+		t.Fatalf("minimal: %v %v", minimal, err)
+	}
+	std, err := p.Profile(provider.ProfileStandard, []string{"privacy", "no-attribution"}, provider.ProfileContext{})
+	if err != nil || std["approval_policy"] != "on-request" || std["sandbox_mode"] != "workspace-write" ||
+		std["shell_environment_policy"].(map[string]any)["inherit"] != "core" || std["analytics"] == nil || std["feedback"] == nil {
+		t.Fatalf("standard: %v %v", std, err)
+	}
+	strict, err := p.Profile(provider.ProfileStrict, nil, provider.ProfileContext{})
+	if err != nil || strict["sandbox_mode"] != "read-only" || strict["sandbox_workspace_write"] == nil {
+		t.Fatalf("strict: %v %v", strict, err)
+	}
+	if _, err := p.Profile("lax", nil, provider.ProfileContext{}); err == nil {
+		t.Fatal("unknown profile")
+	}
+	if _, err := p.Profile(provider.ProfileStandard, []string{"telemetry"}, provider.ProfileContext{}); err == nil {
+		t.Fatal("unknown option")
+	}
+	// Every profile encodes as config.toml.
+	for _, doc := range []map[string]any{minimal, std, strict} {
+		if _, err := (Settings{}).Encode(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
