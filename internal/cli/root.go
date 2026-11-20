@@ -128,7 +128,7 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 		stdin:       os.Stdin,
 		stdout:      os.Stdout,
 		stderr:      os.Stderr,
-		interactive: isTerminal(os.Stdin) && isTerminal(os.Stdout),
+		interactive: isTerminal(os.Stdin) && isTerminal(os.Stdout) && visibleConsole(),
 		colorOut:    !noColor && isTerminal(os.Stdout),
 		colorErr:    !noColor && isTerminal(os.Stderr),
 		ttyErr:      vt && isTerminal(os.Stderr),
