@@ -3,13 +3,13 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -110,6 +110,31 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.check(t, strings.Contains(strict, `"blockReadsOutsideWorkingDirectories": true`) && strings.Contains(strict, `"DISABLE_TELEMETRY": "1"`) && strings.Contains(strict, `.claude-work/.credentials.json`), "strict profile settings missing")
 	s.srn(t, "doctor", "strictacct").exit(1).out(`^account claude/strictacct$`, `settings.json follows main \+ strict profile`).noOut(`^account claude/work$`)
 	s.srn(t, "account", "rm", "strictacct", "--yes").exit(0)
+	s.srn(t, "account", "add", "mini", "--profile", "minimal", "--with", "no-attribution", "-y").exit(0).out(
+		`^  profile +minimal \(secrets denied\) \+ no-attribution$`,
+		`^✓ settings from claude/main \+ minimal profile \+ no-attribution$`)
+	mini := read(t, filepath.Join(s.home, ".claude-mini", "settings.json"))
+	s.check(t, strings.Contains(mini, `"commit": ""`) && strings.Contains(mini, `Read(~/.ssh/**)`) && !strings.Contains(mini, `Bash(git push *)`), "minimal profile settings wrong")
+	s.srn(t, "account", "add", "mini", "--profile", "standard", "-y").exit(0).out(`^✓ settings updated: .*permissions\.ask`).noOut(`^✓ created`)
+	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-mini", "settings.json")), `Bash(git push *)`), "switching to the standard profile did not reach claude/mini")
+	s.srn(t, "account", "add", "mini", "-y").exit(0).out(`^  profile +standard .*\+ no-attribution$`, `^✓ claude/mini is up to date$`)
+	s.srn(t, "account", "rm", "mini", "--yes").exit(0)
+
+	// A failing step says which, what state the account is in and how to retry; nothing is left behind.
+	mainSettings := filepath.Join(s.home, ".claude", "settings.json")
+	saved, savedErr := os.ReadFile(mainSettings)
+	write(t, mainSettings, `{"model":`)
+	s.srn(t, "account", "add", "broken", "-y").exit(1).out(
+		`^✗ build settings failed: `,
+		`^  state: nothing was created$`,
+		`^  retry: srn account add claude/broken$`)
+	left, _ := filepath.Glob(filepath.Join(s.home, ".claude-broken*"))
+	s.check(t, len(left) == 0, "a failed account add left %v", left)
+	if savedErr == nil {
+		write(t, mainSettings, string(saved))
+	} else if err := os.Remove(mainSettings); err != nil {
+		t.Fatal(err)
+	}
 	s.srn(t, "account", "ls").exit(0).out(`^claude/main +yes +me@.claude `, `^claude/work +no `)
 	s.srn(t, "account", "login", "work").exit(0).out(`^logged in to claude/work as me@.claude-work$`)
 	s.srn(t, "account", "rename", "work", "job", "-y").exit(0).out(`renamed claude/work → claude/job`)
@@ -334,10 +359,11 @@ func testGuard(t *testing.T, s *sandbox) {
 		out(`"permissionDecision":"deny"`, `direct push to protected branch ."main`)
 	s.run(t, opt{stdin: payload(`git push origin "$BRANCH"`)}, "srn", "hook", "guard-git").exit(0).out(`"permissionDecision":"ask"`)
 	s.run(t, opt{stdin: "not json"}, "srn", "hook", "guard-git").exit(0).out(`"permissionDecision":"ask"`)
-	if runtime.GOOS != "windows" {
-		shim := filepath.Join(s.home, ".local", "share", "squadrn", "plugin", "bin", "squadrn-hook")
-		s.run(t, opt{stdin: payload("git push --force origin feat-x")}, shim, "guard-git").exit(0).out(`"permissionDecision":"deny"`)
-	}
+
+	// The installed plugin's hook, started exactly the way Claude Code starts it.
+	s.claudeHook(t, payload("git push --force origin feat-x")).exit(0).out(`"permissionDecision":"deny"`, `force push`)
+	s.claudeHook(t, payload("git push origin HEAD:main")).exit(0).out(`"permissionDecision":"deny"`)
+	s.claudeHook(t, payload("git push origin feat-x")).exit(0).noOut(`.`)
 
 	// Layer 2: real pushes from a session go through git's pre-push hook, which squadrn wires
 	// into every session it starts. The fake agent runs the push in the session's environment.
@@ -407,46 +433,14 @@ func testCodex(t *testing.T, s *sandbox) {
 	r.err(`squadrn guard: direct push to protected branch "main"`)
 }
 
-// knownDoctorFailures lists doctor problems (✗) a platform is known to report in the sandbox;
-// each is an open product issue. Windows: the layer-1 probe starts the cmd.exe line of
-// hooks.windows.json with Go's argument quoting, and cmd.exe misreads the escaped quotes
-// ('\"…squadrn.exe\"' is not recognized). Whether Claude Code's own spawn hits the same is
-// open; the guard section checks the guard binary directly.
-var knownDoctorFailures = map[string][]string{
-	"windows": {"layer 1 (pre-tool hook) did not deny a force push when run like Claude Code runs it"},
-}
-
 func testDoctor(t *testing.T, s *sandbox) {
-	r := s.srn(t, "doctor")
-	if known := knownDoctorFailures[runtime.GOOS]; len(known) > 0 {
-		// Known product issues, tracked for a fix: the run fails once they are fixed, so the
-		// entry is removed and doctor must pass again.
-		r.exit(1)
-		var unexpected []string
-		for _, line := range strings.Split(norm(r.stdout), "\n") {
-			if strings.Contains(line, "✗") && !slices.ContainsFunc(known, func(k string) bool { return strings.Contains(line, k) }) {
-				unexpected = append(unexpected, line)
-			}
-		}
-		s.check(t, len(unexpected) == 0, "doctor reports unexpected problems:\n%s", strings.Join(unexpected, "\n"))
-		for _, k := range known {
-			r.out(regexp.QuoteMeta(k))
-		}
-	} else {
-		r.exit(0)
-	}
-	r.out(`^install$`, `✓ installed release `+regexp.QuoteMeta(version), `✓ git`, `✓ layer 2 \(git pre-push hook\) installed`,
-		`^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`,
-		`^account codex/work$`, `✓ logged in as me@.codex-work`, `✓ push guard hook installed and trusted`, `✓ credentials kept in ~/.codex-work`)
-	if len(knownDoctorFailures[runtime.GOOS]) == 0 {
-		r.out(`✓ layer 1 \(pre-tool hook\) denies force pushes`).noOut(`✗`)
-	}
+	s.srn(t, "doctor").exit(0).
+		out(`^install$`, `✓ installed release `+regexp.QuoteMeta(version), `✓ git`, `✓ layer 1 \(pre-tool hook\) denies force pushes`,
+			`✓ layer 2 \(git pre-push hook\) installed`, `^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`,
+			`^account codex/work$`, `✓ logged in as me@.codex-work`, `✓ push guard hook installed and trusted`, `✓ credentials kept in ~/.codex-work`).
+		noOut(`✗`)
 	s.srn(t, "doctor", "--json").out(`"group": "push guard"`)
-	one := s.srn(t, "doctor", "codex/work")
-	one.out(`^account codex/work$`, `✓ push guard hook installed and trusted`).noOut(`^account claude/`)
-	if len(knownDoctorFailures[runtime.GOOS]) == 0 {
-		one.exit(0)
-	}
+	s.srn(t, "doctor", "codex/work").exit(0).out(`^account codex/work$`, `✓ push guard hook installed and trusted`).noOut(`^account claude/`)
 	s.srn(t, "doctor", "ghost").exit(1)
 	s.srn(t, "doctor", "work", "extra").exit(2)
 }
@@ -486,4 +480,59 @@ func testUninstall(t *testing.T, s *sandbox) {
 	}
 	b, _ := os.ReadFile(filepath.Join(s.home, ".claude", ".plugins"))
 	s.check(t, !strings.Contains(string(b), "squadrn@squadrn"), "plugin still registered in claude/main")
+}
+
+// guardHook is the PreToolUse entry of the installed plugin's hooks.json that runs guard-git.
+type guardHook struct {
+	Command   string   `json:"command"`
+	Args      []string `json:"args"`
+	OnFailure string   `json:"onFailure"`
+}
+
+// claudeHook runs the installed guard hook with stdin as Claude Code does
+// (code.claude.com/docs/en/hooks): with args (exec form) the command is spawned directly with
+// ${CLAUDE_PLUGIN_ROOT} substituted into the command and each argument, no shell involved; without
+// args (shell form) the command string goes to sh -c (Git Bash on Windows). An exec-form hook must
+// fail closed: onFailure "block", so a squadrn.exe that cannot start blocks the tool call.
+func (s *sandbox) claudeHook(t *testing.T, stdin string) *result {
+	t.Helper()
+	root := filepath.Join(s.home, ".local", "share", "squadrn", "plugin")
+	b, err := os.ReadFile(filepath.Join(root, "hooks", "hooks.json"))
+	if err != nil {
+		s.fail(t, "plugin hooks.json: %v", err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Matcher string      `json:"matcher"`
+			Hooks   []guardHook `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		s.fail(t, "plugin hooks.json: %v", err)
+	}
+	var h *guardHook
+	for _, grp := range doc.Hooks["PreToolUse"] {
+		for i, c := range grp.Hooks {
+			if strings.Contains(c.Command+" "+strings.Join(c.Args, " "), "guard-git") {
+				s.check(t, strings.Contains(grp.Matcher, "Bash"), "the guard hook does not match the Bash tool: %q", grp.Matcher)
+				h = &grp.Hooks[i]
+			}
+		}
+	}
+	if h == nil {
+		s.fail(t, "hooks.json has no guard-git PreToolUse hook:\n%s", b)
+	}
+	env := []string{"CLAUDE_PLUGIN_ROOT=" + root, "CLAUDE_PROJECT_DIR=" + s.root}
+	if h.Args == nil {
+		return s.run(t, opt{stdin: stdin, env: env}, "sh", "-c", h.Command)
+	}
+	s.check(t, h.OnFailure == "block", "the exec-form guard hook does not fail closed (onFailure %q)", h.OnFailure)
+	sub := func(v string) string { return strings.ReplaceAll(v, "${CLAUDE_PLUGIN_ROOT}", root) }
+	args := make([]string, len(h.Args))
+	for i, a := range h.Args {
+		args[i] = sub(a)
+	}
+	bin := sub(h.Command)
+	s.check(t, filepath.IsAbs(bin) && s.exists(bin), "the guard hook command %q does not resolve to an installed file", bin)
+	return s.run(t, opt{stdin: stdin, env: env}, bin, args...)
 }

@@ -3,17 +3,17 @@
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
-        "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook guard-git || exit /b 2"], "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "guard-git"], "timeout": 5, "onFailure": "block" }]
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook notify \"Needs input\""], "async": true }] }
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify", "Needs input"], "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook notify \"Done\""], "async": true }] }
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify", "Done"], "async": true }] }
     ],
     "StopFailure": [
-      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "cmd.exe", "args": ["/d", "/c", "\"${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe\" hook limit"], "async": true }] }
+      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "limit"], "async": true }] }
     ]
   }
 }
