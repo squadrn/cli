@@ -189,7 +189,7 @@ func TestMoveToTrash(t *testing.T) {
 		t.Error("account still exists after removal")
 	}
 	m, _ := s.Get("main")
-	if _, err := s.MoveToTrash(m, time.Now()); !errors.Is(err, ErrReserved) {
+	if _, err := s.MoveToTrash(m, time.Now()); !errors.Is(err, ErrReserved) || err.Error() != "claude/main is the main account (~/.claude) and cannot be removed" {
 		t.Errorf("removing main err = %v", err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/inuse"
+	"github.com/squadrn/squadrn/internal/usage"
 	"github.com/squadrn/squadrn/internal/worktree"
 )
 
@@ -67,4 +68,34 @@ func (a *app) checkAccountFree(acct account.Account, force bool) error {
 		return fmt.Errorf("%s is in use by %s; stop it first (or use --force)", acct.Label(), a.sessionDesc(used[0]))
 	}
 	return nil
+}
+
+// recordedDirs are the directories squadrn knows sessions of accts ran in without searching the
+// disk: the working directories in their usage records and in the handoffs match accepts, and
+// their parents up to (not including) the home dir.
+func (a *app) recordedDirs(accts []account.Account, match func(usage.Handoff) bool) []string {
+	var recorded []string
+	for _, acct := range accts {
+		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok {
+			recorded = append(recorded, snap.Cwd, snap.LimitedCwd)
+		}
+	}
+	_, _, _ = a.ledger().Latest(func(h usage.Handoff) bool {
+		if match(h) {
+			recorded = append(recorded, h.Cwd)
+		}
+		return false
+	})
+	seen := map[string]bool{}
+	var dirs []string
+	for _, d := range recorded {
+		for d != "" && filepath.IsAbs(d) && d != a.store.Home && d != filepath.Dir(d) {
+			if !seen[d] {
+				seen[d] = true
+				dirs = append(dirs, d)
+			}
+			d = filepath.Dir(d)
+		}
+	}
+	return dirs
 }

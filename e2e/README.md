@@ -22,7 +22,8 @@ On Windows it uses Windows PowerShell for `install.ps1`. It takes about 10 secon
    (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_NOSYSTEM`), a private tmux socket dir under `/tmp` and a
    local bare remote. The developer's `GIT_*`, `CLAUDE_*`, `SQUADRN_*`, `GH_*`, tokens and PATH
    entries under the real home are dropped. PATH starts with the fakes, then `~/.local/bin` of
-   the sandbox. On macOS a failing `security` stub keeps the login Keychain out of reach.
+   the sandbox. Commands run without a terminal (Unix: a new session; Windows: the installed commands
+   are detached from the console), so prompts that fall back to the terminal behave as on a CI runner. On macOS a failing `security` stub keeps the login Keychain out of reach.
 3. **Flows** (`e2e_test.go`, one subtest per section, in order): install (the first-install
    summary, `srn setup` without a terminal and, on Unix, answered at a pseudo terminal through
    `script(1)`), help/version/

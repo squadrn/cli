@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/squadrn/squadrn/internal/fakeagent"
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/release"
 )
 
@@ -251,11 +252,10 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, s.lookPath(name), args...)
+	bin := s.lookPath(name)
+	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = o.dir
-	if o.cmdLine != "" {
-		setCmdLine(cmd, o.cmdLine)
-	}
+	cmd.SysProcAttr = sysProcAttr(o.cmdLine, fsx.Within(bin, s.home))
 	if cmd.Dir == "" {
 		cmd.Dir = s.root
 	}

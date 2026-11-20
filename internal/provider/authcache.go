@@ -145,14 +145,15 @@ func (c AuthCache) Cached(key string) (AuthStatus, bool) {
 	return e.Status, true
 }
 
-// Forget drops one account, e.g. after login, logout or removal.
-func (c AuthCache) Forget(key string) {
+// Forget drops one account, e.g. after login, logout or removal; false when none was cached.
+func (c AuthCache) Forget(key string) bool {
 	entries := c.read()
 	if _, ok := entries[key]; !ok {
-		return
+		return false
 	}
 	delete(entries, key)
 	c.write(entries)
+	return true
 }
 
 // write is best-effort: a cache failure must never fail the command.
