@@ -431,3 +431,23 @@ func TestUsageTrackingLine(t *testing.T) {
 		t.Errorf("on: %+v", c)
 	}
 }
+
+func TestOnlyChecksOneAccount(t *testing.T) {
+	e := env(t, fakeAgent{loggedIn: true}, nil)
+	if err := os.MkdirAll(filepath.Join(e.Store.Home, ".claude-work"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(e.Store.Home, ".claude-work", account.Marker), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.Only = "claude/work"
+	checks := e.accounts(context.Background())
+	if len(checks) == 0 {
+		t.Fatal("no checks")
+	}
+	for _, c := range checks {
+		if c.Group != "account claude/work" {
+			t.Errorf("checked %s", c.Group)
+		}
+	}
+}
