@@ -155,6 +155,9 @@ func (a *app) setup(yes bool) error {
 		a.store.DefaultProvider = cfg.DefaultProvider
 		a.out("   %s new accounts get the %s profile\n", ok, profile)
 	}
+	if err := a.protectOwnFiles(in, ask, yes, ok, mark); err != nil {
+		return err
+	}
 
 	a.out("3. existing accounts\n")
 	accts, err := a.store.List()
@@ -277,4 +280,49 @@ func (a *app) summary() {
 
 func (a *app) nextSteps() {
 	a.out("next: %[1]s account add <name> (a new account) · %[1]s <account> (start a session) · %[1]s grid (side by side)\n", a.cmd)
+}
+
+// protectOwnFiles offers to deny agents edits of squadrn's own files in claude/main's settings,
+// which doctor recommends; accounts made with a profile have these rules already.
+func (a *app) protectOwnFiles(in *bufio.Reader, ask, yes bool, ok, mark string) error {
+	path, missing := a.missingOwnRules()
+	if len(missing) == 0 {
+		return nil
+	}
+	f := settingsFormat(provider.Claude)
+	protect := yes
+	if ask {
+		var err error
+		if protect, err = a.askYes(in, "protect", "deny agents edits of "+config.Slug+"'s files in "+a.tilde(path)+"?"); err != nil {
+			return err
+		}
+	}
+	if !protect {
+		a.out("   %s skipped (later: %s doctor shows the rules to add)\n", mark, a.cmd)
+		return nil
+	}
+	if err := account.AddToList(path, f, "permissions.deny", missing); err != nil {
+		a.warnf("cannot add the rules to %s: %v", a.tilde(path), err)
+		return nil
+	}
+	a.out("   %s agents cannot edit %s's files (permissions.deny in %s)\n", ok, config.Slug, a.tilde(path))
+	return nil
+}
+
+// missingOwnRules are the Edit deny rules for squadrn's own dirs that claude/main's settings
+// file (path) lacks; none when there is no such account or its settings cannot be read (doctor
+// reports that).
+func (a *app) missingOwnRules() (path string, missing []string) {
+	main, err := a.store.Get(provider.Claude.ID + "/" + account.Main)
+	f := settingsFormat(provider.Claude)
+	if err != nil || f == nil {
+		return "", nil
+	}
+	var rules []string
+	for _, d := range a.profileContext(main).OwnDirs {
+		rules = append(rules, "Edit("+d+"/**)")
+	}
+	path = settingsPath(main)
+	missing, _ = account.MissingFromList(path, f, "permissions.deny", rules)
+	return path, missing
 }

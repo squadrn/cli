@@ -17,14 +17,18 @@ stdout '^   ✓ Claude Code 2.1.329'
 stdout '^   – Codex CLI not found'
 stdout '^   profile        standard'
 stdout '^   – skipped ~/.claude-tool \(later: srn account adopt claude/tool\)$'
+stdout '^   ✓ agents cannot edit squadrn.s files \(permissions.deny in ~/.claude/settings.json\)$'
 stdout '^   ✓ usage tracking on: claude/main$'
 stdout '^5. doctor$'
+stdout '^  ✓ agents cannot edit squadrn.s files \(permissions.deny\)$'
 stdout '^next: srn account add <name>'
 ! exists home/.claude-tool/.squadrn-account
 grep 'hook statusline' home/.claude/settings.json
+grep '"Edit\(~/.local/share/squadrn/\*\*\)"' home/.claude/settings.json
 
 # It is idempotent.
 exec squadrn setup -y
+! stdout '^   ✓ agents cannot edit'
 stdout '^   ✓ on for every account that reports usage$'
 
 # Codex on PATH and a codex dir named like an account are found too.
@@ -58,6 +62,8 @@ stderr '  profiles       minimal   secrets denied$'
 stderr 'profile        minimal / standard / strict \[standard\]: '
 stderr 'adopt ~/.claude-old as claude/old\? \(another tool may own it\) \[y/N\] '
 stderr '   ✓ new accounts get the strict profile$'
+stderr 'protect +deny agents edits of squadrn.s files in ~/.claude/settings.json\? \[Y/n\] '
+stderr '   – skipped \(later: srn doctor shows the rules to add\)$'
 stderr 'adopted claude/old$'
 stderr 'track +usage limits for claude/main, claude/old\? \[Y/n\] '
 stderr '– skipped \(later: srn usage setup --all\)$'
@@ -72,5 +78,6 @@ stdout 'next: srn doctor'
 -- empty --
 -- answers --
 strict
+n
 y
 n

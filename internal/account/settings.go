@@ -362,3 +362,50 @@ func hashIf(v any, has bool) string {
 	}
 	return hash(v)
 }
+
+// MissingFromList returns the values the list at key (e.g. permissions.deny) of the settings file
+// at path does not hold yet.
+func MissingFromList(path string, f provider.SettingsFormat, key string, values []string) ([]string, error) {
+	doc, _, err := readSettings(path, f)
+	if err != nil {
+		return nil, err
+	}
+	have, _ := getPath(doc, key, f.Deep())
+	list, _ := have.([]any)
+	var missing []string
+	for _, v := range values {
+		if !slices.Contains(list, any(v)) {
+			missing = append(missing, v)
+		}
+	}
+	return missing, nil
+}
+
+// AddToList appends the values the list at key of the settings file at path does not hold yet,
+// keeping everything else; a missing file is created. Links are followed, so main's file is
+// edited in place.
+func AddToList(path string, f provider.SettingsFormat, key string, values []string) error {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	doc, _, err := readSettings(path, f)
+	if err != nil {
+		return err
+	}
+	have, _ := getPath(doc, key, f.Deep())
+	list, ok := have.([]any)
+	if have != nil && !ok {
+		return fmt.Errorf("%s in %s is not a list", key, path)
+	}
+	for _, v := range values {
+		if !slices.Contains(list, any(v)) {
+			list = append(list, v)
+		}
+	}
+	setPath(doc, key, list, f.Deep())
+	b, err := f.Encode(doc)
+	if err != nil {
+		return err
+	}
+	return fsx.WriteBytes(path, b, 0o600)
+}
