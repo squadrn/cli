@@ -143,21 +143,8 @@ func (a *app) purgeInUse(accts []account.Account) {
 	for _, acct := range accts {
 		add(acct.Dir)
 	}
-	var recorded []string
-	for _, acct := range accts {
-		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok {
-			recorded = append(recorded, snap.Cwd, snap.LimitedCwd)
-		}
-	}
-	_, _, _ = a.ledger().Latest(func(h usage.Handoff) bool {
-		recorded = append(recorded, h.Cwd)
-		return false
-	})
-	for _, d := range recorded {
-		for d != "" && filepath.IsAbs(d) && d != a.store.Home && d != filepath.Dir(d) {
-			add(d)
-			d = filepath.Dir(d)
-		}
+	for _, d := range a.recordedDirs(accts, func(usage.Handoff) bool { return true }) {
+		add(d)
 	}
 	for _, d := range dirs {
 		reg := filepath.Join(d, inuse.Dir)

@@ -147,7 +147,7 @@ Available Commands:
   logout      Sign an account out (keeps its dir)
   ls          List accounts with login status
   rename      Rename an account (logs it out first; log in again afterwards)
-  rm          Log an account out and move its dir to the trash
+  rm          Log an account out and move its dir to the trash (--purge: delete it for good)
 
 Flags:
   -h, --help   help for account
@@ -242,7 +242,12 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-account-rm.txt --
-Log an account out and move its dir to the trash
+Log an account out and move its dir to the trash.
+
+--purge deletes the dir permanently instead and removes every record squadrn keeps of the
+account: its usage record, its handoffs, its in-use records and its cached login status.
+At a terminal it asks you to type the account (e.g. claude/personal), even with --yes;
+without one it needs --purge --yes.
 
 Usage:
   srn account rm <account> [flags]
@@ -250,7 +255,8 @@ Usage:
 Flags:
   -f, --force   remove even if a session seems to use the account
   -h, --help    help for rm
-  -y, --yes     do not ask for confirmation
+      --purge   delete the dir permanently and every record squadrn keeps of the account
+  -y, --yes     do not ask for confirmation (with --purge: only without a terminal)
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)

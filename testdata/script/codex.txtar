@@ -55,7 +55,11 @@ exists home/.codex-work/.squadrn-managed.json
 exec squadrn account add codex/ro --profile strict -y
 stdout '^  profile +strict \(read-only workspace; use standard for daily work\)$'
 grep '^sandbox_mode = "read-only"$' home/.codex-ro/config.toml
-exec squadrn account rm codex/ro --yes
+exec squadrn account rm codex/ro --purge --yes
+stdout '^logged out codex/ro$'
+stdout '^deleted ~/.codex-ro$'
+grep 'cfg=.*/home/.codex-ro args=logout$' home/calls.log
+! exists home/.codex-ro
 
 # add is idempotent: nothing is re-installed or re-trusted.
 rm home/calls.log

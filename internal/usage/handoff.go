@@ -2,6 +2,7 @@ package usage
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -62,4 +63,37 @@ func (l Ledger) Latest(match func(Handoff) bool) (Handoff, bool, error) {
 		}
 	}
 	return last, found, sc.Err()
+}
+
+// Remove rewrites the ledger without the handoffs from or to account and returns how many it
+// dropped. Lines that do not parse are kept. A missing ledger is empty.
+func (l Ledger) Remove(account string) (int, error) {
+	return DropLines(l.Path, func(line []byte) bool {
+		var h Handoff
+		return json.Unmarshal(line, &h) == nil && (h.From == account || h.To == account)
+	})
+}
+
+// DropLines atomically rewrites the line-oriented file path without the lines drop accepts and
+// returns how many it dropped; the file is not written when none is. A missing file is empty.
+func DropLines(path string, drop func([]byte) bool) (int, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	var kept []byte
+	n := 0
+	for line := range bytes.Lines(b) {
+		if t := bytes.TrimRight(line, "\r\n"); len(t) > 0 && drop(t) {
+			n++
+			continue
+		}
+		kept = append(kept, line...)
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	return n, fsx.WriteBytes(path, kept, 0o600)
 }
