@@ -169,6 +169,11 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if shared := a.sharedNames(acct.Spec); isNew && len(shared) > 0 {
 		a.out("  %-14s %s from %s/%s\n", "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
 	}
+	if o.relink && !isNew {
+		if o.relink, err = a.confirmRelink(in, acct, ag, ask, o.yes); err != nil {
+			return err
+		}
+	}
 	trackUsage := o.usage != nil && *o.usage
 	noUsage := o.usage != nil && !*o.usage
 	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && (isNew || !a.usageTracking(acct)) {
@@ -181,11 +186,6 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	doLogin := o.login != nil && *o.login
 	if !status.LoggedIn && o.login == nil && ask {
 		if doLogin, err = a.askYes(in, "log in now?", ""); err != nil {
-			return err
-		}
-	}
-	if o.relink && !isNew {
-		if o.relink, err = a.confirmRelink(acct, ag, o.yes); err != nil {
 			return err
 		}
 	}
@@ -496,6 +496,17 @@ func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
 		return false, err
 	}
 	return !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "n"), nil
+}
+
+// askNo is askYes for a question whose default is no.
+func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
+	a.errf("  %-14s %s [y/N] ", label, question)
+	line, err := in.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	s := strings.ToLower(strings.TrimSpace(line))
+	return s == "y" || s == "yes", nil
 }
 
 func profileList() string {

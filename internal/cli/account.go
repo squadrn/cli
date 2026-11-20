@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"strings"
@@ -163,9 +164,10 @@ func (a *app) accountList(asJSON bool) error {
 	return nil
 }
 
-// confirmRelink asks before moving the account's own copies of shared files aside; false means
-// there is nothing to relink.
-func (a *app) confirmRelink(acct account.Account, ag provider.Agent, yes bool) (bool, error) {
+// confirmRelink asks before moving the account's own copies of shared files aside: at a
+// terminal as a plan question (no keeps them), else it needs yes. false means there is nothing
+// to move or the answer was no.
+func (a *app) confirmRelink(in *bufio.Reader, acct account.Account, ag provider.Agent, ask, yes bool) (bool, error) {
 	conflicts := a.provisioner(ag).Conflicts(acct)
 	if len(conflicts) == 0 {
 		return false, nil
@@ -173,6 +175,9 @@ func (a *app) confirmRelink(acct account.Account, ag provider.Agent, yes bool) (
 	names := make([]string, len(conflicts))
 	for i, c := range conflicts {
 		names[i] = a.tilde(c)
+	}
+	if ask {
+		return a.askNo(in, "relink", "move "+strings.Join(names, ", ")+" aside (.bak-<time>) and link main's?")
 	}
 	return true, a.confirm(yes, "Move %s aside (.bak-<time>) and link to the main account's", strings.Join(names, ", "))
 }

@@ -123,6 +123,13 @@ rm home/.claude-work/CLAUDE.md
 cp settings.json home/.claude-work/CLAUDE.md
 exec squadrn work
 stderr 'warning: ~/.claude-work/CLAUDE.md was replaced in claude/work, so it no longer follows the main account'
+# --relink moves the own copy aside; without a terminal that needs --yes.
+! exec squadrn account add work --relink
+stderr 'move ~/.claude-work/CLAUDE.md aside \(.bak-<time>\) and link to the main account.s; re-run with --yes'
+exec squadrn account add work --relink --yes
+stdout '^✓ moved ~/.claude-work/CLAUDE.md aside to ~/.claude-work/CLAUDE.md.bak-'
+stdout '^✓ linked ~/.claude-work/CLAUDE.md$'
+exec sh -c 'rm home/.claude-work/CLAUDE.md.bak-*'
 rm home/.claude-work/CLAUDE.md
 exec squadrn account add work
 stdout 'linked ~/.claude-work/CLAUDE.md'
