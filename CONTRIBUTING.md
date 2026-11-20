@@ -8,7 +8,7 @@ so the design can be agreed (decisions live in [docs/adr](docs/adr)).
 Go (version in `go.mod`), `git` 2.31+, `tmux`, `golangci-lint` v2, `shellcheck`, `actionlint`.
 
 ```sh
-make hooks      # once per clone: checks commit messages locally
+make hooks      # commit-msg check; any make target also turns it on
 make check      # lint, race tests, coverage gates, plugin validation; run before every push
 ```
 

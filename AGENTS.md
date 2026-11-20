@@ -48,7 +48,8 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 
 Messages follow [Conventional Commits](https://www.conventionalcommits.org) as checked by
 `@commitlint/config-conventional`. `scripts/commitlint.sh` enforces it: locally through
-`.githooks/commit-msg` (`make hooks` once per clone) and in CI for every pushed commit.
+`.githooks/commit-msg` (turned on by any `make` target, or `make hooks`) and in CI by the `lint`
+job for every pushed commit.
 
 ```
 <type>(<scope>)!: <subject>
