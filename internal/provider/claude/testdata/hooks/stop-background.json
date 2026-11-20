@@ -1,0 +1,1 @@
+{"session_id":"abc123","prompt_id":"p1","cwd":"/Users/me/api","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"Started the build.","background_tasks":[{"id":"b1","command":"make build"}],"session_crons":[]}

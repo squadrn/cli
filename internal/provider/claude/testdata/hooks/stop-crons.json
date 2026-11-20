@@ -1,0 +1,1 @@
+{"session_id":"abc123","prompt_id":"p1","cwd":"/Users/me/api","hook_event_name":"Stop","stop_hook_active":false,"background_tasks":[],"session_crons":[{"id":"c1","schedule":"*/5 * * * *"}]}
