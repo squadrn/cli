@@ -15,6 +15,8 @@ var (
 	_ provider.PrivateSettings = Settings{}
 	_ provider.Profiler        = Profiles{}
 	_ provider.RateLimiter     = CLI{}
+	_ provider.HookEvents      = Events{}
+	_ provider.HookReplier     = Events{}
 )
 
 func init() {
@@ -29,5 +31,6 @@ func init() {
 		},
 		Settings: Settings{},
 		Profiles: Profiles{},
+		Events:   Events{},
 	})
 }
