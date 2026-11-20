@@ -37,8 +37,11 @@ func TestAskProfileAndYes(t *testing.T) {
 }
 
 func TestProfileDescriptions(t *testing.T) {
-	if got := profileDesc("standard", []string{"privacy"}); got != "standard (secrets denied, push guard, 30-day history) + privacy" {
+	if got := profileDesc(provider.Claude, "standard", []string{"privacy"}); got != "standard (secrets denied, push guard, 30-day history) + privacy" {
 		t.Errorf("profileDesc = %q", got)
+	}
+	if got := profileDesc(provider.Codex, "strict", nil); got != "strict (read-only workspace; use standard for daily work)" {
+		t.Errorf("codex profileDesc = %q", got)
 	}
 	if got := profileName("strict", nil); got != "strict profile" {
 		t.Errorf("profileName = %q", got)

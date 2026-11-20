@@ -164,7 +164,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 			return err
 		}
 	} else if profile != "" {
-		a.out("  %-14s %s\n", "profile", profileDesc(profile, options))
+		a.out("  %-14s %s\n", "profile", profileDesc(acct.Spec, profile, options))
 	}
 	if shared := a.sharedNames(acct.Spec); isNew && len(shared) > 0 {
 		a.out("  %-14s %s from %s/%s\n", "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
@@ -496,8 +496,8 @@ func optionList() string {
 }
 
 // profileDesc is "standard (secrets denied, …)" plus the options.
-func profileDesc(profile string, options []string) string {
-	s := profile + " (" + provider.ProfileSummary(profile) + ")"
+func profileDesc(spec provider.Spec, profile string, options []string) string {
+	s := profile + " (" + spec.ProfileSummary(profile) + ")"
 	if len(options) > 0 {
 		s += " + " + strings.Join(options, ", ")
 	}

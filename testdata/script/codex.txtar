@@ -17,6 +17,7 @@ env SQUADRN_SHARED_MCP='docs secret absent'
 env SQUADRN_MARKETPLACE=$REPO_ROOT
 exec squadrn account add codex/work
 stdout '^Codex CLI .*· new account codex/work → ~/.codex-work$'
+stdout '^  profile +standard \(workspace-write sandbox, no network, asks before leaving it\)$'
 stdout '^  shared         skills, AGENTS.md from codex/main$'
 stdout '^✓ created ~/.codex-work \(private\)$'
 stdout '^✓ settings from codex/main \+ standard profile$'
@@ -49,6 +50,12 @@ grep '^inherit = "core"$' home/.codex-work/config.toml
 ! grep 'mcp_servers|main-only|keyring|/.codex/hooks.json' home/.codex-work/config.toml
 exists home/.codex-work/.squadrn-managed.json
 ! grep 'mcp add secret' home/calls.log
+
+# strict is a read-only workspace, and says so.
+exec squadrn account add codex/ro --profile strict -y
+stdout '^  profile +strict \(read-only workspace; use standard for daily work\)$'
+grep '^sandbox_mode = "read-only"$' home/.codex-ro/config.toml
+exec squadrn account rm codex/ro --yes
 
 # add is idempotent: nothing is re-installed or re-trusted.
 rm home/calls.log

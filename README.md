@@ -179,7 +179,13 @@ Each Codex account keeps its login in its own `auth.json`: squadrn sets
 shared) and restores it whenever it runs Codex for the account. MCP servers listed in
 `shared_mcp` are copied from `codex/main` with `codex mcp add`. Claude-only for now: `swap`
 (Codex's session store is not documented), `wt` and `grid` worktrees (`codex --worktree` takes
-no name), usage limits in the status line.
+no name), usage limits in the status line (`srn usage` asks Codex for them instead, at most every
+5 minutes unless `--refresh`).
+
+Codex profiles map to `config.toml`: `minimal` keeps credentials per account and secret
+environment variables out of commands; `standard` (default) adds a workspace-write sandbox without
+network that asks before leaving it; `strict` makes the workspace **read-only** — use it for
+review-only accounts, and `standard` for daily work.
 
 ## Usage limits
 

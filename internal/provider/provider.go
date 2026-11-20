@@ -62,6 +62,8 @@ type Spec struct {
 	// Credentials is an account's credential file relative to its dir ("" when the CLI keeps
 	// it elsewhere only); other accounts' profiles deny reading it.
 	Credentials string
+	// ProfileSummaries describe the profiles where the shared summaries do not fit this CLI.
+	ProfileSummaries map[string]string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
 	InstallHint  string
 	NativeMarker string
@@ -280,6 +282,15 @@ func ProfileSummary(name string) string {
 	return ""
 }
 
+// ProfileSummary is the one-line description of a profile for this provider: its own when it
+// has one (ProfileSummaries), else the shared one.
+func (s Spec) ProfileSummary(name string) string {
+	if v, ok := s.ProfileSummaries[name]; ok {
+		return v
+	}
+	return ProfileSummary(name)
+}
+
 // ValidOption reports whether name is a known toggle.
 func ValidOption(name string) bool {
 	for _, o := range Options {
@@ -375,6 +386,11 @@ var Codex = Spec{
 	},
 	SessionID:   regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
 	Credentials: "auth.json",
+	ProfileSummaries: map[string]string{
+		ProfileMinimal:  "credentials per account, secret env vars not passed",
+		ProfileStandard: "workspace-write sandbox, no network, asks before leaving it",
+		ProfileStrict:   "read-only workspace; use standard for daily work",
+	},
 	InstallHint: "npm install -g @openai/codex",
 	Caps:        Caps{Plugins: true, SharedMCP: true, UsageQuery: true},
 }

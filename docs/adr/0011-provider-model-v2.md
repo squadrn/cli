@@ -177,7 +177,7 @@ Codex (`config.toml`, implemented with the Codex provider):
 |---|---|
 | minimal | `cli_auth_credentials_store = "file"`; `[shell_environment_policy] ignore_default_excludes = false` (KEY/SECRET/TOKEN variables are not passed to commands). Codex has no per-path read rules: the `.env`/`~/.ssh` denials of minimal have no equivalent |
 | standard | minimal, plus `approval_policy = "on-request"`, `sandbox_mode = "workspace-write"`, `[sandbox_workspace_write] network_access = false`, `[shell_environment_policy] inherit = "core"` |
-| strict | standard with `sandbox_mode = "read-only"`, plus `rules/squadrn.rules` with `forbidden` prefix rules for `git push --force`, `git push -f`, `git reset --hard`, `rm -rf` |
+| strict | read-only workspace (use standard for daily work): standard with `sandbox_mode = "read-only"`, plus `rules/squadrn.rules` with `forbidden` prefix rules for `git push --force`, `git push -f`, `git reset --hard`, `rm -rf` |
 
 Never set by default: model, reasoning effort, the permission mode in `standard` (the CLI
 default stays), attribution.
