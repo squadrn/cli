@@ -16,3 +16,11 @@ func hasTmux() bool { return false }
 
 // tmuxPane: no tmux on Windows.
 func tmuxPane(context.Context) (paneState, bool) { return paneState{}, false }
+
+func setPaneState(context.Context, string, string) {}
+
+func ringBell(context.Context, string) error { return errNoClient }
+
+func showPane(context.Context, string, string) error { return errNoClient }
+
+func insideTmux() bool { return false }

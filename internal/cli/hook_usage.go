@@ -98,7 +98,7 @@ func compactUsage(name string, s usage.Snapshot, now time.Time) string {
 // and notified like any StopFailure through notify.
 func (h hookEnv) limit() int {
 	raw, _ := h.readInput()
-	h.notifyEvent(hookSpec(), raw)
+	h.notifyEvent(hookSpec(), raw, false)
 	return exitOK
 }
 

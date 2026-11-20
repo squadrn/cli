@@ -17,6 +17,13 @@
   `self-install`).
 - Account profiles turn Claude Code's own notifications off while squadrn's are on, so you no
   longer get both.
+- iTerm2, WezTerm, Ghostty, Warp and kitty show input and failures themselves (terminal
+  notification sequences) outside tmux. In tmux each agent's pane carries its state (grid borders
+  colour it) and rings the bell when it needs you; **`srn next`** jumps to that pane, and a click on
+  a `terminal-notifier` notification switches to it.
+- **`srn ps` lists every running agent**, also sessions started in a plain terminal, with a
+  `STATE` column (`working`, `input`, `failed`, `done`). Columns are now ACCOUNT, WORKTREE, STATE,
+  SESSION, PROCESS.
 - **`srn account rm <account> --purge`:** logs the account out, deletes its dir permanently
   instead of moving it to the trash (links inside are removed, never followed; a linked dir is
   refused) and removes every record squadrn keeps of it: usage record, handoff ledger entries,

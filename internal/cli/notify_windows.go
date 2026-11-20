@@ -104,3 +104,6 @@ func terminalBundle() string { return "" }
 func terminalFrontmost(context.Context) (front, known bool) { return false, false }
 
 func focusSources() string { return "unknown on Windows: every notification is shown" }
+
+// activateApp: only macOS brings a terminal app forward.
+func activateApp(context.Context, string) error { return nil }

@@ -107,7 +107,8 @@ Agents:
   deps           Install dependencies in a worktree (package manager from its lockfile)
   gc             Remove clean worktrees that are merged or empty (dry run without --yes)
   grid           Run agents side by side in a tmux grid, one worktree each
-  ps             List running agents: session, account, worktree
+  next           Jump to the tmux pane of the agent that waits for you (then a failed one)
+  ps             List running agents: account, worktree, state, where
   swap           Move a conversation to another account and resume it there
   wt             Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)
 
@@ -422,7 +423,7 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-ps.txt --
-List running agents: session, account, worktree
+List running agents: account, worktree, state, where
 
 Usage:
   srn ps [flags]
@@ -1533,14 +1534,20 @@ complete -k -c srn -n '__srn_requires_order_preservation && __srn_prepare_comple
         "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" guard-git", "timeout": 5 }]
       }
     ],
+    "PostToolUse": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+    ],
     "Notification": [
-      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|auth_success|quota_auto_resume_fired|quota_auto_resume_stale|quota_auto_resume_disabled|plugin_notification", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|auth_success|quota_auto_resume_fired|quota_auto_resume_stale|quota_auto_resume_disabled|plugin_notification", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify --terminal", "timeout": 5 }] }
     ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
     ],
     "StopFailure": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify --terminal", "timeout": 5 }] }
     ]
   }
 }

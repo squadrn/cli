@@ -24,6 +24,10 @@ const (
 	Info Kind = "info"
 )
 
+// Working is the state of an agent busy with a turn; the other states are the kinds of the
+// event it last reported (input, failed, done).
+const Working = "working"
+
 // Kinds lists every kind, highest priority first.
 var Kinds = []Kind{Input, Failed, Done, Info}
 
@@ -62,6 +66,21 @@ type Event struct {
 	// Message is the agent's own text (assistant reply, notification text): shown only with
 	// the preview setting.
 	Message string `json:"message,omitempty"`
+	// Busy: the agent keeps working (a prompt was submitted, a tool ran, a turn ended with
+	// background work left).
+	Busy bool `json:"busy,omitempty"`
+}
+
+// State is the agent's state after e: working, input, failed or done ("" when e says nothing
+// about it, like an info notice).
+func (e Event) State() string {
+	switch {
+	case e.Kind == Input || e.Kind == Failed || e.Kind == Done:
+		return string(e.Kind)
+	case e.Busy:
+		return Working
+	}
+	return ""
 }
 
 // Settings are the [notify] table of squadrn's config.
@@ -84,15 +103,17 @@ const (
 	WhenUnfocused = "unfocused"
 	WhenAlways    = "always"
 
-	MethodAuto    = "auto"
-	MethodDesktop = "desktop"
-	MethodOff     = "off"
+	MethodAuto     = "auto"
+	MethodTerminal = "terminal"
+	MethodDesktop  = "desktop"
+	MethodTmux     = "tmux"
+	MethodOff      = "off"
 )
 
 var (
 	sounds  = []string{SoundInput, SoundAll, SoundNone}
 	whens   = []string{WhenUnfocused, WhenAlways}
-	methods = []string{MethodAuto, MethodDesktop, MethodOff}
+	methods = []string{MethodAuto, MethodTerminal, MethodDesktop, MethodTmux, MethodOff}
 )
 
 // DefaultEvents are the kinds notified unless events names others.

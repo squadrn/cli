@@ -1,0 +1,1 @@
+{"session_id":"abc123","prompt_id":"p2","cwd":"/Users/me/api","permission_mode":"default","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"ls"},"tool_response":{"stdout":""}}

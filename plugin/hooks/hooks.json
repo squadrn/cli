@@ -6,14 +6,20 @@
         "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" guard-git", "timeout": 5 }]
       }
     ],
+    "PostToolUse": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+    ],
     "Notification": [
-      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|auth_success|quota_auto_resume_fired|quota_auto_resume_stale|quota_auto_resume_disabled|plugin_notification", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|auth_success|quota_auto_resume_fired|quota_auto_resume_stale|quota_auto_resume_disabled|plugin_notification", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify --terminal", "timeout": 5 }] }
     ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
     ],
     "StopFailure": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify --terminal", "timeout": 5 }] }
     ]
   }
 }
