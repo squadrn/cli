@@ -88,6 +88,9 @@ func (a *app) swap(o swapOptions) error {
 	var to *account.Account
 	if o.to != "" {
 		acct, err := a.store.Get(o.to)
+		if errors.Is(err, account.ErrAmbiguous) {
+			acct, err = a.transferTarget(o.to, err)
+		}
 		if err != nil {
 			return err
 		}
@@ -188,6 +191,24 @@ func (a *app) swap(o swapOptions) error {
 	}
 	a.out("pane %s now runs %s as %s\n", pane, src.worktree, to.Label())
 	return nil
+}
+
+// transferTarget resolves a bare --to name that several providers have to the one account whose
+// provider can take a conversation; ambiguous is returned when that is not exactly one.
+func (a *app) transferTarget(name string, ambiguous error) (account.Account, error) {
+	var found []account.Account
+	for _, spec := range provider.All() {
+		if !spec.Caps.SessionTransfer {
+			continue
+		}
+		if acct, err := a.store.Get(spec.ID + "/" + name); err == nil {
+			found = append(found, acct)
+		}
+	}
+	if len(found) != 1 {
+		return account.Account{}, ambiguous
+	}
+	return found[0], nil
 }
 
 func (a *app) ledger() usage.Ledger {
