@@ -130,7 +130,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	now := a.now()
 	stop := a.spin(fmt.Sprintf("checking %d account(s)…", len(accts)))
 	statuses := a.statuses(accts, refresh)
-	a.queryUsage(accts, statuses)
+	a.queryUsage(accts, statuses, refresh)
 	stop()
 	rep := usageReport{Accounts: make([]usageRow, len(accts))}
 	cands := a.candidates(accts, statuses)
@@ -173,16 +173,25 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	return rep
 }
 
-// usageQueryTimeout bounds reading one account's usage limits from its CLI.
-const usageQueryTimeout = 10 * time.Second
+const (
+	// usageQueryTimeout bounds reading one account's usage limits from its CLI.
+	usageQueryTimeout = 5 * time.Second
+	// usageQueryFresh: a recorded snapshot younger than this is shown without asking the CLI.
+	usageQueryFresh = 5 * time.Minute
+)
 
 // queryUsage reads the usage limits of logged-in accounts whose CLI reports them on request
-// (Caps.UsageQuery) and records them; an account that answers nothing keeps what was recorded.
-func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult) {
+// (Caps.UsageQuery) and records them, unless what was recorded is fresh and refresh is off; an
+// account that answers nothing keeps what was recorded.
+func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult, refresh bool) {
+	now := a.now()
 	var wg sync.WaitGroup
 	for i, acct := range accts {
 		st := statuses[i]
 		if !acct.Spec.Caps.UsageQuery || st.Err != nil || !st.Status.LoggedIn || st.Status.Metered() {
+			continue
+		}
+		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok && !refresh && now.Sub(snap.ObservedAt) < usageQueryFresh {
 			continue
 		}
 		ag, err := a.agent(acct.Spec)

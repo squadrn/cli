@@ -79,6 +79,16 @@ stdout '^codex/work +.* 42% .* 7% .*'
 ! stdout 'not tracked: .*codex'
 exec squadrn usage --json
 stdout '"account": "codex/work"'
+# A snapshot younger than 5 minutes is shown without asking codex again; --refresh asks.
+cp limits2.json home/.codex-work/.limits
+exec squadrn usage
+stdout '^codex/work +.* 42% .* just now$'
+exec squadrn usage --refresh
+stdout '^codex/work +.* 50% .* 9% .*'
+# An older snapshot is read again without --refresh.
+cp old-usage.json home/.local/state/squadrn/usage/codex-work.json
+exec squadrn usage
+stdout '^codex/work +.* 50% .* 9% .* just now$'
 
 # Sessions, resume and codex subcommands run as the account.
 exec squadrn codex/work
@@ -151,6 +161,10 @@ grep 'cfg=.*/home/.codex-job args=logout$' home/calls.log
  {"name":"secret","enabled":true,"transport":{"type":"stdio","command":"srv","args":[],"env":{"TOKEN":"x"},"env_vars":[],"cwd":null}}]
 -- limits.json --
 {"rateLimits":{"limitId":"codex","primary":{"usedPercent":42,"windowDurationMins":300,"resetsAt":4102444800},"secondary":{"usedPercent":7,"windowDurationMins":10080,"resetsAt":4102444800}},"rateLimitsByLimitId":null}
+-- limits2.json --
+{"rateLimits":{"primary":{"usedPercent":50,"windowDurationMins":300,"resetsAt":4102444800},"secondary":{"usedPercent":9,"windowDurationMins":10080,"resetsAt":4102444800}}}
+-- old-usage.json --
+{"five_hour":{"used_pct":10},"observed_at":"2020-01-01T00:00:00Z"}
 -- user-hooks.json --
 {
   "hooks": {
