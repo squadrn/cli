@@ -72,10 +72,9 @@ standard (non-admin) user with Defender on:
   ask for more per job), and leave "Allow GitHub Actions to create and approve pull requests" off.
 - *Settings → Code security*: **Private vulnerability reporting** on (SECURITY.md points to it);
   Dependabot alerts on.
-- *Settings → Branches* (or a ruleset) for `main`: require a pull request, the CI checks and the
-  `commits` check; block force pushes and deletion. Docs-only pull requests skip the `ci`
-  workflow, whose jobs then never report: require `commits` alone, or require the `ci` jobs too
-  and merge docs-only pull requests as an admin.
+- *Settings → Rules* (ruleset) for `main`: require a pull request and the `ci` checks (`lint`,
+  which also checks commit messages, and the test jobs); block force pushes and deletion. `ci`
+  runs for every change, docs-only ones included, so the required checks always report.
 
 ## Signing key
 

@@ -4,6 +4,13 @@ LDFLAGS := -s -w -X github.com/squadrn/squadrn/internal/cli.Version=$(VERSION)
 
 .PHONY: build race e2e cover-gates cover-gates-windows vuln lint fmt check validate hooks clean
 
+# Every development target turns on the commit-msg hook once, so commit messages are checked
+# before a commit exists (see AGENTS.md, Commits).
+HOOKS_SET := $(shell git config --local --get core.hooksPath 2>/dev/null)
+ifneq ($(HOOKS_SET),.githooks)
+$(shell git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks && echo "commit-msg hook on (core.hooksPath=.githooks)" >&2)
+endif
+
 build:
 	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/squadrn
 
@@ -46,7 +53,7 @@ validate:
 
 check: lint race cover-gates validate
 
-# Commit message checks for this clone (see AGENTS.md, Commits).
+# Turns the commit-msg hook on explicitly (every other target does it too).
 hooks:
 	git config core.hooksPath .githooks
 
