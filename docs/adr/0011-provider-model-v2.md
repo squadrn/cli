@@ -177,7 +177,13 @@ Codex (`config.toml`, implemented with the Codex provider):
 |---|---|
 | minimal | `cli_auth_credentials_store = "file"`; `[shell_environment_policy] ignore_default_excludes = false` (KEY/SECRET/TOKEN variables are not passed to commands). Codex has no per-path read rules: the `.env`/`~/.ssh` denials of minimal have no equivalent |
 | standard | minimal, plus `approval_policy = "on-request"`, `sandbox_mode = "workspace-write"`, `[sandbox_workspace_write] network_access = false`, `[shell_environment_policy] inherit = "core"` |
-| strict | read-only workspace (use standard for daily work): standard with `sandbox_mode = "read-only"`, plus `rules/squadrn.rules` with `forbidden` prefix rules for `git push --force`, `git push -f`, `git reset --hard`, `rm -rf` |
+| strict | read-only workspace (use standard for daily work): standard with `sandbox_mode = "read-only"` |
+
+Codex strict adds no `rules/` file. Codex 0.171.0 loads every regular `*.rules` file in
+`$CODEX_HOME/rules/` (`core/src/exec_policy.rs`), but `rules/` is shared from `codex/main` as a
+link, so a squadrn file there would apply to main and every other account, and one that fails to
+parse makes Codex drop all rules files. Force pushes are already denied by the guard (layers 1
+and 2), and the read-only sandbox covers `git reset --hard` and `rm -rf` in the workspace.
 
 Never set by default: model, reasoning effort, the permission mode in `standard` (the CLI
 default stays), attribution.
@@ -202,19 +208,21 @@ touched unless `no-attribution` is chosen.
    usage tracking (naming the accounts it applies to), log in now.
 3. **Apply** with one line per step. A *new* account is built in a temp dir next to the target
    (`~/.codex-work.tmp-<pid>`) and renamed into place, so a failure leaves no half account.
-4. **Verify** and summarise:
+4. **Verify** and summarise: (Codex shown; it is not asked about usage tracking, since `srn usage` reads
+   its limits from the CLI):
 
 ```
 $ srn account add codex/work
 Codex CLI 0.171.0 · new account codex/work → ~/.codex-work
-  profile        standard (secrets denied, push guard, 30-day history)
-  shared         skills, agents, AGENTS.md from codex/main
-  usage limits   track for codex/work? [Y/n]
+  profiles       minimal   credentials per account, secret env vars not passed
+                 standard  workspace-write sandbox, no network, asks before leaving it
+                 strict    read-only workspace; use standard for daily work
+  profile        minimal / standard / strict [standard]:
+  shared         skills, AGENTS.md from codex/main
   log in now?    [Y/n]
-✓ created ~/.codex-work (credentials: file, private)
+✓ created ~/.codex-work (private)
 ✓ settings from codex/main + standard profile
 ✓ push guard: pre-tool hook + git pre-push
-✓ usage tracking on
 ↗ opening login…
 ✓ logged in as you@example.com (Pro)
 done in 1.2s · start: srn work · check: srn doctor codex/work
