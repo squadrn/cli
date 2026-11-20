@@ -160,7 +160,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	ask := a.interactive && !o.yes
 	in := bufio.NewReader(a.stdin)
 	if isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
-		if profile, err = a.askProfile(in); err != nil {
+		if profile, err = a.askProfile(in, acct.Spec); err != nil {
 			return err
 		}
 	} else if profile != "" {
@@ -443,7 +443,16 @@ func (a *app) startCommand(acct account.Account) string {
 	return a.cmd + " " + acct.Label()
 }
 
-func (a *app) askProfile(in *bufio.Reader) (string, error) {
+// askProfile lists spec's profiles with what each one does, then asks for one; Enter is the
+// default.
+func (a *app) askProfile(in *bufio.Reader, spec provider.Spec) (string, error) {
+	for i, p := range provider.ProfileNames {
+		label := ""
+		if i == 0 {
+			label = "profiles"
+		}
+		a.errf("  %-14s %-9s %s\n", label, p.Name, spec.ProfileSummary(p.Name))
+	}
 	for {
 		a.errf("  %-14s %s [%s]: ", "profile", profileList(), provider.DefaultProfile)
 		line, err := in.ReadString('\n')
