@@ -90,7 +90,24 @@ var dropEnv = regexp.MustCompile(`(?i)^(HOME|USERPROFILE|XDG_[A-Z_]+|GIT_[A-Z0-9
 
 func newSandbox(t *testing.T) *sandbox {
 	t.Helper()
-	root := t.TempDir()
+	// Not t.TempDir: on Windows self-uninstall removes the installed files from a helper that
+	// outlives the command, so the dir can stay busy for a few seconds.
+	root, err := os.MkdirTemp("", "squadrn-e2e-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(500 * time.Millisecond) {
+			err := os.RemoveAll(root)
+			if err == nil {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Logf("left %s: %v", root, err)
+				return
+			}
+		}
+	})
 	if real, err := filepath.EvalSymlinks(root); err == nil {
 		root = real
 	}
