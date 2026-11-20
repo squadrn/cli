@@ -451,6 +451,10 @@ func testCodex(t *testing.T, s *sandbox) {
 	s.check(t, strings.Contains(string(cfg), `sandbox_mode = "workspace-write"`), "the standard profile did not reach config.toml:\n%s", cfg)
 	hooks, _ := os.ReadFile(filepath.Join(dir, "hooks.json"))
 	s.check(t, strings.Contains(string(hooks), "guard-git --no-ask"), "hooks.json has no guard hook:\n%s", hooks)
+	s.check(t, strings.Count(string(hooks), "notify --agent codex") == 4, "hooks.json lacks the notification hooks:\n%s", hooks)
+	s.check(t, strings.Count(string(cfg), "trusted_hash") == 5, "not every squadrn hook is trusted:\n%s", cfg)
+	s.check(t, strings.Contains(string(cfg), `"notify", "--agent", "codex"]`) && strings.Contains(string(cfg), "notifications = false"),
+		"the profile does not route Codex notifications through squadrn:\n%s", cfg)
 	s.srn(t, "account", "ls").exit(0).out(`^codex/work +no +`)
 	s.srn(t, "account", "login", "codex/work").exit(0).out(`^logged in to codex/work as me@.codex-work$`)
 	s.srn(t, "usage").exit(0).out(`^codex/work .* nodata`)
