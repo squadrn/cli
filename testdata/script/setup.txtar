@@ -20,7 +20,9 @@ stdout '^   – skipped ~/.claude-tool \(later: srn account adopt claude/tool\)$
 stdout '^   ✓ agents cannot edit squadrn.s files \(permissions.deny in ~/.claude/settings.json\)$'
 stdout '^   ✓ usage tracking on: claude/main$'
 stdout '^5. doctor$'
-stdout '^  ✓ agents cannot edit squadrn.s files \(permissions.deny\)$'
+# Doctor's groups and checks are indented under the step like the other steps' lines.
+stdout '^   install$'
+stdout '^     ✓ agents cannot edit squadrn.s files \(permissions.deny\)$'
 stdout '^next: srn account add <name>'
 ! exists home/.claude-tool/.squadrn-account
 grep 'hook statusline' home/.claude/settings.json
@@ -58,7 +60,7 @@ stderr '  ✓ installed release 1.0.0$'
 stderr '  ✓ srn on PATH$'
 ! stderr 'different program'
 stderr '^set up squadrn \(every step can be skipped'
-stderr '  profiles       minimal   secrets denied$'
+stderr '^   profiles       minimal   secrets denied$'
 stderr 'profile        minimal / standard / strict \[standard\]: '
 stderr 'adopt ~/.claude-old as claude/old\? \(another tool may own it\) \[y/N\] '
 stderr '   ✓ new accounts get the strict profile$'

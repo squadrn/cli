@@ -66,6 +66,8 @@ type app struct {
 	// named: this run already said which account the session runs as (swap), so the banner
 	// does not repeat it.
 	named bool
+	// pad indents plan lines and questions (padding); setup sets its step indent.
+	pad   string
 	cache provider.AuthCache
 	now   func() time.Time
 	// agents overrides how provider CLIs are found (tests); nil uses the real ones.

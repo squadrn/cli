@@ -94,6 +94,9 @@ func (a *app) setup(yes bool) error {
 	}
 	in := bufio.NewReader(a.stdin)
 	ok, mark := a.paint(a.colorOut, "32", "✓"), a.paint(a.colorOut, "2", "–")
+	// Questions and the output of the commands setup runs are indented like its steps' lines.
+	a.pad = setupIndent
+	defer func() { a.pad = "" }()
 
 	a.out("1. agent CLIs\n")
 	clis := a.detectCLIs()
@@ -140,7 +143,7 @@ func (a *app) setup(yes bool) error {
 			return err
 		}
 	} else {
-		a.out("   %-14s %s\n", "profile", profileDesc(spec, profile, nil))
+		a.out("%s%-14s %s\n", a.padding(), "profile", profileDesc(spec, profile, nil))
 	}
 	if profile != cfg.ProfileName() || cfg.DefaultProvider != a.cfg.DefaultProvider {
 		cfg.DefaultProfile = profile
@@ -191,7 +194,9 @@ func (a *app) setup(yes bool) error {
 			return err
 		}
 		a.out("   adopted %s\n", acct.Label())
-		if err := a.accountAdd(acct.Label(), addOptions{yes: true, usage: new(bool), login: new(bool)}); err != nil {
+		if err := a.indented(func() error {
+			return a.accountAdd(acct.Label(), addOptions{yes: true, usage: new(bool), login: new(bool)})
+		}); err != nil {
 			a.warnf("%s: %v", acct.Label(), err)
 		}
 	}
@@ -233,7 +238,7 @@ func (a *app) setup(yes bool) error {
 	}
 
 	a.out("5. doctor\n")
-	if err := a.runDoctor(""); err != nil && !errors.Is(err, errQuiet) {
+	if err := a.indented(func() error { return a.runDoctor("") }); err != nil && !errors.Is(err, errQuiet) {
 		return err
 	}
 	a.nextSteps()
@@ -242,7 +247,7 @@ func (a *app) setup(yes bool) error {
 
 // askLine asks a free-form question with a default on one plan line.
 func (a *app) askLine(in *bufio.Reader, label, choices, def string) (string, error) {
-	a.errf("   %-14s %s [%s]: ", label, choices, def)
+	a.errf("%s%-14s %s [%s]: ", a.padding(), label, choices, def)
 	line, err := in.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
@@ -325,4 +330,38 @@ func (a *app) missingOwnRules() (path string, missing []string) {
 	path = settingsPath(main)
 	missing, _ = account.MissingFromList(path, f, "permissions.deny", rules)
 	return path, missing
+}
+
+// setupIndent lines up what a step shows under its title ("1. ").
+const setupIndent = "   "
+
+// indented runs f with its standard output indented by setup's step indent; its questions
+// already use a.pad.
+func (a *app) indented(f func() error) error {
+	out := a.stdout
+	a.stdout = &indentWriter{w: out, prefix: setupIndent}
+	defer func() { a.stdout = out }()
+	return f()
+}
+
+// indentWriter prefixes every line written through it.
+type indentWriter struct {
+	w      io.Writer
+	prefix string
+	mid    bool
+}
+
+func (iw *indentWriter) Write(p []byte) (int, error) {
+	var b []byte
+	for _, c := range p {
+		if !iw.mid && c != '\n' {
+			b = append(b, iw.prefix...)
+		}
+		b = append(b, c)
+		iw.mid = c != '\n'
+	}
+	if _, err := iw.w.Write(b); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }

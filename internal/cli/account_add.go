@@ -167,10 +167,10 @@ func (a *app) accountAdd(input string, o addOptions) error {
 			return err
 		}
 	} else if profile != "" {
-		a.out("  %-14s %s\n", "profile", profileDesc(acct.Spec, profile, options))
+		a.out("%s%-14s %s\n", a.padding(), "profile", profileDesc(acct.Spec, profile, options))
 	}
 	if shared := a.sharedNames(acct.Spec); isNew && len(shared) > 0 {
-		a.out("  %-14s %s from %s/%s\n", "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
+		a.out("%s%-14s %s from %s/%s\n", a.padding(), "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
 	}
 	if o.relink && !isNew {
 		if o.relink, err = a.confirmRelink(in, acct, ag, ask, o.yes); err != nil {
@@ -469,10 +469,10 @@ func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (stri
 		if i == 0 {
 			label = "profiles"
 		}
-		a.errf("  %-14s %-9s %s\n", label, p.Name, spec.ProfileSummary(p.Name))
+		a.errf("%s%-14s %-9s %s\n", a.padding(), label, p.Name, spec.ProfileSummary(p.Name))
 	}
 	for {
-		a.errf("  %-14s %s [%s]: ", "profile", profileList(), def)
+		a.errf("%s%-14s %s [%s]: ", a.padding(), "profile", profileList(), def)
 		line, err := in.ReadString('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
 			return "", err
@@ -498,7 +498,7 @@ func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
 	if question != "" {
 		question += " "
 	}
-	a.errf("  %-14s %s[Y/n] ", label, question)
+	a.errf("%s%-14s %s[Y/n] ", a.padding(), label, question)
 	line, err := in.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
@@ -506,9 +506,17 @@ func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
 	return !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "n"), nil
 }
 
+// padding indents plan lines and questions: two spaces, or setup's step indent.
+func (a *app) padding() string {
+	if a.pad == "" {
+		return "  "
+	}
+	return a.pad
+}
+
 // askNo is askYes for a question whose default is no.
 func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
-	a.errf("  %-14s %s [y/N] ", label, question)
+	a.errf("%s%-14s %s [y/N] ", a.padding(), label, question)
 	line, err := in.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
