@@ -5,6 +5,7 @@ package proc
 import (
 	"context"
 	"errors"
+	"io"
 	"os/exec"
 	"strings"
 	"testing"
@@ -42,6 +43,38 @@ func TestOptionsDirEnvStdin(t *testing.T) {
 	if err != nil || string(out) != "/ 1 in" {
 		t.Fatalf("out = %q, %v", out, err)
 	}
+}
+
+// A client answers what the program prints while it runs: stdin is held open until the reply
+// arrives on the Stdout tee.
+func TestOptionsStdoutTee(t *testing.T) {
+	pr, pw := io.Pipe()
+	tee := &lineWatcher{want: "ready", seen: make(chan struct{})}
+	go func() {
+		<-tee.seen
+		_, _ = pw.Write([]byte("go\n"))
+		_ = pw.Close()
+	}()
+	out, err := Output(context.Background(), Options{Stdin: pr, Stdout: tee}, "sh", "-c", `echo ready; read x; echo "$x"`)
+	if err != nil || string(out) != "ready\ngo\n" {
+		t.Fatalf("out = %q, %v", out, err)
+	}
+}
+
+type lineWatcher struct {
+	want string
+	seen chan struct{}
+	buf  strings.Builder
+	done bool
+}
+
+func (w *lineWatcher) Write(p []byte) (int, error) {
+	w.buf.Write(p)
+	if !w.done && strings.Contains(w.buf.String(), w.want+"\n") {
+		w.done = true
+		close(w.seen)
+	}
+	return len(p), nil
 }
 
 func TestExitCodeOfNonExitError(t *testing.T) {
