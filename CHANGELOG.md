@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.4
 
 - **Notifications rewritten** ([ADR 0012](docs/adr/0012-notifications.md)): one notification when
   an agent needs you (approval, question, reply), failed (usage limit, login, billing, server) or
@@ -33,6 +33,22 @@
   in-use records, config change log entries and cached login status. The output lists what was
   removed. At a terminal it asks you to type the account unless `-y` is given; without one it
   needs `--purge --yes`. Works for Claude Code and Codex accounts.
+- Fixes from a walk through every command:
+  - The installer's first-run `doctor` checks the installed `srn`/`squadrn`, not the download.
+  - `srn work` with `claude/work` and `codex/work` says the name is ambiguous instead of
+    unknown; `swap --to work` picks the account that can take the conversation.
+  - `account add --no-usage` is honoured when the main account tracks usage; `--relink` is asked
+    on the plan, before the login; "done in" leaves out time spent on questions and the login;
+    a main account without settings is no longer named as their source.
+  - Files and dirs main gains later (skills, agents, …) are linked into existing accounts.
+  - `wt ls` shows agents started in a plain terminal as running.
+  - Windows: prompts only on a console you can see; a hidden console gets the
+    needs-a-terminal error instead of waiting forever. `account rm --purge --yes` never prompts.
+  - `setup` offers the self-protection deny rules and indents its questions and output;
+    `completion` writes for the login shell on a fresh home; `gc` says when there is nothing to
+    remove; `config` shows empty values as `-`; `doctor` lists each agent CLI once and marks
+    missing optional tools as skipped; `self-uninstall` words Codex accounts and says what it
+    keeps; clearer guard refusals, help text and account name rule.
 
 ## 1.0.0-rc.3
 
