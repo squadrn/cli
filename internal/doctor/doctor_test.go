@@ -141,7 +141,7 @@ func TestGuardLayers(t *testing.T) {
 
 func TestHookProbe(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("the Windows hooks.json runs squadrn.exe through cmd.exe; covered by the windows e2e script")
+		t.Skip("the Windows hooks.json starts squadrn.exe itself; covered by the e2e harness")
 	}
 	e := env(t, fakeAgent{}, nil)
 	fakeInstall(t, e, "deny")
