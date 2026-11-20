@@ -280,6 +280,23 @@ func (s Store) Exists(input string) bool {
 	return err == nil
 }
 
+// MainOf returns the provider's default account when input names one ("main", "codex/main"),
+// whether or not its dir exists yet.
+func (s Store) MainOf(input string) (Account, bool) {
+	pid, name := parseRef(input)
+	if name != Main {
+		return Account{}, false
+	}
+	if pid == "" {
+		pid = s.defaultProvider()
+	}
+	spec, err := s.provider(pid)
+	if err != nil {
+		return Account{}, false
+	}
+	return s.account(spec, Main), true
+}
+
 // Define validates a ref for a new (or existing) secondary account without requiring it to exist.
 func (s Store) Define(input string) (Account, error) {
 	pid, name := parseRef(input)

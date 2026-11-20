@@ -202,7 +202,8 @@ exitcode 2 squadrn account add Bad
 ! exec squadrn account add Bad
 stderr '^srn: invalid account name "Bad": use 2 to 24 lower-case letters, digits and hyphens, starting with a letter$'
 exitcode 2 squadrn account add doctor
-exitcode 2 squadrn account add main
+# main is set up, not created: settings flags are usage errors.
+exitcode 2 squadrn account add main --profile strict
 exitcode 2 squadrn account add
 exitcode 2 squadrn account frob
 exitcode 2 squadrn account ls extra

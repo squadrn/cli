@@ -594,9 +594,6 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 	}
 	installed, enabled, err := gi.PluginState(ctx, a.ConfigDir())
 	fix := e.Command + " account add " + a.Label()
-	if a.IsMain() {
-		fix = reinstallHint
-	}
 	// Without a plugin ID the guard is a hook squadrn writes itself (Codex: hooks.json), which
 	// the CLI runs only once trusted.
 	what, off, on := "squadrn plugin", "disabled", "enabled"
