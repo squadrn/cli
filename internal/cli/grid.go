@@ -307,8 +307,11 @@ func (a *app) psCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List running agents: account, worktree, state, where",
-		Args:  noArgs,
-		RunE:  func(*cobra.Command, []string) error { return a.ps(asJSON) },
+		Example: examples(a.cmd,
+			"ps", "agents running in grids and terminals",
+			"ps --json", "the same as JSON"),
+		Args: noArgs,
+		RunE: func(*cobra.Command, []string) error { return a.ps(asJSON) },
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
 	return cmd

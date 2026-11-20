@@ -34,7 +34,7 @@ func (h hookEnv) statusline(args []string) int {
 	case len(args) == 1 && strings.HasPrefix(args[0], "--then="):
 		then = strings.TrimPrefix(args[0], "--then=")
 	default:
-		_, _ = fmt.Fprintln(h.stderr, hookUsage)
+		_, _ = fmt.Fprintln(h.stderr, hookUsage())
 		return exitUsage
 	}
 	raw, _ := h.readInput()

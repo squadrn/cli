@@ -111,37 +111,20 @@ func (p *namePrompt) aliases(answer, command string, forced map[string]bool) ([]
 	return list, true
 }
 
-// renameSummary describes a change of command names: "command: ai → srn (removed: ai, sx,
-// added: srn, squadrn)"; "command: squadrn → srn (aliases: squadrn)" for a swap; "aliases: sx
-// (removed: srn, added: sx)" when only aliases changed; "" when nothing changed.
+// renameSummary describes a change of command names after the linked/removed lines that list
+// each link: "command: ai → srn", "aliases: sx, squadrn", both joined with "; "; "" when nothing
+// changed.
 func renameSummary(oldCmd string, oldAliases []string, newCmd string, newAliases []string) string {
-	before := append([]string{oldCmd}, oldAliases...)
-	after := append([]string{newCmd}, newAliases...)
-	var removed, added []string
-	for _, n := range before {
-		if !slices.Contains(after, n) {
-			removed = append(removed, n)
+	var parts []string
+	if oldCmd != newCmd {
+		parts = append(parts, fmt.Sprintf("command: %s → %s", oldCmd, newCmd))
+	}
+	if !slices.Equal(oldAliases, newAliases) {
+		aliases := "none"
+		if len(newAliases) > 0 {
+			aliases = strings.Join(newAliases, ", ")
 		}
+		parts = append(parts, "aliases: "+aliases)
 	}
-	for _, n := range after {
-		if !slices.Contains(before, n) {
-			added = append(added, n)
-		}
-	}
-	none := func(l []string) string {
-		if len(l) == 0 {
-			return "none"
-		}
-		return strings.Join(l, ", ")
-	}
-	if len(removed) == 0 && len(added) == 0 {
-		if oldCmd == newCmd {
-			return ""
-		}
-		return fmt.Sprintf("command: %s → %s (aliases: %s)", oldCmd, newCmd, none(newAliases))
-	}
-	if oldCmd == newCmd {
-		return fmt.Sprintf("aliases: %s (removed: %s, added: %s)", none(newAliases), none(removed), none(added))
-	}
-	return fmt.Sprintf("command: %s → %s (removed: %s, added: %s)", oldCmd, newCmd, none(removed), none(added))
+	return strings.Join(parts, "; ")
 }

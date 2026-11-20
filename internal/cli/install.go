@@ -164,6 +164,8 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		a.out("%s: %s\n", pathWhere, doctor.PathFix(a.layout.BinDir))
 	}
 	if fresh && nc.selfInstall {
+		// The installers run this from the unpacked release; the names lead to the installed copy.
+		a.self = a.layout.Binary()
 		return a.firstRun(nc.interactive)
 	}
 	a.out("next: %s doctor\n", cfg.Command)

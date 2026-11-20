@@ -56,16 +56,23 @@ func (h hookEnv) readInput() ([]byte, error) {
 	return io.ReadAll(io.LimitReader(h.stdin, maxHookInput))
 }
 
-// hookUsage names the installed binary, not the user's command: the plugin (through squadrn-hook)
-// and the git hook shims run hooks through it, whatever the command is called.
-const hookUsage = "usage: squadrn hook guard-git [--no-ask] | notify [--terminal] [--agent <provider>] [<payload>] | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
-	"internal: the squadrn plugin (squadrn-hook) and git hooks run this through the installed binary"
+// hookUsage describes the hook subcommands under the user's command name; the plugin (through
+// squadrn-hook) and the git hook shims run them through the installed binary whatever it is called.
+func hookUsage() string {
+	cfg, _ := config.Load()
+	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] | notify [--terminal] [--agent <provider>] [<payload>] | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
+		"internal: the " + config.Slug + " plugin (squadrn-hook) and git hooks run this through the installed binary"
+}
 
 // runHook handles `squadrn hook …` and returns the exit code.
 func runHook(args []string, h hookEnv) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(h.stderr, hookUsage)
+		_, _ = fmt.Fprintln(h.stderr, hookUsage())
 		return exitUsage
+	}
+	if len(args) == 2 && (args[1] == "-h" || args[1] == "--help") {
+		_, _ = fmt.Fprintln(h.stdout, hookUsage())
+		return exitOK
 	}
 	switch args[0] {
 	case "guard-git":
@@ -73,7 +80,7 @@ func runHook(args []string, h hookEnv) int {
 		if len(args) != 1 && !noAsk {
 			// Exit 2 blocks the tool call in Claude Code and Codex, so a bad invocation still
 			// fails closed.
-			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
 		h.guardGit(noAsk)
@@ -81,7 +88,7 @@ func runHook(args []string, h hookEnv) int {
 	case "notify":
 		n, ok := parseNotifyArgs(args[1:])
 		if !ok {
-			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
 		raw := []byte(n.payload)
@@ -97,7 +104,7 @@ func runHook(args []string, h hookEnv) int {
 		return exitOK
 	case "deliver":
 		if len(args) != 2 {
-			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
 		return h.deliver(args[1])
@@ -107,7 +114,7 @@ func runHook(args []string, h hookEnv) int {
 			cfgFile, args = args[2], args[2:]
 		}
 		if len(args) < 2 {
-			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
 		return h.git(cfgFile, args[1], args[2:])
@@ -115,22 +122,22 @@ func runHook(args []string, h hookEnv) int {
 		return h.statusline(args[1:])
 	case "limit":
 		if len(args) != 1 {
-			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
 		return h.limit()
 	case "config-change":
 		if len(args) != 1 {
-			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
 		h.configChange()
 		return exitOK
 	case "-h", "--help", "help":
-		_, _ = fmt.Fprintln(h.stdout, hookUsage)
+		_, _ = fmt.Fprintln(h.stdout, hookUsage())
 		return exitOK
 	}
-	_, _ = fmt.Fprintln(h.stderr, hookUsage)
+	_, _ = fmt.Fprintln(h.stderr, hookUsage())
 	return exitUsage
 }
 
@@ -293,10 +300,36 @@ func (h hookEnv) prePush(ctx context.Context, cfgFile, dir, home string, args []
 	if d.Verdict == guard.Allow {
 		return exitOK
 	}
-	remote := strings.Join(args, " ")
-	guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-push", d, dir, "git push "+remote+" ("+strings.TrimSpace(strings.ReplaceAll(string(input), "\n", "; "))+")")
-	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s\nPush a feature branch and open a pull request instead.\n", d.Reason)
+	guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-push", d, dir, prePushCommand(args, input))
+	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s\n", d.Reason)
+	if !strings.Contains(d.Reason, "open a PR") {
+		_, _ = fmt.Fprintln(h.stderr, "Push a feature branch and open a pull request instead.")
+	}
 	return exitError
+}
+
+// prePushCommand describes a refused push for the guard log as the git push it amounts to:
+// git push <remote> <local ref>:<remote ref>... (<url>), with :<remote ref> for a deletion.
+func prePushCommand(args []string, input []byte) string {
+	cmd := "git push"
+	if len(args) > 0 {
+		cmd += " " + args[0]
+	}
+	updates, err := guard.ParsePrePush(bytes.NewReader(input))
+	if err != nil {
+		return cmd + " (" + strings.TrimSpace(strings.ReplaceAll(string(input), "\n", "; ")) + ")"
+	}
+	for _, u := range updates {
+		if strings.Trim(u.LocalSHA, "0") == "" {
+			cmd += " :" + u.RemoteRef
+		} else {
+			cmd += " " + u.LocalRef + ":" + u.RemoteRef
+		}
+	}
+	if len(args) > 1 && args[1] != args[0] {
+		cmd += " (" + args[1] + ")"
+	}
+	return cmd
 }
 
 func (h hookEnv) gitFail(name string, err error) int {

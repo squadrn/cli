@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"strings"
@@ -163,9 +164,10 @@ func (a *app) accountList(asJSON bool) error {
 	return nil
 }
 
-// confirmRelink asks before moving the account's own copies of shared files aside; false means
-// there is nothing to relink.
-func (a *app) confirmRelink(acct account.Account, ag provider.Agent, yes bool) (bool, error) {
+// confirmRelink asks before moving the account's own copies of shared files aside: at a
+// terminal as a plan question (no keeps them), else it needs yes. false means there is nothing
+// to move or the answer was no.
+func (a *app) confirmRelink(in *bufio.Reader, acct account.Account, ag provider.Agent, ask, yes bool) (bool, error) {
 	conflicts := a.provisioner(ag).Conflicts(acct)
 	if len(conflicts) == 0 {
 		return false, nil
@@ -173,6 +175,9 @@ func (a *app) confirmRelink(acct account.Account, ag provider.Agent, yes bool) (
 	names := make([]string, len(conflicts))
 	for i, c := range conflicts {
 		names[i] = a.tilde(c)
+	}
+	if ask {
+		return a.askNo(in, "relink", "move "+strings.Join(names, ", ")+" aside (.bak-<time>) and link main's?")
 	}
 	return true, a.confirm(yes, "Move %s aside (.bak-<time>) and link to the main account's", strings.Join(names, ", "))
 }
@@ -271,8 +276,8 @@ func (a *app) accountRmCmd() *cobra.Command {
 		Long: "Log an account out and move its dir to the trash.\n\n" +
 			"--purge deletes the dir permanently instead and removes every record squadrn keeps of the\n" +
 			"account: its usage record, its handoffs, its in-use records and its cached login status.\n" +
-			"At a terminal it asks you to type the account (e.g. claude/personal), even with --yes;\n" +
-			"without one it needs --purge --yes.",
+			"At a terminal it asks you to type the account (e.g. claude/personal); --yes skips that,\n" +
+			"and without a terminal it is required.",
 		Args:              oneArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -309,7 +314,7 @@ func (a *app) accountRmCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation (with --purge: only without a terminal)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "remove even if a session seems to use the account")
 	cmd.Flags().BoolVar(&purge, "purge", false, "delete the dir permanently and every record squadrn keeps of the account")
 	return cmd

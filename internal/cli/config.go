@@ -42,10 +42,10 @@ func (a *app) configCmd() *cobra.Command {
 			env := config.EnvOverrides()
 			for _, k := range config.Keys {
 				if v, ok := env[k]; ok {
-					a.out("%-19s %s  (from %s)\n", k, values[k], v)
+					a.out("%-19s %s  (from %s)\n", k, dash(values[k]), v)
 					continue
 				}
-				a.out("%-19s %s\n", k, values[k])
+				a.out("%-19s %s\n", k, dash(values[k]))
 			}
 			return nil
 		},

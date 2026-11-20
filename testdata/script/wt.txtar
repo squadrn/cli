@@ -27,6 +27,21 @@ exec git -C .. status --porcelain
 exitcode 2 squadrn wt Bad_Name
 exitcode 2 squadrn wt
 exitcode 1 squadrn wt feat-d -a ghost
+
+# wt ls shows an agent started in a terminal (outside a grid) as running, in --json too.
+exec git -C .. worktree add -q -b worktree-feat-h .claude/worktrees/feat-h
+env FAKE_HOLD=22222222-2222-4222-8222-222222222222
+exec squadrn personal wt feat-h &
+waitfor $WORK/home/held.txt '^[0-9]+$'
+env FAKE_HOLD=
+exec squadrn wt ls
+stdout '^feat-h +worktree-feat-h +clean +claude/personal$'
+exec squadrn wt ls --json
+stdout '"running_as": "claude/personal"'
+kill -INT
+wait
+exec squadrn wt ls --json
+stdout '"running_as": ""'
 cd $WORK
 exitcode 1 squadrn wt feat-a
 -- home/.claude-personal/.squadrn-account --

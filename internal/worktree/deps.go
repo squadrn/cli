@@ -20,6 +20,15 @@ var installers = []installer{
 	{"package-lock.json", []string{"npm", "ci", "--prefer-offline"}},
 }
 
+// Lockfiles are the lockfiles deps recognises, in the order they are looked for.
+func Lockfiles() []string {
+	out := make([]string, len(installers))
+	for i, in := range installers {
+		out[i] = in.lockfile
+	}
+	return out
+}
+
 // InstallCommand returns the dependency install command for the lockfile in dir.
 func InstallCommand(dir string) ([]string, error) {
 	for _, in := range installers {

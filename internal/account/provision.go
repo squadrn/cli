@@ -286,6 +286,8 @@ type Refresh struct {
 	Conflicts []string
 	// Replaced are shared items the account has its own file or dir for instead of the link.
 	Replaced []string
+	// Linked are shared items main gained after the account was set up, linked now.
+	Linked []string
 }
 
 // RefreshShared keeps account a following main before a session: per-entry links (skills) are
@@ -316,6 +318,12 @@ func (s Store) RefreshShared(a Account) Refresh {
 	for _, item := range a.Spec.Shared {
 		dst, src := filepath.Join(a.Dir, item), sources[item]
 		fi, err := os.Lstat(dst)
+		if errors.Is(err, fs.ErrNotExist) {
+			if _, err := os.Stat(src); err == nil && link(src, dst) == nil {
+				out.Linked = append(out.Linked, dst)
+			}
+			continue
+		}
 		if err != nil || (!fi.Mode().IsRegular() && !fi.IsDir()) || slices.Contains(out.Conflicts, dst) {
 			continue
 		}

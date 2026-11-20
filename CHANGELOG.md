@@ -31,8 +31,8 @@
   instead of moving it to the trash (links inside are removed, never followed; a linked dir is
   refused) and removes every record squadrn keeps of it: usage record, handoff ledger entries,
   in-use records, config change log entries and cached login status. The output lists what was
-  removed. At a terminal it asks you to type the account, even with `-y`; without one it needs
-  `--purge --yes`. Works for Claude Code and Codex accounts.
+  removed. At a terminal it asks you to type the account unless `-y` is given; without one it
+  needs `--purge --yes`. Works for Claude Code and Codex accounts.
 
 ## 1.0.0-rc.3
 

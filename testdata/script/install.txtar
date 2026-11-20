@@ -14,7 +14,7 @@ exec squadrn self-install rel --interactive
 stderr 'Command name \[srn\]: '
 stderr 'Short alias \[squadrn\] \(''-'' for none\): '
 stderr 'invalid command name "con": it is a reserved device name on Windows'
-stdout '^command: srn → ai \(removed: srn, squadrn, added: ai, sx\)$'
+stdout '^command: srn → ai; aliases: sx$'
 exists home/.local/bin/ai
 exists home/.local/bin/sx
 ! exists home/.local/bin/squadrn
@@ -33,6 +33,17 @@ exec squadrn self-install rel --interactive --command ai
 ! stderr 'Command name'
 exec squadrn self-update --rollback
 ! stderr 'Command name'
+
+# A fresh home gets completions for the login shell in a dir made for them; zsh is told how to
+# load it.
+env SHELL=/bin/zsh
+exec squadrn self-install rel --interactive --command ai
+stdout '^  zsh completion → ~/.zsh/completions \(new: add to ~/.zshrc: fpath=\(~/.zsh/completions \$fpath\); autoload -Uz compinit && compinit\)$'
+exists home/.zsh/completions/_ai
+! stdout 'bash completion|fish completion'
+exec squadrn self-install rel --interactive --command ai
+stdout '^  zsh completion → ~/.zsh/completions$'
+env SHELL=
 
 -- answers --
 con

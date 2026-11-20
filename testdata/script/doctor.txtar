@@ -4,12 +4,14 @@ mkdir home/.claude-personal home/.claude/agents
 cp empty home/.claude/.loggedin
 cp plugins.json home/.claude/.plugins
 cp settings.json home/.claude/settings.json
+cp empty home/.claude/CLAUDE.md
 exec sh -c 'ln -s /elsewhere home/.claude-personal/agents && ln -s /gone home/.claude-personal/hooks'
 
 ! exec squadrn doctor
 stdout '^install$'
 stdout '✓ git'
-stdout '! claude at .* is not the native build'
+stdout '! claude .* at .* is not the native build'
+! stdout '✓ claude'
 stdout '! squadrn plugin files not installed'
 stdout '^settings & hooks$'
 stdout '✓ settings.json valid'
@@ -27,7 +29,8 @@ stdout '! srn not on PATH'
 stdout '^account claude/personal$'
 stdout '✗ not logged in  → srn account login claude/personal'
 stdout '✗ squadrn plugin not installed \(no git push guard\)  → srn account add claude/personal'
-stdout '✗ agents is not linked to main  → srn account add claude/personal'
+stdout '✗ agents is not linked to main  → srn account add claude/personal --relink$'
+stdout '! CLAUDE.md is not linked to main yet  → srn account add claude/personal$'
 stdout '! dangling link hooks  → srn account add claude/personal'
 stdout '[0-9]+ problem\(s\), [0-9]+ warning\(s\)$'
 exitcode 1 squadrn doctor
@@ -39,6 +42,10 @@ stdout '"group": "push guard"'
 exec sh -c 'chmod 700 home/.claude-personal'
 ! exec squadrn doctor
 ! stdout 'readable by other users'
+# A shared file main gained later is linked by the next session.
+exec squadrn personal -- hi
+! exec squadrn doctor
+! stdout 'CLAUDE.md is not linked'
 
 
 -- empty --

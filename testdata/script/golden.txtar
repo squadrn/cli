@@ -87,20 +87,22 @@ tree home/.config/squadrn
 cmp stdout layout-config.txt
 
 -- help-root.txt --
-Squadrn runs coding agents (today: Claude Code) as one of several accounts on this machine.
+Squadrn runs coding agents (today: Claude Code and Codex CLI) as one of several accounts on this
+machine.
 
-Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.
+Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal,
+codex/work is ~/.codex-work.
 
 Usage:
   srn [<account>] [<command> | agent args... | -- prompt] [flags]
   srn [command]
 
 Examples:
-  srn                                  pick an account interactively
-  srn personal                         run as claude/personal (also: -a personal, claude/personal)
-  srn personal -p "hi"                 agent flags go to the agent CLI
-  srn personal -- "fix the bug"        a prompt goes after --
-  srn account add work                 create claude/work, then: srn account login work
+  srn                                    pick an account interactively
+  srn personal                           run as claude/personal (also: -a personal, claude/personal)
+  srn personal -p "hi"                   agent flags go to the agent CLI
+  srn personal -- "fix the bug"          a prompt goes after --
+  srn account add work                   create claude/work, then: srn account login work
   srn grid ~/repo feat-a personal:fix-b  two agents side by side
 
 Agents:
@@ -120,12 +122,14 @@ Setup:
   completion     Generate the autocompletion script for the specified shell
   config         Show settings; get or set one (command and aliases relink ~/.local/bin)
   doctor         Check the install, the push guard, hooks and every account (or one)
-  help           Help about any command
   notify         Check and test notifications (input needed, failed, done)
   self-uninstall Remove squadrn: plugin from every account, command links, completions, installed files
   self-update    Update squadrn and its plugin in every account
   setup          Guided first run: agent CLIs, default profile, existing accounts, usage tracking, doctor
   version        Print the squadrn version
+
+Additional Commands:
+  help           Help about any command
 
 Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -155,9 +159,7 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 
 Use "srn account [command] --help" for more information about a command.
 -- help-account-ls.txt --
@@ -171,9 +173,7 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-add.txt --
 Create or repair an account (settings, shared files, push guard, usage, login)
 
@@ -198,9 +198,7 @@ Flags:
   -y, --yes              do not ask; use the defaults and the flags given
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-login.txt --
 Sign an account in
 
@@ -211,9 +209,7 @@ Flags:
   -h, --help   help for login
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-logout.txt --
 Sign an account out (keeps its dir)
 
@@ -224,9 +220,7 @@ Flags:
   -h, --help   help for logout
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-rename.txt --
 Rename an account (logs it out first; log in again afterwards)
 
@@ -239,16 +233,14 @@ Flags:
   -y, --yes     do not ask for confirmation
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-rm.txt --
 Log an account out and move its dir to the trash.
 
 --purge deletes the dir permanently instead and removes every record squadrn keeps of the
 account: its usage record, its handoffs, its in-use records and its cached login status.
-At a terminal it asks you to type the account (e.g. claude/personal), even with --yes;
-without one it needs --purge --yes.
+At a terminal it asks you to type the account (e.g. claude/personal); --yes skips that,
+and without a terminal it is required.
 
 Usage:
   srn account rm <account> [flags]
@@ -257,15 +249,13 @@ Flags:
   -f, --force   remove even if a session seems to use the account
   -h, --help    help for rm
       --purge   delete the dir permanently and every record squadrn keeps of the account
-  -y, --yes     do not ask for confirmation (with --purge: only without a terminal)
+  -y, --yes     do not ask for confirmation
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-usage.txt --
-Show what the status line last reported about each account's usage limits (5-hour and
-7-day windows), when it last hit a limit, and the best account to continue with in this repository.
+Show what each account last reported about its usage limits (5-hour and 7-day windows),
+when it last hit a limit, and, inside a repository, the best account to continue with there.
 
 Usage is recorded by the status line, so it needs a one-time setup per account:
 srn usage setup wraps the status line command (your own one keeps running and showing).
@@ -290,9 +280,8 @@ Flags:
       --watch     redraw every 5 seconds
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 
 Use "srn usage [command] --help" for more information about a command.
 -- help-wt.txt --
@@ -303,10 +292,10 @@ Usage:
   srn wt [command]
 
 Examples:
-  srn wt feat-login           as main
-  srn personal wt fix-otp      as claude/personal
-  srn wt ls                    list worktrees
-  srn wt rm feat-login         remove one
+  srn wt feat-login        as main
+  srn personal wt fix-otp  as claude/personal
+  srn wt ls                list worktrees
+  srn wt rm feat-login     remove one
 
 Available Commands:
   ls          List the agent worktrees of this repository
@@ -332,9 +321,8 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-wt-rm.txt --
 Remove a worktree and its branch if merged. --force also removes a modified worktree,
 --force-branch also deletes an unmerged branch; both ask first (-y skips).
@@ -349,9 +337,8 @@ Flags:
   -y, --yes            do not ask for confirmation with --force or --force-branch
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-grid.txt --
 Run agents side by side in a tmux grid for <repo>: one pane per agent, each in its own
 worktree. Running grid again for the same repository adds panes.
@@ -392,9 +379,8 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-grid-attach.txt --
 Attach to the grid of a repository (default: this one)
 
@@ -405,9 +391,8 @@ Flags:
   -h, --help   help for attach
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-grid-stop.txt --
 Stop the grid of a repository and every agent in it (worktrees are kept)
 
@@ -419,23 +404,24 @@ Flags:
   -y, --yes    do not ask for confirmation
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-ps.txt --
 List running agents: account, worktree, state, where
 
 Usage:
   srn ps [flags]
 
+Examples:
+  srn ps         agents running in grids and terminals
+  srn ps --json  the same as JSON
+
 Flags:
   -h, --help   help for ps
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-swap.txt --
 Move a conversation to another account and resume it there, e.g. when an account hits its
 usage limit. Without arguments the conversation is the one that last hit its limit in this
@@ -466,14 +452,20 @@ Flags:
   -y, --yes               do not ask for confirmation
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-gc.txt --
-Remove clean worktrees that are merged or empty (dry run without --yes)
+Remove the agent worktrees of this repository that are clean and merged (or have no commits
+of their own), with their worktree-<name> branches. Without --yes it only lists what it would do.
+Git-ignored files in a removed worktree (build output, dependencies) go with it; --json counts
+them in "ignored".
 
 Usage:
   srn gc [flags]
+
+Examples:
+  srn gc        list what would be removed
+  srn gc --yes  remove it
 
 Flags:
   -f, --force   let git remove clean worktrees it refuses (those containing submodules)
@@ -482,36 +474,43 @@ Flags:
   -y, --yes     remove instead of only listing
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-deps.txt --
-Install dependencies in a worktree (package manager from its lockfile)
+Install dependencies in agent worktree <name> with the package manager its lockfile names. Supported
+lockfiles, the first one found wins: pnpm-lock.yaml, bun.lock, bun.lockb, yarn.lock,
+package-lock.json.
 
 Usage:
   srn deps <name> [flags]
+
+Examples:
+  srn deps feat-login  install the dependencies of worktree feat-login
 
 Flags:
   -h, --help   help for deps
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-doctor.txt --
 Check the install, the push guard, hooks and every account (or one)
 
 Usage:
   srn doctor [<account>] [flags]
 
+Examples:
+  srn doctor           everything
+  srn doctor personal  the install and claude/personal only
+  srn doctor --json    the checks as JSON (exit 1 when one fails)
+
 Flags:
   -h, --help   help for doctor
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+  -C, --dir string   run as if started in this directory
+      --no-color     disable colors (also: NO_COLOR=1)
 -- help-config.txt --
 Show settings; get or set one (command and aliases relink ~/.local/bin)
 
@@ -534,9 +533,7 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 
 Use "srn config [command] --help" for more information about a command.
 -- help-config-get.txt --
@@ -550,9 +547,7 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-config-set.txt --
 Change one setting. Lists are comma separated; "" clears a list, or restores the default
 protected_branches. Changing command or aliases relinks them in the bin dir.
@@ -565,9 +560,7 @@ Flags:
   -h, --help    help for set
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-self-update.txt --
 Update squadrn and its plugin in every account to the newest release of your channel.
 --check only looks and shows the release notes; --rollback goes back to the release installed
@@ -591,9 +584,7 @@ Flags:
       --tag string        install this release (v1.2.3) instead of the newest
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-self-uninstall.txt --
 Remove squadrn from this machine. Accounts, their logins and conversations are kept.
 --purge also removes the config, the guard log and caches, and the session registries
@@ -605,13 +596,11 @@ Usage:
 
 Flags:
   -h, --help    help for self-uninstall
-      --purge   also remove the config, guard log and caches
+      --purge   also remove the config, guard log, caches and session registries (accounts stay)
   -y, --yes     do not ask for confirmation
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-version.txt --
 Print the squadrn version
 
@@ -623,9 +612,7 @@ Flags:
       --json   print JSON
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-completion.txt --
 Generate the autocompletion script for srn for the specified shell.
 See each sub-command's help for details on how to use the generated script.
@@ -644,9 +631,7 @@ Flags:
   -h, --help   help for completion
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 
 Use "srn completion [command] --help" for more information about a command.
 -- completion-bash.txt --
@@ -1604,9 +1589,7 @@ Flags:
   -y, --yes              do not ask; use the defaults
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)
 -- help-usage-setup.txt --
 Record an account's usage through its status line: the status line command in the account's
 settings.json is wrapped, so squadrn sees what Claude Code reports while your own command keeps
@@ -1622,6 +1605,4 @@ Flags:
   -y, --yes    do not ask for confirmation
 
 Global Flags:
-  -a, --account string   account to run as (provider/name or name)
-  -C, --dir string       run as if started in this directory
-      --no-color         disable colors (also: NO_COLOR=1)
+      --no-color   disable colors (also: NO_COLOR=1)

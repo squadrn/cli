@@ -12,6 +12,7 @@
 //	FAKE_EXEC=<json array> run that command in the session's environment and directory and
 //	                      exit with its status (e.g. a git push through the guard)
 //	FAKE_LOGIN_FAILS=1    login does not log in
+//	FAKE_LOGIN_WAIT=<d>   login takes that long, like a person signing in (a Go duration)
 //	FAKE_VERSION=<v>      --version prints it the way the CLI does (else it is a session)
 //
 // See e2e/README.md for adding the fake of a new provider.
@@ -126,4 +127,11 @@ func session(registry string) int {
 		time.Sleep(60 * time.Second)
 	}
 	return 0
+}
+
+// loginWait stands in for the time a person takes to sign in (FAKE_LOGIN_WAIT).
+func loginWait() {
+	if d, err := time.ParseDuration(os.Getenv("FAKE_LOGIN_WAIT")); err == nil {
+		time.Sleep(d)
+	}
 }

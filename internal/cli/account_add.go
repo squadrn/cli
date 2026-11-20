@@ -159,21 +159,31 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	}
 	ask := a.interactive && !o.yes
 	in := bufio.NewReader(a.stdin)
+	// waited is the time spent on the user (questions, the login), left out of "done in".
+	var waited time.Duration
+	asked := time.Now()
 	if isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
 		if profile, err = a.askProfile(in, acct.Spec, profile); err != nil {
 			return err
 		}
 	} else if profile != "" {
-		a.out("  %-14s %s\n", "profile", profileDesc(acct.Spec, profile, options))
+		a.out("%s%-14s %s\n", a.padding(), "profile", profileDesc(acct.Spec, profile, options))
 	}
 	if shared := a.sharedNames(acct.Spec); isNew && len(shared) > 0 {
-		a.out("  %-14s %s from %s/%s\n", "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
+		a.out("%s%-14s %s from %s/%s\n", a.padding(), "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
+	}
+	if o.relink && !isNew {
+		if o.relink, err = a.confirmRelink(in, acct, ag, ask, o.yes); err != nil {
+			return err
+		}
 	}
 	trackUsage := o.usage != nil && *o.usage
+	noUsage := o.usage != nil && !*o.usage
 	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && (isNew || !a.usageTracking(acct)) {
 		if trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
 			return err
 		}
+		noUsage = !trackUsage
 	}
 	status := <-login
 	doLogin := o.login != nil && *o.login
@@ -182,10 +192,8 @@ func (a *app) accountAdd(input string, o addOptions) error {
 			return err
 		}
 	}
-	if o.relink && !isNew {
-		if o.relink, err = a.confirmRelink(acct, ag, o.yes); err != nil {
-			return err
-		}
+	if ask {
+		waited = time.Since(asked)
 	}
 
 	// Apply.
@@ -252,7 +260,13 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	switch {
 	case isNew || srep.Created || srep.Backup != "":
 		what := "settings from " + acct.Provider + "/" + account.Main
-		if profile != "" {
+		if !fsx.IsFile(filepath.Join(a.store.MainDir(acct.Spec), acct.Spec.Settings)) {
+			// No main account (or no settings in it) to start from.
+			what = "settings created"
+			if profile != "" {
+				what = "settings: " + profileName(profile, options)
+			}
+		} else if profile != "" {
 			what += " + " + profileName(profile, options)
 		}
 		if srep.Backup != "" {
@@ -273,19 +287,30 @@ func (a *app) accountAdd(input string, o addOptions) error {
 			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
 		}
 	}
-	if trackUsage && !a.usageTracking(acct) {
-		step.name = "turn usage tracking on"
+	// A new account copies main's status line, so it may already run the recorder.
+	switch tracking := a.usageTracking(acct); {
+	case trackUsage && !tracking:
 		if err := a.enableUsage(acct); err != nil {
 			warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
 		} else {
 			note("usage tracking on")
 		}
+	case noUsage && tracking:
+		if err := a.disableUsage(acct); err != nil {
+			warn("usage tracking: %v; run: %s usage setup --undo %s", err, a.cmd, acct.Label())
+		} else {
+			note("usage tracking off")
+		}
+	case isNew && tracking:
+		note("usage tracking on")
 	}
 
 	// Verify.
 	if doLogin {
 		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
+		loginAt := time.Now()
 		err := ag.Run(acct.ConfigDir(), ag.LoginArgs())
+		waited += time.Since(loginAt)
 		a.cache.Forget(acct.Label())
 		if err != nil {
 			warn("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label())
@@ -304,7 +329,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if !status.LoggedIn {
 		next = "log in: " + a.cmd + " account login " + acct.Label()
 	}
-	a.out("done in %.1fs · %s · check: %s doctor %s\n", time.Since(start).Seconds(), next, a.cmd, acct.Label())
+	a.out("done in %.1fs · %s · check: %s doctor %s\n", (time.Since(start) - waited).Seconds(), next, a.cmd, acct.Label())
 	return nil
 }
 
@@ -450,10 +475,10 @@ func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (stri
 		if i == 0 {
 			label = "profiles"
 		}
-		a.errf("  %-14s %-9s %s\n", label, p.Name, spec.ProfileSummary(p.Name))
+		a.errf("%s%-14s %-9s %s\n", a.padding(), label, p.Name, spec.ProfileSummary(p.Name))
 	}
 	for {
-		a.errf("  %-14s %s [%s]: ", "profile", profileList(), def)
+		a.errf("%s%-14s %s [%s]: ", a.padding(), "profile", profileList(), def)
 		line, err := in.ReadString('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
 			return "", err
@@ -479,12 +504,31 @@ func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
 	if question != "" {
 		question += " "
 	}
-	a.errf("  %-14s %s[Y/n] ", label, question)
+	a.errf("%s%-14s %s[Y/n] ", a.padding(), label, question)
 	line, err := in.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
 	}
 	return !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "n"), nil
+}
+
+// padding indents plan lines and questions: two spaces, or setup's step indent.
+func (a *app) padding() string {
+	if a.pad == "" {
+		return "  "
+	}
+	return a.pad
+}
+
+// askNo is askYes for a question whose default is no.
+func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
+	a.errf("%s%-14s %s [y/N] ", a.padding(), label, question)
+	line, err := in.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	s := strings.ToLower(strings.TrimSpace(line))
+	return s == "y" || s == "yes", nil
 }
 
 func profileList() string {

@@ -44,6 +44,7 @@ func Codex(args []string) int {
 		fmt.Fprintln(os.Stderr, "Not logged in")
 		return 1
 	case cmd == "login":
+		loginWait()
 		if os.Getenv("FAKE_LOGIN_FAILS") == "" {
 			_ = os.WriteFile(file(".loggedin"), nil, 0o600)
 		}

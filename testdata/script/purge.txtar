@@ -16,13 +16,12 @@ cp stale-other.json repo/.squadrn-inuse/999999998.json
 exec squadrn account ls
 grep 'claude/work' home/.cache/squadrn/auth.json
 
-# Without a terminal it needs --yes; --yes is ignored at a terminal, where only the typed
-# account confirms.
+# Without a terminal it needs --yes; at a terminal only the typed account confirms.
 exitcode 2 squadrn account rm work --purge
 ! exec squadrn account rm work --purge
 stderr 'needs a terminal or --purge --yes'
 env SQUADRN_TEST_TTY=$WORK/wrong
-! exec squadrn account rm work --purge --yes
+! exec squadrn account rm work --purge
 stderr 'Type claude/work to confirm: '
 stderr 'aborted'
 exists home/.claude-work/.loggedin
@@ -44,7 +43,12 @@ exists repo/.squadrn-inuse/999999998.json
 ! grep 'claude/work' home/.cache/squadrn/auth.json
 exitcode 1 squadrn account rm work --purge --yes
 
-# Without a terminal --purge --yes is enough; with no records only the dir goes.
+# --purge --yes never asks, at a terminal or not; with no records only the dir goes.
+mkdir home/.claude-three
+cp empty home/.claude-three/.squadrn-account
+exec squadrn account rm three --purge --yes
+! stderr 'to confirm'
+! exists home/.claude-three
 env SQUADRN_TEST_TTY=
 mkdir home/.claude-two
 cp empty home/.claude-two/.squadrn-account

@@ -40,7 +40,7 @@ keep going; restart them afterwards.`,
 		},
 	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
-	cmd.Flags().BoolVar(&purge, "purge", false, "also remove the config, guard log and caches")
+	cmd.Flags().BoolVar(&purge, "purge", false, "also remove the config, guard log, caches and session registries (accounts stay)")
 	return cmd
 }
 
@@ -51,18 +51,28 @@ func (a *app) uninstall(purge bool) error {
 	}
 	for _, idx := range byProvider(accts) {
 		same := pick(accts, idx)
-		ag, err := a.agent(same[0].Spec)
+		spec := same[0].Spec
+		// Without a plugin ID the guard is a hook squadrn writes itself (Codex: hooks.json).
+		what := "plugin"
+		if spec.Plugin == "" {
+			what = "push guard hook"
+		}
+		ag, err := a.agent(spec)
 		if err != nil {
-			a.warnf("%v; remove the plugin yourself: %s plugin uninstall squadrn@squadrn", err, same[0].Spec.Binary)
+			if spec.Plugin != "" {
+				a.warnf("%v; remove the plugin yourself: %s plugin uninstall squadrn@squadrn", err, spec.Binary)
+			} else {
+				a.warnf("%v; remove %s's push guard hook from its accounts yourself", err, config.Slug)
+			}
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		for label, err := range install.RemovePlugins(ctx, same, ag) {
 			if err != nil {
-				a.warnf("%s: plugin uninstall: %v", label, err)
+				a.warnf("%s: %s uninstall: %v", label, what, err)
 				continue
 			}
-			a.out("  %s: plugin removed\n", label)
+			a.out("  %s: %s removed\n", label, what)
 		}
 		cancel()
 	}
@@ -113,6 +123,13 @@ func (a *app) uninstall(purge bool) error {
 				a.out("  removed %s\n", a.tilde(d))
 			}
 		}
+	}
+	if len(accts) > 0 {
+		dirs := make([]string, len(accts))
+		for i, acct := range accts {
+			dirs[i] = a.tilde(acct.Dir)
+		}
+		a.out("  kept the accounts with their logins and conversations: %s\n", strings.Join(dirs, ", "))
 	}
 	a.out("squadrn is uninstalled; restart running agent sessions\n")
 	return nil

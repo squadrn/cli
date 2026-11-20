@@ -88,6 +88,9 @@ func (a *app) swap(o swapOptions) error {
 	var to *account.Account
 	if o.to != "" {
 		acct, err := a.store.Get(o.to)
+		if errors.Is(err, account.ErrAmbiguous) {
+			acct, err = a.transferTarget(o.to, err)
+		}
 		if err != nil {
 			return err
 		}
@@ -141,7 +144,11 @@ func (a *app) swap(o swapOptions) error {
 	if from.Label() != to.Label() {
 		fromOrg, toOrg := st[0].Status.OrgName, st[1].Status.OrgName
 		if st[0].Err == nil && st[1].Err == nil && fromOrg != toOrg {
-			if err := a.confirm(o.yes, "Move the conversation from %s (%s) to %s (%s), another organization", from.Label(), orgOr(fromOrg), to.Label(), orgOr(toOrg)); err != nil {
+			what := "Move the conversation from %s (%s) to %s (%s)"
+			if fromOrg != "" && toOrg != "" {
+				what += ", another organization"
+			}
+			if err := a.confirm(o.yes, what, from.Label(), orgOr(fromOrg), to.Label(), orgOr(toOrg)); err != nil {
 				return err
 			}
 		}
@@ -180,6 +187,7 @@ func (a *app) swap(o swapOptions) error {
 		if err := os.Chdir(src.cwd); err != nil {
 			return err
 		}
+		a.named = true
 		return a.session(ag, *to, ss.ResumeArgs(src.session.ID), "")
 	}
 	command := proc.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ss.ResumeArgs(src.session.ID)...)...)
@@ -188,6 +196,24 @@ func (a *app) swap(o swapOptions) error {
 	}
 	a.out("pane %s now runs %s as %s\n", pane, src.worktree, to.Label())
 	return nil
+}
+
+// transferTarget resolves a bare --to name that several providers have to the one account whose
+// provider can take a conversation; ambiguous is returned when that is not exactly one.
+func (a *app) transferTarget(name string, ambiguous error) (account.Account, error) {
+	var found []account.Account
+	for _, spec := range provider.All() {
+		if !spec.Caps.SessionTransfer {
+			continue
+		}
+		if acct, err := a.store.Get(spec.ID + "/" + name); err == nil {
+			found = append(found, acct)
+		}
+	}
+	if len(found) != 1 {
+		return account.Account{}, ambiguous
+	}
+	return found[0], nil
 }
 
 func (a *app) ledger() usage.Ledger {
@@ -273,17 +299,18 @@ func (a *app) located(ss provider.SessionStore, src swapSource, spec provider.Sp
 func (a *app) swapCandidates(ss provider.SessionStore, accts []account.Account, dirs []string, dir string) []swapSource {
 	var out []swapSource
 	var lim usage.Snapshot
-	for _, acct := range accts {
+	limOwner := 0
+	for i, acct := range accts {
 		snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name)
 		if ok && snap.LimitedSession != "" && fsx.Within(snap.LimitedCwd, dir) && snap.LimitedAt.After(lim.LimitedAt) {
-			lim = snap
+			lim, limOwner = snap, i
 		}
 	}
 	if lim.LimitedSession != "" {
 		_, moved, _ := a.ledger().Latest(func(h usage.Handoff) bool {
 			return h.Session == lim.LimitedSession && h.At.After(lim.LimitedAt)
 		})
-		if s, err := ss.FindSession(dirs, lim.LimitedSession); err == nil && !moved {
+		if s, err := findSessionOf(ss, dirs, lim.LimitedSession, limOwner); err == nil && !moved {
 			out = append(out, swapSource{session: s, cwd: lim.LimitedCwd, limited: true, at: lim.LimitedAt})
 		}
 	}
@@ -299,12 +326,27 @@ func (a *app) swapCandidates(ss provider.SessionStore, accts []account.Account, 
 		if slices.ContainsFunc(running, func(c swapSource) bool { return c.session.ID == ls.SessionID }) {
 			continue
 		}
-		if s, err := ss.FindSession(dirs, ls.SessionID); err == nil {
+		if s, err := findSessionOf(ss, dirs, ls.SessionID, ls.Owner); err == nil {
 			running = append(running, swapSource{session: s, cwd: ls.Cwd, running: true, at: s.ModTime})
 		}
 	}
 	slices.SortStableFunc(running, func(x, y swapSource) int { return y.at.Compare(x.at) })
 	return append(out, running...)
+}
+
+// findSessionOf finds conversation id, taking owner's copy unless another account's is newer: a
+// swap leaves the old copy behind with the same modification time, so the newest-copy rule
+// alone can pick the account the conversation left.
+func findSessionOf(ss provider.SessionStore, dirs []string, id string, owner int) (provider.Session, error) {
+	s, err := ss.FindSession(dirs, id)
+	if err != nil || s.Owner == owner || owner < 0 || owner >= len(dirs) {
+		return s, err
+	}
+	if own, ownErr := ss.FindSession(dirs[owner:owner+1], id); ownErr == nil && !own.ModTime.Before(s.ModTime) {
+		own.Owner = owner
+		return own, nil
+	}
+	return s, nil
 }
 
 func shortID(id string) string {
@@ -462,7 +504,7 @@ func (a *app) waitGone(h holder) bool {
 
 func orgOr(org string) string {
 	if org == "" {
-		return "personal"
+		return "no organization"
 	}
 	return org
 }

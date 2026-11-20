@@ -47,6 +47,14 @@ func TestAskProfileAndYes(t *testing.T) {
 			t.Errorf("askYes(%q) = %v, %v", input, got, err)
 		}
 	}
+	for input, want := range map[string]bool{"\n": false, "y\n": true, "Yes\n": true, "n\n": false, "": false} {
+		if got, err := a.askNo(bufio.NewReader(strings.NewReader(input)), "relink", "move x?"); err != nil || got != want {
+			t.Errorf("askNo(%q) = %v, %v", input, got, err)
+		}
+	}
+	if !strings.Contains(errOut.String(), "  relink         move x? [y/N] ") {
+		t.Errorf("askNo prompt = %q", errOut.String())
+	}
 }
 
 func TestProfileDescriptions(t *testing.T) {

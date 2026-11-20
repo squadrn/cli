@@ -51,10 +51,11 @@ func (a *app) wtCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wt <name>",
 		Short: "Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)",
-		Example: fmt.Sprintf(`  %[1]s wt feat-login           as main
-  %[1]s personal wt fix-otp      as claude/personal
-  %[1]s wt ls                    list worktrees
-  %[1]s wt rm feat-login         remove one`, a.cmd),
+		Example: examples(a.cmd,
+			"wt feat-login", "as main",
+			"personal wt fix-otp", "as claude/personal",
+			"wt ls", "list worktrees",
+			"wt rm feat-login", "remove one"),
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -91,11 +92,13 @@ func (a *app) wtCmd() *cobra.Command {
 }
 
 type worktreeRow struct {
-	Name    string `json:"name"`
-	Branch  string `json:"branch"`
-	Path    string `json:"path"`
-	Dirty   bool   `json:"dirty"`
-	Account string `json:"account,omitempty"` // running in a grid pane as this account
+	Name   string `json:"name"`
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+	Dirty  bool   `json:"dirty"`
+	// RunningAs is the account of the agent running in the worktree, in a grid pane or a
+	// terminal; "" when none runs.
+	RunningAs string `json:"running_as"`
 }
 
 func (a *app) wtLsCmd() *cobra.Command {
@@ -122,7 +125,14 @@ func (a *app) wtLsCmd() *cobra.Command {
 			for _, w := range wts {
 				name, _ := repo.Name(w)
 				dirty, _ := worktree.Dirty(ctx, w.Path)
-				rows = append(rows, worktreeRow{Name: name, Branch: w.Branch, Path: w.Path, Dirty: dirty, Account: running[name]})
+				as := running[name]
+				if used := repo.InUse(w); as == "" && len(used) > 0 {
+					as = used[0].Account
+					if as == "" {
+						as = a.sessionDesc(used[0])
+					}
+				}
+				rows = append(rows, worktreeRow{Name: name, Branch: w.Branch, Path: w.Path, Dirty: dirty, RunningAs: as})
 			}
 			if asJSON {
 				return a.printJSON(rows)
@@ -134,7 +144,7 @@ func (a *app) wtLsCmd() *cobra.Command {
 			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, "NAME\tBRANCH\tSTATE\tRUNNING AS")
 			for _, r := range rows {
-				state, as := "clean", r.Account
+				state, as := "clean", r.RunningAs
 				if r.Dirty {
 					state = "modified"
 				}
@@ -296,12 +306,14 @@ func ignoredNote(n int) string {
 }
 
 type gcRow struct {
-	Name    string          `json:"name"`
-	Branch  string          `json:"branch"`
-	Action  worktree.Action `json:"action"`
-	Reason  string          `json:"reason"`
-	Ignored int             `json:"ignored"`
-	Removed bool            `json:"removed"`
+	Name   string          `json:"name"`
+	Branch string          `json:"branch"`
+	Action worktree.Action `json:"action"`
+	Reason string          `json:"reason"`
+	// Ignored counts the git-ignored files and dirs (build output, dependencies) that go with
+	// the worktree when it is removed.
+	Ignored int  `json:"ignored"`
+	Removed bool `json:"removed"`
 }
 
 // gcReport is gc --json: the plan, and with --yes what was removed and what failed.
@@ -316,7 +328,14 @@ func (a *app) gcCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Remove clean worktrees that are merged or empty (dry run without --yes)",
-		Args:  noArgs,
+		Long: `Remove the agent worktrees of this repository that are clean and merged (or have no commits
+of their own), with their worktree-<name> branches. Without --yes it only lists what it would do.
+Git-ignored files in a removed worktree (build output, dependencies) go with it; --json counts
+them in "ignored".`,
+		Example: examples(a.cmd,
+			"gc", "list what would be removed",
+			"gc --yes", "remove it"),
+		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
 			repo, err := a.repoHere(ctx, a.defaultSpec())
@@ -338,11 +357,21 @@ func (a *app) gcCmd() *cobra.Command {
 				return a.gcJSON(ctx, repo, base, cands, yes, force)
 			}
 			a.out("base: %s\n", base)
+			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
+			removable := 0
 			for _, c := range cands {
 				name, _ := repo.Name(c.Worktree)
-				a.out("  %-16s %-32s %s%s\n", c.Action, name, a.gcReason(c), ignoredNote(c.Ignored))
+				_, _ = fmt.Fprintf(w, "  %s\t%s\t%s%s\n", c.Action, name, a.gcReason(c), ignoredNote(c.Ignored))
+				if c.Action != worktree.Keep {
+					removable++
+				}
 			}
-			if !yes {
+			_ = w.Flush()
+			switch {
+			case removable == 0:
+				a.out("nothing to remove\n")
+				return nil
+			case !yes:
 				a.out("dry run; re-run with --yes to remove\n")
 				return nil
 			}
@@ -365,8 +394,11 @@ func (a *app) gcCmd() *cobra.Command {
 
 func (a *app) depsCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:               "deps <name>",
-		Short:             "Install dependencies in a worktree (package manager from its lockfile)",
+		Use:   "deps <name>",
+		Short: "Install dependencies in a worktree (package manager from its lockfile)",
+		Long: wrapText("Install dependencies in agent worktree <name> with the package manager its lockfile "+
+			"names. Supported lockfiles, the first one found wins: "+strings.Join(worktree.Lockfiles(), ", ")+".", 100),
+		Example:           examples(a.cmd, "deps feat-login", "install the dependencies of worktree feat-login"),
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {

@@ -62,7 +62,8 @@ func (a *app) names() []string {
 	return out
 }
 
-// completionDirs are the per-user completion dirs of each shell; only existing ones are used.
+// completionDirs are the per-user completion dirs of each shell; existing ones are used, and the
+// login shell's.
 func (a *app) completionDirs() map[string]string {
 	dirs := config.DirsFor(a.store.Home, "")
 	return map[string]string{

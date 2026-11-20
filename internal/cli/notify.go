@@ -216,7 +216,7 @@ func (h hookEnv) deliver(arg string) int {
 		err = json.Unmarshal(b, &d)
 	}
 	if err != nil {
-		_, _ = fmt.Fprintln(h.stderr, hookUsage)
+		_, _ = fmt.Fprintln(h.stderr, hookUsage())
 		return exitUsage
 	}
 	home, err := config.Home()

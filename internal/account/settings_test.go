@@ -226,3 +226,47 @@ func TestSyncSettingsNeverTakesPrivateKeysFromMain(t *testing.T) {
 		t.Fatal("the account's own private key was removed")
 	}
 }
+
+func TestAddToListKeepsTheRestAndFollowsLinks(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real.json")
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(real, []byte(`{"model":"opus","permissions":{"deny":["Read(x)"],"ask":["Bash(y)"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, path); err != nil {
+		t.Skip("symlinks unavailable:", err)
+	}
+	want := []string{"Read(x)", "Edit(a/**)"}
+	if missing, err := MissingFromList(path, jsonFormat{}, "permissions.deny", want); err != nil || !slices.Equal(missing, []string{"Edit(a/**)"}) {
+		t.Fatalf("MissingFromList = %v, %v", missing, err)
+	}
+	if err := AddToList(path, jsonFormat{}, "permissions.deny", want); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Lstat(path); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("the link was replaced")
+	}
+	doc, _, err := readSettings(real, jsonFormat{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	perms := doc["permissions"].(map[string]any)
+	if doc["model"] != "opus" || len(perms["ask"].([]any)) != 1 || len(perms["deny"].([]any)) != 2 {
+		t.Fatalf("settings after AddToList: %v", doc)
+	}
+	if missing, _ := MissingFromList(path, jsonFormat{}, "permissions.deny", want); len(missing) != 0 {
+		t.Fatalf("still missing %v", missing)
+	}
+	// A missing file is created; a key that is not a list is an error.
+	fresh := filepath.Join(dir, "fresh.json")
+	if err := AddToList(fresh, jsonFormat{}, "permissions.deny", want); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(real, []byte(`{"permissions":{"deny":"x"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddToList(path, jsonFormat{}, "permissions.deny", want); err == nil {
+		t.Fatal("a non-list deny was overwritten")
+	}
+}

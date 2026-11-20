@@ -50,6 +50,14 @@ cd .claude/worktrees/feat-open
 exec squadrn gc
 stdout 'keep +feat-open'
 
+exec squadrn gc
+stdout '^  keep  feat-open +unmerged commits$'
+stdout '^nothing to remove$'
+! stdout 'dry run'
+exec squadrn gc --yes
+stdout '^nothing to remove$'
+! stdout 'removed 0'
+
 exec squadrn gc --json
 stdout '"action": "keep"'
 stdout '"name": "feat-open"'

@@ -94,15 +94,15 @@ func (a *app) accountPurge(acct account.Account, yes bool) error {
 	return nil
 }
 
-// confirmPurge asks for the account's label at a terminal, even with --yes: a purge cannot be
-// undone. Without a terminal --yes is required.
+// confirmPurge asks for the account's label at a terminal: a purge cannot be undone. --yes
+// skips the question; without a terminal it is required.
 func (a *app) confirmPurge(acct account.Account, yes bool) error {
+	if yes {
+		return nil
+	}
 	in, out, done, ok := a.terminalIO()
 	if !ok {
-		if !yes {
-			return usagef("permanently deleting %s and every record of %s needs a terminal or --purge --yes", a.tilde(acct.Dir), acct.Label())
-		}
-		return nil
+		return usagef("permanently deleting %s and every record of %s needs a terminal or --purge --yes", a.tilde(acct.Dir), acct.Label())
 	}
 	defer done()
 	_, _ = fmt.Fprintf(out, "Permanently delete %s and every record of %s (no trash, cannot be undone).\nType %s to confirm: ",

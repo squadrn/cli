@@ -18,8 +18,12 @@ import (
 func (a *app) doctorCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
-		Use:               "doctor [<account>]",
-		Short:             "Check the install, the push guard, hooks and every account (or one)",
+		Use:   "doctor [<account>]",
+		Short: "Check the install, the push guard, hooks and every account (or one)",
+		Example: examples(a.cmd,
+			"doctor", "everything",
+			"doctor personal", "the install and claude/personal only",
+			"doctor --json", "the checks as JSON (exit 1 when one fails)"),
 		Args:              optionalArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -46,6 +50,7 @@ func (a *app) printChecks(checks []doctor.Check) error {
 		doctor.OK:   a.paint(a.colorOut, "32", "✓"),
 		doctor.Warn: a.paint(a.colorOut, "33", "!"),
 		doctor.Fail: a.paint(a.colorOut, "31", "✗"),
+		doctor.Skip: a.paint(a.colorOut, "2", "–"),
 	}
 	group := ""
 	counts := map[doctor.Status]int{}
@@ -82,7 +87,7 @@ func (a *app) doctorEnv(only string) doctor.Env {
 		Layout:    a.layout,
 		Config:    a.cfg,
 		LookPath:  exec.LookPath,
-		Self:      selfPath(),
+		Self:      a.selfBinary(),
 		Names:     append([]string{a.cmd}, a.cfg.Aliases...),
 		Command:   a.cmd,
 		Timeout:   10 * time.Second,
@@ -112,6 +117,14 @@ func (a *app) doctorEnv(only string) doctor.Env {
 		}
 	}
 	return env
+}
+
+// selfBinary is the squadrn program the command names must reach.
+func (a *app) selfBinary() string {
+	if a.self != "" {
+		return a.self
+	}
+	return selfPath()
 }
 
 func (a *app) checks(only string) []doctor.Check {

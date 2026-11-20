@@ -472,6 +472,11 @@ func TestRefreshSharedReconcilesEntriesAndReportsReplaced(t *testing.T) {
 		t.Errorf("Refresh = %+v", r)
 	}
 	settings := filepath.Join(a.Dir, "CLAUDE.md")
+	// A shared item the account does not have yet (main gained it later) is linked.
+	must(t, os.Remove(settings))
+	if r := s.RefreshShared(a); !slices.Equal(r.Linked, []string{settings}) || !LinksTo(settings, filepath.Join(main, "CLAUDE.md")) {
+		t.Errorf("missing item not linked: %+v", r)
+	}
 	must(t, os.Remove(settings))
 	must(t, os.WriteFile(settings, []byte(`{"own":true}`), 0o600))
 	// Unix: a file replaced the link. Windows (copies): the copy was edited.
