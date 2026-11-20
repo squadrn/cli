@@ -2,7 +2,7 @@
 # Every account gets its own settings.json, built from main's (ADR 0011); main is never written.
 ! exists home/.claude/settings.json
 exec squadrn account add work --no-usage
-stdout '^✓ settings from claude/main \+ standard profile$'
+stdout '^✓ settings: standard profile$'
 ! exists home/.claude/settings.json
 exec sh -c 'test -f home/.claude-work/settings.json && test ! -L home/.claude-work/settings.json && echo own'
 stdout '^own$'
