@@ -179,7 +179,11 @@ func (a *app) routeTable() routeTable {
 		subs[c.Name()] = true
 	}
 	return routeTable{
-		isAccount:   a.store.Exists,
+		// An ambiguous name is an account too: resolving it later says which ones it could be.
+		isAccount: func(w string) bool {
+			_, err := a.store.Get(w)
+			return err == nil || errors.Is(err, account.ErrAmbiguous)
+		},
 		isUnmanaged: a.store.IsUnmanaged,
 		subcommands: subs,
 		passthrough: func(acct, w string) bool {

@@ -81,6 +81,15 @@ grep 'cfg=.*/home/.codex-work args=login$' home/calls.log
 exec squadrn account ls
 stdout '^codex/work +yes +me@.codex-work +~/.codex-work$'
 
+# A bare name both providers have is ambiguous wherever it is used, not an unknown word.
+exec squadrn account add claude/work --no-usage --no-login -y
+! exec squadrn work -- hi
+stderr 'ambiguous account name "work": use one of claude/work, codex/work'
+! stderr 'unknown command'
+! exec squadrn work -p hi
+stderr 'ambiguous account name "work"'
+exec squadrn account rm claude/work --yes
+
 # usage reads the limits from the app server; none reported (or logged out) is no data.
 rm home/calls.log
 exec squadrn usage
