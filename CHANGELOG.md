@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0-rc.3
+
+- **OpenAI Codex CLI:** `codex/<name>` accounts (`CODEX_HOME`, credentials kept per account),
+  login, runs, `--worktree`, resume and swap between Codex accounts, MCP, usage limits in
+  `srn usage` (read from Codex, cached for 5 minutes), and the push guard as a Codex pre-tool hook
+  plus the git pre-push hook. Codex cannot ask, so its guard denies what it would ask about; on
+  Windows a hook that fails to start lets the command run (`srn doctor` says so).
+- **Profiles:** `srn account add` offers `minimal`, `standard` (default) and `strict`, with the
+  `privacy` and `no-attribution` toggles (`--profile`, or `default_profile` in the config). The
+  standard profile denies reading secrets (`.env`, `~/.ssh`, cloud and package credentials, the
+  password store, other accounts' credential files) and asks before `git push`, `git reset --hard`
+  and `rm -rf`.
+- **Own settings per account:** an account's `settings.json` / `config.toml` is now its own copy
+  built from main's settings and its profile, never a link. Squadrn keeps only the keys it owns in
+  sync and keeps your own changes (`/model`, `/config`). Existing links are turned into copies on
+  the first session (backup kept).
+- **`account add` rewritten:** it plans, asks everything up front, applies with progress and
+  verifies; a re-run says the account is up to date; a failed step leaves nothing half-created and
+  names the retry command. A first add takes about 1.5s with Claude Code (was 4.2s), a re-run
+  0.3s.
+- **`srn setup`:** a guided first run (agent CLIs found, default provider and profile, adopting
+  existing account dirs, usage tracking, doctor). The installer runs it after the first install at
+  a terminal; `self-update` never does.
+- **Windows:** the push-guard hook now starts `squadrn.exe` directly and blocks when it cannot run
+  (Claude Code 2.1.295 or newer; doctor warns on older ones). With rc.1/rc.2 every Bash and
+  PowerShell tool call could be blocked. Git for Windows is found under Git Bash's own `git.exe`
+  too, and alias copies are recognised after a rename.
+- Account names only exclude squadrn's own commands; agent subcommands go through
+  `srn <account> <subcommand>`.
+
 ## 1.0.0-rc.2
 
 - **Breaking:** the default command is now `srn`, with `squadrn` as its alias (was `squadrn` with
