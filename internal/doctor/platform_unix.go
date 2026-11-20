@@ -7,6 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // executable: the execute bit is set.
@@ -50,3 +53,9 @@ func shellForm(command string) (string, []string) { return "sh", []string{"-c", 
 
 // powerShellOnly: Unix agents always use the shell tool.
 func powerShellOnly() bool { return false }
+
+// sameProgram: a command name reaches this squadrn through a link.
+func sameProgram(p, self string) bool { return fsx.SameFile(p, self) }
+
+// versionNotes: the Unix hooks fail closed in their sh shim, whatever the agent CLI's version.
+func versionNotes(provider.Spec, string) []Check { return nil }

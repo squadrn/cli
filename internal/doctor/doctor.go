@@ -161,7 +161,7 @@ func (e Env) install(ctx context.Context) []Check {
 	for _, n := range e.Names {
 		if p, err := e.LookPath(n); err != nil {
 			out = append(out, bad(g, Warn, n+" not on PATH", e.pathFix()))
-		} else if !fsx.SameFile(p, e.Self) {
+		} else if !sameProgram(p, e.Self) {
 			out = append(out, bad(g, Warn, n+" on PATH ("+e.tilde(p)+") is a different program than this squadrn", e.Command+" config set command <name>"))
 		} else {
 			out = append(out, ok(g, n+" on PATH"))
@@ -241,6 +241,7 @@ func (e Env) versions(ctx context.Context) []Check {
 			continue
 		}
 		out = append(out, ok("install", spec.Binary+" "+v))
+		out = append(out, versionNotes(spec, v)...)
 	}
 	return out
 }

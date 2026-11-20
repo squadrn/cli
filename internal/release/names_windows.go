@@ -120,11 +120,11 @@ func removeRunning(path string) error {
 	return fsx.MoveAside(path)
 }
 
-// CheckInstallDir refuses a data dir whose path cmd.exe would expand or split: the plugin hooks
-// run "<dir>\\bin\\squadrn.exe" through cmd.exe (ADR 0008, component 3).
+// CheckInstallDir refuses a data dir whose path cmd.exe would expand or split: squadrn removes
+// its own files after an update or uninstall through a detached cmd.exe (ADR 0008).
 func CheckInstallDir(dir string) error {
 	if i := strings.IndexAny(dir, "%^&!"); i >= 0 {
-		return fmt.Errorf("%w: %s contains %q, which cmd.exe would misread in the plugin hooks; set XDG_DATA_HOME to a path without %%, ^, & or ! in it", ErrUnsafeInstallDir, dir, dir[i])
+		return fmt.Errorf("%w: %s contains %q, which cmd.exe would misread when squadrn cleans up after an update or uninstall; set XDG_DATA_HOME to a path without %%, ^, & or ! in it", ErrUnsafeInstallDir, dir, dir[i])
 	}
 	return nil
 }
