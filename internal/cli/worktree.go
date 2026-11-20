@@ -297,12 +297,14 @@ func ignoredNote(n int) string {
 }
 
 type gcRow struct {
-	Name    string          `json:"name"`
-	Branch  string          `json:"branch"`
-	Action  worktree.Action `json:"action"`
-	Reason  string          `json:"reason"`
-	Ignored int             `json:"ignored"`
-	Removed bool            `json:"removed"`
+	Name   string          `json:"name"`
+	Branch string          `json:"branch"`
+	Action worktree.Action `json:"action"`
+	Reason string          `json:"reason"`
+	// Ignored counts the git-ignored files and dirs (build output, dependencies) that go with
+	// the worktree when it is removed.
+	Ignored int  `json:"ignored"`
+	Removed bool `json:"removed"`
 }
 
 // gcReport is gc --json: the plan, and with --yes what was removed and what failed.
@@ -317,6 +319,10 @@ func (a *app) gcCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Remove clean worktrees that are merged or empty (dry run without --yes)",
+		Long: `Remove the agent worktrees of this repository that are clean and merged (or have no commits
+of their own), with their worktree-<name> branches. Without --yes it only lists what it would do.
+Git-ignored files in a removed worktree (build output, dependencies) go with it; --json counts
+them in "ignored".`,
 		Example: examples(a.cmd,
 			"gc", "list what would be removed",
 			"gc --yes", "remove it"),
@@ -342,11 +348,21 @@ func (a *app) gcCmd() *cobra.Command {
 				return a.gcJSON(ctx, repo, base, cands, yes, force)
 			}
 			a.out("base: %s\n", base)
+			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
+			removable := 0
 			for _, c := range cands {
 				name, _ := repo.Name(c.Worktree)
-				a.out("  %-16s %-32s %s%s\n", c.Action, name, a.gcReason(c), ignoredNote(c.Ignored))
+				_, _ = fmt.Fprintf(w, "  %s\t%s\t%s%s\n", c.Action, name, a.gcReason(c), ignoredNote(c.Ignored))
+				if c.Action != worktree.Keep {
+					removable++
+				}
 			}
-			if !yes {
+			_ = w.Flush()
+			switch {
+			case removable == 0:
+				a.out("nothing to remove\n")
+				return nil
+			case !yes:
 				a.out("dry run; re-run with --yes to remove\n")
 				return nil
 			}

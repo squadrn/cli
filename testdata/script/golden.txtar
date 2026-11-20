@@ -453,7 +453,10 @@ Global Flags:
   -C, --dir string   run as if started in this directory
       --no-color     disable colors (also: NO_COLOR=1)
 -- help-gc.txt --
-Remove clean worktrees that are merged or empty (dry run without --yes)
+Remove the agent worktrees of this repository that are clean and merged (or have no commits
+of their own), with their worktree-<name> branches. Without --yes it only lists what it would do.
+Git-ignored files in a removed worktree (build output, dependencies) go with it; --json counts
+them in "ignored".
 
 Usage:
   srn gc [flags]
