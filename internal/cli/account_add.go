@@ -267,7 +267,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	}
 	a.reportProvision(acct, rep, isNew, note, warn)
 	if isNew || rep.PluginInstalled {
-		if guard := a.guardLine(acct, ag); guard != "" {
+		if guard := a.guardLine(acct, ag, rep.PluginInstalled); guard != "" {
 			note("push guard: %s", guard)
 		} else if acct.Spec.Caps.Plugins {
 			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
@@ -396,9 +396,12 @@ func (a *app) reportProvision(acct account.Account, rep account.Report, isNew bo
 }
 
 // guardLine names the push-guard layers acct has: the CLI's pre-tool hook and git's pre-push.
-func (a *app) guardLine(acct account.Account, ag provider.Agent) string {
+// A plugin installed just now is installed and enabled; otherwise the CLI is asked.
+func (a *app) guardLine(acct account.Account, ag provider.Agent, justInstalled bool) string {
 	var layers []string
-	if gi, ok := ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
+	if justInstalled {
+		layers = append(layers, "pre-tool hook")
+	} else if gi, ok := ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
 		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
 		installed, enabled, err := gi.PluginState(ctx, acct.ConfigDir())
 		cancel()

@@ -10,7 +10,9 @@ import (
 
 // Claude fakes Claude Code. The account is CLAUDE_CONFIG_DIR, else ~/.claude (main). Files in
 // it drive the answers: .loggedin (with .org and .plan) for auth status, .mcp for user MCP
-// servers, .markets and .plugins for the plugin registry, sessions/ for running sessions.
+// servers, .markets and .plugins for the plugin listings, sessions/ for running sessions. Adding
+// a marketplace or installing the plugin also writes the registry files the real CLI keeps in
+// plugins/, which squadrn reads before asking the CLI.
 func Claude(args []string) int {
 	cfg := os.Getenv("CLAUDE_CONFIG_DIR")
 	dir := cfg
@@ -58,17 +60,23 @@ func Claude(args []string) int {
 		cat(".markets", "[]")
 	case strings.HasPrefix(cmd, "plugin marketplace add "):
 		write(".markets", `[{"name":"squadrn"}]`+"\n")
+		_ = os.MkdirAll(file("plugins"), 0o755)
+		write(filepath.Join("plugins", "known_marketplaces.json"), `{"squadrn":{"source":{"source":"directory"}}}`+"\n")
 	case cmd == "--version" && os.Getenv("FAKE_VERSION") != "":
 		fmt.Println(os.Getenv("FAKE_VERSION") + " (Claude Code)")
 	case cmd == "plugin list --json":
 		cat(".plugins", "[]")
 	case strings.HasPrefix(cmd, "plugin install "):
 		write(".plugins", `[{"id":"squadrn@squadrn","enabled":true}]`+"\n")
+		_ = os.MkdirAll(file("plugins"), 0o755)
+		write(filepath.Join("plugins", "installed_plugins.json"), `{"version":2,"plugins":{"squadrn@squadrn":[{"scope":"user"}]}}`+"\n")
 	case strings.HasPrefix(cmd, "plugin uninstall "):
 		_ = os.Remove(file(".plugins"))
+		_ = os.Remove(file(filepath.Join("plugins", "installed_plugins.json")))
 		logCall("cfg=%s args=%s", cfg, cmd)
 	case strings.HasPrefix(cmd, "plugin marketplace remove "):
 		_ = os.Remove(file(".markets"))
+		_ = os.Remove(file(filepath.Join("plugins", "known_marketplaces.json")))
 		logCall("cfg=%s args=%s", cfg, cmd)
 	default:
 		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)

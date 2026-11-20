@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,20 +56,29 @@ func addMCP(ctx context.Context, r provider.Runner, configDir, name string, conf
 }
 
 // installPlugin registers the marketplace in dir unless it is known and installs the plugin
-// unless it is installed.
+// unless it is installed. Both are read from the config dir's plugin registry first (a new
+// account has none: nothing to list); the CLI is asked only when the registry is unreadable.
 func installPlugin(ctx context.Context, r provider.Runner, configDir, dir string) (bool, error) {
-	markets, err := listNames(ctx, r, configDir, "name", "plugin", "marketplace", "list", "--json")
-	if err != nil {
-		return false, err
-	}
-	if !markets[marketplace] {
-		if _, err := r.Output(ctx, configDir, "plugin", "marketplace", "add", dir); err != nil {
+	markets, plugins, ok := readRegistry(configDir)
+	var err error
+	if !ok {
+		if markets, err = listNames(ctx, r, configDir, "name", "plugin", "marketplace", "list", "--json"); err != nil {
 			return false, err
 		}
 	}
-	plugins, err := listNames(ctx, r, configDir, "id", "plugin", "list", "--json")
-	if err != nil {
-		return false, err
+	if !markets[marketplace] {
+		if _, err := r.Output(ctx, configDir, "plugin", "marketplace", "add", dir); err != nil {
+			// The registry may have been stale or elsewhere: the add failing because the
+			// marketplace is known is fine.
+			if known, lerr := listNames(ctx, r, configDir, "name", "plugin", "marketplace", "list", "--json"); lerr != nil || !known[marketplace] {
+				return false, err
+			}
+		}
+	}
+	if !ok {
+		if plugins, err = listNames(ctx, r, configDir, "id", "plugin", "list", "--json"); err != nil {
+			return false, err
+		}
 	}
 	if plugins[provider.Claude.Plugin] {
 		return false, nil
@@ -170,6 +180,45 @@ func pluginRegistered(configDir string) bool {
 	entry, ok := reg.Plugins[provider.Claude.Plugin]
 	var installs []json.RawMessage
 	return ok && json.Unmarshal(entry, &installs) == nil && len(installs) > 0
+}
+
+// readRegistry reads Claude Code's plugin registry in the config dir (internal:
+// plugins/known_marketplaces.json, {"<name>": {...}}, and plugins/installed_plugins.json,
+// {"plugins": {"<id>": [...]}}). A missing file is an empty set; ok is false when a file cannot
+// be read or parsed, and the caller asks the CLI.
+func readRegistry(configDir string) (markets, plugins map[string]bool, ok bool) {
+	dir, ok := configDirOrMain(configDir)
+	if !ok {
+		return nil, nil, false
+	}
+	var known map[string]json.RawMessage
+	if !readJSON(filepath.Join(dir, "plugins", "known_marketplaces.json"), &known) {
+		return nil, nil, false
+	}
+	var reg struct {
+		Plugins map[string][]json.RawMessage `json:"plugins"`
+	}
+	if !readJSON(filepath.Join(dir, "plugins", "installed_plugins.json"), &reg) {
+		return nil, nil, false
+	}
+	markets = make(map[string]bool, len(known))
+	for name := range known {
+		markets[name] = true
+	}
+	plugins = make(map[string]bool, len(reg.Plugins))
+	for id, installs := range reg.Plugins {
+		plugins[id] = len(installs) > 0
+	}
+	return markets, plugins, true
+}
+
+// readJSON decodes path into v; a missing file leaves v empty and counts as read.
+func readJSON(path string, v any) bool {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return true
+	}
+	return err == nil && json.Unmarshal(b, v) == nil
 }
 
 // mcpConfigured reads the user-scope MCP servers in the account's .claude.json (internal; the
