@@ -94,7 +94,7 @@ func (a *app) accountAdoptCmd() *cobra.Command {
 			if len(account.Provisioner{Store: a.store}.Conflicts(acct)) > 0 {
 				hint = a.relinkHint(acct) // it has its own copies: a plain add would keep them
 			}
-			a.out("adopted %s (%s); link main's settings with: %s\n", acct.Label(), a.tilde(acct.Dir), hint)
+			a.out("adopted %s (%s); set it up from main with: %s\n", acct.Label(), a.tilde(acct.Dir), hint)
 			return nil
 		},
 	}

@@ -41,7 +41,8 @@ type Spec struct {
 	ConfigEnv string
 	// MCPConfig is the main account's file holding user-scope MCP servers, relative to home.
 	MCPConfig string
-	// Settings is the main account's settings file, relative to MainDir.
+	// Settings is an account's settings file, relative to its dir; secondary accounts get their
+	// own copy, merged from main's (Driver.Settings).
 	Settings string
 	// Shared are linked from the main account into every other account. SharedPerEntry dirs are
 	// linked entry by entry, skipping the listed entries (managed per account by the CLI).
@@ -214,11 +215,22 @@ type StatusLine interface {
 	// Wrap is a command running bin with hook, then old; Unwrap reverses it.
 	Wrap(bin, hook, old, home string) (string, error)
 	Unwrap(cmd, hook string) (old string, ours bool)
+	// Key is the settings key holding the status line (one path for SettingsFormat).
+	Key() string
 	// Shell is how the CLI runs a status line command.
 	Shell(cmd string) (bin string, argv []string)
 	// Parse reads the status line input; ParseLimit the hook input of a turn that failed.
 	Parse(raw []byte, now time.Time) (usage.Snapshot, error)
 	ParseLimit(raw []byte, now time.Time, loc *time.Location) (LimitHit, error)
+}
+
+// SettingsFormat reads and writes the CLI's settings file (Spec.Settings) as a generic document,
+// so squadrn can merge an account's own copy from main's (ADR 0011). It needs no CLI binary.
+type SettingsFormat interface {
+	Decode(b []byte) (map[string]any, error)
+	Encode(doc map[string]any) ([]byte, error)
+	// Deep are the top-level objects merged one level down (Claude: permissions, env, hooks).
+	Deep() []string
 }
 
 // Driver is the code behind a Spec, registered by the provider's own package.
@@ -228,6 +240,8 @@ type Driver struct {
 	New func(extraEnv []string) (Agent, error)
 	// StatusLine is nil when the provider has none.
 	StatusLine StatusLine
+	// Settings is nil when accounts do not get their own settings file.
+	Settings SettingsFormat
 }
 
 var Claude = Spec{
@@ -239,7 +253,8 @@ var Claude = Spec{
 	ConfigEnv: "CLAUDE_CONFIG_DIR",
 	MCPConfig: ".claude.json",
 	Settings:  "settings.json",
-	Shared:    []string{"settings.json", "CLAUDE.md", "agents", "hooks", "commands", "output-styles", "keybindings.json"},
+	// settings.json is not shared: each account has its own copy, merged from main's (ADR 0011).
+	Shared: []string{"CLAUDE.md", "agents", "hooks", "commands", "output-styles", "rules", "keybindings.json"},
 	// skills/synced is managed per account by claude.ai.
 	SharedPerEntry: map[string][]string{"skills": {"synced"}},
 	WorktreeDir:    ".claude/worktrees",

@@ -611,6 +611,7 @@ func (e Env) links(a account.Account, g string) []Check {
 			}
 		}
 	}
+	out = append(out, e.accountSettings(a, g)...)
 	for _, item := range a.Spec.Shared {
 		src := filepath.Join(e.Store.MainDir(a.Spec), item)
 		if _, err := os.Stat(src); err != nil {
@@ -638,4 +639,41 @@ func resolve(p string) string {
 		return real
 	}
 	return p
+}
+
+// accountSettings checks a secondary account's own settings copy and its record (ADR 0011).
+func (e Env) accountSettings(a account.Account, g string) []Check {
+	if d, ok := provider.DriverOf(a.Spec.ID); !ok || d.Settings == nil {
+		return nil
+	}
+	fix := e.Command + " account add " + a.Label()
+	name := a.Spec.Settings
+	path := account.SettingsPath(a)
+	if account.LinksTo(path, filepath.Join(e.Store.MainDir(a.Spec), name)) {
+		return []Check{bad(g, Warn, name+" is still a link to main's (it becomes the account's own copy at the next start)", fix)}
+	}
+	m, recorded, err := account.ReadManaged(a.Dir)
+	switch {
+	case err != nil:
+		return []Check{bad(g, Fail, account.ManagedFile+" unreadable: "+err.Error(), "move it aside, then: "+fix)}
+	case !recorded:
+		return []Check{bad(g, Warn, name+" not set up from main yet", fix)}
+	}
+	if fi, err := os.Lstat(path); err != nil || !fi.Mode().IsRegular() {
+		return []Check{bad(g, Fail, name+" is missing or not a file", fix)}
+	}
+	var own []string
+	for _, k := range slices.Sorted(maps.Keys(m.Keys)) {
+		if m.Keys[k].Source == account.SourceUser {
+			own = append(own, k)
+		}
+	}
+	msg := name + " follows main"
+	if m.Profile != "" {
+		msg += " + " + m.Profile + " profile"
+	}
+	if len(own) > 0 {
+		msg += "; changed here: " + strings.Join(own, ", ")
+	}
+	return []Check{ok(g, msg)}
 }

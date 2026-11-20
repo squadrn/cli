@@ -224,6 +224,7 @@ func provisionFixture(t *testing.T) (Store, Account, *fakeAgent, Provisioner) {
 	s := newStore(t, "work")
 	main := s.MainDir(provider.Claude)
 	must(t, os.WriteFile(filepath.Join(main, "settings.json"), []byte("{}"), 0o600))
+	must(t, os.WriteFile(filepath.Join(main, "CLAUDE.md"), []byte("# main\n"), 0o600))
 	must(t, os.MkdirAll(filepath.Join(main, "agents"), 0o755))
 	must(t, os.MkdirAll(filepath.Join(main, "skills", "find-skills"), 0o755))
 	must(t, os.MkdirAll(filepath.Join(main, "skills", "synced"), 0o755))
@@ -243,8 +244,8 @@ func TestProvision(t *testing.T) {
 	r, err := p.Provision(context.Background(), a)
 	must(t, err)
 
-	if target, _ := os.Readlink(filepath.Join(a.Dir, "settings.json")); target != filepath.Join(s.MainDir(provider.Claude), "settings.json") {
-		t.Errorf("settings.json link = %q", target)
+	if target, _ := os.Readlink(filepath.Join(a.Dir, "CLAUDE.md")); target != filepath.Join(s.MainDir(provider.Claude), "CLAUDE.md") {
+		t.Errorf("CLAUDE.md link = %q", target)
 	}
 	if _, err := os.Lstat(filepath.Join(a.Dir, "skills", "find-skills")); err != nil {
 		t.Errorf("skill not linked: %v", err)
@@ -252,8 +253,8 @@ func TestProvision(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(a.Dir, "skills", "synced")); err == nil {
 		t.Error("skills/synced must stay per account")
 	}
-	if _, err := os.Lstat(filepath.Join(a.Dir, "CLAUDE.md")); err == nil {
-		t.Error("missing source CLAUDE.md must not create a dangling link")
+	if _, err := os.Lstat(filepath.Join(a.Dir, "output-styles")); err == nil {
+		t.Error("missing source output-styles must not create a dangling link")
 	}
 	if !slices.Equal(r.MCPAdded, []string{"codegraph", "figwright"}) ||
 		!slices.Equal(r.MCPSkipped, []string{"secret", "hdr"}) ||
@@ -344,17 +345,17 @@ func TestProvisionRemovesLinksToItemsMainNoLongerHas(t *testing.T) {
 
 func TestProvisionReportsConflicts(t *testing.T) {
 	_, a, _, p := provisionFixture(t)
-	must(t, os.WriteFile(filepath.Join(a.Dir, "settings.json"), []byte("{}"), 0o600))
+	must(t, os.WriteFile(filepath.Join(a.Dir, "CLAUDE.md"), []byte("{}"), 0o600))
 	r, err := p.Provision(context.Background(), a)
 	must(t, err)
-	if !slices.Equal(r.Conflicts, []string{filepath.Join(a.Dir, "settings.json")}) {
+	if !slices.Equal(r.Conflicts, []string{filepath.Join(a.Dir, "CLAUDE.md")}) {
 		t.Errorf("Conflicts = %v", r.Conflicts)
 	}
 }
 
 func TestProvisionRelinkKeepsABackup(t *testing.T) {
 	s, a, _, p := provisionFixture(t)
-	own := filepath.Join(a.Dir, "settings.json")
+	own := filepath.Join(a.Dir, "CLAUDE.md")
 	must(t, os.MkdirAll(a.Dir, 0o700))
 	must(t, os.WriteFile(own, []byte(`{"own":true}`), 0o600))
 	if c := p.Conflicts(a); !slices.Equal(c, []string{own}) {
@@ -371,8 +372,8 @@ func TestProvisionRelinkKeepsABackup(t *testing.T) {
 	if b, err := os.ReadFile(bak); err != nil || string(b) != `{"own":true}` {
 		t.Fatalf("backup = %q, %v", b, err)
 	}
-	if !LinksTo(own, filepath.Join(s.MainDir(provider.Claude), "settings.json")) {
-		t.Fatal("settings.json not linked after relink")
+	if !LinksTo(own, filepath.Join(s.MainDir(provider.Claude), "CLAUDE.md")) {
+		t.Fatal("CLAUDE.md not linked after relink")
 	}
 	if c := p.Conflicts(a); len(c) != 0 {
 		t.Fatalf("Conflicts after relink = %v", c)
@@ -388,17 +389,18 @@ func TestProvisionRelinkKeepsABackup(t *testing.T) {
 	}
 }
 
-func TestProvisionCreatesMainSettings(t *testing.T) {
+// settings.json is not shared any more: Provision neither links it nor creates main's.
+func TestProvisionLeavesSettingsAlone(t *testing.T) {
 	s, a, _, p := provisionFixture(t)
 	main := filepath.Join(s.MainDir(provider.Claude), "settings.json")
 	must(t, os.Remove(main))
-	r, err := p.Provision(context.Background(), a)
+	_, err := p.Provision(context.Background(), a)
 	must(t, err)
-	if b, err := os.ReadFile(main); err != nil || string(b) != "{}\n" {
-		t.Fatalf("main settings = %q, %v", b, err)
+	if _, err := os.Lstat(main); err == nil {
+		t.Error("main settings created")
 	}
-	if !slices.Contains(r.Linked, filepath.Join(a.Dir, "settings.json")) {
-		t.Fatalf("Linked = %v", r.Linked)
+	if _, err := os.Lstat(filepath.Join(a.Dir, "settings.json")); err == nil {
+		t.Error("account settings linked")
 	}
 }
 
@@ -469,7 +471,7 @@ func TestRefreshSharedReconcilesEntriesAndReportsReplaced(t *testing.T) {
 	if len(r.Conflicts)+len(r.Replaced) != 0 {
 		t.Errorf("Refresh = %+v", r)
 	}
-	settings := filepath.Join(a.Dir, "settings.json")
+	settings := filepath.Join(a.Dir, "CLAUDE.md")
 	must(t, os.Remove(settings))
 	must(t, os.WriteFile(settings, []byte(`{"own":true}`), 0o600))
 	// Unix: a file replaced the link. Windows (copies): the copy was edited.

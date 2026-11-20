@@ -53,6 +53,12 @@ with the git-level guard's `GIT_CONFIG_*` entries in its environment → `Exec` 
 process (on Windows: runs it as a child and passes its exit status through), with
 `CLAUDE_CONFIG_DIR` set, or *unset* for main (Claude Code keys credentials to the variable).
 
+**Settings.** Secondary accounts have their own settings file, built from main's, the
+profile and squadrn's own keys (`account.SyncSettings`, [ADR 0011](adr/0011-provider-model-v2.md)).
+`<account>/.squadrn-managed.json` records each key squadrn wrote with its SHA-256; before every
+session the copy follows main where the user left a key alone, and a key the user changed is kept
+and reported once. An rc.2 link to main's settings becomes a copy (the link is kept as a backup).
+
 **Grid.** `grid.Assign` turns specs into agents → one tmux session per repo, created and tagged
 (`@squadrn_repo`) in a single tmux invocation so concurrent `grid` runs join instead of
 duplicating; one pane per agent running `squadrn -a <provider/name> wt <name>`; panes carry
