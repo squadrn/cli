@@ -162,6 +162,15 @@ srn account rename work job      # logs work out first; log in again as job
 srn account rm work              # logs out and moves the dir to the trash (macOS ~/.Trash)
 ```
 
+`srn account rm work --purge` deletes the dir permanently instead of trashing it and removes every
+record squadrn keeps of the account: its usage record, its entries in the handoff ledger, its
+in-use records (in its dir and in the repositories its records name) and its cached login status.
+It prints exactly what it removed. Links inside the dir are removed, never followed; a dir that is
+itself a link is refused. At a terminal you confirm by typing the account (`claude/work`), even
+with `-y`; scripts without a terminal pass `--purge --yes`. If something cannot be deleted (a file
+another program holds open on Windows), the account and its records stay and the same command
+finishes the job.
+
 A word that is neither a squadrn command, an account nor an agent subcommand is a usage error with
 a suggestion (`srn acount` → *did you mean account?*), so a typo never becomes a prompt.
 Global options before the command: `-a <account>`, `-C <dir>`, `--no-color` (also `NO_COLOR=1`).
