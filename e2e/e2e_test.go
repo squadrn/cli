@@ -316,7 +316,7 @@ func testGuard(t *testing.T, s *sandbox) {
 	s.run(t, opt{stdin: payload("git push -f origin feat-x")}, "srn", "hook", "guard-git").exit(0).
 		out(`"permissionDecision":"deny"`, `force push is not allowed`)
 	s.run(t, opt{stdin: payload("git push origin HEAD:main")}, "srn", "hook", "guard-git").exit(0).
-		out(`"permissionDecision":"deny"`, `direct push to protected branch \\"main\\"`)
+		out(`"permissionDecision":"deny"`, `direct push to protected branch ."main`)
 	s.run(t, opt{stdin: payload(`git push origin "$BRANCH"`)}, "srn", "hook", "guard-git").exit(0).out(`"permissionDecision":"ask"`)
 	s.run(t, opt{stdin: "not json"}, "srn", "hook", "guard-git").exit(0).out(`"permissionDecision":"ask"`)
 	if runtime.GOOS != "windows" {

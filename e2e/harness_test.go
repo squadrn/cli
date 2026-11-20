@@ -263,9 +263,13 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	return r
 }
 
+// indent prefixes each line for the transcript; long output (completion scripts, help) is cut.
 func indent(s, prefix string) string {
-	s = strings.TrimRight(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
-	return prefix + strings.ReplaceAll(s, "\n", "\n"+prefix) + "\n"
+	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(s, "\r\n", "\n"), "\n"), "\n")
+	if n := len(lines); n > 40 {
+		lines = append(lines[:30:30], fmt.Sprintf("… %d more lines", n-30))
+	}
+	return prefix + strings.Join(lines, "\n"+prefix) + "\n"
 }
 
 // fail stops the test and prints the whole transcript so far.
@@ -313,7 +317,11 @@ func (r *result) noOut(res ...string) {
 	}
 }
 
-func norm(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+// norm makes output comparable across platforms: LF line ends and forward slashes, so one
+// regexp matches ~/.local/bin/srn and ~\.local\bin\srn.exe alike.
+func norm(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), `\`, "/")
+}
 
 func (s *sandbox) srn(t *testing.T, args ...string) *result {
 	t.Helper()
