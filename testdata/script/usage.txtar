@@ -1,5 +1,5 @@
 [windows] skip 'Unix script: sh, symlinks'
-# Fixture: main (max, acme) with its own status line; work shares main's settings.json.
+# Fixture: main (max, acme) with its own status line; work has its own copy of main's settings.
 cp settings.json home/.claude/settings.json
 cp empty home/.claude/.loggedin
 cp max home/.claude/.plan
@@ -35,17 +35,22 @@ exitcode 2 squadrn usage --undo
 exitcode 2 squadrn usage setup a b
 exitcode 2 squadrn usage setup --all work
 exec squadrn usage setup --all -y
-stdout '^usage tracking on: ~/.claude/settings.json \(claude/main, claude/work\)$'
-! stdout 'claude-work'
+stdout '^usage tracking on: ~/.claude/settings.json \(claude/main\)$'
+stdout '^usage tracking on: ~/.claude-work/settings.json \(claude/work\)$'
 grep '"command": ".*/squadrn hook statusline --then .echo mine; printf ' home/.claude/settings.json
 grep '"padding": 2' home/.claude/settings.json
 grep '"model": "opus"' home/.claude/settings.json
-exec sh -c 'test -L home/.claude-work/settings.json'
+grep '"command": ".*/squadrn hook statusline --then .echo mine; printf ' home/.claude-work/settings.json
+exec sh -c 'test ! -L home/.claude-work/settings.json'
+# The session-start sync keeps squadrn's status line and does not report it as a user change.
+exec squadrn work -- hi
+! stderr 'kept your change'
+grep 'hook statusline' home/.claude-work/settings.json
 
 # Setting it up again changes nothing.
 cp home/.claude/settings.json before.json
 exec squadrn usage setup work
-stdout '^usage tracking already on: ~/.claude/settings.json \(claude/main, claude/work\)$'
+stdout '^usage tracking already on: ~/.claude-work/settings.json \(claude/work\)$'
 cmp home/.claude/settings.json before.json
 exec squadrn usage setup --all -y
 stdout 'already on'
@@ -127,29 +132,31 @@ exec sh -c 'squadrn doctor > doctor.txt || true'
 grep 'usage tracking: on' doctor.txt
 
 # --undo restores the previous command, once.
-exec squadrn usage setup --undo -y
-stdout '^usage tracking off: ~/.claude/settings.json \(claude/main, claude/work\)$'
+exec squadrn usage setup --undo --all -y
+stdout '^usage tracking off: ~/.claude/settings.json \(claude/main\)$'
+stdout '^usage tracking off: ~/.claude-work/settings.json \(claude/work\)$'
+! grep 'hook statusline' home/.claude-work/settings.json
 grep '"command": "echo mine; printf ''%s'' x"' home/.claude/settings.json
 ! grep 'hook statusline' home/.claude/settings.json
 exec squadrn usage setup --undo -y
 stdout 'not set up'
 
-# An account with its own settings and no status line gets one; undo removes it again.
+# An adopted account with its own settings and no status line gets main's, wrapped; undo puts
+# main's command back.
 mkdir home/.claude-solo
 cp emptyobj home/.claude-solo/settings.json
 exec squadrn account adopt solo --yes
-stdout 'link main.s settings with: srn account add claude/solo --relink$'
+stdout 'set it up from main with: srn account add claude/solo$'
 exec squadrn account add solo --usage
 stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
-grep '"command": ".* hook statusline"' home/.claude-solo/settings.json
-! grep 'then' home/.claude-solo/settings.json
+grep '"command": ".* hook statusline --then .echo mine' home/.claude-solo/settings.json
 exec squadrn usage setup --undo solo -y
-! grep 'statusLine' home/.claude-solo/settings.json
+grep '"command": "echo mine; printf ''%s'' x"' home/.claude-solo/settings.json
 exitcode 2 squadrn account add solo --usage --no-usage
 
 # --all asks once and names every settings file with the accounts it covers.
 ! exec squadrn usage setup --all
-stderr 'record usage limits through the status line of ~/.claude/settings.json \(claude/main, claude/work\); ~/.claude-solo/settings.json \(claude/solo\); re-run with --yes'
+stderr 'record usage limits through the status line of ~/.claude/settings.json \(claude/main\); ~/.claude-solo/settings.json \(claude/solo\); ~/.claude-work/settings.json \(claude/work\); re-run with --yes'
 ! grep 'hook statusline' home/.claude/settings.json
 
 # self-uninstall puts every status line back.

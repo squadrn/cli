@@ -64,11 +64,30 @@ func (a *app) wrapStatusLine(sl provider.StatusLine, old string) (string, error)
 }
 
 // settingsGroup is one settings file, the status line format it holds, and the accounts that
-// use it (through links to main's).
+// use it: one account, unless its settings could not be made its own copy (still a link).
 type settingsGroup struct {
-	path     string
-	sl       provider.StatusLine
-	accounts []string
+	path  string
+	sl    provider.StatusLine
+	accts []account.Account
+}
+
+// claim records the status line as squadrn's key in the group's own copies (on), or hands it
+// back to main's value (off), so the settings sync neither reverts nor reports it.
+func (g settingsGroup) claim(on bool) error {
+	for _, acct := range g.accts {
+		if fsx.Real(settingsPath(acct)) != fsx.Real(g.path) {
+			continue
+		}
+		f := settingsFormat(acct.Spec)
+		if on {
+			if err := account.ClaimSetting(acct, f, g.sl.Key()); err != nil {
+				return err
+			}
+		} else if err := account.ReleaseSetting(acct, f, g.sl.Key()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // tracked reads g's status line: whether it has one and whether it runs squadrn's recorder.
@@ -93,6 +112,10 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 		if sl == nil {
 			continue
 		}
+		// An account still linked to main's settings gets its own copy first.
+		if _, err := a.syncSettings(t); err != nil {
+			return nil, err
+		}
 		key := fsx.Real(settingsPath(t))
 		if seen[key] {
 			continue
@@ -101,7 +124,7 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 		g := settingsGroup{path: settingsPath(t), sl: sl}
 		for _, x := range all {
 			if x.Spec.Caps.UsageReport && (fsx.Real(settingsPath(x)) == key || fsx.SameFile(settingsPath(x), key)) {
-				g.accounts = append(g.accounts, x.Label())
+				g.accts = append(g.accts, x)
 			}
 		}
 		groups = append(groups, g)
@@ -111,7 +134,11 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 
 // groupWhere names a settings file and the accounts that use it.
 func (a *app) groupWhere(g settingsGroup) string {
-	return fmt.Sprintf("%s (%s)", a.tilde(fsx.Real(g.path)), strings.Join(g.accounts, ", "))
+	labels := make([]string, len(g.accts))
+	for i, acct := range g.accts {
+		labels[i] = acct.Label()
+	}
+	return fmt.Sprintf("%s (%s)", a.tilde(fsx.Real(g.path)), strings.Join(labels, ", "))
 }
 
 func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
@@ -129,6 +156,9 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 			return err
 		}
 		if err := g.sl.SetCommand(g.path, old); err != nil {
+			return err
+		}
+		if err := g.claim(false); err != nil {
 			return err
 		}
 		a.out("usage tracking off: %s\n", where)
@@ -150,6 +180,9 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 		return err
 	}
 	if err := g.sl.SetCommand(g.path, wrapped); err != nil {
+		return err
+	}
+	if err := g.claim(true); err != nil {
 		return err
 	}
 	a.out("usage tracking on: %s\n", where)

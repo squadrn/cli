@@ -25,7 +25,7 @@ func (a *app) usageCmd() *cobra.Command {
 		Long: fmt.Sprintf(`Show what the status line last reported about each account's usage limits (5-hour and
 7-day windows), when it last hit a limit, and the best account to continue with in this repository.
 
-Usage is recorded by the status line, so it needs a one-time setup per settings file:
+Usage is recorded by the status line, so it needs a one-time setup per account:
 %[1]s usage setup wraps the status line command (your own one keeps running and showing).`, a.cmd),
 		Example: fmt.Sprintf(`  %[1]s usage                 all accounts
   %[1]s usage work            details of claude/work
@@ -71,7 +71,7 @@ func (a *app) usageSetupCmd() *cobra.Command {
 		Short: "Record an account's usage through its status line",
 		Long: `Record an account's usage through its status line: the status line command in the account's
 settings.json is wrapped, so squadrn sees what Claude Code reports while your own command keeps
-running and showing. Accounts that share a settings file are set up together.`,
+running and showing. Each account has its own settings.json, so each is set up on its own.`,
 		Args:              optionalArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
