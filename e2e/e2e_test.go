@@ -109,6 +109,31 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.check(t, strings.Contains(strict, `"blockReadsOutsideWorkingDirectories": true`) && strings.Contains(strict, `"DISABLE_TELEMETRY": "1"`) && strings.Contains(strict, `.claude-work/.credentials.json`), "strict profile settings missing")
 	s.srn(t, "doctor", "strictacct").exit(1).out(`^account claude/strictacct$`, `settings.json follows main \+ strict profile`).noOut(`^account claude/work$`)
 	s.srn(t, "account", "rm", "strictacct", "--yes").exit(0)
+	s.srn(t, "account", "add", "mini", "--profile", "minimal", "--with", "no-attribution", "-y").exit(0).out(
+		`^  profile +minimal \(secrets denied\) \+ no-attribution$`,
+		`^✓ settings from claude/main \+ minimal profile \+ no-attribution$`)
+	mini := read(t, filepath.Join(s.home, ".claude-mini", "settings.json"))
+	s.check(t, strings.Contains(mini, `"commit": ""`) && strings.Contains(mini, `Read(~/.ssh/**)`) && !strings.Contains(mini, `Bash(git push *)`), "minimal profile settings wrong")
+	s.srn(t, "account", "add", "mini", "--profile", "standard", "-y").exit(0).out(`^✓ settings updated: .*permissions\.ask`).noOut(`^✓ created`)
+	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-mini", "settings.json")), `Bash(git push *)`), "switching to the standard profile did not reach claude/mini")
+	s.srn(t, "account", "add", "mini", "-y").exit(0).out(`^  profile +standard .*\+ no-attribution$`, `^✓ claude/mini is up to date$`)
+	s.srn(t, "account", "rm", "mini", "--yes").exit(0)
+
+	// A failing step says which, what state the account is in and how to retry; nothing is left behind.
+	mainSettings := filepath.Join(s.home, ".claude", "settings.json")
+	saved, savedErr := os.ReadFile(mainSettings)
+	write(t, mainSettings, `{"model":`)
+	s.srn(t, "account", "add", "broken", "-y").exit(1).out(
+		`^✗ build settings failed: `,
+		`^  state: nothing was created$`,
+		`^  retry: srn account add claude/broken$`)
+	left, _ := filepath.Glob(filepath.Join(s.home, ".claude-broken*"))
+	s.check(t, len(left) == 0, "a failed account add left %v", left)
+	if savedErr == nil {
+		write(t, mainSettings, string(saved))
+	} else if err := os.Remove(mainSettings); err != nil {
+		t.Fatal(err)
+	}
 	s.srn(t, "account", "ls").exit(0).out(`^claude/main +yes +me@.claude `, `^claude/work +no `)
 	s.srn(t, "account", "login", "work").exit(0).out(`^logged in to claude/work as me@.claude-work$`)
 	s.srn(t, "account", "rename", "work", "job", "-y").exit(0).out(`renamed claude/work → claude/job`)
