@@ -299,17 +299,18 @@ func (a *app) located(ss provider.SessionStore, src swapSource, spec provider.Sp
 func (a *app) swapCandidates(ss provider.SessionStore, accts []account.Account, dirs []string, dir string) []swapSource {
 	var out []swapSource
 	var lim usage.Snapshot
-	for _, acct := range accts {
+	limOwner := 0
+	for i, acct := range accts {
 		snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name)
 		if ok && snap.LimitedSession != "" && fsx.Within(snap.LimitedCwd, dir) && snap.LimitedAt.After(lim.LimitedAt) {
-			lim = snap
+			lim, limOwner = snap, i
 		}
 	}
 	if lim.LimitedSession != "" {
 		_, moved, _ := a.ledger().Latest(func(h usage.Handoff) bool {
 			return h.Session == lim.LimitedSession && h.At.After(lim.LimitedAt)
 		})
-		if s, err := ss.FindSession(dirs, lim.LimitedSession); err == nil && !moved {
+		if s, err := findSessionOf(ss, dirs, lim.LimitedSession, limOwner); err == nil && !moved {
 			out = append(out, swapSource{session: s, cwd: lim.LimitedCwd, limited: true, at: lim.LimitedAt})
 		}
 	}
@@ -325,12 +326,27 @@ func (a *app) swapCandidates(ss provider.SessionStore, accts []account.Account, 
 		if slices.ContainsFunc(running, func(c swapSource) bool { return c.session.ID == ls.SessionID }) {
 			continue
 		}
-		if s, err := ss.FindSession(dirs, ls.SessionID); err == nil {
+		if s, err := findSessionOf(ss, dirs, ls.SessionID, ls.Owner); err == nil {
 			running = append(running, swapSource{session: s, cwd: ls.Cwd, running: true, at: s.ModTime})
 		}
 	}
 	slices.SortStableFunc(running, func(x, y swapSource) int { return y.at.Compare(x.at) })
 	return append(out, running...)
+}
+
+// findSessionOf finds conversation id, taking owner's copy unless another account's is newer: a
+// swap leaves the old copy behind with the same modification time, so the newest-copy rule
+// alone can pick the account the conversation left.
+func findSessionOf(ss provider.SessionStore, dirs []string, id string, owner int) (provider.Session, error) {
+	s, err := ss.FindSession(dirs, id)
+	if err != nil || s.Owner == owner || owner < 0 || owner >= len(dirs) {
+		return s, err
+	}
+	if own, ownErr := ss.FindSession(dirs[owner:owner+1], id); ownErr == nil && !own.ModTime.Before(s.ModTime) {
+		own.Owner = owner
+		return own, nil
+	}
+	return s, nil
 }
 
 func shortID(id string) string {
