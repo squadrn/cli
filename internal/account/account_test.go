@@ -147,7 +147,7 @@ func TestDefineRejectsMain(t *testing.T) {
 }
 
 func TestListGroupsByProviderMainFirst(t *testing.T) {
-	s := twoProviders(newStore(t, "zeta", "alpha", "Bad", "mcp"))
+	s := twoProviders(newStore(t, "zeta", "alpha", "Bad", "grid"))
 	must(t, os.WriteFile(filepath.Join(s.Home, ".claude-file"), nil, 0o600))
 	must(t, os.MkdirAll(filepath.Join(s.Home, ".codex"), 0o755))
 	mkAccount(t, filepath.Join(s.Home, ".codex-b2"))
@@ -196,6 +196,7 @@ func TestMoveToTrash(t *testing.T) {
 
 type fakeAgent struct {
 	provider.Agent
+	provider.GuardInstaller
 	calls     []string
 	mcp       map[string]bool // servers present in the target account
 	installed bool
