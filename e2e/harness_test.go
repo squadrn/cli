@@ -184,6 +184,10 @@ func (s *sandbox) installFakes() {
 	}
 	for _, name := range append(fakeagent.Names(), fakeagent.NotifierNames()...) {
 		if runtime.GOOS == "windows" {
+			if name == "powershell" {
+				// The install test runs the real Windows PowerShell; no e2e step notifies.
+				continue
+			}
 			// The fake is this test binary, started under the CLI's name.
 			copyFile(s.t, self, filepath.Join(s.fakeBin, name+".exe"), 0o755)
 			continue

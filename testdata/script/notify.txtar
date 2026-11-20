@@ -25,7 +25,8 @@ exitcode 2 squadrn notify test bogus
 exitcode 2 squadrn notify test done extra
 exec squadrn notify status
 stdout '^  .* sent +done +Claude Code · main · .* \(fake\)$'
-stdout '^log: ~/.local/state/squadrn/notify.log$'
+[!windows] stdout '^log: ~/.local/state/squadrn/notify.log$'
+[windows] stdout '^log: ~\\.local\\state\\squadrn\\notify.log$'
 rm sent.jsonl
 
 # Claude Code's hooks: an approval names the tool; the reply itself is never shown.
