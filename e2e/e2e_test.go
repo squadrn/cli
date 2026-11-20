@@ -95,7 +95,8 @@ func testConfig(t *testing.T, s *sandbox) {
 }
 
 func testAccounts(t *testing.T, s *sandbox) {
-	s.srn(t, "account", "add", "work").exit(0).out(
+	// Timing bounds are generous (targets: 1.5s first add, 0.3s re-run) but catch a regression.
+	s.srn(t, "account", "add", "work").exit(0).within(3*time.Second).out(
 		`^Claude Code .*· new account claude/work → ~/.claude-work$`,
 		`^  profile +standard \(secrets denied, push guard, 30-day history\)$`,
 		`^✓ created ~.\.claude-work \(private\)$`,
@@ -103,7 +104,7 @@ func testAccounts(t *testing.T, s *sandbox) {
 		`^✓ push guard: pre-tool hook \+ git pre-push$`,
 		`^done in [0-9.]+s · log in: srn account login claude/work · check: srn doctor claude/work$`)
 	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-work", "settings.json")), `Bash(git push *)`), "the standard profile did not reach claude/work's settings")
-	s.srn(t, "account", "add", "work").exit(0).out(`^✓ claude/work is up to date$`).noOut(`^✓ created`)
+	s.srn(t, "account", "add", "work").exit(0).within(time.Second).out(`^✓ claude/work is up to date$`).noOut(`^✓ created`)
 	s.srn(t, "account", "add", "strictacct", "--profile", "strict", "--with", "privacy", "-y").exit(0).out(`^✓ settings from claude/main \+ strict profile \+ privacy$`)
 	strict := read(t, filepath.Join(s.home, ".claude-strictacct", "settings.json"))
 	s.check(t, strings.Contains(strict, `"blockReadsOutsideWorkingDirectories": true`) && strings.Contains(strict, `"DISABLE_TELEMETRY": "1"`) && strings.Contains(strict, `.claude-work/.credentials.json`), "strict profile settings missing")

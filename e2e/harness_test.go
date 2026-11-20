@@ -239,6 +239,7 @@ type result struct {
 	line         string
 	code         int
 	stdout, errs string
+	took         time.Duration
 }
 
 // run runs a command in the sandbox and records it in the transcript.
@@ -256,8 +257,9 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 5 * time.Second
+	begin := time.Now()
 	err := cmd.Run()
-	r := &result{s: s, t: t, line: strings.TrimSpace(name + " " + strings.Join(args, " ")), stdout: stdout.String(), errs: stderr.String()}
+	r := &result{s: s, t: t, line: strings.TrimSpace(name + " " + strings.Join(args, " ")), stdout: stdout.String(), errs: stderr.String(), took: time.Since(begin)}
 	switch {
 	case cmd.ProcessState != nil:
 		r.code = cmd.ProcessState.ExitCode()
@@ -270,7 +272,7 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	if len(o.env) > 0 {
 		fmt.Fprintf(s.log, "  [env %s]", strings.Join(o.env, " "))
 	}
-	fmt.Fprintf(s.log, "\n[exit %d]\n", r.code)
+	fmt.Fprintf(s.log, "\n[exit %d, %s]\n", r.code, r.took.Round(time.Millisecond))
 	if r.stdout != "" {
 		fmt.Fprintf(s.log, "%s", indent(r.stdout, "  | "))
 	}
@@ -310,6 +312,17 @@ func (r *result) out(res ...string) *result {
 		if !regexp.MustCompile("(?m)" + re).MatchString(norm(r.stdout)) {
 			r.s.fail(r.t, "%s: stdout does not match %q", r.line, re)
 		}
+	}
+	return r
+}
+
+// within asserts that the command took at most limit on macOS and Linux and logs the time on
+// every platform (Windows runners are too slow and noisy for a bound).
+func (r *result) within(limit time.Duration) *result {
+	r.t.Helper()
+	r.t.Logf("%s: %s (bound %s)", r.line, r.took.Round(time.Millisecond), limit)
+	if runtime.GOOS != "windows" && r.took > limit {
+		r.s.fail(r.t, "%s: took %s, more than %s", r.line, r.took.Round(time.Millisecond), limit)
 	}
 	return r
 }
