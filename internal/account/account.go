@@ -31,24 +31,15 @@ var (
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,23}$`)
 
-// Commands are squadrn's top-level subcommands. They, and every provider CLI's subcommands, cannot
-// be account names: `squadrn <word> ...` would be ambiguous.
+// Commands are squadrn's top-level subcommands; they cannot be account names, since
+// `squadrn <word> ...` runs the subcommand. A provider CLI's subcommands can: an account of that
+// name is matched before the subcommand is passed through (ADR 0011).
 var Commands = []string{
 	"account", "completion", "config", "deps", "doctor", "gc", "grid", "help", "hook", "ps",
 	"self-install", "self-uninstall", "self-update", "swap", "usage", "version", "wt",
 }
 
-func reserved(name string) bool {
-	if slices.Contains(Commands, name) {
-		return true
-	}
-	for _, spec := range provider.All() {
-		if slices.Contains(spec.Subcommands, name) {
-			return true
-		}
-	}
-	return false
-}
+func reserved(name string) bool { return slices.Contains(Commands, name) }
 
 // Ref names an account: provider/name.
 type Ref struct {
@@ -91,7 +82,7 @@ func ValidateName(name string) error {
 		return fmt.Errorf("%w %q (expected %s)", ErrInvalidName, name, namePattern)
 	}
 	if reserved(name) {
-		return fmt.Errorf("%w %q: it is a squadrn or provider subcommand", ErrReserved, name)
+		return fmt.Errorf("%w %q: it is a squadrn command", ErrReserved, name)
 	}
 	return nil
 }

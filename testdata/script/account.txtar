@@ -92,6 +92,14 @@ stderr 'claude/work is in use by pid 1 \(claude/work\); stop it first \(or use -
 stderr 'in use by pid 1'
 rm home/.claude-work/.squadrn-inuse/1.json
 
+# A provider subcommand is a valid account name; the account is matched before the subcommand.
+exec squadrn account add mcp --no-usage
+exec squadrn mcp -- hi
+stdout 'cfg=.*/.claude-mcp args=hi'
+exec squadrn account rm mcp --yes
+exec squadrn mcp list
+stdout 'cfg=<unset> args=mcp list'
+
 # login runs the agent's login and says who is logged in.
 exec squadrn account login work
 stdout '^logged in to claude/work as me@.claude-work$'
@@ -130,7 +138,7 @@ exists home/.local/state/squadrn/usage/claude-work.json
 
 # Validation: invalid and reserved names are usage errors (2).
 exitcode 2 squadrn account add Bad
-exitcode 2 squadrn account add mcp
+exitcode 2 squadrn account add doctor
 exitcode 2 squadrn account add main
 exitcode 2 squadrn account add
 exitcode 2 squadrn account frob

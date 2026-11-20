@@ -65,7 +65,7 @@ func TestValidateName(t *testing.T) {
 		"main": nil, "acme-2": nil, "ab": nil,
 		"a": ErrInvalidName, "Personal": ErrInvalidName, "2fa": ErrInvalidName, "a_b": ErrInvalidName,
 		strings.Repeat("a", 25): ErrInvalidName,
-		"mcp":                   ErrReserved, "wt": ErrReserved, "self-update": ErrReserved, "config": ErrReserved,
+		"mcp":                   nil, "wt": ErrReserved, "self-update": ErrReserved, "config": ErrReserved,
 	} {
 		err := ValidateName(name)
 		if (want == nil && err != nil) || (want != nil && !errors.Is(err, want)) {
@@ -289,9 +289,15 @@ func TestRename(t *testing.T) {
 	}
 }
 
-func TestProviderSubcommandsAreReserved(t *testing.T) {
-	for _, n := range []string{"mcp", "doctor", "setup-token", "grid"} {
+// Only squadrn's own commands are reserved; a provider subcommand is a valid account name.
+func TestOnlySquadrnCommandsAreReserved(t *testing.T) {
+	for _, n := range []string{"doctor", "grid", "usage"} {
 		if err := ValidateName(n); !errors.Is(err, ErrReserved) {
+			t.Errorf("ValidateName(%q) = %v", n, err)
+		}
+	}
+	for _, n := range []string{"mcp", "setup-token", "plugin", "auth"} {
+		if err := ValidateName(n); err != nil {
 			t.Errorf("ValidateName(%q) = %v", n, err)
 		}
 	}
