@@ -21,6 +21,8 @@ const (
 	optRepo    = "@squadrn_repo" // session: repository root the grid belongs to
 	optAccount = "@squadrn_acct" // pane: account label, e.g. claude/personal
 	optName    = "@squadrn_name" // pane: worktree name
+	// OptState is the pane's agent state (working, input, failed, done), set by the hooks.
+	OptState = "@squadrn_state"
 	// fieldSep separates -F fields. Not a tab: tmux < 3.5 rewrites tabs in output to '_'.
 	// Fields that may contain it (paths, session names, commands) are printed with the q:
 	// modifier, which escapes it with a backslash; splitFields undoes that.
@@ -66,6 +68,10 @@ type Pane struct {
 	Account string `json:"account"`
 	Name    string `json:"name"`
 	Command string `json:"command"`
+	// PID is the pane's process, State the agent's (OptState), Path its working directory.
+	PID   int    `json:"pid,omitempty"`
+	State string `json:"state,omitempty"`
+	Path  string `json:"-"`
 }
 
 type Session struct {
@@ -175,7 +181,33 @@ func (t Tmux) Sessions(ctx context.Context) ([]Session, error) {
 
 // Panes lists squadrn agent panes, of one session or ("") of every session.
 func (t Tmux) Panes(ctx context.Context, session string) ([]Pane, error) {
-	format := strings.Join([]string{"#{pane_id}", q("session_name"), q(optAccount), q(optName), q("pane_current_command")}, fieldSep)
+	all, err := t.listPanes(ctx, session)
+	var panes []Pane
+	for _, p := range all {
+		if p.Name != "" {
+			panes = append(panes, p)
+		}
+	}
+	return panes, err
+}
+
+// StatePanes lists every pane whose agent reported a state, grid or not.
+func (t Tmux) StatePanes(ctx context.Context) ([]Pane, error) {
+	all, err := t.listPanes(ctx, "")
+	var panes []Pane
+	for _, p := range all {
+		if p.State != "" {
+			panes = append(panes, p)
+		}
+	}
+	return panes, err
+}
+
+func (t Tmux) listPanes(ctx context.Context, session string) ([]Pane, error) {
+	format := strings.Join([]string{
+		"#{pane_id}", q("session_name"), q(optAccount), q(optName), q("pane_current_command"),
+		"#{pane_pid}", q(OptState), q("pane_current_path"),
+	}, fieldSep)
 	args := []string{"list-panes", "-F", format}
 	if session == "" {
 		args = append(args, "-a")
@@ -191,10 +223,11 @@ func (t Tmux) Panes(ctx context.Context, session string) ([]Pane, error) {
 	var panes []Pane
 	for _, line := range strings.Split(out, "\n") {
 		f := splitFields(line)
-		if len(f) != 5 || f[3] == "" {
+		if len(f) != 8 {
 			continue
 		}
-		panes = append(panes, Pane{ID: f[0], Session: f[1], Account: f[2], Name: f[3], Command: f[4]})
+		pid, _ := strconv.Atoi(f[5])
+		panes = append(panes, Pane{ID: f[0], Session: f[1], Account: f[2], Name: f[3], Command: f[4], PID: pid, State: f[6], Path: f[7]})
 	}
 	return panes, nil
 }
@@ -244,7 +277,7 @@ func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows in
 			{"new-session", "-d", "-s", name, "-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows), "-c", startDir(dir), command},
 			{"set", "-t", name, optRepo, root},
 			{"set", "-t", name, "pane-border-status", "top"},
-			{"set", "-t", name, "pane-border-format", " #{" + optAccount + "} · #{" + optName + "} "},
+			{"set", "-t", name, "pane-border-format", borderFormat},
 		}
 		cmds = append(cmds, tagCmds(name+":", a)...)
 		_, err = t.batch(ctx, cmds...)
@@ -261,6 +294,12 @@ func (t Tmux) Start(ctx context.Context, prefix, root, dir string, cols, rows in
 	}
 	return "", errors.New("cannot find a free tmux session name")
 }
+
+// borderFormat names each pane's account and worktree and, coloured, what its agent waits for.
+const borderFormat = " #{" + optAccount + "} · #{" + optName + "} " +
+	"#{?#{==:#{" + OptState + "},input},#[fg=black#,bg=yellow] needs input #[default] ," +
+	"#{?#{==:#{" + OptState + "},failed},#[fg=white#,bg=red] failed #[default] ," +
+	"#{?#{==:#{" + OptState + "},done},#[fg=green]done#[default] ,}}}"
 
 // isGone: the pane or session disappeared because its command exited immediately.
 func isGone(err error) bool {
