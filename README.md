@@ -358,7 +358,12 @@ terminal forward. `notify.method` picks one channel: `terminal`, `desktop`, `tmu
 
 Do Not Disturb and Focus modes apply as for any app. While squadrn's notifications are on, account
 profiles turn Claude Code's own off (`preferredNotifChannel: "notifications_disabled"`), so you do
-not get both; your own value in an account's `settings.json` wins. Deliveries are logged (titles,
+not get both; your own value in an account's `settings.json` wins.
+
+Codex accounts get the same notifications: approvals from a `PermissionRequest` hook, finished
+turns from the `Stop` hook and Codex's `notify` program, the agent's state from its prompt and tool
+hooks. `srn account add codex/<name>` installs and trusts these hooks like the push guard and sets
+`notify` and `[tui] notifications = false` in the account's `config.toml` (your own values win). Deliveries are logged (titles,
 never agent text) in `~/.local/state/squadrn/notify.log`.
 
 ## Git push guard

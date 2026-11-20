@@ -1,0 +1,1 @@
+{"type":"agent-turn-complete","thread-id":"abc123","turn-id":"t1","cwd":"/Users/me/api","input-messages":["fix the tests"],"last-assistant-message":"All tests pass."}

@@ -16,24 +16,44 @@ import (
 )
 
 // The push guard's layer 1 is a PreToolUse hook in $CODEX_HOME/hooks.json running the squadrn
-// plugin's hook entry point. Codex runs a user hook only once its exact definition is trusted:
-// squadrn records that trust the way Codex's /hooks review does, through the app server
-// (hooks/list gives the hook's key and current hash, config/batchWrite stores
-// hooks.state.<key>.trusted_hash in config.toml), so the hash is always Codex's own.
+// plugin's hook entry point; PermissionRequest, UserPromptSubmit, PostToolUse and Stop hooks
+// report the agent's state and approvals for notifications (ADR 0012). Codex runs a user hook
+// only once its exact definition is trusted: squadrn records that trust the way Codex's /hooks
+// review does, through the app server (hooks/list gives each hook's key and current hash,
+// config/batchWrite stores hooks.state.<key>.trusted_hash in config.toml), so the hash is always
+// Codex's own.
 
 const (
 	hooksFile = "hooks.json"
 	// guardArgs: Codex hooks cannot ask (permissionDecision "ask" is not supported and lets the
 	// call through), so the guard denies what it would ask about.
 	guardArgs    = "guard-git --no-ask"
+	notifyArgs   = "notify --agent codex"
 	hookTimeout  = 10
 	trustTimeout = 15 * time.Second
 )
 
-// ours reports whether a hooks.json command is squadrn's guard, from any install location and
-// in either platform's form.
+// hookDef is one hook squadrn keeps in hooks.json.
+type hookDef struct{ event, matcher, args string }
+
+// hookDefs are squadrn's hooks, the guard first.
+var hookDefs = []hookDef{
+	{"PreToolUse", "Bash", guardArgs},
+	{"PermissionRequest", "", notifyArgs},
+	{"UserPromptSubmit", "", notifyArgs},
+	{"PostToolUse", "", notifyArgs},
+	{"Stop", "", notifyArgs},
+}
+
+// squadrnCommand reports whether a hooks.json command runs squadrn's hook entry point, from any
+// install location and in either platform's form.
+func squadrnCommand(cmd string) bool {
+	return strings.Contains(cmd, "squadrn-hook") || strings.Contains(cmd, "squadrn.exe")
+}
+
+// ours reports whether a hooks.json command is squadrn's guard.
 func ours(cmd string) bool {
-	return (strings.Contains(cmd, "squadrn-hook") || strings.Contains(cmd, "squadrn.exe")) && strings.Contains(cmd, "guard-git")
+	return squadrnCommand(cmd) && strings.Contains(cmd, "guard-git")
 }
 
 // hookDoc is hooks.json; unknown fields are kept as they are.
@@ -90,40 +110,47 @@ func installedCommand(path string) (string, error) {
 	return "", nil
 }
 
-// setGuardHook makes cmd the only squadrn guard hook in hooks.json at path ("" removes it),
+// setHooks makes squadrn's hooks those of marketplace in hooks.json at path ("" removes them),
 // keeping every other hook. It reports whether the file changed.
-func setGuardHook(path, cmd string) (bool, error) {
+func setHooks(path, marketplace string) (bool, error) {
 	doc, events, err := readHooks(path)
 	if err != nil {
 		return false, err
 	}
-	var groups []json.RawMessage
-	found := false
-	for _, g := range events["PreToolUse"] {
-		cmds := groupCommands(g)
-		if len(cmds) == 1 && ours(cmds[0]) {
-			if cmd != "" && cmds[0] == cmd && !found {
-				found = true
-				groups = append(groups, g)
+	for _, d := range hookDefs {
+		cmd := ""
+		if marketplace != "" {
+			cmd = hookCommand(marketplace, d.args)
+		}
+		var groups []json.RawMessage
+		found := false
+		for _, g := range events[d.event] {
+			cmds := groupCommands(g)
+			if len(cmds) == 1 && squadrnCommand(cmds[0]) {
+				if cmd != "" && cmds[0] == cmd && !found {
+					found = true
+					groups = append(groups, g)
+				}
+				continue
 			}
-			continue
+			groups = append(groups, g)
 		}
-		groups = append(groups, g)
-	}
-	if cmd != "" && !found {
-		g, err := json.Marshal(map[string]any{
-			"matcher": "Bash",
-			"hooks":   []map[string]any{{"type": "command", "command": cmd, "timeout": hookTimeout}},
-		})
-		if err != nil {
-			return false, err
+		if cmd != "" && !found {
+			group := map[string]any{"hooks": []map[string]any{{"type": "command", "command": cmd, "timeout": hookTimeout}}}
+			if d.matcher != "" {
+				group["matcher"] = d.matcher
+			}
+			g, err := json.Marshal(group)
+			if err != nil {
+				return false, err
+			}
+			groups = append(groups, g)
 		}
-		groups = append(groups, g)
-	}
-	if len(groups) == 0 {
-		delete(events, "PreToolUse")
-	} else {
-		events["PreToolUse"] = groups
+		if len(groups) == 0 {
+			delete(events, d.event)
+		} else {
+			events[d.event] = groups
+		}
 	}
 	raw, err := json.Marshal(events)
 	if err != nil {
@@ -167,21 +194,32 @@ type listedHook struct {
 	TrustStatus string `json:"trustStatus"`
 }
 
-// guardHook finds squadrn's guard hook from hooks.json at path in a hooks/list result.
-func guardHook(raw json.RawMessage, path string) (listedHook, bool) {
+// squadrnHooks lists squadrn's hooks from hooks.json at path in a hooks/list result.
+func squadrnHooks(raw json.RawMessage, path string) []listedHook {
 	var r struct {
 		Data []struct {
 			Hooks []listedHook `json:"hooks"`
 		} `json:"data"`
 	}
 	if json.Unmarshal(raw, &r) != nil {
-		return listedHook{}, false
+		return nil
 	}
+	var out []listedHook
 	for _, e := range r.Data {
 		for _, h := range e.Hooks {
-			if ours(h.Command) && (fsx.SameFile(h.SourcePath, path) || fsx.SamePath(h.SourcePath, path)) {
-				return h, true
+			if squadrnCommand(h.Command) && (fsx.SameFile(h.SourcePath, path) || fsx.SamePath(h.SourcePath, path)) {
+				out = append(out, h)
 			}
+		}
+	}
+	return out
+}
+
+// guardHook finds squadrn's guard hook from hooks.json at path in a hooks/list result.
+func guardHook(raw json.RawMessage, path string) (listedHook, bool) {
+	for _, h := range squadrnHooks(raw, path) {
+		if ours(h.Command) {
+			return h, true
 		}
 	}
 	return listedHook{}, false
@@ -191,43 +229,59 @@ func trusted(h listedHook) bool {
 	return h.Enabled && (h.TrustStatus == "trusted" || h.TrustStatus == "managed")
 }
 
-// listGuard asks the app server for the state of squadrn's guard hook in configDir.
-func (c CLI) listGuard(ctx context.Context, configDir string) (listedHook, bool, error) {
+// listHooks asks the app server for the state of squadrn's hooks in configDir.
+func (c CLI) listHooks(ctx context.Context, configDir string) (json.RawMessage, string, error) {
 	dir := c.dir(configDir)
 	r, err := c.appServer(ctx, configDir, request{Method: "hooks/list", Params: map[string]any{"cwds": []string{dir}}})
 	if err != nil {
-		return listedHook{}, false, err
+		return nil, "", err
 	}
 	if r[0].Err != nil {
-		return listedHook{}, false, fmt.Errorf("codex hooks/list: %w", r[0].Err)
+		return nil, "", fmt.Errorf("codex hooks/list: %w", r[0].Err)
 	}
-	h, ok := guardHook(r[0].Result, filepath.Join(dir, hooksFile))
+	return r[0].Result, filepath.Join(dir, hooksFile), nil
+}
+
+// listGuard asks the app server for the state of squadrn's guard hook in configDir.
+func (c CLI) listGuard(ctx context.Context, configDir string) (listedHook, bool, error) {
+	raw, path, err := c.listHooks(ctx, configDir)
+	if err != nil {
+		return listedHook{}, false, err
+	}
+	h, ok := guardHook(raw, path)
 	return h, ok, nil
 }
 
-// trustGuard records trust in squadrn's guard hook, as Codex's /hooks review would. It reports
-// whether it changed anything.
-func (c CLI) trustGuard(ctx context.Context, configDir string) (bool, error) {
+// trustHooks records trust in squadrn's hooks, as Codex's /hooks review would. The guard must
+// be listed; it reports whether it changed anything.
+func (c CLI) trustHooks(ctx context.Context, configDir string) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, trustTimeout)
 	defer cancel()
-	h, ok, err := c.listGuard(ctx, configDir)
+	raw, path, err := c.listHooks(ctx, configDir)
 	if err != nil {
 		return false, err
 	}
-	if !ok {
+	if _, ok := guardHook(raw, path); !ok {
 		return false, errors.New("codex does not list squadrn's guard hook from " + hooksFile)
 	}
-	if trusted(h) {
-		return false, nil
+	trust := map[string]any{}
+	for _, h := range squadrnHooks(raw, path) {
+		if trusted(h) {
+			continue
+		}
+		if h.Key == "" || h.CurrentHash == "" {
+			return false, errors.New("codex lists a squadrn hook without a key or hash")
+		}
+		trust[h.Key] = map[string]any{"trusted_hash": h.CurrentHash, "enabled": true}
 	}
-	if h.Key == "" || h.CurrentHash == "" {
-		return false, errors.New("codex lists squadrn's guard hook without a key or hash")
+	if len(trust) == 0 {
+		return false, nil
 	}
 	r, err := c.appServer(ctx, configDir, request{Method: "config/batchWrite", Params: map[string]any{
 		"edits": []map[string]any{{
 			"keyPath":       "hooks.state",
 			"mergeStrategy": "upsert",
-			"value":         map[string]any{h.Key: map[string]any{"trusted_hash": h.CurrentHash, "enabled": true}},
+			"value":         trust,
 		}},
 	}})
 	if err != nil {
@@ -239,37 +293,37 @@ func (c CLI) trustGuard(ctx context.Context, configDir string) (bool, error) {
 	return true, nil
 }
 
-// InstallPlugin installs the guard hook from marketplace into configDir's hooks.json and trusts
-// it. It reports whether it changed anything.
+// InstallPlugin installs squadrn's hooks from marketplace into configDir's hooks.json and trusts
+// them. It reports whether it changed anything.
 func (c CLI) InstallPlugin(ctx context.Context, configDir, marketplace string) (bool, error) {
 	if err := c.prepare(configDir); err != nil {
 		return false, err
 	}
-	changed, err := setGuardHook(filepath.Join(c.dir(configDir), hooksFile), hookCommand(marketplace))
+	changed, err := setHooks(filepath.Join(c.dir(configDir), hooksFile), marketplace)
 	if err != nil {
 		return false, err
 	}
-	t, err := c.trustGuard(ctx, configDir)
+	t, err := c.trustHooks(ctx, configDir)
 	return changed || t, err
 }
 
-// UpdatePlugin re-trusts the installed guard hook (its files changed with an update).
+// UpdatePlugin re-trusts squadrn's installed hooks (their files changed with an update).
 func (c CLI) UpdatePlugin(ctx context.Context, configDir string) error {
 	cmd, err := installedCommand(filepath.Join(c.dir(configDir), hooksFile))
 	if err != nil || cmd == "" {
 		return err
 	}
-	_, err = c.trustGuard(ctx, configDir)
+	_, err = c.trustHooks(ctx, configDir)
 	return err
 }
 
-// RemovePlugin removes the guard hook; other hooks are kept.
+// RemovePlugin removes squadrn's hooks; other hooks are kept.
 func (c CLI) RemovePlugin(_ context.Context, configDir string) error {
 	path := filepath.Join(c.dir(configDir), hooksFile)
 	if !fsx.IsFile(path) {
 		return nil
 	}
-	_, err := setGuardHook(path, "")
+	_, err := setHooks(path, "")
 	return err
 }
 

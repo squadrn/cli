@@ -12,7 +12,7 @@ import (
 // are what limit an agent here.
 type Profiles struct{}
 
-func (Profiles) Profile(name string, options []string, _ provider.ProfileContext) (map[string]any, error) {
+func (Profiles) Profile(name string, options []string, ctx provider.ProfileContext) (map[string]any, error) {
 	env := map[string]any{"ignore_default_excludes": false}
 	doc := map[string]any{storeKey: storeFile, "shell_environment_policy": env}
 	switch name {
@@ -28,6 +28,12 @@ func (Profiles) Profile(name string, options []string, _ provider.ProfileContext
 	default:
 		return nil, fmt.Errorf("unknown profile %q", name)
 	}
+	if ctx.Notify && ctx.Hook != "" {
+		// Squadrn notifies instead: Codex runs the notify program with the finished turn as its
+		// last argument, and its own terminal notifications are turned off.
+		doc["notify"] = NotifyProgram(ctx.Hook)
+		doc["tui"] = map[string]any{"notifications": false}
+	}
 	for _, o := range options {
 		switch o {
 		case "privacy":
@@ -40,4 +46,10 @@ func (Profiles) Profile(name string, options []string, _ provider.ProfileContext
 		}
 	}
 	return doc, nil
+}
+
+// NotifyProgram is the notify argv that hands Codex's turn-complete events to squadrn (bin is
+// the squadrn binary). Codex runs it directly, without a shell.
+func NotifyProgram(bin string) []any {
+	return []any{bin, "hook", "notify", "--agent", provider.Codex.ID}
 }

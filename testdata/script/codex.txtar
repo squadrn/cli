@@ -38,6 +38,32 @@ grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
 grep '"matcher": "Bash"' home/.codex-work/hooks.json
 grep 'plugin/bin/squadrn-hook\\" guard-git --no-ask' home/.codex-work/hooks.json
 grep 'trusted_hash = "sha256:' home/.codex-work/config.toml
+# Squadrn notifies for Codex: its notify program, the approval, prompt, tool and stop hooks
+# (trusted like the guard), and Codex's own terminal notifications off.
+grep '^notify = \[".*squadrn", "hook", "notify", "--agent", "codex"\]$' home/.codex-work/config.toml
+grep '^\[tui\]$' home/.codex-work/config.toml
+grep '^notifications = false$' home/.codex-work/config.toml
+grep -count=5 'squadrn-hook' home/.codex-work/hooks.json
+grep -count=4 'squadrn-hook\\" notify --agent codex' home/.codex-work/hooks.json
+grep -count=5 'trusted_hash = "sha256:' home/.codex-work/config.toml
+grep 'hooks.json:permission_request:0:0' home/.codex-work/config.toml
+env SQUADRN_TEST_NOTIFY=$WORK/sent.jsonl CODEX_HOME=$WORK/home/.codex-work
+stdin codex-permission.json
+exec squadrn hook notify --agent codex
+! stdout .
+grep '"title":"Codex CLI · work · api","body":"Needs approval: Bash","kind":"input","sound":true,"group":"c0"' sent.jsonl
+# Codex reads a Stop hook's output as JSON. The notify program's turn-complete of the same turn
+# (its payload is the last argument) is not shown twice.
+stdin codex-stop.json
+exec squadrn hook notify --agent codex
+stdout '^\{\}$'
+grep '"body":"Done","kind":"done","group":"c1"' sent.jsonl
+exec squadrn hook notify --agent codex '{"type":"agent-turn-complete","thread-id":"c1","turn-id":"t1","cwd":"/src/api","last-assistant-message":"ok"}'
+! stdout .
+grep -count=1 '"kind":"done"' sent.jsonl
+exitcode 2 squadrn hook notify --agent nope
+exitcode 2 squadrn hook notify --agent
+env SQUADRN_TEST_NOTIFY= CODEX_HOME=
 grep 'cfg=.*/home/.codex-work[^ ]* args=mcp add docs -- npx -y @acme/docs-mcp' home/calls.log
 # config.toml is the account's own copy, merged from main's: settings follow main, but MCP
 # servers, hooks and their trust, and the credentials store stay the account's.
@@ -219,3 +245,7 @@ command = "npx"
 cli_auth_credentials_store = "file"
 -- push-var.json --
 {"session_id":"s","transcript_path":null,"cwd":".","hook_event_name":"PreToolUse","model":"m","permission_mode":"default","turn_id":"t","tool_name":"Bash","tool_use_id":"c","tool_input":{"command":"git push origin \"$BRANCH\""}}
+-- codex-permission.json --
+{"session_id":"c0","turn_id":"t1","transcript_path":null,"cwd":"/src/api","hook_event_name":"PermissionRequest","model":"gpt-5.5","permission_mode":"default","tool_name":"Bash","tool_input":{"command":"rm -rf build"}}
+-- codex-stop.json --
+{"session_id":"c1","turn_id":"t1","transcript_path":null,"cwd":"/src/api","hook_event_name":"Stop","model":"gpt-5.5","permission_mode":"default","stop_hook_active":false,"last_assistant_message":"ok"}

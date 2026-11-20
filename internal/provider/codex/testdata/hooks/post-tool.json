@@ -1,0 +1,1 @@
+{"session_id":"abc123","turn_id":"t1","transcript_path":null,"cwd":"/Users/me/api","hook_event_name":"PostToolUse","model":"gpt-5.5","permission_mode":"default","tool_name":"apply_patch","tool_use_id":"call_1","tool_input":{"command":"*** Begin Patch"},"tool_response":"ok"}

@@ -16,7 +16,7 @@ import (
 // Codex fakes the Codex CLI. The account is CODEX_HOME, else ~/.codex (main). Files in it drive
 // the answers: .loggedin for `login status` (printed on stderr, like Codex), .mcp and .mcplist
 // for MCP servers, .limits for account/rateLimits/read. `app-server` speaks stdio JSONL:
-// initialize, account/read, account/rateLimits/read, hooks/list (squadrn's guard hook from
+// initialize, account/read, account/rateLimits/read, hooks/list (squadrn's hooks from
 // hooks.json, keyed and hashed like Codex, trusted when config.toml records that hash) and
 // config/batchWrite (records the trust).
 func Codex(args []string) int {
@@ -88,7 +88,6 @@ func codexAppServer(dir, cfg string, loggedIn bool) {
 	}
 	hooksPath := filepath.Join(real, "hooks.json")
 	configPath := filepath.Join(dir, "config.toml")
-	key := hooksPath + ":pre_tool_use:0:0"
 	out := json.NewEncoder(os.Stdout)
 	reply := func(id json.RawMessage, result any) {
 		_ = out.Encode(map[string]any{"id": id, "result": result})
@@ -123,7 +122,7 @@ func codexAppServer(dir, cfg string, loggedIn bool) {
 			}
 			reply(m.ID, json.RawMessage(b))
 		case "hooks/list":
-			reply(m.ID, map[string]any{"data": []any{map[string]any{"cwd": "/", "warnings": []any{}, "errors": []any{}, "hooks": codexHooks(hooksPath, configPath, key)}}})
+			reply(m.ID, map[string]any{"data": []any{map[string]any{"cwd": "/", "warnings": []any{}, "errors": []any{}, "hooks": codexHooks(hooksPath, configPath)}}})
 		case "config/batchWrite":
 			var p struct {
 				Edits []struct {
@@ -146,42 +145,62 @@ func codexAppServer(dir, cfg string, loggedIn bool) {
 	}
 }
 
-// codexHooks lists squadrn's guard hook from hooks.json, hashed by the file's content.
-func codexHooks(hooksPath, configPath, key string) []any {
+// codexHooks lists squadrn's hooks from hooks.json, each keyed and hashed by its event, position
+// and definition as Codex does.
+func codexHooks(hooksPath, configPath string) []any {
 	b, err := os.ReadFile(hooksPath)
 	if err != nil {
 		return []any{}
 	}
 	var doc struct {
 		Hooks map[string][]struct {
-			Hooks []struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
 				Command string `json:"command"`
 			} `json:"hooks"`
 		} `json:"hooks"`
 	}
 	_ = json.Unmarshal(b, &doc)
-	for _, g := range doc.Hooks["PreToolUse"] {
-		for _, h := range g.Hooks {
-			if !strings.Contains(h.Command, "guard-git") {
-				continue
-			}
-			sum := sha256.Sum256(b)
-			hash := "sha256:" + hex.EncodeToString(sum[:])
-			status := "untrusted"
-			cfg, _ := os.ReadFile(configPath)
-			for _, m := range trustedHash.FindAllStringSubmatch(string(cfg), -1) {
-				if m[1] == hash {
-					status = "trusted"
+	cfg, _ := os.ReadFile(configPath)
+	out := []any{}
+	for _, event := range []string{"PreToolUse", "PermissionRequest", "UserPromptSubmit", "PostToolUse", "Stop"} {
+		for gi, g := range doc.Hooks[event] {
+			for hi, h := range g.Hooks {
+				if !strings.Contains(h.Command, "squadrn-hook") && !strings.Contains(h.Command, "squadrn.exe") {
+					continue
 				}
+				sum := sha256.Sum256([]byte(event + "\x00" + g.Matcher + "\x00" + h.Command))
+				hash := "sha256:" + hex.EncodeToString(sum[:])
+				status := "untrusted"
+				for _, m := range trustedHash.FindAllStringSubmatch(string(cfg), -1) {
+					if m[1] == hash {
+						status = "trusted"
+					}
+				}
+				out = append(out, map[string]any{
+					"key": fmt.Sprintf("%s:%s:%d:%d", hooksPath, snake(event), gi, hi), "eventName": event, "handlerType": "command",
+					"command": h.Command, "matcher": g.Matcher, "sourcePath": hooksPath, "source": "user", "enabled": true,
+					"isManaged": false, "currentHash": hash, "trustStatus": status,
+				})
 			}
-			return []any{map[string]any{
-				"key": key, "eventName": "preToolUse", "handlerType": "command", "command": h.Command,
-				"matcher": "Bash", "sourcePath": hooksPath, "source": "user", "enabled": true,
-				"isManaged": false, "currentHash": hash, "trustStatus": status,
-			}}
 		}
 	}
-	return []any{}
+	return out
+}
+
+// snake is PreToolUse as pre_tool_use.
+func snake(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // setCodexTrust upserts hooks.state."<key>".trusted_hash in config.toml, as Codex does.

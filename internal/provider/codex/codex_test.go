@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strconv"
@@ -125,10 +126,10 @@ func TestEnsureFileStore(t *testing.T) {
 	}
 }
 
-func TestSetGuardHook(t *testing.T) {
+func TestSetHooks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "hooks.json")
-	cmd := hookCommand("/opt/squadrn")
-	if !ours(cmd) {
+	cmd := hookCommand("/opt/squadrn", guardArgs)
+	if !ours(cmd) || !squadrnCommand(hookCommand("/opt/squadrn", notifyArgs)) || ours(hookCommand("/opt/squadrn", notifyArgs)) {
 		t.Fatalf("command %s is not recognised as the guard", cmd)
 	}
 	user := `{"description":"mine","hooks":{"Stop":[{"hooks":[{"type":"command","command":"notify"}]}],
@@ -137,7 +138,7 @@ func TestSetGuardHook(t *testing.T) {
 	if err := os.WriteFile(path, []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := setGuardHook(path, cmd)
+	changed, err := setHooks(path, "/opt/squadrn")
 	if err != nil || !changed {
 		t.Fatalf("install: %v %v", changed, err)
 	}
@@ -145,30 +146,33 @@ func TestSetGuardHook(t *testing.T) {
 		t.Fatalf("installed %q", got)
 	}
 	b, _ := os.ReadFile(path)
-	for _, want := range []string{`"description": "mine"`, `"command": "notify"`, `"command": "lint"`, `"matcher": "Bash"`, `"timeout": 10`} {
+	for _, want := range []string{
+		`"description": "mine"`, `"command": "notify"`, `"command": "lint"`, `"matcher": "Bash"`, `"timeout": 10`,
+		`"PermissionRequest"`, `"UserPromptSubmit"`, `"PostToolUse"`,
+	} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("lost %s:\n%s", want, b)
 		}
 	}
-	if strings.Contains(string(b), "/old/") || strings.Count(string(b), "guard-git") != 1 {
-		t.Fatalf("old hook kept:\n%s", b)
+	if strings.Contains(string(b), "/old/") || strings.Count(string(b), "guard-git") != 1 || strings.Count(string(b), notifyArgs) != 4 {
+		t.Fatalf("old hook kept or hooks missing:\n%s", b)
 	}
-	if changed, err := setGuardHook(path, cmd); err != nil || changed {
+	if changed, err := setHooks(path, "/opt/squadrn"); err != nil || changed {
 		t.Fatalf("second install: %v %v", changed, err)
 	}
-	if changed, err := setGuardHook(path, ""); err != nil || !changed {
+	if changed, err := setHooks(path, ""); err != nil || !changed {
 		t.Fatalf("remove: %v %v", changed, err)
 	}
 	if got, _ := installedCommand(path); got != "" {
 		t.Fatalf("still installed: %q", got)
 	}
-	if b, _ := os.ReadFile(path); !strings.Contains(string(b), `"command": "lint"`) {
-		t.Fatalf("remove dropped a user hook:\n%s", b)
+	if b, _ := os.ReadFile(path); !strings.Contains(string(b), `"command": "lint"`) || !strings.Contains(string(b), `"command": "notify"`) || strings.Contains(string(b), "squadrn-hook") {
+		t.Fatalf("remove dropped a user hook or kept one of squadrn's:\n%s", b)
 	}
 	if err := os.WriteFile(path, []byte(`{"hooks":[1]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := setGuardHook(path, cmd); err == nil {
+	if _, err := setHooks(path, "/opt/squadrn"); err == nil {
 		t.Fatal("a malformed hooks.json is overwritten")
 	}
 }
@@ -181,11 +185,15 @@ func TestGuardHook(t *testing.T) {
 	}
 	raw, _ := json.Marshal(map[string]any{"data": []any{map[string]any{"cwd": dir, "hooks": []any{
 		map[string]any{"key": "other", "command": "lint", "sourcePath": path, "enabled": true, "trustStatus": "trusted"},
-		map[string]any{"key": path + ":pre_tool_use:0:0", "command": hookCommand("/x"), "sourcePath": path, "enabled": true, "currentHash": "sha256:1", "trustStatus": "modified"},
+		map[string]any{"key": path + ":pre_tool_use:0:0", "command": hookCommand("/x", guardArgs), "sourcePath": path, "enabled": true, "currentHash": "sha256:1", "trustStatus": "modified"},
+		map[string]any{"key": path + ":stop:0:0", "command": hookCommand("/x", notifyArgs), "sourcePath": path, "enabled": true, "currentHash": "sha256:2", "trustStatus": "untrusted"},
 	}}}})
 	h, ok := guardHook(raw, path)
 	if !ok || h.CurrentHash != "sha256:1" || trusted(h) {
 		t.Fatalf("got %+v %v", h, ok)
+	}
+	if hs := squadrnHooks(raw, path); len(hs) != 2 || hs[1].CurrentHash != "sha256:2" {
+		t.Fatalf("squadrn hooks = %+v", hs)
 	}
 	if _, ok := guardHook(raw, filepath.Join(dir, "elsewhere.json")); ok {
 		t.Fatal("hook of another file")
@@ -381,8 +389,16 @@ func TestProfiles(t *testing.T) {
 	if _, err := p.Profile(provider.ProfileStandard, []string{"telemetry"}, provider.ProfileContext{}); err == nil {
 		t.Fatal("unknown option")
 	}
+	if minimal["notify"] != nil || minimal["tui"] != nil {
+		t.Fatalf("notify keys without squadrn notifications: %v", minimal)
+	}
+	notified, err := p.Profile(provider.ProfileMinimal, nil, provider.ProfileContext{Notify: true, Hook: "/opt/bin/squadrn"})
+	if err != nil || !reflect.DeepEqual(notified["notify"], []any{"/opt/bin/squadrn", "hook", "notify", "--agent", "codex"}) ||
+		notified["tui"].(map[string]any)["notifications"] != false {
+		t.Fatalf("notify: %v %v", notified, err)
+	}
 	// Every profile encodes as config.toml.
-	for _, doc := range []map[string]any{minimal, std, strict} {
+	for _, doc := range []map[string]any{minimal, std, strict, notified} {
 		if _, err := (Settings{}).Encode(doc); err != nil {
 			t.Fatal(err)
 		}
