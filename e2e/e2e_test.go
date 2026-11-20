@@ -350,6 +350,12 @@ func testGuard(t *testing.T, s *sandbox) {
 }
 
 func testDoctor(t *testing.T, s *sandbox) {
+	if runtime.GOOS == "windows" {
+		root := filepath.Join(s.home, ".local", "share", "squadrn", "plugin")
+		payload := `{"cwd":"C:/","tool_name":"PowerShell","tool_input":{"command":"git push --force origin main"}}`
+		s.run(t, opt{stdin: payload, env: []string{"CLAUDE_PLUGIN_ROOT=" + root}}, "cmd.exe", "/d", "/c", `"`+root+`\..\bin\squadrn.exe" hook guard-git || exit /b 2`)
+		s.run(t, opt{}, "where", "git", "sh", "bash", "squadrn", "srn")
+	}
 	r := s.srn(t, "doctor").exit(0)
 	r.out(`^install$`, `✓ installed release `+regexp.QuoteMeta(version), `✓ git`, `✓ layer 1 \(pre-tool hook\) denies force pushes`,
 		`✓ layer 2 \(git pre-push hook\) installed`, `^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`).noOut(`✗`)

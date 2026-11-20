@@ -116,6 +116,16 @@ func newSandbox(t *testing.T) *sandbox {
 	}
 	realHome, _ := os.UserHomeDir()
 	s.path = []string{s.fakeBin, filepath.Join(s.home, ".local", "bin")}
+	if runtime.GOOS == "windows" {
+		// What a Git for Windows install puts on PATH; Git Bash (as in CI) puts mingw64\bin first.
+		if git, err := exec.LookPath("git"); err == nil {
+			root := filepath.Dir(filepath.Dir(git))
+			if filepath.Base(root) == "mingw64" {
+				root = filepath.Dir(root)
+			}
+			s.path = append(s.path, filepath.Join(root, "cmd"))
+		}
+	}
 	for _, d := range filepath.SplitList(os.Getenv("PATH")) {
 		// Tools installed for the developer (a real squadrn or claude in ~/.local/bin) stay out.
 		if rel, err := filepath.Rel(realHome, d); realHome != "" && err == nil && !strings.HasPrefix(rel, "..") {
