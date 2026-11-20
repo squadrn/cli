@@ -223,15 +223,14 @@ func (a *app) rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   c + " [<account>] [<command> | agent args... | -- prompt]",
 		Short: "Run coding agents across multiple accounts and parallel worktrees",
-		Long: `Squadrn runs coding agents (today: Claude Code) as one of several accounts on this machine.
-
-Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal.`,
-		Example: fmt.Sprintf(`  %[1]s                                  pick an account interactively
-  %[1]s personal                         run as claude/personal (also: -a personal, claude/personal)
-  %[1]s personal -p "hi"                 agent flags go to the agent CLI
-  %[1]s personal -- "fix the bug"        a prompt goes after --
-  %[1]s account add work                 create claude/work, then: %[1]s account login work
-  %[1]s grid ~/repo feat-a personal:fix-b  two agents side by side`, c),
+		Long:  rootLong(),
+		Example: examples(c,
+			"", "pick an account interactively",
+			"personal", "run as claude/personal (also: -a personal, claude/personal)",
+			`personal -p "hi"`, "agent flags go to the agent CLI",
+			`personal -- "fix the bug"`, "a prompt goes after --",
+			"account add work", "create claude/work, then: "+c+" account login work",
+			"grid ~/repo feat-a personal:fix-b", "two agents side by side"),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.ArbitraryArgs,
@@ -287,13 +286,80 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 	add("accounts", a.accountCmd(), a.usageCmd())
 	add("setup", a.setupCmd(), a.doctorCmd(), a.configCmd(), a.selfUpdateCmd(), a.selfUninstallCmd(), a.versionCmd())
 	root.AddCommand(a.selfInstallCmd())
-	root.SetHelpCommandGroupID("setup")
 	root.SetCompletionCommandGroupID("setup")
+	defaultHelp := root.HelpFunc()
+	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		root.PersistentFlags().Lookup("account").Hidden = !accountFlagApplies(cmd)
+		root.PersistentFlags().Lookup("dir").Hidden = !dirFlagApplies(cmd)
+		defaultHelp(cmd, args)
+	})
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 	a.root = root
 	a.completionForEveryName()
 	return root
+}
+
+// rootLong introduces squadrn with the agent CLIs it supports and an account of each.
+func rootLong() string {
+	specs := provider.All()
+	var names, dirs []string
+	for i, spec := range specs {
+		names = append(names, spec.Name)
+		name := "personal"
+		if i > 0 {
+			name = "work"
+		}
+		dirs = append(dirs, fmt.Sprintf("%s/%s is ~/%s%s", spec.ID, name, spec.DirPrefix, name))
+	}
+	return wrapText(fmt.Sprintf("Squadrn runs coding agents (today: %s) as one of several accounts on this machine.", joinAnd(names)), 100) +
+		"\n\n" + wrapText(fmt.Sprintf("Accounts are provider/name: %s/main is ~/%s, %s.", specs[0].ID, specs[0].MainDir, strings.Join(dirs, ", ")), 100)
+}
+
+// wrapText breaks a paragraph into lines of at most width columns, between words.
+func wrapText(s string, width int) string {
+	var b strings.Builder
+	n := 0
+	for i, w := range strings.Fields(s) {
+		switch {
+		case i == 0:
+		case n+1+len([]rune(w)) > width:
+			b.WriteString("\n")
+			n = 0
+		default:
+			b.WriteString(" ")
+			n++
+		}
+		b.WriteString(w)
+		n += len([]rune(w))
+	}
+	return b.String()
+}
+
+// joinAnd lists words as "a, b and c".
+func joinAnd(words []string) string {
+	if len(words) < 2 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
+}
+
+// examples formats a command's examples: pairs of arguments (after the command name) and what
+// they do, the descriptions aligned.
+func examples(cmd string, pairs ...string) string {
+	width := 0
+	for i := 0; i < len(pairs); i += 2 {
+		width = max(width, len(strings.TrimSpace(cmd+" "+pairs[i])))
+	}
+	var lines []string
+	for i := 0; i < len(pairs); i += 2 {
+		line := strings.TrimSpace(cmd + " " + pairs[i])
+		if pairs[i+1] != "" {
+			line += strings.Repeat(" ", width-len(line)+2) + pairs[i+1]
+		}
+		lines = append(lines, "  "+line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // takesAccount reports whether cmd runs as an account: starting an agent (the root command),
@@ -307,6 +373,29 @@ func takesAccount(cmd *cobra.Command) bool {
 	case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 		return true
 	case "wt", "grid":
+		return len(path) == 1
+	}
+	return false
+}
+
+// accountFlagApplies reports whether -a means something for cmd, for its help: the commands that
+// run as an account.
+func accountFlagApplies(cmd *cobra.Command) bool {
+	path := strings.Fields(cmd.CommandPath())[1:]
+	return len(path) == 0 || (len(path) == 1 && (path[0] == "wt" || path[0] == "grid"))
+}
+
+// dirFlagApplies reports whether -C means something for cmd, for its help: the commands that
+// work on the repository (or directory) they are started in.
+func dirFlagApplies(cmd *cobra.Command) bool {
+	path := strings.Fields(cmd.CommandPath())[1:]
+	if len(path) == 0 {
+		return true
+	}
+	switch path[0] {
+	case "wt", "grid", "gc", "deps", "swap", "doctor":
+		return true
+	case "usage":
 		return len(path) == 1
 	}
 	return false

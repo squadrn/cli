@@ -51,10 +51,11 @@ func (a *app) wtCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wt <name>",
 		Short: "Run the agent in worktree <name> of this repository (Claude: .claude/worktrees/<name>)",
-		Example: fmt.Sprintf(`  %[1]s wt feat-login           as main
-  %[1]s personal wt fix-otp      as claude/personal
-  %[1]s wt ls                    list worktrees
-  %[1]s wt rm feat-login         remove one`, a.cmd),
+		Example: examples(a.cmd,
+			"wt feat-login", "as main",
+			"personal wt fix-otp", "as claude/personal",
+			"wt ls", "list worktrees",
+			"wt rm feat-login", "remove one"),
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -316,7 +317,10 @@ func (a *app) gcCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Remove clean worktrees that are merged or empty (dry run without --yes)",
-		Args:  noArgs,
+		Example: examples(a.cmd,
+			"gc", "list what would be removed",
+			"gc --yes", "remove it"),
+		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
 			repo, err := a.repoHere(ctx, a.defaultSpec())
@@ -365,8 +369,11 @@ func (a *app) gcCmd() *cobra.Command {
 
 func (a *app) depsCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:               "deps <name>",
-		Short:             "Install dependencies in a worktree (package manager from its lockfile)",
+		Use:   "deps <name>",
+		Short: "Install dependencies in a worktree (package manager from its lockfile)",
+		Long: wrapText("Install dependencies in agent worktree <name> with the package manager its lockfile "+
+			"names. Supported lockfiles, the first one found wins: "+strings.Join(worktree.Lockfiles(), ", ")+".", 100),
+		Example:           examples(a.cmd, "deps feat-login", "install the dependencies of worktree feat-login"),
 		Args:              oneArg,
 		ValidArgsFunction: a.completeWorktrees,
 		RunE: func(_ *cobra.Command, args []string) error {

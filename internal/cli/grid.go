@@ -307,7 +307,10 @@ func (a *app) psCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List running agents: session, account, worktree",
-		Args:  noArgs,
+		Example: examples(a.cmd,
+			"ps", "agents running in grids",
+			"ps --json", "the same as JSON"),
+		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			if err := a.requireTmux("ps"); err != nil {
 				return err

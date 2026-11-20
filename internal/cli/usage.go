@@ -25,8 +25,8 @@ func (a *app) usageCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "usage [<account>]",
 		Short: "Show each account's usage limits and which one to use next",
-		Long: fmt.Sprintf(`Show what the status line last reported about each account's usage limits (5-hour and
-7-day windows), when it last hit a limit, and the best account to continue with in this repository.
+		Long: fmt.Sprintf(`Show what each account last reported about its usage limits (5-hour and 7-day windows),
+when it last hit a limit, and, inside a repository, the best account to continue with there.
 
 Usage is recorded by the status line, so it needs a one-time setup per account:
 %[1]s usage setup wraps the status line command (your own one keeps running and showing).`, a.cmd),

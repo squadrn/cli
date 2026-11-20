@@ -25,6 +25,9 @@ func (a *app) setupCmd() *cobra.Command {
 and settings profile, offers to adopt config dirs named like accounts (~/.claude-<name>), offers
 usage tracking for the accounts that do not record it yet, then runs doctor. Every step can be
 skipped; without a terminal nothing is changed unless --yes takes the defaults.`,
+		Example: examples(a.cmd,
+			"setup", "asks at each step",
+			"setup -y", "takes the defaults"),
 		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error { return a.setup(yes) },
 	}

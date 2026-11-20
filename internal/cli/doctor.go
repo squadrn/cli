@@ -18,8 +18,12 @@ import (
 func (a *app) doctorCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
-		Use:               "doctor [<account>]",
-		Short:             "Check the install, the push guard, hooks and every account (or one)",
+		Use:   "doctor [<account>]",
+		Short: "Check the install, the push guard, hooks and every account (or one)",
+		Example: examples(a.cmd,
+			"doctor", "everything",
+			"doctor personal", "the install and claude/personal only",
+			"doctor --json", "the checks as JSON (exit 1 when one fails)"),
 		Args:              optionalArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
