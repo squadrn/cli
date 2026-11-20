@@ -116,11 +116,12 @@ type PluginResult struct {
 func Plugins(ctx context.Context, accts []account.Account, ag provider.Agent, marketplace string) []PluginResult {
 	var out []PluginResult
 	for _, acct := range accts {
-		if !acct.Spec.Caps.Plugins {
+		gi, ok := ag.(provider.GuardInstaller)
+		if !acct.Spec.Caps.Plugins || !ok {
 			continue
 		}
 		res := PluginResult{Account: acct}
-		installed, err := ag.InstallPlugin(ctx, acct.ConfigDir(), marketplace)
+		installed, err := gi.InstallPlugin(ctx, acct.ConfigDir(), marketplace)
 		switch {
 		case err != nil:
 			res.Action, res.Err = PluginFailed, err
@@ -128,7 +129,7 @@ func Plugins(ctx context.Context, accts []account.Account, ag provider.Agent, ma
 			res.Action = PluginInstalled
 		default:
 			res.Action = PluginUpdated
-			if err := ag.UpdatePlugin(ctx, acct.ConfigDir()); err != nil {
+			if err := gi.UpdatePlugin(ctx, acct.ConfigDir()); err != nil {
 				res.Action, res.Err = PluginFailed, err
 			}
 		}
@@ -142,10 +143,11 @@ func Plugins(ctx context.Context, accts []account.Account, ag provider.Agent, ma
 func RemovePlugins(ctx context.Context, accts []account.Account, ag provider.Agent) map[string]error {
 	errs := map[string]error{}
 	for _, acct := range accts {
-		if !acct.Spec.Caps.Plugins {
+		gi, ok := ag.(provider.GuardInstaller)
+		if !acct.Spec.Caps.Plugins || !ok {
 			continue
 		}
-		errs[acct.Label()] = ag.RemovePlugin(ctx, acct.ConfigDir())
+		errs[acct.Label()] = gi.RemovePlugin(ctx, acct.ConfigDir())
 	}
 	return errs
 }

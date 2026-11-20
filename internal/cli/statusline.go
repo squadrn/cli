@@ -11,7 +11,7 @@ import (
 
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider/claude"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // settingsPath is the account's settings file, which holds its status line.
@@ -19,16 +19,26 @@ func settingsPath(acct account.Account) string {
 	return filepath.Join(acct.Dir, acct.Spec.Settings)
 }
 
+// statusLineOf is the status line of spec's CLI; nil when it reports no usage that way.
+func statusLineOf(spec provider.Spec) provider.StatusLine {
+	if !spec.Caps.UsageReport {
+		return nil
+	}
+	d, _ := provider.DriverOf(spec.ID)
+	return d.StatusLine
+}
+
 // usageTracking: the account's status line already runs squadrn's recorder.
 func (a *app) usageTracking(acct account.Account) bool {
-	if !acct.Spec.Caps.UsageReport {
+	sl := statusLineOf(acct.Spec)
+	if sl == nil {
 		return false
 	}
-	cmd, ok, err := claude.StatusLineCommand(settingsPath(acct))
+	cmd, ok, err := sl.Command(settingsPath(acct))
 	if err != nil || !ok {
 		return false
 	}
-	_, ours := unwrapStatusLine(cmd)
+	_, ours := sl.Unwrap(cmd, statusLineHook)
 	return ours
 }
 
@@ -49,18 +59,26 @@ func (a *app) statusLineBinary() string {
 const statusLineHook = "hook statusline"
 
 // wrapStatusLine is the status line command that records usage and then runs old ("" for none).
-func (a *app) wrapStatusLine(old string) (string, error) {
-	return claude.WrapStatusLine(a.statusLineBinary(), statusLineHook, old, a.store.Home)
+func (a *app) wrapStatusLine(sl provider.StatusLine, old string) (string, error) {
+	return sl.Wrap(a.statusLineBinary(), statusLineHook, old, a.store.Home)
 }
 
-func unwrapStatusLine(cmd string) (old string, ours bool) {
-	return claude.UnwrapStatusLine(cmd, statusLineHook)
-}
-
-// settingsGroup is one settings file and the accounts that use it (through links to main's).
+// settingsGroup is one settings file, the status line format it holds, and the accounts that
+// use it (through links to main's).
 type settingsGroup struct {
 	path     string
+	sl       provider.StatusLine
 	accounts []string
+}
+
+// tracked reads g's status line: whether it has one and whether it runs squadrn's recorder.
+func (g settingsGroup) tracked() (cmd, old string, has, ours bool, err error) {
+	cmd, has, err = g.sl.Command(g.path)
+	if err != nil {
+		return "", "", false, false, err
+	}
+	old, ours = g.sl.Unwrap(cmd, statusLineHook)
+	return cmd, old, has, ours, nil
 }
 
 func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error) {
@@ -71,7 +89,8 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 	var groups []settingsGroup
 	seen := map[string]bool{}
 	for _, t := range targets {
-		if !t.Spec.Caps.UsageReport {
+		sl := statusLineOf(t.Spec)
+		if sl == nil {
 			continue
 		}
 		key := fsx.Real(settingsPath(t))
@@ -79,7 +98,7 @@ func (a *app) settingsGroups(targets []account.Account) ([]settingsGroup, error)
 			continue
 		}
 		seen[key] = true
-		g := settingsGroup{path: settingsPath(t)}
+		g := settingsGroup{path: settingsPath(t), sl: sl}
 		for _, x := range all {
 			if x.Spec.Caps.UsageReport && (fsx.Real(settingsPath(x)) == key || fsx.SameFile(settingsPath(x), key)) {
 				g.accounts = append(g.accounts, x.Label())
@@ -97,11 +116,10 @@ func (a *app) groupWhere(g settingsGroup) string {
 
 func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 	where := a.groupWhere(g)
-	cmd, has, err := claude.StatusLineCommand(g.path)
+	cmd, old, has, ours, err := g.tracked()
 	if err != nil {
 		return err
 	}
-	old, ours := unwrapStatusLine(cmd)
 	if undo {
 		if !has || !ours {
 			a.out("usage tracking is not set up in %s\n", where)
@@ -110,7 +128,7 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 		if err := a.confirm(yes, "Restore the previous status line in %s", where); err != nil {
 			return err
 		}
-		if err := claude.SetStatusLineCommand(g.path, old); err != nil {
+		if err := g.sl.SetCommand(g.path, old); err != nil {
 			return err
 		}
 		a.out("usage tracking off: %s\n", where)
@@ -120,7 +138,7 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 		a.out("usage tracking already on: %s\n", where)
 		return nil
 	}
-	wrapped, err := a.wrapStatusLine(cmd)
+	wrapped, err := a.wrapStatusLine(g.sl, cmd)
 	if err != nil {
 		return err
 	}
@@ -131,7 +149,7 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 	if err := a.confirm(yes, "%s", what); err != nil {
 		return err
 	}
-	if err := claude.SetStatusLineCommand(g.path, wrapped); err != nil {
+	if err := g.sl.SetCommand(g.path, wrapped); err != nil {
 		return err
 	}
 	a.out("usage tracking on: %s\n", where)
@@ -182,12 +200,11 @@ func (a *app) restoreStatusLines() {
 		return
 	}
 	for _, g := range groups {
-		cmd, has, err := claude.StatusLineCommand(g.path)
-		old, ours := unwrapStatusLine(cmd)
+		_, old, has, ours, err := g.tracked()
 		if err != nil || !has || !ours {
 			continue
 		}
-		if err := claude.SetStatusLineCommand(g.path, old); err != nil {
+		if err := g.sl.SetCommand(g.path, old); err != nil {
 			a.warnf("cannot restore the status line in %s: %v", a.tilde(g.path), err)
 			continue
 		}

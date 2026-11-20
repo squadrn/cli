@@ -20,8 +20,9 @@
 |---|---|---|
 | `cli` | argument routing, flags, output (text, `--json`, colors), exit codes | business rules |
 | `account` | `provider/name` refs, resolution, provisioning (links, MCP allowlist, plugin), rename | printing |
-| `provider` | `Spec` (data: dirs, env var, shared items, worktree dir, subcommands, capabilities), the `Agent` interface, the auth cache | provider internals |
-| `provider/claude` | everything about Claude Code: `CLAUDE_CONFIG_DIR`, auth status, transcripts, plugin registry paths | — |
+| `provider` | `Spec` (data: dirs, env var, shared items, worktree dir, subcommands, capabilities), the `Agent` and capability interfaces, the driver registry, the auth cache ([ADR 0011](adr/0011-provider-model-v2.md)) | provider internals |
+| `provider/claude` | everything about Claude Code: `CLAUDE_CONFIG_DIR`, auth status, transcripts, plugin registry paths, the status line; registers its driver | — |
+| `provider/all` | imports every provider package so its driver is registered (`cli` imports this, never a provider package) | — |
 | `grid` | agent assignment (`--spread`), tmux sessions and pane tags (batched, race-safe) | git |
 | `worktree` | repo root, agent worktrees, gc classification, removal, lockfile detection | tmux |
 | `guard` | shell parsing, push decisions (pre-tool and pre-push), protected-branch policy, decision log | I/O beyond git and the log |
@@ -46,7 +47,7 @@ also stops its grandchildren.
 account names, agent subcommands (`Spec.Subcommands`) pass through, anything else is a usage error
 with suggestions. `hook …` is dispatched before config, store or cobra, so it cannot fail open.
 
-**Run as an account.** `cli.app.agent(spec)` returns the provider's `Agent` (Claude: `claude.CLI`)
+**Run as an account.** `cli.app.agent(spec)` returns the provider's registered `Agent` (Claude: `claude.CLI`)
 with the git-level guard's `GIT_CONFIG_*` entries in its environment → `Exec` replaces the
 process (on Windows: runs it as a child and passes its exit status through), with
 `CLAUDE_CONFIG_DIR` set, or *unset* for main (Claude Code keys credentials to the variable).
@@ -66,17 +67,17 @@ and `wt rm`, `account rm` and `account rename` refuse (unless `--force`), what a
 folder encodes the working directory; long ones are shortened by an undocumented rule), with a
 `<session>/` dir (subagents, tool results) and checkpoints in `<config>/file-history/<session>/`.
 `swap` finds a conversation by session ID with a glob over every account of the provider
-(`Agent.FindSession`), or, with `--worktree <name>`, the newest one of that worktree.
+(`SessionStore.FindSession`), or, with `--worktree <name>`, the newest one of that worktree.
 Without `--session` the candidates come from the usage store (the last limit hit in or below the
 working directory, unless the ledger shows it moved since) and from Claude Code's session registry
 `<config>/sessions/<pid>.json` (read as a hint). Before copying, every live holder is stopped
 (a grid pane is respawned; otherwise the registry and the in-use records name the process, which
 gets an interrupt, then — asked again — termination, through the `cli/stop_unix.go` /
-`stop_windows.go` pair). `Agent.TransferSession` (`provider/claude`) copies under the same folder name, refuses a
+`stop_windows.go` pair). `SessionStore.TransferSession` (`provider/claude`) copies under the same folder name, refuses a
 target copy that is not a prefix of the source (`--force` overrides), verifies size and SHA-256
 and renames the transcript into place last. The handoff is appended to the state dir's
 `handoffs.jsonl` (`usage.Ledger`). Only `provider/claude` knows the layout; `cli` reaches it
-through `provider.Agent`.
+through `provider.SessionStore`.
 
 **Usage.** Claude Code's status line runs `squadrn hook statusline --then '<old command>'` once
 `usage setup` has wrapped `statusLine.command` in the account's `settings.json`. The hook parses

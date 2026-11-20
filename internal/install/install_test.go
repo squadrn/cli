@@ -77,6 +77,7 @@ func TestNameCheck(t *testing.T) {
 
 type fakeAgent struct {
 	provider.Agent
+	provider.GuardInstaller
 	installed bool
 	fail      string
 	calls     []string

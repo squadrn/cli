@@ -547,7 +547,11 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 }
 
 func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g string) Check {
-	installed, enabled, err := ag.PluginState(ctx, a.ConfigDir())
+	gi, has := ag.(provider.GuardInstaller)
+	if !has {
+		return bad(g, Fail, "no git push guard hook for "+a.Spec.Name, "")
+	}
+	installed, enabled, err := gi.PluginState(ctx, a.ConfigDir())
 	switch {
 	case err != nil:
 		return bad(g, Warn, "cannot list plugins", "")
@@ -558,7 +562,7 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 		}
 		return bad(g, Fail, "squadrn plugin not installed (no git push guard)", fix)
 	case !enabled:
-		return bad(g, Fail, "squadrn plugin disabled (no git push guard)", a.Spec.Binary+" "+strings.Join(ag.EnablePluginArgs(), " "))
+		return bad(g, Fail, "squadrn plugin disabled (no git push guard)", a.Spec.Binary+" "+strings.Join(gi.EnablePluginArgs(), " "))
 	}
 	return ok(g, "squadrn plugin enabled")
 }

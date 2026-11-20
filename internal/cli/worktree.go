@@ -22,7 +22,8 @@ func (a *app) defaultSpec() provider.Spec {
 	if s, ok := provider.Get(a.store.DefaultProvider); ok {
 		return s
 	}
-	return provider.Claude
+	s, _ := provider.Get(provider.Default)
+	return s
 }
 
 // repoHere opens the repository of the working directory with spec's worktree layout.
@@ -75,10 +76,14 @@ func (a *app) wtCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			wt, ok := ag.(provider.Worktrees)
+			if !ok {
+				return fmt.Errorf("%s: %s cannot create worktrees", acct.Label(), acct.Spec.Name)
+			}
 			if err := os.Chdir(repo.Root); err != nil {
 				return err
 			}
-			return a.session(ag, acct, ag.WorktreeArgs(args[0]), args[0])
+			return a.session(ag, acct, wt.WorktreeArgs(args[0]), args[0])
 		},
 	}
 	cmd.AddCommand(a.wtLsCmd(), a.wtRmCmd())

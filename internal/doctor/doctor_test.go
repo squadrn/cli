@@ -21,6 +21,7 @@ import (
 
 type fakeAgent struct {
 	provider.Agent
+	provider.GuardInstaller
 	loggedIn bool
 	authErr  error
 	plugins  string
