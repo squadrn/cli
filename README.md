@@ -166,8 +166,8 @@ srn account rm work              # logs out and moves the dir to the trash (macO
 record squadrn keeps of the account: its usage record, its entries in the handoff ledger, its
 in-use records (in its dir and in the repositories its records name) and its cached login status.
 It prints exactly what it removed. Links inside the dir are removed, never followed; a dir that is
-itself a link is refused. At a terminal you confirm by typing the account (`claude/work`), even
-with `-y`; scripts without a terminal pass `--purge --yes`. If something cannot be deleted (a file
+itself a link is refused. At a terminal you confirm by typing the account (`claude/work`), unless
+you pass `-y`; scripts without a terminal pass `--purge --yes`. If something cannot be deleted (a file
 another program holds open on Windows), the account and its records stay and the same command
 finishes the job.
 

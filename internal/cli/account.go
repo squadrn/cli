@@ -276,8 +276,8 @@ func (a *app) accountRmCmd() *cobra.Command {
 		Long: "Log an account out and move its dir to the trash.\n\n" +
 			"--purge deletes the dir permanently instead and removes every record squadrn keeps of the\n" +
 			"account: its usage record, its handoffs, its in-use records and its cached login status.\n" +
-			"At a terminal it asks you to type the account (e.g. claude/personal), even with --yes;\n" +
-			"without one it needs --purge --yes.",
+			"At a terminal it asks you to type the account (e.g. claude/personal); --yes skips that,\n" +
+			"and without a terminal it is required.",
 		Args:              oneArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -314,7 +314,7 @@ func (a *app) accountRmCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation (with --purge: only without a terminal)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "remove even if a session seems to use the account")
 	cmd.Flags().BoolVar(&purge, "purge", false, "delete the dir permanently and every record squadrn keeps of the account")
 	return cmd

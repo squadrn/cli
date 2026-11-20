@@ -237,8 +237,8 @@ Log an account out and move its dir to the trash.
 
 --purge deletes the dir permanently instead and removes every record squadrn keeps of the
 account: its usage record, its handoffs, its in-use records and its cached login status.
-At a terminal it asks you to type the account (e.g. claude/personal), even with --yes;
-without one it needs --purge --yes.
+At a terminal it asks you to type the account (e.g. claude/personal); --yes skips that,
+and without a terminal it is required.
 
 Usage:
   srn account rm <account> [flags]
@@ -247,7 +247,7 @@ Flags:
   -f, --force   remove even if a session seems to use the account
   -h, --help    help for rm
       --purge   delete the dir permanently and every record squadrn keeps of the account
-  -y, --yes     do not ask for confirmation (with --purge: only without a terminal)
+  -y, --yes     do not ask for confirmation
 
 Global Flags:
       --no-color   disable colors (also: NO_COLOR=1)
