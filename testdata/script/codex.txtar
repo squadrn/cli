@@ -118,6 +118,13 @@ exec squadrn usage
 stdout '^codex/work +.* 42% .* just now$'
 exec squadrn usage --refresh
 stdout '^codex/work +.* 50% .* 9% .*'
+# Outside a repository there is no best account; in one, it is of the default provider.
+! stdout 'best for this repo'
+exec git init -q repo
+cd repo
+exec squadrn usage
+stdout '^best for this repo: claude/main$'
+cd $WORK
 # An older snapshot is read again without --refresh.
 cp old-usage.json home/.local/state/squadrn/usage/codex-work.json
 exec squadrn usage

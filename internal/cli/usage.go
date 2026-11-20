@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -16,6 +17,7 @@ import (
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn/internal/worktree"
 )
 
 const watchEvery = 5 * time.Second
@@ -166,11 +168,19 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 			}
 		}
 	}
-	ranked, next := usage.Best(cands, rep.From, now)
-	if len(ranked) > 0 {
+	// Without an account seen here, the best one is of the default provider, like swap's pick;
+	// outside a repository nothing was seen and there is nothing to continue.
+	pool := cands
+	if rep.From == "" {
+		def := a.defaultSpec().ID
+		pool = slices.DeleteFunc(slices.Clone(cands), func(c usage.Candidate) bool { return c.Provider != def })
+	}
+	ranked, next := usage.Best(pool, rep.From, now)
+	if len(ranked) == 0 {
+		rep.NextReset = next
+	} else if rep.From != "" || worktree.Toplevel(context.Background(), cwd) != "" {
 		rep.Best = ranked[0].Account
 	}
-	rep.NextReset = next
 	return rep
 }
 
