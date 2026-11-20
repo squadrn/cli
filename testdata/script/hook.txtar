@@ -148,6 +148,17 @@ stdin ../pp-feat.txt
 stderr 'direct push to protected branch "feat-x"'
 cd $WORK
 
+# The strict profile's ConfigChange hook appends one line to the audit log and never blocks.
+env CLAUDE_CONFIG_DIR=$HOME/.claude-work
+stdin configchange.json
+exec squadrn hook config-change
+exec cat $HOME/.local/state/squadrn/config-changes.log
+stdout '"source":"user_settings"'
+stdout '"file":"/x/settings.json"'
+stdout '"config_dir":".*/.claude-work"'
+exitcode 2 squadrn hook config-change extra
+env CLAUDE_CONFIG_DIR=
+
 -- evil-config --
 protected_branches = ["nothing"]
 -- strict-config --
@@ -187,3 +198,5 @@ protected_branches = [
 {"cwd":"feat","tool_name":"Python","tool_input":{"command":"print(1)"}}
 -- garbage.txt --
 not json
+-- configchange.json --
+{"hook_event_name":"ConfigChange","source":"user_settings","file_path":"/x/settings.json"}
