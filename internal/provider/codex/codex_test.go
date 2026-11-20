@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn/internal/usage"
 )
 
 func TestParseLoginStatus(t *testing.T) {
@@ -254,7 +255,7 @@ func TestParseRateLimits(t *testing.T) {
 	if err != nil || got.Five.UsedPct != 3 || got.Seven.UsedPct != 4 {
 		t.Fatalf("no durations: %+v %v", got, err)
 	}
-	if _, err := parseRateLimits(json.RawMessage(`{"rateLimits":{}}`), now); !errors.Is(err, ErrNoUsage) {
+	if _, err := parseRateLimits(json.RawMessage(`{"rateLimits":{}}`), now); !errors.Is(err, usage.ErrNoLimits) {
 		t.Fatalf("empty: %v", err)
 	}
 	if _, err := parseRateLimits(json.RawMessage(`[`), now); err == nil {

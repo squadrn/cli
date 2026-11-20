@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -181,8 +182,9 @@ const (
 )
 
 // queryUsage reads the usage limits of logged-in accounts whose CLI reports them on request
-// (Caps.UsageQuery) and records them, unless what was recorded is fresh and refresh is off; an
-// account that answers nothing keeps what was recorded.
+// (Caps.UsageQuery) and records them, unless the account was checked recently and refresh is
+// off. A CLI that reports no limits is recorded as asked (QueriedAt), so it is not asked again
+// for a while either; one that fails to answer keeps what was recorded and is asked next time.
 func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult, refresh bool) {
 	now := a.now()
 	var wg sync.WaitGroup
@@ -191,7 +193,7 @@ func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult
 		if !acct.Spec.Caps.UsageQuery || st.Err != nil || !st.Status.LoggedIn || st.Status.Metered() {
 			continue
 		}
-		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok && !refresh && now.Sub(snap.ObservedAt) < usageQueryFresh {
+		if snap, ok, _ := a.usageStore().Load(acct.Provider, acct.Name); ok && !refresh && now.Sub(snap.Checked()) < usageQueryFresh {
 			continue
 		}
 		ag, err := a.agent(acct.Spec)
@@ -202,9 +204,16 @@ func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult
 		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), usageQueryTimeout)
 			defer cancel()
-			if snap, err := rl.RateLimits(ctx, acct.ConfigDir()); err == nil {
-				_, _, _ = a.usageStore().Record(acct.Provider, acct.Name, snap)
+			snap, err := rl.RateLimits(ctx, acct.ConfigDir())
+			switch {
+			case err == nil:
+				snap.QueriedAt = now
+			case errors.Is(err, usage.ErrNoLimits):
+				snap = usage.Snapshot{QueriedAt: now}
+			default:
+				return
 			}
+			_, _, _ = a.usageStore().Record(acct.Provider, acct.Name, snap)
 		})
 	}
 	wg.Wait()

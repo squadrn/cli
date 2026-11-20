@@ -3,15 +3,11 @@ package codex
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/squadrn/squadrn/internal/usage"
 )
-
-// ErrNoUsage: the account has no usage limits to report (logged out, or API key billing).
-var ErrNoUsage = errors.New("no usage limits reported")
 
 // RateLimits reads the account's usage limits from the app server (account/rateLimits/read).
 func (c CLI) RateLimits(ctx context.Context, configDir string) (usage.Snapshot, error) {
@@ -20,7 +16,7 @@ func (c CLI) RateLimits(ctx context.Context, configDir string) (usage.Snapshot, 
 		return usage.Snapshot{}, err
 	}
 	if r[0].Err != nil {
-		return usage.Snapshot{}, fmt.Errorf("%w: %w", ErrNoUsage, r[0].Err)
+		return usage.Snapshot{}, fmt.Errorf("%w: %w", usage.ErrNoLimits, r[0].Err)
 	}
 	return parseRateLimits(r[0].Result, time.Now())
 }
@@ -71,7 +67,7 @@ func parseRateLimits(raw json.RawMessage, now time.Time) (usage.Snapshot, error)
 		}
 	}
 	if s.Five == nil && s.Seven == nil {
-		return usage.Snapshot{}, ErrNoUsage
+		return usage.Snapshot{}, usage.ErrNoLimits
 	}
 	return s, nil
 }

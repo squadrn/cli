@@ -78,8 +78,17 @@ exec squadrn account ls
 stdout '^codex/work +yes +me@.codex-work +~/.codex-work$'
 
 # usage reads the limits from the app server; none reported (or logged out) is no data.
+rm home/calls.log
 exec squadrn usage
-stdout '^codex/work .* nodata '
+stdout '^codex/work .* nodata +-$'
+grep 'cfg=.*/home/.codex-work args=app-server account/rateLimits/read' home/calls.log
+# "No limits reported" is remembered for 5 minutes too; --refresh asks again.
+rm home/calls.log
+exec squadrn usage
+stdout '^codex/work .* nodata +-$'
+! exists home/calls.log
+exec squadrn usage --refresh
+grep 'account/rateLimits/read' home/calls.log
 cp limits.json home/.codex-work/.limits
 exec squadrn usage --refresh
 stdout '^codex/work +.* 42% .* 7% .*'

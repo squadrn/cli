@@ -115,6 +115,7 @@ func codexAppServer(dir, cfg string, loggedIn bool) {
 			}
 			reply(m.ID, map[string]any{"account": account, "requiresOpenaiAuth": true})
 		case "account/rateLimits/read":
+			logCall("cfg=%s args=app-server account/rateLimits/read", cfg)
 			b, err := os.ReadFile(filepath.Join(dir, ".limits"))
 			if err != nil {
 				_ = out.Encode(map[string]any{"id": m.ID, "error": map[string]any{"code": -32600, "message": "codex account authentication required to read rate limits"}})
