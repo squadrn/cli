@@ -71,6 +71,10 @@ func (Profiles) Profile(name string, options []string, ctx provider.ProfileConte
 		return nil, fmt.Errorf("unknown profile %q", name)
 	}
 	doc["permissions"] = perms
+	if ctx.Notify {
+		// Squadrn notifies instead; without this, iTerm2, Ghostty and Kitty would show both.
+		doc["preferredNotifChannel"] = "notifications_disabled"
+	}
 	for _, o := range options {
 		switch o {
 		case "privacy":
