@@ -34,6 +34,17 @@ exec squadrn self-install rel --interactive --command ai
 exec squadrn self-update --rollback
 ! stderr 'Command name'
 
+# A fresh home gets completions for the login shell in a dir made for them; zsh is told how to
+# load it.
+env SHELL=/bin/zsh
+exec squadrn self-install rel --interactive --command ai
+stdout '^  zsh completion → ~/.zsh/completions \(new: add to ~/.zshrc: fpath=\(~/.zsh/completions \$fpath\); autoload -Uz compinit && compinit\)$'
+exists home/.zsh/completions/_ai
+! stdout 'bash completion|fish completion'
+exec squadrn self-install rel --interactive --command ai
+stdout '^  zsh completion → ~/.zsh/completions$'
+env SHELL=
+
 -- answers --
 con
 ai
