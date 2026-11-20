@@ -149,7 +149,7 @@ func TestSetGuardHook(t *testing.T) {
 			t.Errorf("lost %s:\n%s", want, b)
 		}
 	}
-	if strings.Contains(string(b), "/old/") || strings.Count(string(b), "squadrn-hook") != 1 {
+	if strings.Contains(string(b), "/old/") || strings.Count(string(b), "guard-git") != 1 {
 		t.Fatalf("old hook kept:\n%s", b)
 	}
 	if changed, err := setGuardHook(path, cmd); err != nil || changed {

@@ -161,7 +161,7 @@ func codexHooks(hooksPath, configPath, key string) []any {
 	_ = json.Unmarshal(b, &doc)
 	for _, g := range doc.Hooks["PreToolUse"] {
 		for _, h := range g.Hooks {
-			if !strings.Contains(h.Command, "squadrn-hook") {
+			if !strings.Contains(h.Command, "guard-git") {
 				continue
 			}
 			sum := sha256.Sum256(b)
