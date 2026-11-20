@@ -35,6 +35,8 @@ type Entry struct {
 	// Worktree names the agent worktree the session works in when it is recorded in the
 	// repository root because the worktree did not exist yet (wt <name> creates it).
 	Worktree string `json:"worktree,omitempty"`
+	// Cwd is where the session works, in the entry of the account's dir (ps lists it).
+	Cwd string `json:"cwd,omitempty"`
 }
 
 func entryPath(dir, reg string, pid int) string {

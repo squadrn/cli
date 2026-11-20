@@ -58,7 +58,7 @@ func (h hookEnv) readInput() ([]byte, error) {
 
 // hookUsage names the installed binary, not the user's command: the plugin (through squadrn-hook)
 // and the git hook shims run hooks through it, whatever the command is called.
-const hookUsage = "usage: squadrn hook guard-git [--no-ask] | notify | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
+const hookUsage = "usage: squadrn hook guard-git [--no-ask] | notify [--terminal] | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
 	"internal: the squadrn plugin (squadrn-hook) and git hooks run this through the installed binary"
 
 // runHook handles `squadrn hook …` and returns the exit code.
@@ -79,13 +79,18 @@ func runHook(args []string, h hookEnv) int {
 		h.guardGit(noAsk)
 		return exitOK
 	case "notify":
-		// The rc.3 plugin passed a title (notify 'Done'); the event now comes from the input.
-		if len(args) > 2 {
+		// --terminal: a synchronous hook, which may answer with a terminal sequence. The rc.3
+		// plugin passed a title (notify 'Done'); the event now comes from the input.
+		terminal := len(args) > 1 && args[1] == "--terminal"
+		if len(args) > 2 && !terminal || len(args) > 3 {
 			_, _ = fmt.Fprintln(h.stderr, hookUsage)
 			return exitUsage
 		}
 		raw, _ := h.readInput()
-		h.notifyEvent(hookSpec(), raw)
+		if seq := h.notifyEvent(hookSpec(), raw, terminal); seq != "" {
+			b, _ := json.Marshal(map[string]string{"terminalSequence": seq})
+			_, _ = fmt.Fprintln(h.stdout, string(b))
+		}
 		return exitOK
 	case "deliver":
 		if len(args) != 2 {

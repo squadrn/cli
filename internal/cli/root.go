@@ -276,7 +276,8 @@ Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.clau
 			root.AddCommand(cmd)
 		}
 	}
-	add("agents", a.wtCmd(), a.gridCmd(), a.psCmd(), a.swapCmd(), a.gcCmd(), a.depsCmd())
+	add("agents", a.wtCmd(), a.gridCmd(), a.psCmd(), a.nextCmd(), a.swapCmd(), a.gcCmd(), a.depsCmd())
+	root.AddCommand(a.focusCmd())
 	add("accounts", a.accountCmd(), a.usageCmd())
 	add("setup", a.setupCmd(), a.doctorCmd(), a.notifyCmd(), a.configCmd(), a.selfUpdateCmd(), a.selfUninstallCmd(), a.versionCmd())
 	root.AddCommand(a.selfInstallCmd())

@@ -39,6 +39,9 @@ func notifyArgs(tool string, d delivery) []string {
 		if d.Activate != "" {
 			args = append(args, "-activate", d.Activate)
 		}
+		if d.Execute != "" {
+			args = append(args, "-execute", d.Execute)
+		}
 		if d.Sound {
 			args = append(args, "-sound", "default")
 		}
@@ -92,6 +95,12 @@ func terminalFrontmost(ctx context.Context) (front, known bool) {
 
 func focusSources() string {
 	return "tmux pane in view (inside tmux) · frontmost terminal app (lsappinfo)"
+}
+
+// activateApp brings the app with bundle id forward.
+func activateApp(ctx context.Context, bundle string) error {
+	_, err := proc.Output(ctx, proc.Options{}, "open", "-b", bundle)
+	return err
 }
 
 // registerToastApp and unregisterToastApp: only Windows registers an app id for notifications.

@@ -1,0 +1,111 @@
+[windows] skip 'Unix script: sh, tmux'
+# Agent state in tmux panes and ps, srn next and srn focus, terminal notification sequences
+# (ADR 0012). The test binary replaces the desktop notifier.
+env SQUADRN_TEST_NOTIFY=$WORK/sent.jsonl
+exec git init -q repo
+cp empty home/.claude/.loggedin
+cp empty home/.claude-work/.loggedin
+
+# ps lists a session started in a plain terminal, not only grid panes.
+exec squadrn ps
+stdout '^no running agents$'
+cd repo
+env FAKE_HOLD=11111111-1111-4111-8111-111111111111 FAKE_NOREG=1
+exec squadrn work &
+waitfor $WORK/home/held.txt '^[0-9]+$'
+env FAKE_HOLD= FAKE_NOREG=
+cd $WORK
+exec squadrn ps
+stdout '^ACCOUNT +WORKTREE +STATE +SESSION +PROCESS$'
+stdout '^claude/work +repo +- +- +pid [0-9]+$'
+# Its hooks report its state.
+env CLAUDE_CONFIG_DIR=$WORK/home/.claude-work
+jsonexpand prompt.json in.json
+stdin in.json
+exec squadrn hook notify
+! stdout .
+exec squadrn ps
+stdout '^claude/work +repo +working +- +pid [0-9]+$'
+jsonexpand permission.json in.json
+stdin in.json
+exec squadrn hook notify
+exec squadrn ps --json
+stdout '"state": "input"'
+stdout '"account": "claude/work"'
+stdout '"cwd": ".*repo"'
+exec sh -c 'kill $(cat home/held.txt)'
+wait
+
+# Terminals that show notifications get the sequence from the synchronous hooks instead of a
+# desktop notification; the asynchronous ones still use the desktop.
+env TERM_PROGRAM=iTerm.app
+jsonexpand failed.json in.json
+stdin in.json
+exec squadrn hook notify --terminal
+stdout '^\{"terminalSequence":"\\u001b\]9;Claude Code · work · repo: Login expired · srn account login claude/work\\u0007\\u0007"\}$'
+! grep '"group":"s2"' sent.jsonl
+grep '"method":"terminal"' home/.local/state/squadrn/notify.log
+exec squadrn notify status
+stdout '^terminal +iTerm2: shows input and failures itself'
+stdout '^method +auto$'
+env TERM_PROGRAM=Apple_Terminal
+exec squadrn notify status
+stdout '^terminal +Apple_Terminal: no notification sequence'
+jsonexpand failed3.json in.json
+stdin in.json
+exec squadrn hook notify --terminal
+! stdout .
+grep '"group":"s3"' sent.jsonl
+env TERM_PROGRAM=
+exitcode 2 squadrn hook notify --terminal x y
+
+# Inside tmux the pane shows the state, the bell rings for input, and next finds the pane.
+exec tmux new-session -d -s work -x 80 -y 20 'sleep 60'
+exec sh -c 'printf "%s,1,0" "$(tmux display -p "#{socket_path}")" > socket.txt'
+exec sh -c 'printf %s "$(tmux display -p -t work: "#{pane_id}")" > pane.txt'
+envfile TMUX socket.txt
+envfile TMUX_PANE pane.txt
+jsonexpand permission4.json in.json
+stdin in.json
+exec squadrn hook notify --terminal
+exec sh -c 'tmux show -p -t "$TMUX_PANE" -v @squadrn_state'
+stdout '^input$'
+grep '"group":"s4"' sent.jsonl
+grep '"method":"tmux"' home/.local/state/squadrn/notify.log
+exec sh -c 'tmux display -p -t work: "#{window_bell_flag}"'
+stdout '^1$'
+# A click on the notification shows the pane: here no client is attached.
+grep '"execute":".*squadrn'' ''focus'' ''s4''"' sent.jsonl
+! exec squadrn focus s4
+stderr 'no tmux client is attached'
+! exec squadrn focus nope
+stderr 'no running agent session "nope" is known'
+env TMUX= TMUX_PANE=
+! exec squadrn next
+stderr 'claude/work .* \(input\) waits; next needs a terminal to attach: tmux attach -t work'
+envfile TMUX socket.txt
+envfile TMUX_PANE pane.txt
+jsonexpand stop4.json in.json
+stdin in.json
+exec squadrn hook notify
+exec sh -c 'tmux show -p -t "$TMUX_PANE" -v @squadrn_state'
+stdout '^done$'
+env TMUX= TMUX_PANE=
+exec squadrn next
+stdout '^no agent is waiting for you$'
+exec tmux kill-server
+
+-- empty --
+-- home/.claude-work/.squadrn-account --
+-- prompt.json --
+{"session_id":"s1","prompt_id":"p1","cwd":"$WORK${/}repo","hook_event_name":"UserPromptSubmit","prompt":"secret"}
+-- permission.json --
+{"session_id":"s1","prompt_id":"p1","cwd":"$WORK${/}repo","hook_event_name":"Notification","message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}
+-- failed.json --
+{"session_id":"s2","prompt_id":"p1","cwd":"$WORK${/}repo","hook_event_name":"StopFailure","error":"authentication_failed"}
+-- failed3.json --
+{"session_id":"s3","prompt_id":"p1","cwd":"$WORK${/}repo","hook_event_name":"StopFailure","error":"authentication_failed"}
+-- permission4.json --
+{"session_id":"s4","prompt_id":"p1","cwd":"$WORK${/}repo","hook_event_name":"Notification","message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}
+-- stop4.json --
+{"session_id":"s4","prompt_id":"p2","cwd":"$WORK${/}repo","hook_event_name":"Stop","stop_hook_active":false}
