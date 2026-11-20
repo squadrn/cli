@@ -60,3 +60,37 @@ func TestActiveDropsStaleEntries(t *testing.T) {
 }
 
 func itoa(n int) string { b, _ := json.Marshal(n); return string(b) }
+
+func TestForget(t *testing.T) {
+	dir := t.TempDir()
+	if n, live := Forget(dir, "claude/x"); n != 0 || live != nil {
+		t.Fatalf("Forget on an unused dir = %d %v", n, live)
+	}
+	if err := Acquire(dir, Entry{Account: "claude/x"}); err != nil {
+		t.Fatal(err)
+	}
+	reg := filepath.Join(dir, Dir)
+	write := func(name string, e Entry) {
+		b, _ := json.Marshal(e)
+		if err := os.WriteFile(filepath.Join(reg, name), b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("999999999.json", Entry{PID: 999999999, Account: "claude/x"})
+	write("999999998.json", Entry{PID: 999999998, Account: "claude/y"})
+	n, live := Forget(dir, "claude/x")
+	if n != 1 || len(live) != 1 || live[0].PID != os.Getpid() {
+		t.Fatalf("Forget = %d %+v", n, live)
+	}
+	left, _ := os.ReadDir(reg)
+	if len(left) != 2 {
+		t.Fatalf("left = %v", left)
+	}
+	_ = Release(dir)
+	if n, _ := Forget(dir, "claude/y"); n != 1 {
+		t.Fatalf("Forget(y) = %d", n)
+	}
+	if _, err := os.Stat(reg); !os.IsNotExist(err) {
+		t.Fatal("empty registry dir left behind")
+	}
+}

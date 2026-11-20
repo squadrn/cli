@@ -264,10 +264,15 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 }
 
 func (a *app) accountRmCmd() *cobra.Command {
-	var yes, force bool
+	var yes, force, purge bool
 	cmd := &cobra.Command{
-		Use:               "rm <account>",
-		Short:             "Log an account out and move its dir to the trash",
+		Use:   "rm <account>",
+		Short: "Log an account out and move its dir to the trash (--purge: delete it for good)",
+		Long: "Log an account out and move its dir to the trash.\n\n" +
+			"--purge deletes the dir permanently instead and removes every record squadrn keeps of the\n" +
+			"account: its usage record, its handoffs, its in-use records and its cached login status.\n" +
+			"At a terminal it asks you to type the account (e.g. claude/personal), even with --yes;\n" +
+			"without one it needs --purge --yes.",
 		Args:              oneArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -281,15 +286,14 @@ func (a *app) accountRmCmd() *cobra.Command {
 			if err := a.checkAccountFree(acct, force); err != nil {
 				return err
 			}
+			if purge {
+				return a.accountPurge(acct, yes)
+			}
 			if err := a.confirm(yes, "Log out %s and move %s to the trash", acct.Label(), a.tilde(acct.Dir)); err != nil {
 				return err
 			}
 			// Log out while the dir is still where its login is keyed to, then move it.
-			loggedOut := false
-			if ag, err := a.agent(acct.Spec); err == nil {
-				_, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...)
-				loggedOut = err == nil
-			}
+			loggedOut := a.logoutQuiet(acct) == nil
 			a.cache.Forget(acct.Label())
 			dst, err := a.store.MoveToTrash(acct, a.now())
 			if err != nil {
@@ -298,16 +302,27 @@ func (a *app) accountRmCmd() *cobra.Command {
 				}
 				return err
 			}
-			if err := usageStore(a.store.Home).Remove(acct.Provider, acct.Name); err != nil {
+			if _, err := usageStore(a.store.Home).Remove(acct.Provider, acct.Name); err != nil {
 				a.warnf("cannot remove the usage record of %s: %v", acct.Label(), err)
 			}
 			a.out("removed account %s (moved to %s)\n", acct.Label(), a.tilde(dst))
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation (with --purge: only without a terminal)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "remove even if a session seems to use the account")
+	cmd.Flags().BoolVar(&purge, "purge", false, "delete the dir permanently and every record squadrn keeps of the account")
 	return cmd
+}
+
+// logoutQuiet signs acct out without printing.
+func (a *app) logoutQuiet(acct account.Account) error {
+	ag, err := a.agent(acct.Spec)
+	if err != nil {
+		return err
+	}
+	_, err = ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...)
+	return err
 }
 
 func (a *app) completeAccounts(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {

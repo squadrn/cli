@@ -306,11 +306,11 @@ func TestStore(t *testing.T) {
 	if err := s.Rename("claude", "job", "work"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Remove("claude", "work"); err != nil {
-		t.Fatal(err)
+	if removed, err := s.Remove("claude", "work"); err != nil || !removed {
+		t.Fatalf("remove: %v %v", removed, err)
 	}
-	if err := s.Remove("claude", "work"); err != nil {
-		t.Fatalf("second remove: %v", err)
+	if removed, err := s.Remove("claude", "work"); err != nil || removed {
+		t.Fatalf("second remove: %v %v", removed, err)
 	}
 	if _, ok, _ := s.Load("claude", "work"); ok {
 		t.Fatal("removed snapshot still loads")

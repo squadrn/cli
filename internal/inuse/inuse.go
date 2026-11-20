@@ -104,3 +104,33 @@ func active(reg string) []Entry {
 	}
 	return out
 }
+
+// Forget removes the entries of dir that name account and no longer run, and returns how many
+// it removed and the live ones it kept; the registry dir goes once empty.
+func Forget(dir, account string) (removed int, live []Entry) {
+	reg := filepath.Join(dir, Dir)
+	files, err := os.ReadDir(reg)
+	if err != nil {
+		return 0, nil
+	}
+	for _, f := range files {
+		pid, err := strconv.Atoi(strings.TrimSuffix(f.Name(), ".json"))
+		if err != nil || !strings.HasSuffix(f.Name(), ".json") {
+			continue
+		}
+		p := filepath.Join(reg, f.Name())
+		var e Entry
+		if b, err := os.ReadFile(p); err != nil || json.Unmarshal(b, &e) != nil || e.Account != account {
+			continue
+		}
+		if e.PID == pid && proc.Alive(e.PID, e.Started) {
+			live = append(live, e)
+			continue
+		}
+		if os.Remove(p) == nil {
+			removed++
+		}
+	}
+	_ = os.Remove(reg) // fails while other entries remain
+	return removed, live
+}

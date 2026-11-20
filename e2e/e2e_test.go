@@ -191,6 +191,19 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.srn(t, "account", "rm", "main", "--yes").exit(2)
 	s.srn(t, "account", "rm", "tool", "--yes").exit(0).out(`removed account claude/tool`)
 	s.check(t, !s.exists(filepath.Join(s.home, ".claude-tool")), "account rm left ~/.claude-tool")
+	// --purge deletes the dir for good and every record of the account; without a terminal it
+	// needs --yes.
+	s.srn(t, "account", "add", "scratch", "-y").exit(0)
+	s.srn(t, "account", "login", "scratch").exit(0)
+	s.srn(t, "account", "rm", "scratch", "--purge").exit(2).err(`needs a terminal or --purge --yes`)
+	s.srn(t, "account", "rm", "scratch", "--purge", "--yes").exit(0).out(
+		`^logged out claude/scratch$`,
+		`^deleted ~[/\\].claude-scratch$`)
+	s.check(t, !s.exists(filepath.Join(s.home, ".claude-scratch")), "account rm --purge left ~/.claude-scratch")
+	trashed, _ := filepath.Glob(filepath.Join(s.home, "*", ".claude-scratch*"))
+	more, _ := filepath.Glob(filepath.Join(s.home, ".local", "share", "Trash", "files", ".claude-scratch*"))
+	trashed = append(trashed, more...)
+	s.check(t, len(trashed) == 0, "account rm --purge moved the dir instead of deleting it: %v", trashed)
 	s.srn(t, "account", "add", "Bad").exit(2)
 	s.srn(t, "-a", "ghost").exit(1).err(`account not found: claude/ghost`)
 }

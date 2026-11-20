@@ -1,0 +1,93 @@
+[windows] skip 'Unix script: sh, symlinks'
+# account rm --purge logs out, deletes the dir for good (never what a link inside points to) and
+# removes every record squadrn keeps of the account.
+mkdir home/.claude-work/projects/p shared
+cp empty home/.claude-work/.squadrn-account
+cp empty home/.claude-work/.loggedin
+cp empty home/.claude-work/projects/p/t.jsonl
+cp empty shared/keep
+symlink home/.claude-work/agents -> $WORK/shared
+mkdir home/.local/state/squadrn/usage repo/wt/.squadrn-inuse repo/.squadrn-inuse
+exec sh -c 'printf "{\"cwd\":\"%s/repo/wt\"}\n" "$WORK" > home/.local/state/squadrn/usage/claude-work.json'
+cp handoffs.jsonl home/.local/state/squadrn/handoffs.jsonl
+exec sh -c 'printf "{\"config_dir\":\"%s/home/.claude-work\"}\n{\"config_dir\":\"\"}\n" "$WORK" > home/.local/state/squadrn/config-changes.log'
+cp stale-work.json repo/wt/.squadrn-inuse/999999999.json
+cp stale-other.json repo/.squadrn-inuse/999999998.json
+exec squadrn account ls
+grep 'claude/work' home/.cache/squadrn/auth.json
+
+# Without a terminal it needs --yes; --yes is ignored at a terminal, where only the typed
+# account confirms.
+exitcode 2 squadrn account rm work --purge
+! exec squadrn account rm work --purge
+stderr 'needs a terminal or --purge --yes'
+env SQUADRN_TEST_TTY=$WORK/wrong
+! exec squadrn account rm work --purge --yes
+stderr 'Type claude/work to confirm: '
+stderr 'aborted'
+exists home/.claude-work/.loggedin
+exists home/.local/state/squadrn/usage/claude-work.json
+
+env SQUADRN_TEST_TTY=$WORK/right
+exec squadrn account rm work --purge
+stderr 'Permanently delete ~/.claude-work and every record of claude/work'
+cmp stdout purged.out
+! exists home/.claude-work
+exists shared/keep
+grep 'args=auth logout' home/calls.log
+! exists home/.local/state/squadrn/usage/claude-work.json
+! grep 'claude/work' home/.local/state/squadrn/handoffs.jsonl
+grep '"s2"' home/.local/state/squadrn/handoffs.jsonl
+! grep '.claude-work' home/.local/state/squadrn/config-changes.log
+! exists repo/wt/.squadrn-inuse
+exists repo/.squadrn-inuse/999999998.json
+! grep 'claude/work' home/.cache/squadrn/auth.json
+exitcode 1 squadrn account rm work --purge --yes
+
+# Without a terminal --purge --yes is enough; with no records only the dir goes.
+env SQUADRN_TEST_TTY=
+mkdir home/.claude-two
+cp empty home/.claude-two/.squadrn-account
+exec squadrn account rm claude/two --purge -y
+stdout '^logged out claude/two$'
+stdout '^deleted ~/.claude-two$'
+! stdout 'removed'
+! exists home/.claude-two
+
+# A dir that is a link is refused before anything happens; main never goes.
+mkdir elsewhere
+cp empty elsewhere/.squadrn-account
+symlink home/.claude-linked -> $WORK/elsewhere
+! exec squadrn account rm linked --purge --yes
+stderr 'account dir is a link'
+exists elsewhere/.squadrn-account
+exitcode 2 squadrn account rm main --purge --yes
+
+# A session in progress blocks it unless --force.
+mkdir home/.claude-busy/.squadrn-inuse
+cp empty home/.claude-busy/.squadrn-account
+cp inuse.json home/.claude-busy/.squadrn-inuse/1.json
+! exec squadrn account rm busy --purge --yes
+stderr 'in use by pid 1'
+exists home/.claude-busy
+
+-- empty --
+-- wrong --
+work
+-- right --
+claude/work
+-- purged.out --
+logged out claude/work
+deleted ~/.claude-work
+removed usage record, 3 handoff entries, 1 config change entry, 1 in-use record, cached login status
+-- handoffs.jsonl --
+{"at":"2026-11-18T10:00:00Z","session":"s1","from":"claude/work","to":"claude/main"}
+{"at":"2026-11-18T11:00:00Z","session":"s2","from":"claude/main","to":"claude/other"}
+{"at":"2026-11-18T12:00:00Z","session":"s3","from":"claude/other","to":"claude/work"}
+{"at":"2026-11-18T13:00:00Z","session":"s4","from":"claude/work","to":"claude/other","cwd":"/nowhere"}
+-- stale-work.json --
+{"pid":999999999,"account":"claude/work"}
+-- stale-other.json --
+{"pid":999999998,"account":"claude/other"}
+-- inuse.json --
+{"pid":1,"account":"claude/busy"}
