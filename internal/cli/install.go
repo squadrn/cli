@@ -160,6 +160,9 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 	if !onPATH(a.layout.BinDir) {
 		a.out("%s: %s\n", pathWhere, doctor.PathFix(a.layout.BinDir))
 	}
+	if fresh && nc.selfInstall {
+		return a.firstRun(nc.interactive)
+	}
 	a.out("next: %s doctor\n", cfg.Command)
 	return nil
 }
@@ -214,4 +217,24 @@ func (a *app) installPlugins() {
 		}
 		cancel()
 	}
+}
+
+// firstRun follows the first install: srn setup at a terminal (the installers pass --interactive
+// then, and pipe stdin, so the controlling terminal is used), else a summary of the agent CLIs,
+// the accounts and next steps. Never after an update.
+func (a *app) firstRun(interactive bool) error {
+	in, out, done, ok := a.terminalIO()
+	if !ok || !interactive {
+		if ok {
+			done()
+		}
+		a.summary()
+		return nil
+	}
+	defer done()
+	stdin, stdout, stderr, interactive := a.stdin, a.stdout, a.stderr, a.interactive
+	a.stdin, a.stdout, a.stderr, a.interactive = in, out, out, true
+	defer func() { a.stdin, a.stdout, a.stderr, a.interactive = stdin, stdout, stderr, interactive }()
+	a.out("\nset up %s (every step can be skipped; run it again any time: %s setup)\n", config.Slug, a.cmd)
+	return a.setup(false)
 }

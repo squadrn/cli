@@ -122,6 +122,7 @@ Setup:
   help           Help about any command
   self-uninstall Remove squadrn: plugin from every account, command links, completions, installed files
   self-update    Update squadrn and its plugin in every account
+  setup          Guided first run: agent CLIs, default profile, existing accounts, usage tracking, doctor
   version        Print the squadrn version
 
 Flags:

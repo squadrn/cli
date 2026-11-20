@@ -64,10 +64,42 @@ func testInstall(t *testing.T, s *sandbox) {
 	} else {
 		r = s.run(t, opt{env: env}, "sh", installer)
 	}
-	r.exit(0).out(`verified release signature`, `installed squadrn `+regexp.QuoteMeta(version))
+	// A first install without a terminal says what it found and what to run next (no setup).
+	r.exit(0).out(`verified release signature`, `installed squadrn `+regexp.QuoteMeta(version), `^agent CLIs: Claude Code`, `^next: srn setup \(guided`)
 	s.check(t, s.exists(s.lookPath("srn")) && s.lookPath("srn") != "srn", "srn is not on the sandbox PATH")
 	s.srn(t, "version").exit(0).out(`^squadrn ` + regexp.QuoteMeta(version) + `$`)
 	s.run(t, opt{}, "squadrn", "--version").exit(0).out(`^squadrn ` + regexp.QuoteMeta(version) + `$`)
+	s.srn(t, "setup").exit(0).out(`^accounts: claude/main`, `^next: srn setup`)
+	testSetupTTY(t, s)
+}
+
+// testSetupTTY answers srn setup at a pseudo terminal: strict as the default profile, the other
+// tool's dir and usage tracking skipped. The sandbox is put back for the later sections.
+func testSetupTTY(t *testing.T, s *sandbox) {
+	if runtime.GOOS == "windows" {
+		t.Log("srn setup at a terminal: skipped on Windows (no script(1))")
+		return
+	}
+	old := filepath.Join(s.home, ".claude-old")
+	if err := os.Mkdir(old, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	s.srnTTY(t, "strict\nn\nn\n", "setup").exit(0).out(
+		`^1\. agent CLIs$`,
+		`profile +minimal / standard / strict \[standard\]: `,
+		`✓ new accounts get the strict profile$`,
+		`adopt ~/\.claude-old as claude/old\? \(another tool may own it\) \[y/N\] `,
+		`– skipped ~/\.claude-old \(later: srn account adopt claude/old\)`,
+		`usage limits for claude/main\? \[Y/n\] `,
+		`– skipped \(later: srn usage setup --all\)`,
+		`^5\. doctor$`,
+		`^next: srn account add <name>`)
+	s.srn(t, "config", "get", "default_profile").exit(0).out(`^strict$`)
+	s.check(t, !s.exists(filepath.Join(old, ".squadrn-account")), "setup adopted ~/.claude-old although the answer was no")
+	s.srn(t, "config", "set", "default_profile", "standard").exit(0)
+	if err := os.Remove(old); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func testCLI(t *testing.T, s *sandbox) {
@@ -397,6 +429,8 @@ func testDoctor(t *testing.T, s *sandbox) {
 		noOut(`✗`)
 	s.srn(t, "doctor", "--json").out(`"group": "push guard"`)
 	s.srn(t, "doctor", "a", "b").exit(2)
+	s.srn(t, "setup", "-y").exit(0).out(`^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^5\. doctor$`, `^next: srn account add <name>`)
+	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ on for every account that reports usage$`).noOut(`new accounts get`)
 }
 
 func testUpdate(t *testing.T, s *sandbox) {

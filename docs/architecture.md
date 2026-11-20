@@ -3,7 +3,7 @@
 ```
                  ┌────────────────────────────── squadrn (one binary) ──────────────────────────────┐
  user ─────────▶ │ cli: route · account · wt · grid · ps · swap · usage · gc · deps · doctor        │
-                 │      config · self-update · self-install · self-uninstall                        │
+                 │      setup · config · self-update · self-install · self-uninstall                │
  Claude Code ──▶ │ hook guard-git · notify · limit  ◀── plugin hooks (fail closed)                  │
                  │ hook statusline                  ◀── statusLine.command (usage setup)            │
  git ──────────▶ │ hook git <name>                  ◀── ~/.local/share/squadrn/git-hooks/<name>     │

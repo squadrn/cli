@@ -10,7 +10,7 @@ stdout 'linked ~/.local/bin/ai'
 stdout 'linked ~/.local/bin/sx'
 stdout 'claude/main: plugin installed'
 stdout 'claude/personal: plugin installed'
-stdout 'next: ai doctor'
+stdout 'next: ai setup \(guided'
 exists home/.local/share/squadrn/plugin/bin/squadrn-hook
 grep '"version": "dev"' home/.local/share/squadrn/plugin/.claude-plugin/plugin.json
 grep '^command = "ai"' home/.config/squadrn/config.toml
