@@ -58,7 +58,7 @@ func (h hookEnv) readInput() ([]byte, error) {
 
 // hookUsage names the installed binary, not the user's command: the plugin (through squadrn-hook)
 // and the git hook shims run hooks through it, whatever the command is called.
-const hookUsage = "usage: squadrn hook guard-git [--no-ask] | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit\n" +
+const hookUsage = "usage: squadrn hook guard-git [--no-ask] | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change\n" +
 	"internal: the squadrn plugin (squadrn-hook) and git hooks run this through the installed binary"
 
 // runHook handles `squadrn hook …` and returns the exit code.
@@ -103,6 +103,13 @@ func runHook(args []string, h hookEnv) int {
 			return exitUsage
 		}
 		return h.limit()
+	case "config-change":
+		if len(args) != 1 {
+			_, _ = fmt.Fprintln(h.stderr, hookUsage)
+			return exitUsage
+		}
+		h.configChange()
+		return exitOK
 	case "-h", "--help", "help":
 		_, _ = fmt.Fprintln(h.stdout, hookUsage)
 		return exitOK
@@ -303,4 +310,36 @@ func desktopNotify(title, body string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, _ = proc.Output(ctx, proc.Options{}, argv[0], argv[1:]...)
+}
+
+// configChangeLog is the audit log of the strict profile's ConfigChange hook.
+const configChangeLog = "config-changes.log"
+
+// configChange records a settings change the agent CLI reports (strict profile): one JSON line
+// with the time, the config dir, the source and the file. It never blocks the change.
+func (h hookEnv) configChange() {
+	raw, _ := h.readInput()
+	var in struct {
+		Source   string `json:"source"`
+		FilePath string `json:"file_path"`
+	}
+	_ = json.Unmarshal(raw, &in)
+	home, err := config.Home()
+	if err != nil {
+		return
+	}
+	dir := config.DirsFor(home, config.Slug).State
+	if os.MkdirAll(dir, 0o700) != nil {
+		return
+	}
+	line, _ := json.Marshal(map[string]string{
+		"at": h.now().UTC().Format(time.RFC3339), "config_dir": os.Getenv(hookSpec().ConfigEnv),
+		"source": in.Source, "file": in.FilePath,
+	})
+	f, err := os.OpenFile(filepath.Join(dir, configChangeLog), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer func() { _ = f.Close() }()
+	_, _ = f.Write(append(line, '\n'))
 }

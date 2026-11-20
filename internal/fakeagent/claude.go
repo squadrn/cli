@@ -29,6 +29,8 @@ func Claude(args []string) int {
 	}
 	write := func(name, content string) { _ = os.WriteFile(file(name), []byte(content), 0o644) }
 	switch {
+	case cmd == "--version" && os.Getenv("FAKE_VERSION") != "":
+		fmt.Println(os.Getenv("FAKE_VERSION") + " (Claude Code)")
 	case cmd == "auth status":
 		if _, err := os.Stat(file(".loggedin")); err == nil {
 			fmt.Printf(`{"loggedIn":true,"email":"me@%s","orgName":"%s","subscriptionType":"%s"}`+"\n", filepath.Base(dir), read(".org"), read(".plan"))

@@ -3,14 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
@@ -70,9 +68,11 @@ func (a *app) accountRenameCmd() *cobra.Command {
 
 func (a *app) accountAdoptCmd() *cobra.Command {
 	var yes bool
+	var profile string
 	cmd := &cobra.Command{
 		Use:               "adopt [<provider>/]<name>",
-		Short:             "Make an existing config dir (e.g. ~/.claude-<name>) an account",
+		Short:             "Make an existing config dir (e.g. ~/.claude-<name>) an account and set it up",
+		Long:              "Make an existing config dir an account, then set it up like account add. Its own settings are\nkept: they become the account's copy, and keys that differ from main's stay as they are.",
 		Args:              oneArg,
 		ValidArgsFunction: a.completeUnmanaged,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -81,7 +81,7 @@ func (a *app) accountAdoptCmd() *cobra.Command {
 				return err
 			}
 			if a.store.Managed(acct) {
-				a.out("%s is already an account\n", acct.Label())
+				a.out("%s is already an account; to repair it: %s account add %s\n", acct.Label(), a.cmd, acct.Label())
 				return nil
 			}
 			if err := a.confirm(yes, "Manage %s as account %s (another tool may own it)", a.tilde(acct.Dir), acct.Label()); err != nil {
@@ -90,15 +90,12 @@ func (a *app) accountAdoptCmd() *cobra.Command {
 			if acct, err = a.store.Adopt(args[0]); err != nil {
 				return err
 			}
-			hint := a.cmd + " account add " + acct.Label()
-			if len(account.Provisioner{Store: a.store}.Conflicts(acct)) > 0 {
-				hint = a.relinkHint(acct) // it has its own copies: a plain add would keep them
-			}
-			a.out("adopted %s (%s); set it up from main with: %s\n", acct.Label(), a.tilde(acct.Dir), hint)
-			return nil
+			a.out("adopted %s (%s)\n", acct.Label(), a.tilde(acct.Dir))
+			return a.accountAdd(acct.Label(), addOptions{profile: profile, yes: yes})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask; use the defaults")
+	cmd.Flags().StringVar(&profile, "profile", "", "settings profile to apply (default: none, keep its settings)")
 	return cmd
 }
 
@@ -162,62 +159,6 @@ func (a *app) accountList(asJSON bool) error {
 	un, _ := a.store.Unmanaged()
 	for _, acct := range un {
 		a.out("unmanaged: %s (%s account adopt %s)\n", a.tilde(acct.Dir), a.cmd, acct.Label())
-	}
-	return nil
-}
-
-func (a *app) accountAddCmd() *cobra.Command {
-	var track, noTrack, relink, yes bool
-	cmd := &cobra.Command{
-		Use:     "add [<provider>/]<name>",
-		Short:   "Create or repair an account (shared links, allowlisted MCP, plugin)",
-		Example: fmt.Sprintf("  %[1]s account add work\n  %[1]s account add claude/work\n  %[1]s account add work --relink   link files the account has its own copy of (keeps a backup)", a.cmd),
-		Args:    oneArg,
-		RunE: func(_ *cobra.Command, args []string) error {
-			if track && noTrack {
-				return usagef("--usage and --no-usage cannot be combined")
-			}
-			var choice *bool
-			if track || noTrack {
-				choice = &track
-			}
-			return a.accountAdd(args[0], choice, relink, yes)
-		},
-		ValidArgsFunction: cobra.NoFileCompletions,
-	}
-	cmd.Flags().BoolVar(&track, "usage", false, "track usage limits in the status line without asking")
-	cmd.Flags().BoolVar(&noTrack, "no-usage", false, "do not track usage limits and do not ask")
-	cmd.Flags().BoolVar(&relink, "relink", false, "move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)")
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation with --relink")
-	return cmd
-}
-
-func (a *app) accountAdd(input string, trackUsage *bool, relink, yes bool) error {
-	acct, err := a.store.Define(input)
-	if err != nil {
-		return err
-	}
-	if fi, err := os.Stat(acct.Dir); err == nil && fi.IsDir() && !a.store.Managed(acct) {
-		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), config.Slug, a.cmd, input)
-	}
-	ag, err := a.agent(acct.Spec)
-	if err != nil {
-		return err
-	}
-	if relink {
-		if relink, err = a.confirmRelink(acct, ag, yes); err != nil {
-			return err
-		}
-	}
-	if err := a.provisionWith(acct, ag, relink); err != nil {
-		return err
-	}
-	a.cache.Forget(acct.Label())
-	if err := a.offerUsageTracking(acct, trackUsage); err != nil {
-		a.warnf("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
-	}
-	if s, err := ag.Auth(context.Background(), acct.ConfigDir()); err != nil || !s.LoggedIn {
-		a.out("next: %s account login %s\n", a.cmd, acct.Label())
 	}
 	return nil
 }

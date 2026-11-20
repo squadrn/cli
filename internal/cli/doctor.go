@@ -18,11 +18,20 @@ import (
 func (a *app) doctorCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
-		Use:   "doctor",
-		Short: "Check the install, the push guard, hooks and every account",
-		Args:  noArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Use:               "doctor [<account>]",
+		Short:             "Check the install, the push guard, hooks and every account (or one)",
+		Args:              optionalArg,
+		ValidArgsFunction: a.completeAccounts,
+		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
+			only := ""
+			if len(args) == 1 {
+				acct, err := a.store.Get(args[0])
+				if err != nil {
+					return err
+				}
+				only = acct.Label()
+			}
 			env := doctor.Env{
 				Store:     a.store,
 				Agent:     a.agent,
@@ -39,6 +48,7 @@ func (a *app) doctorCmd() *cobra.Command {
 				GitHint:   gitver.Hint(),
 				ConfigErr: a.cfgErr,
 				Usage:     a.usageTracking,
+				Only:      only,
 			}
 			if latest, ok := update.Available(Version, update.Load(a.updateStatePath()), a.cfg.Channel()); ok {
 				env.Latest = latest

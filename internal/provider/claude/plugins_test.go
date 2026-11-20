@@ -3,6 +3,8 @@ package claude
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -104,5 +106,39 @@ func TestMCP(t *testing.T) {
 	f.calls = nil
 	if err := addMCP(ctx, f, "", "cg", []byte(`{"command":"cg"}`)); err != nil || strings.Join(f.calls, ";") != `mcp add-json -s user cg {"command":"cg"}` {
 		t.Errorf("addMCP = %v (%v)", err, f.calls)
+	}
+}
+
+func TestFastPathsReadTheConfigDir(t *testing.T) {
+	dir := t.TempDir()
+	if pluginRegistered(dir) || mcpConfigured(dir, "x") {
+		t.Fatal("found state in an empty dir")
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "plugins"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for body, want := range map[string]bool{
+		`{"plugins":{"squadrn@squadrn":[{"scope":"user"}]}}`: true,
+		`{"plugins":{"squadrn@squadrn":[]}}`:                 false,
+		`{"plugins":{"other@x":[{}]}}`:                       false,
+		`not json`:                                           false,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, "plugins", "installed_plugins.json"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := pluginRegistered(dir); got != want {
+			t.Errorf("pluginRegistered(%s) = %v", body, got)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"mcpServers":{"x":{}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !mcpConfigured(dir, "x") || mcpConfigured(dir, "y") {
+		t.Error("mcpConfigured")
+	}
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+	if d, ok := configDirOrMain(""); !ok || d != filepath.Join(dir, ".claude") {
+		t.Errorf("configDirOrMain = %q", d)
 	}
 }

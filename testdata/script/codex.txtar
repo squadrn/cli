@@ -16,20 +16,28 @@ cp main-config.toml home/.codex/config.toml
 env SQUADRN_SHARED_MCP='docs secret absent'
 env SQUADRN_MARKETPLACE=$REPO_ROOT
 exec squadrn account add codex/work
-stdout '^account codex/work → ~/.codex-work$'
-stdout 'linked ~/.codex-work/AGENTS.md'
-stdout 'linked ~/.codex-work/skills/review'
-stdout 'mcp added docs'
-stdout 'mcp skipped secret'
-stdout 'mcp missing absent'
-stdout 'push guard hook installed and trusted \(codex\)'
-stdout 'next: srn account login codex/work'
+stdout '^Codex CLI .*· new account codex/work → ~/.codex-work$'
+stdout '^  shared         skills, AGENTS.md from codex/main$'
+stdout '^✓ created ~/.codex-work \(private\)$'
+stdout '^✓ settings from codex/main \+ standard profile$'
+stdout '^✓ mcp docs from codex/main$'
+stdout '^! mcp secret not copied'
+stdout '^! mcp absent is not configured in codex/main$'
+stdout '^✓ push guard: pre-tool hook \+ git pre-push$'
+stdout 'log in: srn account login codex/work'
 exists home/.codex-work/.squadrn-account
+exec sh -c 'ls -a home | grep -c tmp- || true'
+stdout '^0$'
+# The hook was trusted in the temp dir the account was built in; the trust moved with it.
+grep 'hooks.state."[^"]*/.codex-work/hooks.json:pre_tool_use' home/.codex-work/config.toml
+! grep 'tmp-' home/.codex-work/config.toml
+exists home/.codex-work/AGENTS.md
+exists home/.codex-work/skills/review
 grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
 grep '"matcher": "Bash"' home/.codex-work/hooks.json
 grep 'plugin/bin/squadrn-hook\\" guard-git --no-ask' home/.codex-work/hooks.json
 grep 'trusted_hash = "sha256:' home/.codex-work/config.toml
-grep 'cfg=.*/home/.codex-work args=mcp add docs -- npx -y @acme/docs-mcp' home/calls.log
+grep 'cfg=.*/home/.codex-work[^ ]* args=mcp add docs -- npx -y @acme/docs-mcp' home/calls.log
 # config.toml is the account's own copy, merged from main's: settings follow main, but MCP
 # servers, hooks and their trust, and the credentials store stay the account's.
 grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
@@ -41,13 +49,13 @@ exists home/.codex-work/.squadrn-managed.json
 # add is idempotent: nothing is re-installed or re-trusted.
 rm home/calls.log
 exec squadrn account add codex/work
-! stdout 'linked|mcp added|push guard'
+stdout 'codex/work is up to date'
 ! exists home/calls.log
 
 # A user's own hooks are kept; a changed guard hook is trusted again.
 cp user-hooks.json home/.codex-work/hooks.json
 exec squadrn account add codex/work
-stdout 'push guard hook installed and trusted'
+stdout '^✓ push guard: pre-tool hook \+ git pre-push$'
 grep 'my-linter' home/.codex-work/hooks.json
 grep 'squadrn-hook' home/.codex-work/hooks.json
 

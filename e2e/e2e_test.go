@@ -96,8 +96,8 @@ func testConfig(t *testing.T, s *sandbox) {
 }
 
 func testAccounts(t *testing.T, s *sandbox) {
-	s.srn(t, "account", "add", "work").exit(0).out(`^account claude/work → ~/.claude-work$`, `next: srn account login claude/work`)
-	s.srn(t, "account", "add", "work").exit(0).noOut(`plugin installed`)
+	s.srn(t, "account", "add", "work").exit(0).out(`· new account claude/work → ~/.claude-work$`, `^✓ created ~/.claude-work \(private\)$`, `log in: srn account login claude/work`)
+	s.srn(t, "account", "add", "work").exit(0).out(`claude/work is up to date`).noOut(`✓ push guard`)
 	s.srn(t, "account", "ls").exit(0).out(`^claude/main +yes +me@.claude `, `^claude/work +no `)
 	s.srn(t, "account", "login", "work").exit(0).out(`^logged in to claude/work as me@.claude-work$`)
 	s.srn(t, "account", "rename", "work", "job", "-y").exit(0).out(`renamed claude/work → claude/job`)
@@ -112,8 +112,8 @@ func testAccounts(t *testing.T, s *sandbox) {
 	write(t, filepath.Join(s.home, ".claude", "settings.json"), "{}\n")
 	s.srn(t, "account", "ls").exit(0).out(`unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)`)
 	s.srn(t, "account", "adopt", "tool").exit(2)
-	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `srn account add claude/tool`)
-	s.srn(t, "account", "add", "tool", "--relink", "--yes").exit(0).out(`^account claude/tool → ~/.claude-tool$`)
+	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `· claude/tool → ~/.claude-tool$`)
+	s.srn(t, "account", "add", "tool", "--relink", "--yes").exit(0).out(`· claude/tool → ~/.claude-tool$`)
 	s.srn(t, "account", "rm", "tool").exit(2)
 	s.srn(t, "account", "rm", "main", "--yes").exit(2)
 	s.srn(t, "account", "rm", "tool", "--yes").exit(0).out(`removed account claude/tool`)
@@ -356,8 +356,8 @@ func testGuard(t *testing.T, s *sandbox) {
 func testCodex(t *testing.T, s *sandbox) {
 	dir := filepath.Join(s.home, ".codex-work")
 	s.srn(t, "account", "add", "codex/work").exit(0).
-		out(`^account codex/work → ~/.codex-work$`, `push guard hook installed and trusted \(codex\)`, `next: srn account login codex/work`)
-	s.srn(t, "account", "add", "codex/work").exit(0).noOut(`push guard`)
+		out(`^Codex CLI .*· new account codex/work → ~/.codex-work$`, `^✓ push guard: pre-tool hook \+ git pre-push$`, `log in: srn account login codex/work`)
+	s.srn(t, "account", "add", "codex/work").exit(0).out(`codex/work is up to date`).noOut(`✓ push guard`)
 	cfg, _ := os.ReadFile(filepath.Join(dir, "config.toml"))
 	s.check(t, strings.Contains(string(cfg), `cli_auth_credentials_store = "file"`), "config.toml does not keep credentials in the account:\n%s", cfg)
 	s.check(t, strings.Contains(string(cfg), "trusted_hash"), "the guard hook is not trusted:\n%s", cfg)
@@ -425,7 +425,9 @@ func testDoctor(t *testing.T, s *sandbox) {
 		r.out(`✓ layer 1 \(pre-tool hook\) denies force pushes`).noOut(`✗`)
 	}
 	s.srn(t, "doctor", "--json").out(`"group": "push guard"`)
-	s.srn(t, "doctor", "extra").exit(2)
+	s.srn(t, "doctor", "codex/work").exit(0).out(`^account codex/work$`).noOut(`^account claude/`)
+	s.srn(t, "doctor", "ghost").exit(1)
+	s.srn(t, "doctor", "work", "extra").exit(2)
 }
 
 func testUpdate(t *testing.T, s *sandbox) {

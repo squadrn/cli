@@ -83,10 +83,14 @@ Every driver implements `Agent`; everything else is optional and found with a ty
 | `MCPLister` | `ListMCP`: main's servers when they are not in a JSON file (`Spec.MCPConfig` "") | — | ✓ (`codex mcp list --json`) |
 | `CredentialStore` | `CheckCredentials(configDir)`: the login stays in the account dir (doctor) | — | ✓ |
 | `Relocator` | `Relocate(oldDir, newDir)` | ✓ | ✓ (hook trust keys) |
-| `Versioner` | `Version(ctx)` (account add's plan line) | ✓ | ✓ |
-| `SettingsStore` | settings format, profile and onboarding seed (section 2) | ✓ JSON | ✓ TOML |
+| `SettingsFormat` (driver field) | `Decode`, `Encode`, `Deep` (section 2); `PrivateSettings`: keys never taken from main | ✓ JSON | ✓ TOML |
+| `Profiler` (driver field) | `Profile(name, options, ProfileContext)`: the profile's settings document (section 3) | ✓ | ✓ |
+| `Seeder` (driver field) | `Seed(home, dir)`: onboarding state for a new account | ✓ | — |
 | `StatusLine` (driver field) | `Command`, `SetCommand`, `Wrap`, `Unwrap`, `Shell`, `Parse`, `ParseLimit` | ✓ | — |
 | `RateLimits` | `RateLimits(ctx, configDir) (usage.Snapshot, error)`: usage on request | — | ✓ (`app-server`) |
+
+The CLI version comes from `<binary> --version` (`provider.ParseVersion`); no interface.
+`Spec.Credentials` names an account's credential file, which other accounts' profiles deny.
 
 `Caps` stays as data for what is decided without the CLI (worktree flag, swap, MCP sharing,
 usage reporting). Swap only moves conversations between accounts of one provider.
@@ -211,7 +215,8 @@ Codex CLI 0.171.0 · new account codex/work → ~/.codex-work
 ✓ settings from codex/main + standard profile
 ✓ push guard: pre-tool hook + git pre-push
 ✓ usage tracking on
-↗ opening login… logged in as you@example.com (ChatGPT Pro)
+↗ opening login…
+✓ logged in as you@example.com (Pro)
 done in 1.2s · start: srn work · check: srn doctor codex/work
 ```
 
@@ -224,9 +229,13 @@ change them.
 Targets: first add < 1.5 s, a re-run < 0.3 s (excluding login): CLI calls run in parallel, the
 plugin/MCP/auth state is read once and cached for the run.
 
-`account adopt` uses the same plan/apply/verify steps on an existing dir (its own settings become
-the account copy, recorded as user-owned, so nothing of it is overwritten); `--relink` is
-replaced by the settings sync and remains only for the linked content items.
+The login runs the CLI's own interactive flow, so its result is printed on the next line. A
+re-run repeats warnings (an MCP server it cannot copy) but only counts changes.
+
+`account adopt` marks the dir and runs the same flow on it (no temp dir; no profile unless
+`--profile`): its own settings become the account copy and keys that differ from main's are
+recorded as the user's, so nothing of it is overwritten. `--relink` remains for the linked
+content items only. `doctor <account>` checks one account.
 
 ### 5. `srn setup`
 

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/squadrn/squadrn/internal/provider"
@@ -14,6 +16,9 @@ import (
 const marketplace = "squadrn"
 
 func (c CLI) InstallPlugin(ctx context.Context, configDir, dir string) (bool, error) {
+	if pluginRegistered(configDir) {
+		return false, nil // account add re-runs stay fast: no CLI call when it is installed
+	}
 	return installPlugin(ctx, c, configDir, dir)
 }
 
@@ -32,7 +37,7 @@ func (c CLI) PluginState(ctx context.Context, configDir string) (installed, enab
 func (CLI) EnablePluginArgs() []string { return []string{"plugin", "enable", provider.Claude.Plugin} }
 
 func (c CLI) HasMCP(ctx context.Context, configDir, name string) bool {
-	return hasMCP(ctx, c, configDir, name)
+	return mcpConfigured(configDir, name) || hasMCP(ctx, c, configDir, name)
 }
 
 func (c CLI) AddMCP(ctx context.Context, configDir, name string, config []byte) error {
@@ -134,4 +139,58 @@ func listNames(ctx context.Context, r provider.Runner, configDir, field string, 
 		}
 	}
 	return set, nil
+}
+
+// configDirOrMain is the dir the CLI uses for configDir ("" is ~/.claude).
+func configDirOrMain(configDir string) (string, bool) {
+	if configDir != "" {
+		return configDir, true
+	}
+	home, err := os.UserHomeDir()
+	return filepath.Join(home, provider.Claude.MainDir), err == nil
+}
+
+// pluginRegistered reads Claude Code's plugin registry (internal: plugins/installed_plugins.json,
+// {"plugins": {"<id>": [...]}}) for the squadrn plugin. Anything unexpected means "ask the CLI".
+func pluginRegistered(configDir string) bool {
+	dir, ok := configDirOrMain(configDir)
+	if !ok {
+		return false
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "plugins", "installed_plugins.json"))
+	if err != nil {
+		return false
+	}
+	var reg struct {
+		Plugins map[string]json.RawMessage `json:"plugins"`
+	}
+	if json.Unmarshal(b, &reg) != nil {
+		return false
+	}
+	entry, ok := reg.Plugins[provider.Claude.Plugin]
+	var installs []json.RawMessage
+	return ok && json.Unmarshal(entry, &installs) == nil && len(installs) > 0
+}
+
+// mcpConfigured reads the user-scope MCP servers in the account's .claude.json (internal; the
+// main account's is ~/.claude.json). A miss falls back to the CLI.
+func mcpConfigured(configDir, name string) bool {
+	path := ""
+	if configDir != "" {
+		path = filepath.Join(configDir, provider.Claude.MCPConfig)
+	} else if home, err := os.UserHomeDir(); err == nil {
+		path = filepath.Join(home, provider.Claude.MCPConfig)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var doc struct {
+		MCPServers map[string]json.RawMessage `json:"mcpServers"`
+	}
+	if json.Unmarshal(b, &doc) != nil {
+		return false
+	}
+	_, ok := doc.MCPServers[name]
+	return ok
 }

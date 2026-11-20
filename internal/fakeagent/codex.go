@@ -31,7 +31,11 @@ func Codex(args []string) int {
 	loggedIn := func() bool { _, err := os.Stat(file(".loggedin")); return err == nil }
 	switch {
 	case cmd == "--version":
-		fmt.Println("codex-cli 0.171.0")
+		v := os.Getenv("FAKE_VERSION")
+		if v == "" {
+			v = "0.171.0"
+		}
+		fmt.Println("codex-cli " + v)
 	case cmd == "login status":
 		if loggedIn() {
 			fmt.Fprintln(os.Stderr, "Logged in using ChatGPT")

@@ -31,7 +31,8 @@ stdout '✗ agents is not linked to main  → srn account add claude/personal'
 stdout '! dangling link hooks  → srn account add claude/personal'
 stdout '[0-9]+ problem\(s\), [0-9]+ warning\(s\)$'
 exitcode 1 squadrn doctor
-exitcode 2 squadrn doctor extra
+exitcode 2 squadrn doctor a b
+exitcode 1 squadrn doctor ghost
 ! exec squadrn doctor --json
 stdout '"status": "fail"'
 stdout '"group": "push guard"'

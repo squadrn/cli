@@ -12,6 +12,7 @@
 //	FAKE_EXEC=<json array> run that command in the session's environment and directory and
 //	                      exit with its status (e.g. a git push through the guard)
 //	FAKE_LOGIN_FAILS=1    login does not log in
+//	FAKE_VERSION=<v>      --version prints that version
 //
 // See e2e/README.md for adding the fake of a new provider.
 package fakeagent

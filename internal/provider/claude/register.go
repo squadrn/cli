@@ -16,6 +16,8 @@ var (
 	_ provider.Relocator      = CLI{}
 	_ provider.StatusLine     = StatusLine{}
 	_ provider.SettingsFormat = Settings{}
+	_ provider.Profiler       = Profiles{}
+	_ provider.Seeder         = Profiles{}
 )
 
 func init() {
@@ -30,6 +32,8 @@ func init() {
 		},
 		StatusLine: StatusLine{},
 		Settings:   Settings{},
+		Profiles:   Profiles{},
+		Seed:       Profiles{},
 	})
 }
 

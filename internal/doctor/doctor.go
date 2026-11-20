@@ -84,6 +84,8 @@ type Env struct {
 	ConfigErr error
 	// Usage reports whether an account records its usage limits; nil skips the line.
 	Usage func(account.Account) bool
+	// Only limits the account checks to this account label; "" checks every account.
+	Only string
 }
 
 // Run performs every check. Account checks run concurrently.
@@ -509,6 +511,9 @@ func (e Env) accounts(ctx context.Context) []Check {
 	accts, err := e.Store.List()
 	if err != nil {
 		return []Check{bad("accounts", Fail, err.Error(), "")}
+	}
+	if e.Only != "" {
+		accts = slices.DeleteFunc(accts, func(a account.Account) bool { return a.Label() != e.Only })
 	}
 	per := make([][]Check, len(accts))
 	var wg sync.WaitGroup
