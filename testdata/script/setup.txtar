@@ -44,9 +44,15 @@ env XDG_STATE_HOME=$WORK/fresh/.local/state
 env XDG_CACHE_HOME=$WORK/fresh/.cache
 mkdir fresh/.claude fresh/.claude-old
 env SQUADRN_TEST_TTY=$WORK/answers
+env SQUADRN_TEST_VERSION=1.0.0
+env PATH=$WORK/fresh/.local/bin:$PATH
 release rel
-exec squadrn self-install rel --interactive --command srn
+exec $WORK/rel/squadrn self-install rel --interactive --command srn --alias sqx
 stdout 'installed squadrn'
+# Doctor checks the installed copy, not the unpacked release the installer runs.
+stderr '  ✓ installed release 1.0.0$'
+stderr '  ✓ srn on PATH$'
+! stderr 'different program'
 stderr '^set up squadrn \(every step can be skipped'
 stderr '  profiles       minimal   secrets denied$'
 stderr 'profile        minimal / standard / strict \[standard\]: '

@@ -73,6 +73,9 @@ type app struct {
 	backgroundCheck func()
 	// gitChecked: the Git version was checked in this run (openRepo).
 	gitChecked bool
+	// self overrides the program doctor compares the command names with: the installed binary
+	// when the installers run setup from the unpacked release.
+	self string
 }
 
 // Run executes squadrn with args (program name excluded) and returns the process exit code.

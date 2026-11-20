@@ -82,7 +82,7 @@ func (a *app) doctorEnv(only string) doctor.Env {
 		Layout:    a.layout,
 		Config:    a.cfg,
 		LookPath:  exec.LookPath,
-		Self:      selfPath(),
+		Self:      a.selfBinary(),
 		Names:     append([]string{a.cmd}, a.cfg.Aliases...),
 		Command:   a.cmd,
 		Timeout:   10 * time.Second,
@@ -108,6 +108,14 @@ func (a *app) doctorEnv(only string) doctor.Env {
 		}
 	}
 	return env
+}
+
+// selfBinary is the squadrn program the command names must reach.
+func (a *app) selfBinary() string {
+	if a.self != "" {
+		return a.self
+	}
+	return selfPath()
 }
 
 func (a *app) checks(only string) []doctor.Check {
