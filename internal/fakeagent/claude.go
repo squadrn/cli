@@ -61,7 +61,7 @@ func Claude(args []string) int {
 	case cmd == "plugin list --json":
 		cat(".plugins", "[]")
 	case strings.HasPrefix(cmd, "plugin install "):
-		write(".plugins", `[{"id":"squadrn@squadrn"}]`+"\n")
+		write(".plugins", `[{"id":"squadrn@squadrn","enabled":true}]`+"\n")
 	case strings.HasPrefix(cmd, "plugin uninstall "):
 		_ = os.Remove(file(".plugins"))
 		logCall("cfg=%s args=%s", cfg, cmd)
