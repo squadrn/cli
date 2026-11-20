@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -128,6 +130,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	now := a.now()
 	stop := a.spin(fmt.Sprintf("checking %d account(s)…", len(accts)))
 	statuses := a.statuses(accts, refresh)
+	a.queryUsage(accts, statuses)
 	stop()
 	rep := usageReport{Accounts: make([]usageRow, len(accts))}
 	cands := a.candidates(accts, statuses)
@@ -137,7 +140,7 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 		st, c, snap := statuses[i], cands[i], cands[i].Snapshot
 		r := usageRow{
 			Account: acct.Label(), Plan: st.Status.SubscriptionType, Org: st.Status.OrgName, Email: st.Status.Email,
-			State: c.State(now), Tracking: a.usageTracking(acct),
+			State: c.State(now), Tracking: acct.Spec.Caps.UsageQuery || a.usageTracking(acct),
 			FiveHour: snap.Five, SevenDay: snap.Seven, Spend: snap.Spend, ObservedAt: snap.ObservedAt,
 		}
 		if c.Metered {
@@ -170,6 +173,34 @@ func (a *app) usageReport(accts []account.Account, refresh bool) usageReport {
 	return rep
 }
 
+// usageQueryTimeout bounds reading one account's usage limits from its CLI.
+const usageQueryTimeout = 10 * time.Second
+
+// queryUsage reads the usage limits of logged-in accounts whose CLI reports them on request
+// (Caps.UsageQuery) and records them; an account that answers nothing keeps what was recorded.
+func (a *app) queryUsage(accts []account.Account, statuses []provider.AuthResult) {
+	var wg sync.WaitGroup
+	for i, acct := range accts {
+		st := statuses[i]
+		if !acct.Spec.Caps.UsageQuery || st.Err != nil || !st.Status.LoggedIn || st.Status.Metered() {
+			continue
+		}
+		ag, err := a.agent(acct.Spec)
+		rl, ok := ag.(provider.RateLimiter)
+		if err != nil || !ok {
+			continue
+		}
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), usageQueryTimeout)
+			defer cancel()
+			if snap, err := rl.RateLimits(ctx, acct.ConfigDir()); err == nil {
+				_, _, _ = a.usageStore().Record(acct.Provider, acct.Name, snap)
+			}
+		})
+	}
+	wg.Wait()
+}
+
 // candidates describes accts, with their login statuses, for usage.Rank.
 func (a *app) candidates(accts []account.Account, statuses []provider.AuthResult) []usage.Candidate {
 	cands := make([]usage.Candidate, len(accts))
@@ -179,7 +210,7 @@ func (a *app) candidates(accts []account.Account, statuses []provider.AuthResult
 		cands[i] = usage.Candidate{
 			Account: acct.Label(), Provider: acct.Provider,
 			LoggedIn: st.Err != nil || st.Status.LoggedIn, Metered: st.Status.Metered(),
-			Unsupported: !acct.Spec.Caps.UsageReport, Snapshot: snap,
+			Unsupported: !acct.Spec.Caps.UsageReport && !acct.Spec.Caps.UsageQuery, Snapshot: snap,
 		}
 	}
 	return cands

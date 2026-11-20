@@ -14,6 +14,7 @@ var (
 	_ provider.SettingsFormat  = Settings{}
 	_ provider.PrivateSettings = Settings{}
 	_ provider.Profiler        = Profiles{}
+	_ provider.RateLimiter     = CLI{}
 )
 
 func init() {

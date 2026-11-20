@@ -27,6 +27,8 @@ type Caps struct {
 	SharedMCP bool
 	// UsageReport: the CLI reports usage limits to squadrn (status line, limit hook).
 	UsageReport bool
+	// UsageQuery: squadrn reads usage limits from the CLI on request (RateLimiter).
+	UsageQuery bool
 }
 
 type Spec struct {
@@ -186,6 +188,11 @@ type MCP interface {
 // mcpServers form, for a CLI that keeps them elsewhere than a JSON file (Spec.MCPConfig "").
 type MCPLister interface {
 	ListMCP(ctx context.Context, configDir string) (map[string]json.RawMessage, error)
+}
+
+// RateLimiter reads an account's usage limits from the CLI on request (Caps.UsageQuery).
+type RateLimiter interface {
+	RateLimits(ctx context.Context, configDir string) (usage.Snapshot, error)
 }
 
 // CredentialStore checks that an account keeps its credentials in its own config dir (a CLI
@@ -369,7 +376,7 @@ var Codex = Spec{
 	SessionID:   regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
 	Credentials: "auth.json",
 	InstallHint: "npm install -g @openai/codex",
-	Caps:        Caps{Plugins: true, SharedMCP: true},
+	Caps:        Caps{Plugins: true, SharedMCP: true, UsageQuery: true},
 }
 
 var registry = []Spec{Claude, Codex}

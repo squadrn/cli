@@ -70,6 +70,16 @@ grep 'cfg=.*/home/.codex-work args=login$' home/calls.log
 exec squadrn account ls
 stdout '^codex/work +yes +me@.codex-work +~/.codex-work$'
 
+# usage reads the limits from the app server; none reported (or logged out) is no data.
+exec squadrn usage
+stdout '^codex/work .* nodata '
+cp limits.json home/.codex-work/.limits
+exec squadrn usage --refresh
+stdout '^codex/work +.* 42% .* 7% .*'
+! stdout 'not tracked: .*codex'
+exec squadrn usage --json
+stdout '"account": "codex/work"'
+
 # Sessions, resume and codex subcommands run as the account.
 exec squadrn codex/work
 stdout '^cfg=.*/home/.codex-work args=$'
@@ -139,6 +149,8 @@ grep 'cfg=.*/home/.codex-job args=logout$' home/calls.log
 -- mcplist.json --
 [{"name":"docs","enabled":true,"transport":{"type":"stdio","command":"npx","args":["-y","@acme/docs-mcp"],"env":null,"env_vars":[],"cwd":null}},
  {"name":"secret","enabled":true,"transport":{"type":"stdio","command":"srv","args":[],"env":{"TOKEN":"x"},"env_vars":[],"cwd":null}}]
+-- limits.json --
+{"rateLimits":{"limitId":"codex","primary":{"usedPercent":42,"windowDurationMins":300,"resetsAt":4102444800},"secondary":{"usedPercent":7,"windowDurationMins":10080,"resetsAt":4102444800}},"rateLimitsByLimitId":null}
 -- user-hooks.json --
 {
   "hooks": {
