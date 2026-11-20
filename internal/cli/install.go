@@ -140,6 +140,9 @@ func (a *app) installRelease(src, version string, nc nameChoice) error {
 		return err
 	}
 	a.cmd, a.cfg, a.cfgErr = cfg.Command, cfg, nil
+	if err := registerToastApp(); err != nil {
+		a.warnf("cannot register squadrn for desktop notifications: %v", err)
+	}
 	a.out("installed squadrn %s → %s\n", version, a.tilde(a.layout.Binary()))
 	if beta {
 		a.out("  pre-release: following the beta channel (back to stable: %s config set update_channel stable)\n", cfg.Command)

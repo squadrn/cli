@@ -120,6 +120,7 @@ Setup:
   config         Show settings; get or set one (command and aliases relink ~/.local/bin)
   doctor         Check the install, the push guard, hooks and every account (or one)
   help           Help about any command
+  notify         Check and test notifications (input needed, failed, done)
   self-uninstall Remove squadrn: plugin from every account, command links, completions, installed files
   self-update    Update squadrn and its plugin in every account
   setup          Guided first run: agent CLIs, default profile, existing accounts, usage tracking, doctor
@@ -1533,13 +1534,13 @@ complete -k -c srn -n '__srn_requires_order_preservation && __srn_prepare_comple
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Needs input'", "async": true }] }
+      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|auth_success|quota_auto_resume_fired|quota_auto_resume_stale|quota_auto_resume_disabled|plugin_notification", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify 'Done'", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
     ],
     "StopFailure": [
-      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" limit", "async": true }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/squadrn-hook\" notify", "async": true }] }
     ]
   }
 }

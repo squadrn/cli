@@ -86,6 +86,9 @@ type Env struct {
 	Usage func(account.Account) bool
 	// Only limits the account checks to this account label; "" checks every account.
 	Only string
+	// Notifier finds the desktop notifier: its name, what to know about it (or what to install
+	// when ok is false); nil skips the check.
+	Notifier func() (tool, note string, ok bool)
 }
 
 // Run performs every check. Account checks run concurrently.
@@ -95,6 +98,7 @@ func Run(ctx context.Context, e Env) []Check {
 	checks = append(checks, e.versions(ctx)...)
 	checks = append(checks, e.guard(ctx)...)
 	checks = append(checks, e.settings()...)
+	checks = append(checks, e.notifications()...)
 	checks = append(checks, e.accounts(ctx)...)
 	checks = append(checks, e.platform(ctx)...)
 	return checks
@@ -682,4 +686,23 @@ func (e Env) accountSettings(a account.Account, g string) []Check {
 		msg += "; changed here: " + strings.Join(own, ", ")
 	}
 	return []Check{ok(g, msg)}
+}
+
+// notifications reports how squadrn notifies (ADR 0012).
+func (e Env) notifications() []Check {
+	const g = "notifications"
+	switch {
+	case e.Notifier == nil:
+		return nil
+	case !e.Config.Notify.On():
+		return []Check{ok(g, "notifications off")}
+	}
+	tool, note, found := e.Notifier()
+	switch {
+	case !found:
+		return []Check{bad(g, Warn, "no desktop notifier", note)}
+	case note != "":
+		return []Check{bad(g, Warn, "desktop notifications via "+tool, note)}
+	}
+	return []Check{ok(g, "desktop notifications via "+tool)}
 }

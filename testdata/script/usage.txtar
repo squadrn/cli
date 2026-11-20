@@ -9,12 +9,6 @@ exec squadrn account add work --no-usage
 cp empty home/.claude-work/.loggedin
 cp acme home/.claude-work/.org
 
-# Fake notifiers record what the limit hook would show.
-cp notifier bin/osascript
-cp notifier bin/notify-send
-chmod 755 bin/osascript
-chmod 755 bin/notify-send
-
 # Without data nothing is an error.
 exec squadrn usage
 stdout '^ACCOUNT +PLAN +ORG +5H +RESETS +7D +RESETS +STATE +SEEN$'
@@ -93,13 +87,18 @@ exitcode 2 squadrn hook limit extra
 # A turn stopped by the usage limit is recorded and notified.
 exec sh -c 'sed "s#WORKDIR#$WORK#" limit.tmpl > limit.json'
 env CLAUDE_CONFIG_DIR=$HOME/.claude-work
+env SQUADRN_TEST_NOTIFY=$WORK/notified.txt
 stdin limit.json
 exec squadrn hook limit
 grep '"limited_session": "s2"' home/.local/state/squadrn/usage/claude-work.json
 grep '"reset_estimate"' home/.local/state/squadrn/usage/claude-work.json
-grep 'claude/work hit its usage limit \(resets (Mon |Tue |Wed |Thu |Fri |Sat |Sun )?15:45\) — srn swap' notified.txt
+grep '"title":"Claude Code · work · repo","body":"Usage limit · resets (Mon |Tue |Wed |Thu |Fri |Sat |Sun )?15:45 · srn swap"' notified.txt
+# Another error under the rc.3 hook is not a usage limit.
 stdin other-error.json
 exec squadrn hook limit
+grep '"body":"Stopped: server error"' notified.txt
+! grep '"limited_session": "s3"' home/.local/state/squadrn/usage/claude-work.json
+env SQUADRN_TEST_NOTIFY=
 env CLAUDE_CONFIG_DIR=
 
 # The table and JSON show the limit and the best account for the repository it happened in.
@@ -177,9 +176,6 @@ acme
   "model": "opus",
   "statusLine": {"type": "command", "command": "echo mine; printf '%s' x", "padding": 2}
 }
--- notifier --
-#!/bin/sh
-printf '%s\n' "$@" >> "$HOME/../notified.txt"
 -- status.json --
 {"session_id":"s1","cwd":"/repo","rate_limits":{"five_hour":{"used_percentage":42,"resets_at":4102444800},"seven_day":{"used_percentage":18.2,"resets_at":4102444800}}}
 -- nolimits.json --

@@ -16,6 +16,7 @@ import (
 	"github.com/BurntSushi/toml"
 
 	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/notify"
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
@@ -53,6 +54,8 @@ type Config struct {
 	UpdateCheck *bool `toml:"update_check,omitempty"`
 	// UpdateChannel is "stable" (default) or "beta" (also pre-releases).
 	UpdateChannel string `toml:"update_channel,omitempty"`
+	// Notify is the [notify] table: desktop, terminal and tmux notifications (ADR 0012).
+	Notify notify.Settings `toml:"notify,omitempty"`
 }
 
 // ProfileName is the profile new accounts get: default_profile, else provider.DefaultProfile.
@@ -191,6 +194,12 @@ func (c Config) Value(key string) (any, error) {
 		return c.GitHooksEnabled(), nil
 	case "update_check":
 		return c.UpdateCheckEnabled(), nil
+	case "notify.enabled":
+		return c.Notify.Enabled == nil || *c.Notify.Enabled, nil
+	case "notify.events":
+		return c.Notify.EventNames(), nil
+	case "notify.preview":
+		return c.Notify.Preview, nil
 	}
 	return c.Get(key)
 }
@@ -272,6 +281,9 @@ func (c Config) validate() error {
 			return fmt.Errorf("%w: protected_branches has an empty entry", ErrInvalidValue)
 		}
 	}
+	if err := c.Notify.Validate(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidValue, err)
+	}
 	return nil
 }
 
@@ -286,7 +298,10 @@ func Save(path string, c Config) error {
 }
 
 // Keys lists the settings `config get|set` accepts.
-var Keys = []string{"command", "aliases", "default_provider", "default_profile", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel"}
+var Keys = []string{
+	"command", "aliases", "default_provider", "default_profile", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel",
+	"notify.enabled", "notify.events", "notify.sound", "notify.when", "notify.quiet_hours", "notify.preview", "notify.method",
+}
 
 var (
 	ErrUnknownKey   = errors.New("unknown config key")
@@ -314,6 +329,20 @@ func (c Config) Get(key string) (string, error) {
 		return strconv.FormatBool(c.UpdateCheckEnabled()), nil
 	case "update_channel":
 		return c.Channel(), nil
+	case "notify.enabled":
+		return strconv.FormatBool(c.Notify.Enabled == nil || *c.Notify.Enabled), nil
+	case "notify.events":
+		return strings.Join(c.Notify.EventNames(), ","), nil
+	case "notify.sound":
+		return c.Notify.SoundName(), nil
+	case "notify.when":
+		return c.Notify.WhenName(), nil
+	case "notify.quiet_hours":
+		return c.Notify.QuietHours, nil
+	case "notify.preview":
+		return strconv.FormatBool(c.Notify.Preview), nil
+	case "notify.method":
+		return c.Notify.MethodName(), nil
 	}
 	return "", fmt.Errorf("%w %q (known: %s)", ErrUnknownKey, key, strings.Join(Keys, ", "))
 }
@@ -336,16 +365,31 @@ func (c *Config) Set(key, value string) error {
 		c.SharedMCP = list()
 	case "protected_branches":
 		c.ProtectedBranches = list()
-	case "git_hooks", "update_check":
+	case "git_hooks", "update_check", "notify.enabled", "notify.preview":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
 			return fmt.Errorf("%w: %s %q is not true or false", ErrInvalidValue, key, value)
 		}
-		if key == "git_hooks" {
+		switch key {
+		case "git_hooks":
 			c.GitHooks = &b
-		} else {
+		case "update_check":
 			c.UpdateCheck = &b
+		case "notify.enabled":
+			c.Notify.Enabled = &b
+		default:
+			c.Notify.Preview = b
 		}
+	case "notify.events":
+		c.Notify.Events = list()
+	case "notify.sound":
+		c.Notify.Sound = value
+	case "notify.when":
+		c.Notify.When = value
+	case "notify.quiet_hours":
+		c.Notify.QuietHours = value
+	case "notify.method":
+		c.Notify.Method = value
 	case "update_channel":
 		c.UpdateChannel = value
 	default:
