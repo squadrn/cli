@@ -35,13 +35,15 @@ stdout 'args=--worktree feat-a$'
 stderr 'not available on Windows'
 cd $WORK
 
-# Install: command names are copies listed in commands.json; hooks run through cmd.exe.
+# Install: command names are copies listed in commands.json; hooks start squadrn.exe directly
+# (exec form) and block the tool call when it cannot start.
 release rel
 exec squadrn self-install rel --alias sx
 exists home/.local/bin/srn.exe
 exists home/.local/bin/sx.exe
 exists home/.local/share/squadrn/commands.json
-grep 'cmd.exe' home/.local/share/squadrn/plugin/hooks/hooks.json
+grep '"onFailure": "block"' home/.local/share/squadrn/plugin/hooks/hooks.json
+! grep 'cmd.exe' home/.local/share/squadrn/plugin/hooks/hooks.json
 exists home/.local/share/squadrn/completion.ps1
 exec squadrn config set aliases ''
 ! exists home/.local/bin/sx.exe

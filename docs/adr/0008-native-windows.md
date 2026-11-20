@@ -88,10 +88,15 @@ platform.
    (stale guard code).
 3. **Plugin hooks on Windows: exec form, fail closed.** The Windows archive ships its own
    `plugin/hooks/hooks.json` (built, not rewritten at install) and no `sh` shim. Every hook
-   (PreToolUse, Notification, Stop, StopFailure) is exec form through `cmd.exe`, so a missing,
-   quarantined or blocked binary blocks the tool call instead of letting it through:
-   `cmd.exe /d /c "<plugin root>\..\bin\squadrn.exe" hook guard-git || exit /b 2`.
-   Install paths containing `% ^ & !` are refused. Unix keeps its shell-form `hooks.json` and `sh`
+   (PreToolUse, Notification, Stop, StopFailure) is exec form that starts squadrn.exe itself:
+   `"command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "guard-git"]`.
+   Claude Code spawns it with no shell and quotes each argument like Go and libuv do, so no
+   `cmd.exe /c "…"` line (cmd.exe misreads the backslash-escaped quotes and every tool call
+   was blocked). The guard hook fails closed with `"onFailure": "block"` (Claude Code 2.1.295 or
+   newer; `doctor` warns on older ones): a missing, quarantined or blocked binary blocks the tool
+   call. squadrn's marketplace is a local directory, so the plugin loads in place and
+   `${CLAUDE_PLUGIN_ROOT}\..\bin` is the installed binary's directory. Install paths containing
+   `% ^ & !` are refused (squadrn's own cleanup runs through `cmd.exe`). Unix keeps its shell-form `hooks.json` and `sh`
    shim. `doctor` *executes* the hook with a probe payload.
 4. **Push guard, layer 1.**
    - `hookInput` carries `tool_name`: missing → Bash parser; `PowerShell` → PowerShell analyser;
@@ -192,7 +197,7 @@ platform.
 Windows ships as a beta until these are done.
 
 1. **Real-machine checks** that need a logged-in Claude Code on Windows:
-   - S1: the exec-form hook through `cmd.exe` (quoting, `${CLAUDE_PLUGIN_ROOT}` expansion);
+   - S1: the exec-form hook in a real session (`${CLAUDE_PLUGIN_ROOT}` expansion, `onFailure`);
    - S2: the PowerShell tool's hook payload;
    - S3: `projects/` folder naming;
    - S5: picker keys in Windows Terminal and the classic console;

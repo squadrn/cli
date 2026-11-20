@@ -36,7 +36,8 @@ Check (-not (Test-Path "$bin\squadrn.exe")) "no squadrn.exe: --alias replaces th
 Check (Test-Path "$bin\sx.exe") "alias sx.exe"
 Check ((& "$bin\srn.exe" version) -eq "squadrn 1.0.0") "version through the copy"
 Check (Test-Path "$data\git-hooks\pre-push") "git hook shims"
-Check ((Get-Content "$data\plugin\hooks\hooks.json" -Raw) -match "cmd.exe") "windows hooks.json installed"
+$hooksJson = Get-Content "$data\plugin\hooks\hooks.json" -Raw
+Check (($hooksJson -match '"onFailure": "block"') -and ($hooksJson -notmatch "cmd.exe")) "windows hooks.json installed (exec form, fail closed)"
 
 $payload = '{"cwd":"' + ($root -replace '\\', '/') + '","tool_name":"PowerShell","tool_input":{"command":"& git push -f origin x"}}'
 $out = $payload | & "$data\bin\squadrn.exe" hook guard-git
