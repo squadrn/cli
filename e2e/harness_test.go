@@ -117,13 +117,15 @@ func newSandbox(t *testing.T) *sandbox {
 	realHome, _ := os.UserHomeDir()
 	s.path = []string{s.fakeBin, filepath.Join(s.home, ".local", "bin")}
 	if runtime.GOOS == "windows" {
-		// What a Git for Windows install puts on PATH; Git Bash (as in CI) puts mingw64\bin first.
+		// A Git for Windows install puts Git\cmd on PATH; Git Bash (CI's shell) puts its
+		// ucrt64\bin or mingw64\bin first, which is not what users' PowerShell sees.
 		if git, err := exec.LookPath("git"); err == nil {
-			root := filepath.Dir(filepath.Dir(git))
-			if filepath.Base(root) == "mingw64" {
-				root = filepath.Dir(root)
+			for dir := filepath.Dir(git); dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+				if fi, err := os.Stat(filepath.Join(dir, "cmd", "git.exe")); err == nil && !fi.IsDir() {
+					s.path = append(s.path, filepath.Join(dir, "cmd"))
+					break
+				}
 			}
-			s.path = append(s.path, filepath.Join(root, "cmd"))
 		}
 	}
 	for _, d := range filepath.SplitList(os.Getenv("PATH")) {
