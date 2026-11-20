@@ -49,7 +49,7 @@ func (s Store) Purge(a Account) error {
 // CheckPurge reports why Purge would refuse a: a main account, or a dir that is a link.
 func (s Store) CheckPurge(a Account) error {
 	if a.IsMain() {
-		return fmt.Errorf("%w %q: refusing to remove a provider's default account", ErrReserved, a.Label())
+		return MainError{a}
 	}
 	fi, err := os.Lstat(a.Dir)
 	if err != nil {

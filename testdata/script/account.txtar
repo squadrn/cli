@@ -164,6 +164,8 @@ mkdir home/.claude-work/plugins
 exec sh -c 'printf "{\"installPath\":\"%s/.claude-work/plugins/cache/x\"}" "$HOME" > home/.claude-work/plugins/installed_plugins.json'
 cp empty home/.claude-work/.loggedin
 exitcode 2 squadrn account rename work job
+! exec squadrn account rename work job
+stderr 'rename claude/work to claude/job; it will be logged out and has to log in again; re-run with --yes to confirm'
 mkdir home/.local/state/squadrn/usage
 cp settings.json home/.local/state/squadrn/usage/claude-work.json
 exec squadrn account rename work job -y
@@ -191,6 +193,9 @@ exitcode 2 squadrn account ls extra
 # rm without a terminal needs --yes; main can never be removed.
 exitcode 2 squadrn account rm work
 exitcode 2 squadrn account rm main --yes
+! exec squadrn account rm main --yes
+stderr 'claude/main is the main account \(~/.claude\) and cannot be removed'
+! stderr 'reserved'
 exec squadrn account rm claude/work --yes
 [darwin] stdout 'removed account claude/work \(moved to ~/.Trash/.claude-work-'
 [!darwin] stdout 'removed account claude/work \(moved to ~/.local/share/Trash/files/.claude-work-'

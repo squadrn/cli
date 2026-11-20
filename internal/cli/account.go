@@ -233,7 +233,7 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 	if err != nil {
 		return err
 	}
-	if err := a.confirm(yes, "Rename %s to %s; it is logged out and has to log in again", acct.Label(), to.Label()); err != nil {
+	if err := a.confirm(yes, "Rename %s to %s; it will be logged out and has to log in again", acct.Label(), to.Label()); err != nil {
 		return err
 	}
 	ag, err := a.agent(acct.Spec)
@@ -281,7 +281,7 @@ func (a *app) accountRmCmd() *cobra.Command {
 				return err
 			}
 			if acct.IsMain() {
-				return fmt.Errorf("%w: refusing to remove %s", account.ErrReserved, acct.Label())
+				return account.MainError{Account: acct}
 			}
 			if err := a.checkAccountFree(acct, force); err != nil {
 				return err

@@ -87,6 +87,14 @@ func ValidateName(name string) error {
 	return nil
 }
 
+// MainError refuses to remove a provider's main account; it counts as ErrReserved.
+type MainError struct{ Account Account }
+
+func (e MainError) Error() string {
+	return fmt.Sprintf("%s is the main account (~/%s) and cannot be removed", e.Account.Label(), filepath.ToSlash(e.Account.Spec.MainDir))
+}
+func (e MainError) Is(target error) bool { return target == ErrReserved }
+
 // NotFoundError carries the ref so callers can suggest how to create it.
 type NotFoundError struct{ Ref Ref }
 
@@ -332,7 +340,7 @@ func (s Store) candidates(spec provider.Spec) ([]string, error) {
 // the freedesktop trash it also writes the .trashinfo file desktop trash tools need to restore it.
 func (s Store) MoveToTrash(a Account, now time.Time) (string, error) {
 	if a.IsMain() {
-		return "", fmt.Errorf("%w %q: refusing to remove a provider's default account", ErrReserved, a.Label())
+		return "", MainError{a}
 	}
 	files, info := trashDirs(s.Home)
 	if err := os.MkdirAll(files, 0o700); err != nil {
