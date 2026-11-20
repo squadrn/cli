@@ -419,11 +419,7 @@ func testCodex(t *testing.T, s *sandbox) {
 	repo := s.repo(t)
 	payload := fmt.Sprintf(`{"session_id":"s","transcript_path":null,"cwd":%q,"hook_event_name":"PreToolUse","model":"m","permission_mode":"default","turn_id":"t","tool_name":"Bash","tool_use_id":"c","tool_input":{"command":"git push origin \"$BRANCH\""}}`, strings.ReplaceAll(repo, `\`, `/`))
 	s.run(t, opt{stdin: payload}, "srn", "hook", "guard-git", "--no-ask").exit(0).out(`"permissionDecision":"deny"`, `cannot ask for confirmation`)
-	if runtime.GOOS != "windows" {
-		shim := filepath.Join(s.home, ".local", "share", "squadrn", "plugin", "bin", "squadrn-hook")
-		s.check(t, strings.Contains(string(hooks), shim), "hooks.json does not run the installed shim %s:\n%s", shim, hooks)
-		s.run(t, opt{stdin: payload}, shim, "guard-git", "--no-ask").exit(0).out(`"permissionDecision":"deny"`)
-	}
+	s.codexHook(t, dir, payload).exit(0).out(`"permissionDecision":"deny"`)
 
 	// Layer 2 holds in Codex sessions too.
 	s.git(t, repo, "checkout", "-q", "-b", "feat-codex")
@@ -481,6 +477,52 @@ func testUninstall(t *testing.T, s *sandbox) {
 	}
 	b, _ := os.ReadFile(filepath.Join(s.home, ".claude", ".plugins"))
 	s.check(t, !strings.Contains(string(b), "squadrn@squadrn"), "plugin still registered in claude/main")
+}
+
+// codexHook runs the guard hook of the Codex account in dir with stdin as Codex 0.171 does
+// (codex-rs/hooks/src/engine/command_runner.rs): $SHELL -lc "<command>" on Unix, and on Windows
+// %COMSPEC% /C followed by the command in quotes, passed raw (no argument quoting). The command must
+// start the installed squadrn: the sh shim on Unix, squadrn.exe on Windows.
+func (s *sandbox) codexHook(t *testing.T, dir, stdin string) *result {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, "hooks.json"))
+	if err != nil {
+		s.fail(t, "codex hooks.json: %v", err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Matcher string      `json:"matcher"`
+			Hooks   []guardHook `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		s.fail(t, "codex hooks.json: %v", err)
+	}
+	var command string
+	for _, grp := range doc.Hooks["PreToolUse"] {
+		for _, h := range grp.Hooks {
+			if strings.Contains(h.Command, "guard-git --no-ask") {
+				s.check(t, grp.Matcher == "Bash", "the codex guard hook does not match Bash: %q", grp.Matcher)
+				command = h.Command
+			}
+		}
+	}
+	if command == "" {
+		s.fail(t, "codex hooks.json has no guard hook:\n%s", b)
+	}
+	share := filepath.Join(s.home, ".local", "share", "squadrn")
+	if runtime.GOOS != "windows" {
+		shim := filepath.Join(share, "plugin", "bin", "squadrn-hook")
+		s.check(t, strings.Contains(command, shim), "the codex hook does not run the installed shim %s: %s", shim, command)
+		return s.run(t, opt{stdin: stdin}, "sh", "-lc", command)
+	}
+	exe := filepath.Join(share, "bin", "squadrn.exe")
+	s.check(t, strings.Contains(command, exe), "the codex hook does not start the installed %s: %s", exe, command)
+	comspec := os.Getenv("COMSPEC")
+	if comspec == "" {
+		comspec = "cmd.exe"
+	}
+	return s.run(t, opt{stdin: stdin, cmdLine: comspec + ` /C "` + command + `"`}, comspec)
 }
 
 // guardHook is the PreToolUse entry of the installed plugin's hooks.json that runs guard-git.

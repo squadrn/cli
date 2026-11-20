@@ -312,7 +312,9 @@ process. Three layers keep agents from force-pushing or pushing to protected bra
    make git run a program or use another repository, and other GitHub writes; **allows** the
    rest. Any failure or timeout asks, never allows. Codex hooks cannot ask (Codex lets the
    command run), so for Codex accounts the guard denies instead and tells you to run the command
-   yourself.
+   yourself. On Windows Codex starts `squadrn.exe` through `cmd.exe` and lets the command run
+   when the hook cannot start or fails, so there layer 1 fails open for Codex (`doctor` says so);
+   layers 2 and 3 still hold.
 2. **git pre-push hook.** Sessions squadrn starts (`srn`, `wt`, `grid`, `swap`) get
    `core.hooksPath` pointed at `~/.local/share/squadrn/git-hooks` through `GIT_CONFIG_*`. Git's
    pre-push hook sees the exact refs, so pushes layer 1 cannot see (scripts, interpreters) are

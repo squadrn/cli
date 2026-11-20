@@ -231,6 +231,8 @@ type opt struct {
 	dir   string
 	stdin string
 	env   []string
+	// cmdLine (Windows) is the exact command line the process gets, without Go's quoting.
+	cmdLine string
 }
 
 type result struct {
@@ -249,6 +251,9 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.lookPath(name), args...)
 	cmd.Dir = o.dir
+	if o.cmdLine != "" {
+		setCmdLine(cmd, o.cmdLine)
+	}
 	if cmd.Dir == "" {
 		cmd.Dir = s.root
 	}

@@ -285,6 +285,17 @@ Package `internal/provider/codex`; `provider.Codex` is the spec.
   it: it fails the hook run and lets the call through. With `--no-ask` the guard therefore
   **denies** what it would ask about, and its reason tells the user to run the command
   themselves.
+- **Layer 1 on Windows.** Codex 0.171.0 runs a hook command through a shell: `$SHELL -lc
+  "<command>"` on Unix, `%COMSPEC% /C "<command>"` on Windows (`hooks/src/engine/command_runner.rs`;
+  the documented `commandWindows` override exists, the launch itself is not documented). The sh
+  shim cannot run under cmd.exe, so on Windows the command is `"<data dir>\bin\squadrn.exe" hook
+  guard-git --no-ask`, squadrn.exe started directly as the Claude Windows hooks do (#33); cmd.exe
+  drops the outer quotes `/C` adds, keeping the quoted path. A hook that cannot start, exits with
+  a code other than 0 or 2, or times out is a failed run and the tool call **goes through**
+  (`hooks/src/events/pre_tool_use.rs`; the docs leave it unstated), and Codex has no
+  fail-closed option like Claude Code's `onFailure: "block"`. On Unix a missing squadrn still
+  fails closed in the shim; on Windows layer 1 fails open, so `doctor` warns about it there:
+  layer 2 and the server's branch protection remain the boundary.
 - **Hook trust.** Codex runs a non-managed hook only once its exact definition is trusted.
   Managed hooks in `requirements.toml` are trusted by policy, but they live in a system location
   (root) and would apply to every account, so squadrn does not use them. Instead squadrn records

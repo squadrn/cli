@@ -216,8 +216,12 @@ var onFailureSince = [3]int{2, 1, 295}
 var leadingVersion = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
 
 // versionNotes warns when the Windows guard hook (exec form, fail closed through onFailure)
-// would fail open with this Claude Code.
+// would fail open with this Claude Code. Codex has no fail-closed option: a hook that cannot
+// start, fails or times out lets the tool call through (codex-rs hooks, 0.171.0).
 func versionNotes(spec provider.Spec, version string) []Check {
+	if spec.Binary == "codex" {
+		return []Check{bad("push guard", Warn, "Codex CLI lets a tool call through when the guard hook cannot start or fails (layer 1 fails open; layer 2 and the server's branch rules still apply)", "")}
+	}
 	if spec.Binary != "claude" {
 		return nil
 	}

@@ -23,9 +23,6 @@ import (
 
 const (
 	hooksFile = "hooks.json"
-	// hookEntry is the squadrn plugin's hook entry point, relative to the marketplace dir
-	// (.claude-plugin/marketplace.json: source ./plugin).
-	hookEntry = "plugin/bin/squadrn-hook"
 	// guardArgs: Codex hooks cannot ask (permissionDecision "ask" is not supported and lets the
 	// call through), so the guard denies what it would ask about.
 	guardArgs    = "guard-git --no-ask"
@@ -33,14 +30,10 @@ const (
 	trustTimeout = 15 * time.Second
 )
 
-// hookCommand is the hooks.json command running the guard from marketplace.
-func hookCommand(marketplace string) string {
-	return `"` + filepath.ToSlash(filepath.Join(marketplace, hookEntry)) + `" ` + guardArgs
-}
-
-// ours reports whether a hooks.json command is squadrn's guard, from any install location.
+// ours reports whether a hooks.json command is squadrn's guard, from any install location and
+// in either platform's form.
 func ours(cmd string) bool {
-	return strings.Contains(cmd, "squadrn-hook") && strings.Contains(cmd, "guard-git")
+	return (strings.Contains(cmd, "squadrn-hook") || strings.Contains(cmd, "squadrn.exe")) && strings.Contains(cmd, "guard-git")
 }
 
 // hookDoc is hooks.json; unknown fields are kept as they are.

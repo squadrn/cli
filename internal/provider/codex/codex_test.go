@@ -127,8 +127,8 @@ func TestEnsureFileStore(t *testing.T) {
 func TestSetGuardHook(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "hooks.json")
 	cmd := hookCommand("/opt/squadrn")
-	if cmd != `"/opt/squadrn/plugin/bin/squadrn-hook" guard-git --no-ask` {
-		t.Fatalf("command %s", cmd)
+	if !ours(cmd) {
+		t.Fatalf("command %s is not recognised as the guard", cmd)
 	}
 	user := `{"description":"mine","hooks":{"Stop":[{"hooks":[{"type":"command","command":"notify"}]}],
 "PreToolUse":[{"matcher":"apply_patch","hooks":[{"type":"command","command":"lint"}]},
