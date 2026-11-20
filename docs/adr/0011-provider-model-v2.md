@@ -257,6 +257,12 @@ Package `internal/provider/codex`; `provider.Codex` is the spec.
   `doctor` checks the setting (`CredentialStore`). Shared from main: `AGENTS.md`, `rules/` and
   `skills/` entry by entry, without `skills/.system`, which Codex installs and updates in every
   `CODEX_HOME` itself.
+- **Settings.** `config.toml` is the account's own copy, merged from main's (section 2; TOML,
+  deep tables `features`, `model_providers`, `profiles`, `projects`, `sandbox_workspace_write`,
+  `shell_environment_policy`, `tools`, `tui`). Three top-level keys are never taken from main
+  (`provider.PrivateSettings`): `mcp_servers`, which may carry tokens (`shared_mcp` copies the
+  allowlisted ones with `codex mcp add`), `hooks`, whose definitions and trust are keyed by the
+  account's own `hooks.json`, and `cli_auth_credentials_store`, which squadrn sets.
 - **Auth.** `codex login status` prints on stderr, "Logged in using ChatGPT" (or "an API key -
   sk-…", never kept) with exit 0, or "Not logged in" with exit 1. Output that is not recognised
   falls back to the exit status. The email, plan and workspace come from the app server's
