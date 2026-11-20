@@ -198,6 +198,13 @@ exec squadrn account logout codex/job
 stdout 'logged out codex/job'
 grep 'cfg=.*/home/.codex-job args=logout$' home/calls.log
 
+# self-uninstall takes the guard hook out of Codex accounts and says so in Codex's terms.
+exec squadrn self-uninstall --yes
+stdout '^  codex/job: push guard hook removed$'
+! stdout 'codex/job: plugin removed'
+! grep 'squadrn' home/.codex-job/hooks.json
+stdout '^  kept the accounts with their logins and conversations: .*~/.codex-job'
+
 -- empty --
 -- agents.md --
 # shared instructions

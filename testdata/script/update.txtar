@@ -235,6 +235,7 @@ exec squadrn self-uninstall --yes --purge
 stdout 'claude/main: plugin removed'
 stdout 'claude/personal: plugin removed'
 stdout 'removed ~/.local/bin/taken'
+stdout '^  kept the accounts with their logins and conversations: ~/.claude, ~/.claude-personal$'
 stdout 'squadrn is uninstalled'
 ! exists home/.local/share/squadrn
 ! exists home/.local/bin/taken

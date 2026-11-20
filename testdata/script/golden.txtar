@@ -594,7 +594,7 @@ Usage:
 
 Flags:
   -h, --help    help for self-uninstall
-      --purge   also remove the config, guard log and caches
+      --purge   also remove the config, guard log, caches and session registries (accounts stay)
   -y, --yes     do not ask for confirmation
 
 Global Flags:
