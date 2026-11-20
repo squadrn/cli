@@ -40,6 +40,8 @@ type Config struct {
 	Aliases []string `toml:"aliases,omitempty"`
 	// DefaultProvider resolves account refs without a provider (personal → claude/personal).
 	DefaultProvider string `toml:"default_provider,omitempty"`
+	// DefaultProfile is the settings profile new accounts get unless --profile names one.
+	DefaultProfile string `toml:"default_profile,omitempty"`
 	// SharedMCP lists user-scope MCP servers copied from a provider's main account into new accounts.
 	SharedMCP []string `toml:"shared_mcp,omitempty"`
 	// ProtectedBranches are branch globs agents must never push to directly. Repositories can only
@@ -51,6 +53,14 @@ type Config struct {
 	UpdateCheck *bool `toml:"update_check,omitempty"`
 	// UpdateChannel is "stable" (default) or "beta" (also pre-releases).
 	UpdateChannel string `toml:"update_channel,omitempty"`
+}
+
+// ProfileName is the profile new accounts get: default_profile, else provider.DefaultProfile.
+func (c Config) ProfileName() string {
+	if c.DefaultProfile == "" {
+		return provider.DefaultProfile
+	}
+	return c.DefaultProfile
 }
 
 // CommandName is the configured command, or DefaultCommand.
@@ -251,6 +261,9 @@ func (c Config) validate() error {
 			return fmt.Errorf("%w: unknown default_provider %q", ErrInvalidValue, c.DefaultProvider)
 		}
 	}
+	if c.DefaultProfile != "" && provider.ProfileSummary(c.DefaultProfile) == "" {
+		return fmt.Errorf("%w: unknown default_profile %q", ErrInvalidValue, c.DefaultProfile)
+	}
 	if c.UpdateChannel != "" && c.UpdateChannel != Stable && c.UpdateChannel != Beta {
 		return fmt.Errorf("%w: update_channel %q is not stable or beta", ErrInvalidValue, c.UpdateChannel)
 	}
@@ -273,7 +286,7 @@ func Save(path string, c Config) error {
 }
 
 // Keys lists the settings `config get|set` accepts.
-var Keys = []string{"command", "aliases", "default_provider", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel"}
+var Keys = []string{"command", "aliases", "default_provider", "default_profile", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel"}
 
 var (
 	ErrUnknownKey   = errors.New("unknown config key")
@@ -289,6 +302,8 @@ func (c Config) Get(key string) (string, error) {
 		return strings.Join(c.Aliases, ","), nil
 	case "default_provider":
 		return c.DefaultProvider, nil
+	case "default_profile":
+		return c.ProfileName(), nil
 	case "shared_mcp":
 		return strings.Join(c.SharedMCP, ","), nil
 	case "protected_branches":
@@ -315,6 +330,8 @@ func (c *Config) Set(key, value string) error {
 		c.Aliases = list()
 	case "default_provider":
 		c.DefaultProvider = value
+	case "default_profile":
+		c.DefaultProfile = value
 	case "shared_mcp":
 		c.SharedMCP = list()
 	case "protected_branches":

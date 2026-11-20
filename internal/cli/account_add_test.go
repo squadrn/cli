@@ -17,12 +17,12 @@ func TestAskProfileAndYes(t *testing.T) {
 		"\n": provider.DefaultProfile, "strict\n": "strict", "mi\n": "minimal", "bogus\nst\n": "standard",
 		"": provider.DefaultProfile,
 	} {
-		got, err := a.askProfile(bufio.NewReader(strings.NewReader(input)))
+		got, err := a.askProfile(bufio.NewReader(strings.NewReader(input)), provider.DefaultProfile)
 		if err != nil || got != want {
 			t.Errorf("askProfile(%q) = %q, %v; want %q", input, got, err, want)
 		}
 	}
-	if _, err := a.askProfile(bufio.NewReader(strings.NewReader("bogus"))); err == nil {
+	if _, err := a.askProfile(bufio.NewReader(strings.NewReader("bogus")), provider.DefaultProfile); err == nil {
 		t.Error("an unknown profile at EOF was accepted")
 	}
 	if !strings.Contains(errOut.String(), "profile        minimal / standard / strict [standard]: ") {

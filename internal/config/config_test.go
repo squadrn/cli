@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -258,5 +259,18 @@ func TestReadOrEmpty(t *testing.T) {
 	}
 	if _, _, err := ReadOrEmpty(path); err == nil {
 		t.Fatal("an invalid config must be an error")
+	}
+}
+
+func TestDefaultProfile(t *testing.T) {
+	var c Config
+	if v, _ := c.Get("default_profile"); v != "standard" {
+		t.Errorf("default = %q", v)
+	}
+	if err := c.Set("default_profile", "strict"); err != nil || c.ProfileName() != "strict" {
+		t.Errorf("set strict: %v", err)
+	}
+	if err := c.Set("default_profile", "lax"); !errors.Is(err, ErrInvalidValue) {
+		t.Errorf("set lax: %v", err)
 	}
 }
