@@ -8,7 +8,7 @@ import "path/filepath"
 // (.claude-plugin/marketplace.json: source ./plugin). Codex runs hook commands with $SHELL -lc.
 const hookEntry = "plugin/bin/squadrn-hook"
 
-// hookCommand is the hooks.json command running the guard from marketplace.
-func hookCommand(marketplace string) string {
-	return `"` + filepath.ToSlash(filepath.Join(marketplace, hookEntry)) + `" ` + guardArgs
+// hookCommand is the hooks.json command running squadrn's hook args from marketplace.
+func hookCommand(marketplace, args string) string {
+	return `"` + filepath.ToSlash(filepath.Join(marketplace, hookEntry)) + `" ` + args
 }

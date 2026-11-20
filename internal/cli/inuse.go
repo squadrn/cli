@@ -20,9 +20,6 @@ import (
 // release runs only when the session returns (Windows) or fails to start.
 func (a *app) markInUse(acct account.Account, wt string) (release func()) {
 	var dirs []string
-	if inuse.Acquire(acct.Dir, inuse.Entry{Account: acct.Label()}) == nil {
-		dirs = append(dirs, acct.Dir)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cwd, err := os.Getwd()
@@ -30,11 +27,18 @@ func (a *app) markInUse(acct account.Account, wt string) (release func()) {
 	if err == nil {
 		top = worktree.Toplevel(ctx, cwd)
 	}
+	session := cwd
+	if top != "" && wt != "" {
+		session = filepath.Join(top, acct.Spec.WorktreeDir, wt)
+	}
+	if inuse.Acquire(acct.Dir, inuse.Entry{Account: acct.Label(), Cwd: session}) == nil {
+		dirs = append(dirs, acct.Dir)
+	}
 	if top != "" && worktree.Exclude(ctx, top, inuse.Dir+"/") == nil {
 		dir, e := top, inuse.Entry{Account: acct.Label()}
 		if wt != "" {
-			if p := filepath.Join(top, acct.Spec.WorktreeDir, wt); fsx.IsDir(p) {
-				dir = p
+			if fsx.IsDir(session) {
+				dir = session
 			} else {
 				e.Worktree = wt // created by the agent CLI once it runs
 			}

@@ -306,36 +306,12 @@ func (a *app) psCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "ps",
-		Short: "List running agents: session, account, worktree",
+		Short: "List running agents: account, worktree, state, where",
 		Example: examples(a.cmd,
-			"ps", "agents running in grids",
+			"ps", "agents running in grids and terminals",
 			"ps --json", "the same as JSON"),
 		Args: noArgs,
-		RunE: func(*cobra.Command, []string) error {
-			if err := a.requireTmux("ps"); err != nil {
-				return err
-			}
-			panes, err := grid.Tmux{}.Panes(context.Background(), "")
-			if err != nil {
-				return err
-			}
-			if asJSON {
-				if panes == nil {
-					panes = []grid.Pane{}
-				}
-				return a.printJSON(panes)
-			}
-			if len(panes) == 0 {
-				a.out("no running agents\n")
-				return nil
-			}
-			w := tabwriter.NewWriter(a.stdout, 0, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "SESSION\tACCOUNT\tWORKTREE\tPROCESS")
-			for _, p := range panes {
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Session, p.Account, p.Name, p.Command)
-			}
-			return w.Flush()
-		},
+		RunE: func(*cobra.Command, []string) error { return a.ps(asJSON) },
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
 	return cmd

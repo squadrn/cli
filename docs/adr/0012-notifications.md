@@ -67,13 +67,45 @@ failed) is logged in `state/notify.log` (titles only, rotated at 128 KiB).
 | Windows | Windows PowerShell 5.1 (`powershell.exe`, which can load WinRT) shows a `ToastGeneric` toast through `ToastNotificationManager.CreateToastNotifier("Squadrn")`; the text comes from environment variables into XML text nodes; tag and group replace per session. `self-install` registers the AppUserModelID under `HKCU\Software\Classes\AppUserModelId\Squadrn` (`DisplayName`); `self-uninstall` removes it |
 
 **Settings** (`[notify]` in `config.toml`, `config get|set notify.<key>`): `enabled`, `events`,
-`sound`, `when`, `quiet_hours`, `preview`, `method` (`auto`, `desktop`, `off`; `terminal` and
-`tmux` follow with the terminal and tmux channels). Invalid values are errors like any setting.
+`sound`, `when`, `quiet_hours`, `preview`, `method` (`auto`, `terminal`, `desktop`, `tmux`,
+`off`). Invalid values are errors like any setting.
+
+**Terminal channel.** The Notification and StopFailure hooks run synchronously (`hook notify
+--terminal`, 5 s timeout) so they can answer `{"terminalSequence": "…"}`: OSC 9 for iTerm2 and
+WezTerm, OSC 777 for Ghostty and Warp, OSC 99 for kitty (from `TERM_PROGRAM`, `KITTY_WINDOW_ID`),
+a BEL after it when the kind sounds; control characters are dropped from the text. With method
+`auto` the sequence replaces the desktop notification outside tmux only (inside, tmux would need
+`allow-passthrough`). Stop and the working hooks stay async and use the desktop. Windows hooks stay
+async (no terminal channel there yet).
+
+**Agent state and tmux.** UserPromptSubmit and PostToolUse (async) mark the session `working`;
+the kinds above mark it `input`, `failed` or `done`. The state of each session (account, cwd, tmux
+pane and socket, terminal bundle id) is kept in `state/notify.json` (written only on change,
+pruned after 24 h) and set as the pane option `@squadrn_state`; a grid's `pane-border-format`
+colours it. `input` and `failed` ring the bell on the pane's tty (tmux flags the window). `srn
+ps` lists every running agent: grid panes, panes that reported a state, and sessions in the in-use
+registry (now with their cwd), so a plain-terminal session shows too. `srn next` jumps to the
+first pane in `input`, else `failed` (switches the client inside tmux, attaches outside). The
+desktop notification's click action (`terminal-notifier -execute`) runs the hidden `srn focus
+<session>`: select the recorded pane, switch the most recently active client to it, then `open -b`
+the terminal app. Session ids are accepted only as plain tokens.
 
 **Agent-native notifications.** While squadrn's notifications are on, every account profile
 sets Claude Code's `preferredNotifChannel` to `notifications_disabled` (a profile key: the
 user's own value in an account wins, ADR 0011). Main's settings are the user's and are not
 changed.
+
+**Codex.** Codex's hooks.json gets squadrn's `PermissionRequest` (→ `input`, the tool from
+`tool_name`), `UserPromptSubmit` and `PostToolUse` (→ working) and `Stop` (→ `done` unless
+`stop_hook_active`; it prints `{}`, since Codex reads a Stop hook's stdout as JSON) next to the
+guard, all running `hook notify --agent codex` and trusted through the app server like the guard
+(each hook has its own key and hash). The account profile sets the root key `notify =
+["<squadrn>", "hook", "notify", "--agent", "codex"]`: Codex appends the `agent-turn-complete`
+JSON as the last argument (→ `done`, `thread-id`/`turn-id` as session and turn), so a turn still
+notifies when hooks are not trusted; when both fire, the policy's same-turn and 30 s rules leave
+one. The profile also sets `[tui] notifications = false`. Both are profile keys: the user's own
+values in an account win. `self-update` adds the new hooks to existing accounts' hooks.json and
+trusts them; the profile keys follow on the next `account add`.
 
 **Commands.** `srn notify status` (settings, the notifier found and its caveats, focus sources,
 the last five outcomes), `srn notify test [input|failed|done]` (sends one through the same
@@ -89,6 +121,8 @@ through the same path (the title argument is ignored, the event comes from the i
 - `terminal-notifier` is recommended on macOS, not required; a signed helper app (own icon,
   click actions without Homebrew) is left for later.
 - The ADR 0008 row "Desktop notifications: no-op" on Windows is superseded.
-- Planned in the same model: the terminal channel (sync hooks answering `terminalSequence`),
-  tmux pane state, `srn next` and `srn focus` (click to focus), and Codex (`notify` program and
-  `PermissionRequest` hook).
+- Two hook runs more per turn (prompt, each tool): async, and they write state only when it
+  changes.
+- `next` and `focus` are reserved account names.
+- Codex runs its hooks synchronously; the prompt and tool hooks return after a state check and
+  write only on change, and the desktop delivery is detached as for Claude Code.

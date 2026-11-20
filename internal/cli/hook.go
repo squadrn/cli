@@ -60,7 +60,7 @@ func (h hookEnv) readInput() ([]byte, error) {
 // squadrn-hook) and the git hook shims run them through the installed binary whatever it is called.
 func hookUsage() string {
 	cfg, _ := config.Load()
-	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] | notify | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
+	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] | notify [--terminal] [--agent <provider>] [<payload>] | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
 		"internal: the " + config.Slug + " plugin (squadrn-hook) and git hooks run this through the installed binary"
 }
 
@@ -86,13 +86,21 @@ func runHook(args []string, h hookEnv) int {
 		h.guardGit(noAsk)
 		return exitOK
 	case "notify":
-		// The rc.3 plugin passed a title (notify 'Done'); the event now comes from the input.
-		if len(args) > 2 {
+		n, ok := parseNotifyArgs(args[1:])
+		if !ok {
 			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
-		raw, _ := h.readInput()
-		h.notifyEvent(hookSpec(), raw)
+		raw := []byte(n.payload)
+		if n.payload == "" {
+			raw, _ = h.readInput()
+		}
+		if seq := h.notifyEvent(n.spec, raw, n.terminal); seq != "" {
+			b, _ := json.Marshal(map[string]string{"terminalSequence": seq})
+			_, _ = fmt.Fprintln(h.stdout, string(b))
+		} else if r := hookReply(n.spec, raw); r != "" {
+			_, _ = fmt.Fprintln(h.stdout, r)
+		}
 		return exitOK
 	case "deliver":
 		if len(args) != 2 {

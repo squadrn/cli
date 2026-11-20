@@ -5,7 +5,7 @@ package codex
 import "testing"
 
 func TestHookCommandWindows(t *testing.T) {
-	cmd := hookCommand(`C:\Users\me\.local\share\squadrn`)
+	cmd := hookCommand(`C:\Users\me\.local\share\squadrn`, guardArgs)
 	if cmd != `"C:\Users\me\.local\share\squadrn\bin\squadrn.exe" hook guard-git --no-ask` {
 		t.Fatalf("command %s", cmd)
 	}

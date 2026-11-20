@@ -35,8 +35,8 @@ var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,23}$`)
 // `squadrn <word> ...` runs the subcommand. A provider CLI's subcommands can: an account of that
 // name is matched before the subcommand is passed through (ADR 0011).
 var Commands = []string{
-	"account", "completion", "config", "deps", "doctor", "gc", "grid", "help", "hook", "ps",
-	"notify", "self-install", "self-uninstall", "self-update", "setup", "swap", "usage", "version", "wt",
+	"account", "completion", "config", "deps", "doctor", "focus", "gc", "grid", "help", "hook", "next",
+	"notify", "ps", "self-install", "self-uninstall", "self-update", "setup", "swap", "usage", "version", "wt",
 }
 
 func reserved(name string) bool { return slices.Contains(Commands, name) }

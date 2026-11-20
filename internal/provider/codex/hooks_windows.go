@@ -9,7 +9,7 @@ import "path/filepath"
 // drops the outer quotes, so the quoted path survives; the sh shim cannot run there.
 const hookExe = `bin\squadrn.exe`
 
-// hookCommand is the hooks.json command running the guard from marketplace.
-func hookCommand(marketplace string) string {
-	return `"` + filepath.Join(marketplace, hookExe) + `" hook ` + guardArgs
+// hookCommand is the hooks.json command running squadrn's hook args from marketplace.
+func hookCommand(marketplace, args string) string {
+	return `"` + filepath.Join(marketplace, hookExe) + `" hook ` + args
 }

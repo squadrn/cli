@@ -96,3 +96,6 @@ func focusSources() string { return "tmux pane in view (inside tmux); unknown ou
 // registerToastApp and unregisterToastApp: only Windows registers an app id for notifications.
 func registerToastApp() error   { return nil }
 func unregisterToastApp() error { return nil }
+
+// activateApp: only macOS brings a terminal app forward.
+func activateApp(context.Context, string) error { return nil }

@@ -25,10 +25,10 @@ exec sh -c 'tmux list-panes -s -t srn-repo | wc -l'
 stdout '^ *3$'
 
 exec squadrn ps
-stdout '^SESSION +ACCOUNT +WORKTREE +PROCESS$'
-stdout '^srn-repo +claude/main +feat-a '
-stdout '^srn-repo +claude/personal +fix-b '
-stdout '^srn-repo +claude/main +chore-c '
+stdout '^ACCOUNT +WORKTREE +STATE +SESSION +PROCESS$'
+stdout '^claude/main +feat-a +- +srn-repo %[0-9]+ '
+stdout '^claude/personal +fix-b +- +srn-repo %[0-9]+ '
+stdout '^claude/main +chore-c +- +srn-repo %[0-9]+ '
 
 ! exec squadrn grid attach repo
 stderr '^srn: grid attach needs a terminal; run it in one: tmux attach -t srn-repo$'

@@ -349,6 +349,12 @@ type HookEvents interface {
 	ParseEvent(raw []byte) (notify.Event, error)
 }
 
+// HookReplier is HookEvents of a CLI that expects output from some of those hooks (Codex
+// reads a Stop hook's stdout as JSON): HookReply is what the hook prints for raw, "" for nothing.
+type HookReplier interface {
+	HookReply(raw []byte) string
+}
+
 var Claude = Spec{
 	ID:        "claude",
 	Name:      "Claude Code",

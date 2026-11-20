@@ -7,7 +7,7 @@ import (
 )
 
 // Events maps Claude Code's Notification, Stop and StopFailure hook input to notification
-// events (hooks reference, checked against Claude Code 2.1.329; ADR 0012).
+// events, and UserPromptSubmit and PostToolUse to a working agent (hooks reference, checked against Claude Code 2.1.329; ADR 0012).
 type Events struct{}
 
 type hookEvent struct {
@@ -61,7 +61,11 @@ func (Events) ParseEvent(raw []byte) (notify.Event, error) {
 		// is not done yet.
 		if !in.StopHookActive && len(in.BackgroundTasks) == 0 && len(in.SessionCrons) == 0 {
 			e.Kind, e.Message = notify.Done, in.LastAssistant
+		} else {
+			e.Busy = true
 		}
+	case "UserPromptSubmit", "PostToolUse":
+		e.Busy = true
 	case "StopFailure":
 		e.Kind, e.Reason = notify.Failed, in.Error
 	}

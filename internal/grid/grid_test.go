@@ -156,7 +156,7 @@ func TestSessionsAndPanes(t *testing.T) {
 			if args[1] == "-a" {
 				return "plain\nsrn-app\nsrn-app\nsrn-app\nodd\\|name", nil
 			}
-			return "%1|srn-app|claude/main|feat-a|claude\n%2|srn-app|||zsh", nil
+			return "%1|srn-app|claude/main|feat-a|claude|41|input|/r/app/.claude/worktrees/feat-a\n%2|srn-app|||zsh|42||/r/app\n%3|other|||claude|43|done|/r/x\nshort|line", nil
 		}
 		return "", errors.New("unexpected")
 	}}
@@ -167,8 +167,11 @@ func TestSessionsAndPanes(t *testing.T) {
 		t.Fatalf("Sessions = %+v, %v", ss, err)
 	}
 	ps, err := tm.Panes(context.Background(), "srn-app")
-	if err != nil || len(ps) != 1 || ps[0].Name != "feat-a" {
+	if err != nil || len(ps) != 1 || ps[0] != (Pane{ID: "%1", Session: "srn-app", Account: "claude/main", Name: "feat-a", Command: "claude", PID: 41, State: "input", Path: "/r/app/.claude/worktrees/feat-a"}) {
 		t.Fatalf("Panes = %+v, %v", ps, err)
+	}
+	if ps, err := tm.StatePanes(context.Background()); err != nil || len(ps) != 2 || ps[1].ID != "%3" || ps[1].State != "done" {
+		t.Fatalf("StatePanes = %+v, %v", ps, err)
 	}
 	if err := tm.Kill(context.Background(), "srn-app"); err == nil {
 		t.Fatal("Kill error not returned")

@@ -303,7 +303,8 @@ srn grid ~/repo feat-a claude/personal:fix-b         # account as provider/name
 srn grid ~/repo feat-1 feat-2 feat-3 --spread        # spread over logged-in accounts
 srn grid ~/repo personal:chore-c                     # add a pane to the running grid
 srn grid ls | attach [repo] | stop [repo]            # manage running grids
-srn ps [--json]                                      # which agent runs as which account
+srn ps [--json]                                      # every running agent: account, worktree, state
+srn next                                             # jump to the tmux pane that waits for you
 srn deps feat-a                                      # install dependencies (exit status passes through)
 srn gc [--json]                                      # merged/empty worktrees; --yes removes them
 srn gc --yes --force                                 # also those git refuses (submodules)
@@ -347,9 +348,22 @@ srn config set notify.enabled false
 | Linux | `notify-send` (libnotify), else `gdbus`; `input` is urgent and stays until dismissed |
 | Windows | a toast through Windows PowerShell 5.1, under the app id `Squadrn` registered by `self-install` |
 
+Terminals that show notifications themselves get them from the agent instead of the desktop:
+iTerm2 and WezTerm (OSC 9), Ghostty and Warp (OSC 777), kitty (OSC 99), for `input` and `failed`
+outside tmux. In tmux, each agent's pane records its state (`working`, `input`, `failed`, `done`;
+a grid's pane border shows it), the bell rings for `input` and `failed`, `srn ps` lists the state
+and `srn next` jumps to the first pane that needs input, else the first that failed. With
+`terminal-notifier`, a click on a notification switches tmux to the session's pane and brings its
+terminal forward. `notify.method` picks one channel: `terminal`, `desktop`, `tmux` (default `auto`).
+
 Do Not Disturb and Focus modes apply as for any app. While squadrn's notifications are on, account
 profiles turn Claude Code's own off (`preferredNotifChannel: "notifications_disabled"`), so you do
-not get both; your own value in an account's `settings.json` wins. Deliveries are logged (titles,
+not get both; your own value in an account's `settings.json` wins.
+
+Codex accounts get the same notifications: approvals from a `PermissionRequest` hook, finished
+turns from the `Stop` hook and Codex's `notify` program, the agent's state from its prompt and tool
+hooks. `srn account add codex/<name>` installs and trusts these hooks like the push guard and sets
+`notify` and `[tui] notifications = false` in the account's `config.toml` (your own values win). Deliveries are logged (titles,
 never agent text) in `~/.local/state/squadrn/notify.log`.
 
 ## Git push guard

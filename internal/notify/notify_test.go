@@ -351,3 +351,68 @@ func TestStore(t *testing.T) {
 		t.Errorf("after rotation = %+v", got)
 	}
 }
+
+func TestRoute(t *testing.T) {
+	for _, tc := range []struct {
+		method         string
+		k              Kind
+		terminal, tmux bool
+		want           Channels
+	}{
+		{"", Done, false, false, Channels{Desktop: true}},
+		{"", Done, true, false, Channels{Terminal: true}},
+		{"", Input, true, true, Channels{Desktop: true, Bell: true}},
+		{"", Done, false, true, Channels{Desktop: true}},
+		{MethodTerminal, Input, false, false, Channels{}},
+		{MethodTerminal, Input, true, true, Channels{Terminal: true}},
+		{MethodDesktop, Failed, true, true, Channels{Desktop: true}},
+		{MethodTmux, Failed, true, true, Channels{Bell: true}},
+		{MethodTmux, Done, true, true, Channels{}},
+		{MethodOff, Input, true, true, Channels{}},
+	} {
+		if got := (Settings{Method: tc.method}).Route(tc.k, tc.terminal, tc.tmux); got != tc.want {
+			t.Errorf("%s %s terminal=%v tmux=%v: %+v", tc.method, tc.k, tc.terminal, tc.tmux, got)
+		}
+	}
+}
+
+func TestAgents(t *testing.T) {
+	now := at(10, 0)
+	var st State
+	if st.SetAgent("", Agent{State: "done"}) || st.SetAgent("s", Agent{}) {
+		t.Error("recorded without a session or state")
+	}
+	if !st.SetAgent("s1", Agent{State: Working, At: now, Account: "claude/work", Cwd: "/r/a/"}) {
+		t.Error("first state not a change")
+	}
+	if st.SetAgent("s1", Agent{State: Working, At: now.Add(time.Second), Account: "claude/work", Cwd: "/r/a"}) {
+		t.Error("same state reported as a change")
+	}
+	st.SetAgent("s0", Agent{State: "done", At: now.Add(-time.Hour), Account: "claude/work", Cwd: "/r/a"})
+	st.SetAgent("s2", Agent{State: "input", At: now, Account: "claude/main", Cwd: "/r/a"})
+	if a, ok := st.AgentAt("claude/work", "/r/a"); !ok || a.State != Working {
+		t.Errorf("AgentAt = %+v %v", a, ok)
+	}
+	if _, ok := st.AgentAt("claude/work", "/r/b"); ok {
+		t.Error("other dir matched")
+	}
+	st.Agents["old"] = Agent{State: "done", At: now.Add(-48 * time.Hour)}
+	st.prune(now)
+	if _, ok := st.Agents["old"]; ok || len(st.Agents) != 3 {
+		t.Errorf("agents after prune = %v", st.Agents)
+	}
+	for _, tc := range []struct {
+		e    Event
+		want string
+	}{
+		{Event{Kind: Input}, "input"},
+		{Event{Kind: Done, Busy: true}, "done"},
+		{Event{Busy: true}, Working},
+		{Event{Kind: Info}, ""},
+		{Event{}, ""},
+	} {
+		if got := tc.e.State(); got != tc.want {
+			t.Errorf("%+v: %q", tc.e, got)
+		}
+	}
+}
