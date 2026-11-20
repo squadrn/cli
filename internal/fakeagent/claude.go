@@ -44,6 +44,7 @@ func Claude(args []string) int {
 		_ = os.Remove(file(".loggedin"))
 		logCall("cfg=%s args=%s", cfg, cmd)
 	case cmd == "auth login":
+		loginWait()
 		if os.Getenv("FAKE_LOGIN_FAILS") == "" {
 			write(".loggedin", "")
 		}

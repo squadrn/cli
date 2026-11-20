@@ -159,6 +159,9 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	}
 	ask := a.interactive && !o.yes
 	in := bufio.NewReader(a.stdin)
+	// waited is the time spent on the user (questions, the login), left out of "done in".
+	var waited time.Duration
+	asked := time.Now()
 	if isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
 		if profile, err = a.askProfile(in, acct.Spec, profile); err != nil {
 			return err
@@ -188,6 +191,9 @@ func (a *app) accountAdd(input string, o addOptions) error {
 		if doLogin, err = a.askYes(in, "log in now?", ""); err != nil {
 			return err
 		}
+	}
+	if ask {
+		waited = time.Since(asked)
 	}
 
 	// Apply.
@@ -296,7 +302,9 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	// Verify.
 	if doLogin {
 		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
+		loginAt := time.Now()
 		err := ag.Run(acct.ConfigDir(), ag.LoginArgs())
+		waited += time.Since(loginAt)
 		a.cache.Forget(acct.Label())
 		if err != nil {
 			warn("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label())
@@ -315,7 +323,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if !status.LoggedIn {
 		next = "log in: " + a.cmd + " account login " + acct.Label()
 	}
-	a.out("done in %.1fs · %s · check: %s doctor %s\n", time.Since(start).Seconds(), next, a.cmd, acct.Label())
+	a.out("done in %.1fs · %s · check: %s doctor %s\n", (time.Since(start) - waited).Seconds(), next, a.cmd, acct.Label())
 	return nil
 }
 
