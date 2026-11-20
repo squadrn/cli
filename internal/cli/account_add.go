@@ -260,7 +260,13 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	switch {
 	case isNew || srep.Created || srep.Backup != "":
 		what := "settings from " + acct.Provider + "/" + account.Main
-		if profile != "" {
+		if !fsx.IsFile(filepath.Join(a.store.MainDir(acct.Spec), acct.Spec.Settings)) {
+			// No main account (or no settings in it) to start from.
+			what = "settings created"
+			if profile != "" {
+				what = "settings: " + profileName(profile, options)
+			}
+		} else if profile != "" {
 			what += " + " + profileName(profile, options)
 		}
 		if srep.Backup != "" {

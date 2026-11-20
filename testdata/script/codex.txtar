@@ -12,6 +12,11 @@ cp $CODEX_FAKE bin/codex
 mkdir home/.codex/skills/review
 cp agents.md home/.codex/AGENTS.md
 cp mcplist.json home/.codex/.mcplist
+# Without a config.toml in main there is nothing to take settings from.
+exec squadrn account add codex/bare --no-login -y
+stdout '^✓ settings: standard profile$'
+! stdout 'settings from'
+exec squadrn account rm codex/bare --yes
 cp main-config.toml home/.codex/config.toml
 env SQUADRN_SHARED_MCP='docs secret absent'
 env SQUADRN_MARKETPLACE=$REPO_ROOT
