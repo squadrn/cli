@@ -623,7 +623,12 @@ func (e Env) links(a account.Account, g string) []Check {
 		if _, err := os.Stat(src); err != nil {
 			continue
 		}
-		if !account.LinksTo(filepath.Join(a.Dir, item), src) {
+		dst := filepath.Join(a.Dir, item)
+		switch _, err := os.Lstat(dst); {
+		case errors.Is(err, fs.ErrNotExist):
+			// main gained it later: the next session or account add links it.
+			out = append(out, bad(g, Warn, item+" is not linked to main yet", e.Command+" account add "+a.Label()))
+		case !account.LinksTo(dst, src):
 			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account add "+a.Label()+" --relink"))
 		}
 	}
