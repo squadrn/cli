@@ -1,6 +1,6 @@
 // Package provider describes the agent CLIs squadrn drives. What differs between providers is
-// data in Spec; what needs code (running the CLI, reading its login) is behind Agent, which each
-// provider's own package implements (internal/provider/claude).
+// data in Spec; what needs code is behind Agent and the optional capability interfaces, which
+// each provider's own package implements and registers (internal/provider/claude), ADR 0011.
 package provider
 
 import (
@@ -9,7 +9,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/squadrn/squadrn/internal/usage"
 )
 
 type Caps struct {
@@ -45,8 +48,8 @@ type Spec struct {
 	SharedPerEntry map[string][]string
 	// WorktreeDir is where the CLI creates worktrees, relative to the repository root.
 	WorktreeDir string
-	// Subcommands of the agent CLI: `squadrn <account> <subcommand>` passes them through, and
-	// they cannot be account names.
+	// Subcommands of the agent CLI: `squadrn [<account>] <subcommand>` passes them through. They
+	// are valid account names: an account of that name is matched first (ADR 0011).
 	Subcommands []string
 	// SessionID is the form of a conversation's ID (Caps.SessionTransfer).
 	SessionID *regexp.Regexp
@@ -111,30 +114,39 @@ type Runner interface {
 	Output(ctx context.Context, configDir string, args ...string) ([]byte, error)
 }
 
-// Agent drives one provider's CLI.
-type Agent interface {
+// Launcher starts the CLI.
+type Launcher interface {
 	Runner
 	// Exec runs an interactive session in place of squadrn: on Unix it replaces the process; on
 	// Windows it runs as a child and returns ExitStatus when the session ends.
 	Exec(configDir string, args []string) error
 	// Run runs an interactive command (a login) as a child and returns when it ends.
 	Run(configDir string, args []string) error
+}
+
+// Authenticator reads and changes an account's login.
+type Authenticator interface {
 	Auth(ctx context.Context, configDir string) (AuthStatus, error)
-	// LoginArgs, WorktreeArgs and ResumeArgs are the CLI arguments for those sessions.
 	LoginArgs() []string
 	LogoutArgs() []string
+}
+
+// Agent drives one provider's CLI: what every provider has. Everything else is an optional
+// capability below, found with a type assertion.
+type Agent interface {
+	Launcher
+	Authenticator
+}
+
+// Worktrees: the CLI creates git worktrees itself (Caps.Worktree).
+type Worktrees interface {
 	WorktreeArgs(name string) []string
+}
+
+// SessionStore finds stored conversations and moves them between accounts of one provider
+// (Caps.SessionTransfer), looked up across the given config dirs.
+type SessionStore interface {
 	ResumeArgs(session string) []string
-
-	// The squadrn plugin (Caps.Plugins), installed from the local marketplace dir. InstallPlugin
-	// reports whether it installed it (false: it was there already).
-	InstallPlugin(ctx context.Context, configDir, marketplace string) (bool, error)
-	UpdatePlugin(ctx context.Context, configDir string) error
-	RemovePlugin(ctx context.Context, configDir string) error
-	PluginState(ctx context.Context, configDir string) (installed, enabled bool, err error)
-	EnablePluginArgs() []string
-
-	// Conversations (Caps.SessionTransfer), looked up across the given config dirs.
 	FindSession(configDirs []string, id string) (Session, error)
 	// LatestSessionIn is the most recent conversation started in dir.
 	LatestSessionIn(configDirs []string, dir string) (Session, error)
@@ -146,10 +158,63 @@ type Agent interface {
 	TransferSession(s Session, targetConfigDir string, force bool) error
 	// UnavailableModel is the model s uses when target's plan may not include it; "" otherwise.
 	UnavailableModel(s Session, target AuthStatus) string
+}
 
-	// User-scope MCP servers (Caps.SharedMCP); config is a server's JSON definition.
+// GuardInstaller installs the squadrn plugin (Caps.Plugins): the layer-1 push guard and the
+// notification hooks, from the local marketplace dir. InstallPlugin reports whether it
+// installed it (false: it was there already).
+type GuardInstaller interface {
+	InstallPlugin(ctx context.Context, configDir, marketplace string) (bool, error)
+	UpdatePlugin(ctx context.Context, configDir string) error
+	RemovePlugin(ctx context.Context, configDir string) error
+	PluginState(ctx context.Context, configDir string) (installed, enabled bool, err error)
+	EnablePluginArgs() []string
+}
+
+// MCP manages user-scope MCP servers (Caps.SharedMCP); config is a server's JSON definition.
+type MCP interface {
 	HasMCP(ctx context.Context, configDir, name string) bool
 	AddMCP(ctx context.Context, configDir, name string, config []byte) error
+}
+
+// Relocator fixes absolute config-dir paths the CLI recorded, after the dir moved.
+type Relocator interface {
+	Relocate(oldDir, newDir string) error
+}
+
+// LimitHit is a turn that stopped on an error, as the CLI's hook reports it.
+type LimitHit struct {
+	Error   string
+	Details string
+	// Limited: the error is a usage limit, and Observation records it.
+	Limited     bool
+	Observation usage.Snapshot
+}
+
+// StatusLine is a CLI that runs a status line command with its usage limits on stdin
+// (Caps.UsageReport). It needs no CLI binary: the hooks use it on every refresh.
+type StatusLine interface {
+	// Command is the status line command in a settings file; ok is false when there is none.
+	Command(settingsPath string) (cmd string, ok bool, err error)
+	// SetCommand sets it ("" removes the status line).
+	SetCommand(settingsPath, cmd string) error
+	// Wrap is a command running bin with hook, then old; Unwrap reverses it.
+	Wrap(bin, hook, old, home string) (string, error)
+	Unwrap(cmd, hook string) (old string, ours bool)
+	// Shell is how the CLI runs a status line command.
+	Shell(cmd string) (bin string, argv []string)
+	// Parse reads the status line input; ParseLimit the hook input of a turn that failed.
+	Parse(raw []byte, now time.Time) (usage.Snapshot, error)
+	ParseLimit(raw []byte, now time.Time, loc *time.Location) (LimitHit, error)
+}
+
+// Driver is the code behind a Spec, registered by the provider's own package.
+type Driver struct {
+	// New finds the CLI and returns its driver; extraEnv is added to every invocation (the
+	// git-level guard's GIT_CONFIG_* entries).
+	New func(extraEnv []string) (Agent, error)
+	// StatusLine is nil when the provider has none.
+	StatusLine StatusLine
 }
 
 var Claude = Spec{
@@ -182,6 +247,30 @@ var registry = []Spec{Claude}
 const Default = "claude"
 
 func All() []Spec { return append([]Spec(nil), registry...) }
+
+var (
+	driversMu sync.RWMutex
+	drivers   = map[string]Driver{}
+)
+
+// Register attaches the driver of a provider in the registry; provider packages call it from
+// init, and internal/provider/all imports them all.
+func Register(id string, d Driver) {
+	if _, ok := Get(id); !ok {
+		panic("provider: register unknown provider " + id)
+	}
+	driversMu.Lock()
+	defer driversMu.Unlock()
+	drivers[id] = d
+}
+
+// DriverOf is the registered driver of a provider.
+func DriverOf(id string) (Driver, bool) {
+	driversMu.RLock()
+	defer driversMu.RUnlock()
+	d, ok := drivers[id]
+	return d, ok
+}
 
 func Get(id string) (Spec, bool) {
 	for _, s := range registry {

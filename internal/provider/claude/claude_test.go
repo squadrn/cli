@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 type fakeRunner struct {
@@ -125,5 +127,18 @@ func TestUnwrapStatusLine(t *testing.T) {
 		if old != tt.old || ours != tt.ours {
 			t.Errorf("%q: got %q %v, want %q %v", tt.cmd, old, ours, tt.old, tt.ours)
 		}
+	}
+}
+
+func TestRegistersItsDriver(t *testing.T) {
+	d, ok := provider.DriverOf(provider.Claude.ID)
+	if !ok || d.New == nil || d.StatusLine == nil {
+		t.Fatalf("claude driver = %+v, %v", d, ok)
+	}
+	if _, err := d.StatusLine.Parse([]byte(`{"rate_limits":{"five_hour":{"used_percentage":5}}}`), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.StatusLine.ParseLimit([]byte(`{"error":"rate_limit"}`), time.Now(), time.UTC); err != nil {
+		t.Fatal(err)
 	}
 }

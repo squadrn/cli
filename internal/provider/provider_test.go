@@ -19,3 +19,15 @@ func TestMetered(t *testing.T) {
 		}
 	}
 }
+
+func TestRegisterAttachesDrivers(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("registering an unknown provider did not panic")
+		}
+	}()
+	if _, ok := DriverOf("nope"); ok {
+		t.Error("DriverOf(nope) found a driver")
+	}
+	Register("nope", Driver{})
+}

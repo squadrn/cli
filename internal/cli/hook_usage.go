@@ -12,7 +12,6 @@ import (
 	"github.com/squadrn/squadrn/internal/config"
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/usage"
 )
 
@@ -41,7 +40,7 @@ func (h hookEnv) statusline(args []string) int {
 	raw, _ := h.readInput()
 	name, snap := h.recordStatus(raw)
 	if then != "" {
-		bin, argv := claude.StatusLineShell(then)
+		bin, argv := hookStatusLine().Shell(then)
 		ctx, cancel := context.WithTimeout(context.Background(), thenDeadline)
 		defer cancel()
 		out, err := proc.Output(ctx, proc.Options{Stdin: strings.NewReader(string(raw))}, bin, argv...)
@@ -61,7 +60,7 @@ func (h hookEnv) statusline(args []string) int {
 func (h hookEnv) recordStatus(raw []byte) (name string, snap usage.Snapshot) {
 	defer func() { _ = recover() }()
 	now := h.now()
-	obs, err := claude.ParseStatusLine(raw, now)
+	obs, err := hookStatusLine().Parse(raw, now)
 	if err != nil {
 		return "", usage.Snapshot{}
 	}
@@ -108,7 +107,7 @@ func (h hookEnv) limit() int {
 func (h hookEnv) recordLimit(raw []byte) (msg string) {
 	defer func() { _ = recover() }()
 	now := h.now()
-	f, err := claude.ParseStopFailure(raw, now, time.Local)
+	f, err := hookStatusLine().ParseLimit(raw, now, time.Local)
 	if err != nil || !f.Limited {
 		return ""
 	}
@@ -147,7 +146,20 @@ func clock(t, now time.Time) string {
 	return t.Format("Mon 15:04")
 }
 
-// hookAccount is the account a hook runs in, from Claude Code's config-dir variable.
+// hookSpec is the provider whose CLI runs the usage hooks: the one with a status line.
+func hookSpec() provider.Spec {
+	for _, spec := range provider.All() {
+		if statusLineOf(spec) != nil {
+			return spec
+		}
+	}
+	panic("no provider reports usage through a status line")
+}
+
+func hookStatusLine() provider.StatusLine { return statusLineOf(hookSpec()) }
+
+// hookAccount is the account a hook runs in, from the CLI's config-dir variable.
 func hookAccount(store account.Store) (account.Account, bool) {
-	return store.ByConfigDir(provider.Claude, os.Getenv(provider.Claude.ConfigEnv))
+	spec := hookSpec()
+	return store.ByConfigDir(spec, os.Getenv(spec.ConfigEnv))
 }

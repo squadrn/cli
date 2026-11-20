@@ -68,13 +68,11 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 	if err := p.copyMCP(ctx, a, &r); err != nil {
 		return r, err
 	}
-	if !a.Spec.Caps.Plugins {
+	gi, ok := p.Agent.(provider.GuardInstaller)
+	if !a.Spec.Caps.Plugins || !ok || p.Marketplace == "" {
 		return r, nil
 	}
-	if p.Marketplace == "" {
-		return r, nil
-	}
-	installed, err := p.Agent.InstallPlugin(ctx, a.ConfigDir(), p.Marketplace)
+	installed, err := gi.InstallPlugin(ctx, a.ConfigDir(), p.Marketplace)
 	if err != nil {
 		return r, err
 	}
@@ -235,7 +233,8 @@ func (l linker) one(src, dst string, r *Report) error {
 // copyMCP copies allowlisted servers from main. Entries carrying a non-empty env or headers are
 // never copied, even when allowlisted, because that is where tokens live.
 func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
-	if len(p.SharedMCP) == 0 || !a.Spec.Caps.SharedMCP {
+	m, ok := p.Agent.(provider.MCP)
+	if len(p.SharedMCP) == 0 || !a.Spec.Caps.SharedMCP || !ok {
 		return nil
 	}
 	servers, err := readMCPServers(p.Store.mcpConfig(a.Spec))
@@ -243,7 +242,7 @@ func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
 		return err
 	}
 	for _, name := range p.SharedMCP {
-		if p.Agent.HasMCP(ctx, a.ConfigDir(), name) {
+		if m.HasMCP(ctx, a.ConfigDir(), name) {
 			continue
 		}
 		raw, ok := servers[name]
@@ -253,7 +252,7 @@ func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
 		case carriesSecrets(raw):
 			r.MCPSkipped = append(r.MCPSkipped, name)
 		default:
-			if err := p.Agent.AddMCP(ctx, a.ConfigDir(), name, raw); err != nil {
+			if err := m.AddMCP(ctx, a.ConfigDir(), name, raw); err != nil {
 				return err
 			}
 			r.MCPAdded = append(r.MCPAdded, name)
