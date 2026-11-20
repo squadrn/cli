@@ -423,3 +423,49 @@ type paneState struct {
 
 // errNoClient: no tmux client shows the server the pane is in.
 var errNoClient = errors.New("no tmux client is attached")
+
+// hookNotifyArgs are the arguments of `hook notify`.
+type hookNotifyArgs struct {
+	spec     provider.Spec
+	terminal bool
+	payload  string
+}
+
+// parseNotifyArgs reads [--terminal] [--agent <provider>] [<payload>]. --terminal: a synchronous
+// hook, which may answer with a terminal sequence; --agent: the CLI whose hook runs (Claude
+// Code by default); a JSON argument is the payload (Codex's notify program), else it comes on
+// stdin. The rc.3 plugin passed a title (notify 'Done'), which is ignored.
+func parseNotifyArgs(args []string) (hookNotifyArgs, bool) {
+	n := hookNotifyArgs{spec: hookSpec()}
+	positional := 0
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; {
+		case a == "--terminal":
+			n.terminal = true
+		case a == "--agent" && i+1 < len(args):
+			i++
+			spec, ok := provider.Get(args[i])
+			if d, _ := provider.DriverOf(spec.ID); !ok || d.Events == nil {
+				return n, false
+			}
+			n.spec = spec
+		case strings.HasPrefix(a, "-"):
+			return n, false
+		default:
+			positional++
+			if strings.HasPrefix(strings.TrimSpace(a), "{") {
+				n.payload = a
+			}
+		}
+	}
+	return n, positional <= 1
+}
+
+// hookReply is what the hook of spec's CLI must print for raw, "" for nothing.
+func hookReply(spec provider.Spec, raw []byte) string {
+	d, _ := provider.DriverOf(spec.ID)
+	if r, ok := d.Events.(provider.HookReplier); ok {
+		return r.HookReply(raw)
+	}
+	return ""
+}
