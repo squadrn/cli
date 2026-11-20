@@ -223,7 +223,7 @@ runs your own command with the same input and shows its output unchanged (withou
 `work · 5h 42% · 7d 18%`). Each account's own `settings.json` is set up on its own. `account add` offers it once (`--usage`/`--no-usage` decide without asking);
 `self-uninstall` restores the previous command; `doctor` shows whether each account is tracked.
 When a session hits its limit, the plugin's hook records it and notifies
-*"claude/work hit its usage limit (resets 15:45) — srn swap"*.
+*"Usage limit · resets 15:45 · srn swap"* (see [Notifications](#notifications)).
 
 Usage is only known for claude.ai subscriptions (Pro, Max, …), after a session's first reply, and
 only as fresh as the last status line update. States: `ok`, `high` (5h ≥ 80% or 7d ≥ 90%),
@@ -306,6 +306,43 @@ unmerged branch unless `--force-branch` is given.
 Worktree names are `<type>-<slug>` (`feat-otp-login`, `fix-cart-total`); Claude Code creates branch
 `worktree-<name>`. `swap` moves conversations between accounts of the same provider (see [Swap](#swap)).
 
+## Notifications
+
+Squadrn tells you when an agent needs you, failed or finished, and stays quiet while you are
+looking at it:
+
+| Event | When | Example |
+|---|---|---|
+| `input` | an approval, a question, a reply it waits for | *Needs approval: Bash* · *Waiting for your reply* |
+| `failed` | the turn stopped on an error | *Usage limit · resets 15:45 · srn swap* · *Login expired · srn account login claude/work* |
+| `done` | the turn finished (no background work left) | *Done* |
+| `info` | logged in, auto-resume, plugin messages (off by default) | |
+
+The title names the agent, the account and where it works: *Claude Code · work · api/fix-auth*.
+The agent's own text (your prompt, its reply) is never shown unless `notify.preview = true`.
+`input` and `failed` play a sound; nothing is shown while the session's tmux pane is in view, and
+`done` is left out while its terminal is the frontmost app (macOS). One session gets at most one
+notification every 30 seconds (except `input`), a newer one replaces the older, and an idle prompt
+right after *Done* is not repeated.
+
+```sh
+srn notify status                 # settings, the notifier in use and why, the last notifications
+srn notify test [input|failed|done]
+srn config set notify.quiet_hours 22:00-08:00
+srn config set notify.enabled false
+```
+
+| OS | Notifier |
+|---|---|
+| macOS | [`terminal-notifier`](https://github.com/julienXX/terminal-notifier) when installed (`brew install terminal-notifier`: grouped per session, click brings the terminal forward), else `osascript` (shown as Script Editor, which needs notification permission in System Settings) |
+| Linux | `notify-send` (libnotify), else `gdbus`; `input` is urgent and stays until dismissed |
+| Windows | a toast through Windows PowerShell 5.1, under the app id `Squadrn` registered by `self-install` |
+
+Do Not Disturb and Focus modes apply as for any app. While squadrn's notifications are on, account
+profiles turn Claude Code's own off (`preferredNotifChannel: "notifications_disabled"`), so you do
+not get both; your own value in an account's `settings.json` wins. Deliveries are logged (titles,
+never agent text) in `~/.local/state/squadrn/notify.log`.
+
 ## Git push guard
 
 The guard is a safety net against agents' mistakes, not a sandbox: it does not contain a hostile
@@ -370,18 +407,28 @@ protected_branches = ["main", "release/*"]   # repositories can only add to this
 git_hooks = true                             # layer 2 of the push guard
 update_check = true                          # daily background check, notice only
 update_channel = "stable"                    # or "beta" for pre-releases
+
+[notify]
+enabled = true
+events = ["input", "failed", "done"]         # and "info"
+sound = "input"                              # input (input and failed) | all | none
+when = "unfocused"                           # or "always"
+quiet_hours = ""                             # e.g. "22:00-08:00"
+preview = false                              # show the agent's text
+method = "auto"                              # auto | desktop | off
 ```
 
 `srn config [--json]` shows every setting; `srn config get|set <key> [value]` reads or
 changes one. In JSON, lists (`aliases`, `shared_mcp`, `protected_branches`) are arrays and
-`git_hooks`/`update_check` are booleans.
+`git_hooks`/`update_check` are booleans. Notification settings are `notify.<key>`
+(`srn config set notify.sound none`).
 
 MCP servers whose config has a non-empty `env` or `headers` are never copied; add those per account.
 
 | Path | Contents |
 |---|---|
 | `~/.local/share/squadrn/` | binary, plugin, local plugin marketplace, `git-hooks/`, `previous/` (rollback) |
-| `~/.local/state/squadrn/` | guard log, usage records |
+| `~/.local/state/squadrn/` | guard log, usage records, notification state and log |
 | `~/.cache/squadrn/` | login status cache, update check |
 
 ## Exit codes

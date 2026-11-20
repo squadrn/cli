@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **Notifications rewritten** ([ADR 0012](docs/adr/0012-notifications.md)): one notification when
+  an agent needs you (approval, question, reply), failed (usage limit, login, billing, server) or
+  finished, titled *Claude Code · work · api/fix-auth*, with the command to run
+  (*Usage limit · resets 15:45 · srn swap*). Nothing while you look at the session (tmux pane in
+  view; on macOS `done` while its terminal is frontmost), at most one per session every 30 s
+  except input, a newer one replaces the older, no repeated idle prompt after *Done*, and the
+  agent's own text only with `notify.preview`. Was: *Claude: Done* after every turn.
+- `[notify]` settings (`enabled`, `events`, `sound`, `when`, `quiet_hours`, `preview`, `method`),
+  `srn notify status` and `srn notify test`, and a `doctor` line.
+- macOS uses `terminal-notifier` when installed (grouped per session, click brings the terminal
+  forward), else `osascript`; Linux replaces a session's notification and marks input urgent
+  (`gdbus` when `notify-send` is missing); **Windows** shows toasts (app id registered by
+  `self-install`).
+- Account profiles turn Claude Code's own notifications off while squadrn's are on, so you no
+  longer get both.
+
 ## 1.0.0-rc.3
 
 - **OpenAI Codex CLI:** `codex/<name>` accounts (`CODEX_HOME`, credentials kept per account),
