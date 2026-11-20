@@ -253,9 +253,7 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.lookPath(name), args...)
 	cmd.Dir = o.dir
-	if o.cmdLine != "" {
-		setCmdLine(cmd, o.cmdLine)
-	}
+	cmd.SysProcAttr = sysProcAttr(o.cmdLine)
 	if cmd.Dir == "" {
 		cmd.Dir = s.root
 	}
