@@ -21,6 +21,9 @@
   notification sequences) outside tmux. In tmux each agent's pane carries its state (grid borders
   colour it) and rings the bell when it needs you; **`srn next`** jumps to that pane, and a click on
   a `terminal-notifier` notification switches to it.
+- **Codex accounts notify too:** approvals, finished turns and the agent's state through squadrn's
+  Codex hooks (installed and trusted with the push guard) and Codex's `notify` program; Codex's own
+  terminal notifications are turned off in account profiles.
 - **`srn ps` lists every running agent**, also sessions started in a plain terminal, with a
   `STATE` column (`working`, `input`, `failed`, `done`). Columns are now ACCOUNT, WORKTREE, STATE,
   SESSION, PROCESS.

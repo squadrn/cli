@@ -95,6 +95,18 @@ sets Claude Code's `preferredNotifChannel` to `notifications_disabled` (a profil
 user's own value in an account wins, ADR 0011). Main's settings are the user's and are not
 changed.
 
+**Codex.** Codex's hooks.json gets squadrn's `PermissionRequest` (→ `input`, the tool from
+`tool_name`), `UserPromptSubmit` and `PostToolUse` (→ working) and `Stop` (→ `done` unless
+`stop_hook_active`; it prints `{}`, since Codex reads a Stop hook's stdout as JSON) next to the
+guard, all running `hook notify --agent codex` and trusted through the app server like the guard
+(each hook has its own key and hash). The account profile sets the root key `notify =
+["<squadrn>", "hook", "notify", "--agent", "codex"]`: Codex appends the `agent-turn-complete`
+JSON as the last argument (→ `done`, `thread-id`/`turn-id` as session and turn), so a turn still
+notifies when hooks are not trusted; when both fire, the policy's same-turn and 30 s rules leave
+one. The profile also sets `[tui] notifications = false`. Both are profile keys: the user's own
+values in an account win. `self-update` adds the new hooks to existing accounts' hooks.json and
+trusts them; the profile keys follow on the next `account add`.
+
 **Commands.** `srn notify status` (settings, the notifier found and its caveats, focus sources,
 the last five outcomes), `srn notify test [input|failed|done]` (sends one through the same
 notifier, ignoring the policy), and a `doctor` line (notifier found, or what to install).
@@ -112,4 +124,5 @@ through the same path (the title argument is ignored, the event comes from the i
 - Two hook runs more per turn (prompt, each tool): async, and they write state only when it
   changes.
 - `next` and `focus` are reserved account names.
-- Planned in the same model: Codex (`notify` program and `PermissionRequest` hook).
+- Codex runs its hooks synchronously; the prompt and tool hooks return after a state check and
+  write only on change, and the desktop delivery is detached as for Claude Code.
