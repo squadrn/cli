@@ -24,6 +24,16 @@ and [docs/architecture.md](docs/architecture.md).
 - New push forms the guard must judge go into `TestDecide`.
 - Windows code lives in `_windows.go` files; CI runs the Windows tests.
 
+## Branches
+
+`main` is the only long-lived branch and is always releasable: it changes only through pull
+requests with green CI. Work happens on short-lived branches cut from `main` and named after the
+commit type, `feat/…`, `fix/…`, `docs/…`, `refactor/…`, `ci/…` or `chore/…`; they are deleted
+when merged. Releases are tags on `main`, not branches (see docs/maintaining.md).
+
+Pull requests that build on each other target the branch below them; once that one is merged, the
+next is retargeted to `main` and brought up to date with a merge, never a rebase.
+
 ## Commits and pull requests
 
 - [Conventional Commits](https://www.conventionalcommits.org): `<type>(<scope>): <subject>`,
@@ -32,7 +42,8 @@ and [docs/architecture.md](docs/architecture.md).
 - One logical change per commit, with its tests.
 - No AI attribution: no `Co-Authored-By` lines for AI tools and no "Generated with …" lines, in
   commits or pull request descriptions.
-- Pull requests target `main`; never force-push a branch under review.
+- Pull requests target `main` and are merged with a merge commit; never force-push a branch
+  under review.
 
 Releases, signing keys and repository settings: [docs/maintaining.md](docs/maintaining.md).
 
