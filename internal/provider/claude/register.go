@@ -15,6 +15,7 @@ var (
 	_ provider.MCP            = CLI{}
 	_ provider.Relocator      = CLI{}
 	_ provider.StatusLine     = StatusLine{}
+	_ provider.SettingsFormat = Settings{}
 )
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 			return c, nil
 		},
 		StatusLine: StatusLine{},
+		Settings:   Settings{},
 	})
 }
 
@@ -42,6 +44,7 @@ func (StatusLine) Wrap(bin, hook, old, home string) (string, error) {
 }
 
 func (StatusLine) Unwrap(cmd, hook string) (string, bool) { return UnwrapStatusLine(cmd, hook) }
+func (StatusLine) Key() string                            { return "statusLine" }
 func (StatusLine) Shell(cmd string) (string, []string)    { return StatusLineShell(cmd) }
 
 func (StatusLine) Parse(raw []byte, now time.Time) (usage.Snapshot, error) {

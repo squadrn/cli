@@ -57,11 +57,6 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 			return r, err
 		}
 	}
-	if !a.IsMain() {
-		if err := ensureSettings(p.Store.MainDir(a.Spec), a.Spec); err != nil {
-			return r, err
-		}
-	}
 	if err := p.linkShared(a, &r); err != nil {
 		return r, err
 	}
@@ -78,15 +73,6 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 	}
 	r.PluginInstalled = installed
 	return r, nil
-}
-
-// ensureSettings creates main's settings file ({}) when it is missing, so every account links
-// to it rather than ending up with a settings file of its own. An existing file is never touched.
-func ensureSettings(main string, spec provider.Spec) error {
-	if spec.Settings == "" || !slices.Contains(spec.Shared, spec.Settings) {
-		return nil
-	}
-	return fsx.CreateExclusive(filepath.Join(main, spec.Settings), []byte("{}\n"), 0o644)
 }
 
 func (p Provisioner) linkShared(a Account, r *Report) error {

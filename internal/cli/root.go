@@ -442,6 +442,11 @@ func (a *app) banner(acct account.Account) {
 // only create it once it runs.
 func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt string) error {
 	a.banner(acct)
+	if rep, err := a.syncSettings(acct); err != nil {
+		a.warnf("cannot bring the settings of %s up to date: %v", acct.Label(), err)
+	} else {
+		a.noteSettings(acct, rep)
+	}
 	r := a.store.RefreshShared(acct)
 	for _, c := range r.Conflicts {
 		a.warnf("%s was edited in %s, so it no longer follows the main account; to link it again (keeps a backup): %s", a.tilde(c), acct.Label(), a.relinkHint(acct))
@@ -656,6 +661,11 @@ func (a *app) provisionWith(acct account.Account, ag provider.Agent, relink bool
 	if rep.PluginInstalled {
 		a.out("  plugin installed %s\n", acct.Spec.Plugin)
 	}
+	if err != nil {
+		return err
+	}
+	srep, err := a.syncSettings(acct)
+	a.printSettings(acct, srep)
 	return err
 }
 
