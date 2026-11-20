@@ -280,11 +280,6 @@ func (a *app) accountLogout(input string) error {
 	return nil
 }
 
-// relocator is implemented by agents that record absolute config-dir paths.
-type relocator interface {
-	Relocate(oldDir, newDir string) error
-}
-
 func (a *app) accountRename(input, newName string, force, yes bool) error {
 	acct, err := a.store.Get(input)
 	if err != nil {
@@ -317,7 +312,7 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 	if err := usageStore(a.store.Home).Rename(acct.Provider, acct.Name, to.Name); err != nil {
 		a.warnf("cannot move the usage record of %s: %v", acct.Label(), err)
 	}
-	if r, ok := ag.(relocator); ok {
+	if r, ok := ag.(provider.Relocator); ok {
 		if err := r.Relocate(acct.Dir, to.Dir); err != nil {
 			a.warnf("cannot update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
 		}

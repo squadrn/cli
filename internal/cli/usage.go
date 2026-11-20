@@ -12,7 +12,6 @@ import (
 	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/provider/claude"
 	"github.com/squadrn/squadrn/internal/usage"
 )
 
@@ -383,11 +382,10 @@ func (a *app) usageSetup(target string, all, undo, yes bool) error {
 		// One question for all of them, naming every settings file and the accounts it covers.
 		var pending []string
 		for _, g := range groups {
-			cmd, has, err := claude.StatusLineCommand(g.path)
+			_, _, has, ours, err := g.tracked()
 			if err != nil {
 				return err
 			}
-			_, ours := unwrapStatusLine(cmd)
 			if on := has && ours; on == undo {
 				pending = append(pending, a.groupWhere(g))
 			}

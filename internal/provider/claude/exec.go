@@ -13,8 +13,6 @@ import (
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
-var _ provider.Agent = CLI{}
-
 // CLI runs the installed claude binary.
 type CLI struct {
 	Bin string

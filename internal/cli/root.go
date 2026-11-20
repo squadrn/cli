@@ -24,7 +24,7 @@ import (
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/githook"
 	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/provider/claude"
+	_ "github.com/squadrn/squadrn/internal/provider/all"
 	"github.com/squadrn/squadrn/internal/release"
 	"github.com/squadrn/squadrn/internal/ui"
 )
@@ -381,15 +381,11 @@ func (a *app) agent(spec provider.Spec) (provider.Agent, error) {
 	if a.agents != nil {
 		return a.agents(spec)
 	}
-	if spec.ID != provider.Claude.ID {
+	d, ok := provider.DriverOf(spec.ID)
+	if !ok || d.New == nil {
 		return nil, fmt.Errorf("provider %q is not supported yet", spec.ID)
 	}
-	cl, err := claude.Find()
-	if err != nil {
-		return nil, err
-	}
-	cl.ExtraEnv = a.sessionEnv()
-	return cl, nil
+	return d.New(a.sessionEnv())
 }
 
 // sessionEnv points core.hooksPath at the git-level guard for sessions squadrn starts. An invalid

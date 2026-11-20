@@ -44,45 +44,47 @@ verified is not used.
 ### 1. Providers: a registry of specs and capabilities
 
 A provider is **data** (`provider.Spec`: id, product name, binary, dir layout, config env var,
-shared items, settings file, worktree dir, session ID form, install hint, `Caps`) plus **code**
-behind small capability interfaces. Each provider package registers itself:
+shared items, settings file, worktree dir, session ID form, install hint, `Caps`; one variable
+per provider in package `provider`, e.g. `provider.Claude`) plus **code** behind small
+capability interfaces, which the provider's own package registers as a driver:
 
 ```go
 // package provider
-type Provider struct {
-	Spec Spec
+type Driver struct {
 	// New finds the CLI and returns its driver; extraEnv is added to every invocation
 	// (the git-level guard's GIT_CONFIG_* entries).
 	New func(extraEnv []string) (Agent, error)
-	// Usage parses what the CLI reports about usage limits; nil when it reports none. It
-	// must not need the CLI binary (hooks run it on every status line refresh).
-	Usage UsageSource
+	// StatusLine is nil when the provider reports no usage through a status line. It needs
+	// no CLI binary: the hooks use it on every refresh.
+	StatusLine StatusLine
 }
 
-func Register(p Provider)
+func Register(id string, d Driver) // from the provider package's init; id must be a Spec
+func DriverOf(id string) (Driver, bool)
 func All() []Spec
 func Get(id string) (Spec, bool)
-func Lookup(id string) (Provider, bool)
 ```
 
 `internal/provider/all` imports every provider package for its side effect; `cli` imports
 `provider/all` and never a provider package. Tests may import a provider package directly.
 
-Every driver implements `Agent`; everything else is optional and found by type assertion
-(`provider.As[T](ag)` style helpers in `cli`), so a provider only implements what it has:
+Every driver implements `Agent`; everything else is optional and found with a type assertion
+(`ag.(provider.SessionStore)`), so a provider implements only what it has:
 
 | Interface | Methods | Claude | Codex |
 |---|---|---|---|
 | `Launcher` | `Output`, `Exec`, `Run` | ✓ | ✓ |
 | `Authenticator` | `Auth` (normalised `AuthStatus`), `LoginArgs`, `LogoutArgs` | ✓ | ✓ |
-| `Agent` | `Launcher` + `Authenticator` + `Version(ctx)` | ✓ | ✓ |
+| `Agent` | `Launcher` + `Authenticator` | ✓ | ✓ |
 | `Worktrees` | `WorktreeArgs` | ✓ | — |
 | `SessionStore` | `ResumeArgs`, `FindSession`, `LatestSessionIn`, `RunningSessions`, `SessionCwd`, `TransferSession`, `UnavailableModel` | ✓ | ✓ |
-| `GuardInstaller` | `InstallPlugin`, `UpdatePlugin`, `RemovePlugin`, `PluginState`, `EnablePluginArgs` (layer-1 hook per CLI; layer 2, the git pre-push hook, is universal) | ✓ (plugin) | ✓ (hooks) |
+| `GuardInstaller` | `InstallPlugin`, `UpdatePlugin`, `RemovePlugin`, `PluginState`, `EnablePluginArgs` (the layer-1 hook per CLI; layer 2, the git pre-push hook, is universal) | ✓ (plugin) | ✓ (hooks) |
 | `MCP` | `HasMCP`, `AddMCP` | ✓ | ✓ |
 | `Relocator` | `Relocate(oldDir, newDir)` | ✓ | as needed |
-| `SettingsStore` | `ReadSettings`, `WriteSettings`, `Profile`, `Seed` (section 2) | ✓ JSON | ✓ TOML |
-| `UsageSource` | `StatusLine`, `SetStatusLine`, `WrapStatusLine`, `UnwrapStatusLine`, `StatusLineShell`, `ParseStatusLine`, `ParseStopFailure` | ✓ | rate limits via `app-server` |
+| `Versioner` | `Version(ctx)` (account add's plan line) | ✓ | ✓ |
+| `SettingsStore` | settings format, profile and onboarding seed (section 2) | ✓ JSON | ✓ TOML |
+| `StatusLine` (driver field) | `Command`, `SetCommand`, `Wrap`, `Unwrap`, `Shell`, `Parse`, `ParseLimit` | ✓ | — |
+| `RateLimits` | `RateLimits(ctx, configDir) (usage.Snapshot, error)`: usage on request | — | ✓ (`app-server`) |
 
 `Caps` stays as data for what is decided without the CLI (worktree flag, swap, MCP sharing,
 usage reporting). Swap only moves conversations between accounts of one provider.

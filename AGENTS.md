@@ -18,9 +18,11 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 - Domain packages (`account`, `provider`, `grid`, `worktree`, `guard`, `githook`, `install`,
   `release`, `update`, `doctor`, `inuse`, `usage`) never print; `cli` owns output and exit codes
   (`cli/exit.go`).
-- Provider differences are data in `provider.Spec`; behaviour is behind `provider.Agent`. Only
-  `internal/provider/claude` knows Claude Code internals (env vars, transcript layout, plugin
-  registry). New providers get their own package there.
+- Provider differences are data in `provider.Spec`; behaviour is behind `provider.Agent` and the
+  optional capability interfaces (ADR 0011). Only `internal/provider/claude` knows Claude Code
+  internals (env vars, transcript layout, plugin registry). New providers get their own package
+  there, register their driver in `init` and are imported by `internal/provider/all`; `cli`
+  never imports a provider package.
 - External programs run through `internal/proc` (a deadline kills the whole process tree); files
   are written through `internal/fsx` (atomic).
 - The guard fails closed: layer 1 asks, layer 2 denies, when anything is uncertain (ADR 0006).
