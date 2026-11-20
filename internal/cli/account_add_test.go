@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/squadrn/squadrn/internal/account"
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
@@ -50,5 +51,16 @@ func TestProfileDescriptions(t *testing.T) {
 	}
 	if !strings.Contains(optionList(), "privacy") {
 		t.Errorf("optionList = %q", optionList())
+	}
+}
+
+func TestGuardLineTrustsAFreshInstall(t *testing.T) {
+	a := &app{}
+	// A nil agent proves the CLI is not asked for the plugin state right after installing it.
+	if got := a.guardLine(account.Account{Spec: provider.Claude}, nil, true); got != "pre-tool hook + git pre-push" {
+		t.Errorf("guardLine = %q", got)
+	}
+	if got := a.guardLine(account.Account{Spec: provider.Claude}, nil, false); got != "" {
+		t.Errorf("guardLine without a guard installer = %q", got)
 	}
 }

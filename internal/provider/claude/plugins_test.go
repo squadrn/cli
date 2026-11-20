@@ -38,25 +38,67 @@ func (f *pluginCLI) Output(_ context.Context, _ string, args ...string) ([]byte,
 	return nil, nil
 }
 
+// registry writes a config dir's plugin registry files; "" leaves a file out.
+func registry(t *testing.T, known, installed string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "plugins"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"known_marketplaces.json": known, "installed_plugins.json": installed} {
+		if body == "" {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(dir, "plugins", name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
 func TestInstallPlugin(t *testing.T) {
 	ctx := context.Background()
-	f := &pluginCLI{markets: `[{"name":"other"}]`, plugins: `[]`}
-	if ok, err := installPlugin(ctx, f, "", "/m"); !ok || err != nil {
-		t.Fatalf("install = %v, %v (%v)", ok, err, f.calls)
+	const (
+		listM   = "plugin marketplace list --json"
+		add     = "plugin marketplace add /m"
+		listP   = "plugin list --json"
+		install = "plugin install squadrn@squadrn --scope user"
+	)
+	for _, tc := range []struct {
+		name, known, installed string
+		cli                    *pluginCLI
+		ok                     bool
+		calls                  string
+	}{
+		// A new account has no registry: nothing to list.
+		{"fresh", "", "", &pluginCLI{}, true, add + ";" + install},
+		{"marketplace known", `{"squadrn":{"source":{"source":"directory"}}}`, `{"plugins":{}}`, &pluginCLI{}, true, install},
+		{"other marketplace", `{"other":{}}`, `{"version":2,"plugins":{"other@x":[{}]}}`, &pluginCLI{}, true, add + ";" + install},
+		{"installed", `{"squadrn":{}}`, `{"plugins":{"squadrn@squadrn":[{"scope":"user"}]}}`, &pluginCLI{}, false, ""},
+		// An unreadable registry falls back to the CLI listings.
+		{"bad marketplaces", `not json`, "", &pluginCLI{markets: `[{"name":"other"}]`, plugins: `[]`}, true, listM + ";" + add + ";" + listP + ";" + install},
+		{"bad plugins", `{}`, `[]`, &pluginCLI{markets: `[{"name":"squadrn"}]`, plugins: `[{"id":"squadrn@squadrn"}]`}, false, listM + ";" + listP},
+		// The add failing because the CLI knows the marketplace after all is fine.
+		{"stale registry", "", "", &pluginCLI{fail: "plugin marketplace add", markets: `[{"name":"squadrn"}]`}, true, add + ";" + listM + ";" + install},
+	} {
+		dir := registry(t, tc.known, tc.installed)
+		ok, err := installPlugin(ctx, tc.cli, dir, "/m")
+		if err != nil || ok != tc.ok || strings.Join(tc.cli.calls, ";") != tc.calls {
+			t.Errorf("%s: install = %v, %v; calls %q, want %q", tc.name, ok, err, strings.Join(tc.cli.calls, ";"), tc.calls)
+		}
 	}
-	want := "plugin marketplace list --json;plugin marketplace add /m;plugin list --json;plugin install squadrn@squadrn --scope user"
-	if got := strings.Join(f.calls, ";"); got != want {
-		t.Errorf("calls = %s", got)
+	if _, err := installPlugin(ctx, &pluginCLI{fail: "plugin marketplace add", markets: `[]`}, t.TempDir(), "/m"); err == nil {
+		t.Error("a failed marketplace add was dropped")
 	}
-	f.calls = nil
-	if ok, err := installPlugin(ctx, f, "", "/m"); ok || err != nil || strings.Join(f.calls, ";") != "plugin marketplace list --json;plugin list --json" {
-		t.Errorf("second install = %v, %v (%v)", ok, err, f.calls)
+	if _, err := installPlugin(ctx, &pluginCLI{markets: `not json`}, registry(t, "not json", ""), "/m"); err == nil {
+		t.Error("unparsable listing accepted")
 	}
+	if _, err := installPlugin(ctx, &pluginCLI{fail: "plugin install"}, t.TempDir(), "/m"); err == nil {
+		t.Error("a failed install was dropped")
+	}
+	f := &pluginCLI{plugins: `[{"id":"squadrn@squadrn","enabled":true}]`}
 	if installed, enabled, err := pluginState(ctx, f, ""); !installed || !enabled || err != nil {
 		t.Errorf("state = %v %v %v", installed, enabled, err)
-	}
-	if _, err := installPlugin(ctx, &pluginCLI{markets: `not json`}, "", "/m"); err == nil {
-		t.Error("unparsable listing accepted")
 	}
 }
 
