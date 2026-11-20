@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -21,6 +22,17 @@ const maxDepth = 6
 type arg struct {
 	val     string
 	dynamic bool
+	// src is a dynamic word as written ("$BRANCH"), for messages; "" when not known.
+	src string
+}
+
+// shown is how a message names the argument: as written when its value is only known at
+// runtime, else its value quoted.
+func (a arg) shown() string {
+	if a.dynamic && a.src != "" {
+		return a.src
+	}
+	return strconv.Quote(a.val)
 }
 
 func isDynamic(a arg) bool { return a.dynamic }
@@ -818,7 +830,14 @@ func wordArg(w *syntax.Word) arg {
 			dynamic = true
 		}
 	}
-	return arg{val: b.String(), dynamic: dynamic}
+	a := arg{val: b.String(), dynamic: dynamic}
+	if dynamic {
+		var src strings.Builder
+		if syntax.NewPrinter().Print(&src, w) == nil {
+			a.src = src.String()
+		}
+	}
+	return a
 }
 
 // currentBranchWord reports a word that is only $(git branch --show-current) or an equivalent

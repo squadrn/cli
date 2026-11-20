@@ -314,7 +314,7 @@ func decideRefspecs(refs []arg, del bool, f Facts, protected branchMatcher, mapD
 // judgeRefspec applies git's refspec rules to one argument.
 func judgeRefspec(r arg, del bool, f Facts, protected branchMatcher, mapDst mapFunc) Decision {
 	if r.dynamic {
-		return ask(fmt.Sprintf("refspec %q is only known at runtime (variable, glob or brace expansion)", r.val))
+		return ask(fmt.Sprintf("refspec %s is only known at runtime (variable, glob or brace expansion)", r.shown()))
 	}
 	spec := r.val
 	if strings.HasPrefix(spec, "+") {

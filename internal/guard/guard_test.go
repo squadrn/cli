@@ -227,6 +227,7 @@ var decideCases = []decideCase{
 	{Ask, "feat", `$GIT push origin main`},
 	// Runtime-only targets and unparsable input ask.
 	{Ask, "feat", `git push origin $BRANCH`},
+	{Ask, "feat", `git push origin "$BRANCH"`},
 	{Ask, "feat", `git push $REMOTE feat-x`},
 	{Ask, "feat", `git push origin ma{i,}n`},
 	{Ask, "feat", `git push origin release/*`},
