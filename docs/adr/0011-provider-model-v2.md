@@ -77,10 +77,12 @@ Every driver implements `Agent`; everything else is optional and found with a ty
 | `Authenticator` | `Auth` (normalised `AuthStatus`), `LoginArgs`, `LogoutArgs` | ✓ | ✓ |
 | `Agent` | `Launcher` + `Authenticator` | ✓ | ✓ |
 | `Worktrees` | `WorktreeArgs` | ✓ | — |
-| `SessionStore` | `ResumeArgs`, `FindSession`, `LatestSessionIn`, `RunningSessions`, `SessionCwd`, `TransferSession`, `UnavailableModel` | ✓ | ✓ |
+| `SessionStore` | `ResumeArgs`, `FindSession`, `LatestSessionIn`, `RunningSessions`, `SessionCwd`, `TransferSession`, `UnavailableModel` | ✓ | — (section 6) |
 | `GuardInstaller` | `InstallPlugin`, `UpdatePlugin`, `RemovePlugin`, `PluginState`, `EnablePluginArgs` (the layer-1 hook per CLI; layer 2, the git pre-push hook, is universal) | ✓ (plugin) | ✓ (hooks) |
 | `MCP` | `HasMCP`, `AddMCP` | ✓ | ✓ |
-| `Relocator` | `Relocate(oldDir, newDir)` | ✓ | as needed |
+| `MCPLister` | `ListMCP`: main's servers when they are not in a JSON file (`Spec.MCPConfig` "") | — | ✓ (`codex mcp list --json`) |
+| `CredentialStore` | `CheckCredentials(configDir)`: the login stays in the account dir (doctor) | — | ✓ |
+| `Relocator` | `Relocate(oldDir, newDir)` | ✓ | ✓ (hook trust keys) |
 | `Versioner` | `Version(ctx)` (account add's plan line) | ✓ | ✓ |
 | `SettingsStore` | settings format, profile and onboarding seed (section 2) | ✓ JSON | ✓ TOML |
 | `StatusLine` (driver field) | `Command`, `SetCommand`, `Wrap`, `Unwrap`, `Shell`, `Parse`, `ParseLimit` | ✓ | — |
@@ -98,7 +100,9 @@ credential store to it). Each provider names its credential-store policy in its 
 **Reserved account names are Squadrn's own commands only** (`account.Commands`). A provider
 subcommand is not reserved: `srn <account> <subcommand>` passes it through, and a bare
 `srn <subcommand>` still runs it for the main account unless an account has that name (accounts
-are matched before agent subcommands).
+are matched before agent subcommands). A word is passed through only when it is a subcommand of
+the account's own CLI (the default provider's without an account): `srn work resume <id>` for a
+Codex account, while a bare `srn resume` is not a Claude subcommand and is rejected.
 
 ### 2. Settings: per-account copies, merged
 
@@ -237,6 +241,71 @@ A guided first run, idempotent, every step skippable:
 The installer runs it after the **first** install only, and only when there is a terminal; never
 on `self-update`. Without a terminal the installer prints the detected CLIs, the existing
 accounts and the next steps instead.
+
+### 6. Codex CLI provider
+
+Verified against Codex CLI 0.171.0: its `--help` output, a sandboxed run (`CODEX_HOME` in a
+temp dir, a failing `security` first on PATH, never logged in), `codex app-server
+generate-json-schema`, and the source at tag `rust-v0.171.0` where the docs are silent.
+Package `internal/provider/codex`; `provider.Codex` is the spec.
+
+- **Isolation.** Accounts are `CODEX_HOME` dirs; main runs with `CODEX_HOME` unset (Codex's
+  default `~/.codex`). Before Codex runs for an account (session, login, any query) squadrn
+  makes sure its `config.toml` has `cli_auth_credentials_store = "file"`. It replaces only that
+  top-level line, or adds it at the top, and leaves a file that does not parse alone. The
+  keyring (`keyring`, or `auto` where one exists) would not follow the account's dir.
+  `doctor` checks the setting (`CredentialStore`). Shared from main: `AGENTS.md`, `rules/` and
+  `skills/` entry by entry, without `skills/.system`, which Codex installs and updates in every
+  `CODEX_HOME` itself.
+- **Auth.** `codex login status` prints on stderr, "Logged in using ChatGPT" (or "an API key -
+  sk-…", never kept) with exit 0, or "Not logged in" with exit 1. Output that is not recognised
+  falls back to the exit status. The email, plan and workspace come from the app server's
+  `account/read` (best effort, 5 s). Login and logout are `codex login` and `codex logout`.
+- **Push guard, layer 1.** A `PreToolUse` hook (matcher `Bash`) in `$CODEX_HOME/hooks.json`
+  runs `"<data dir>/plugin/bin/squadrn-hook" guard-git --no-ask`, the plugin's entry point, so
+  a missing squadrn still fails closed. Other hooks in the file are kept. Codex sends
+  `tool_name: "Bash"` and `tool_input.command` for shell and unified-exec calls (source:
+  `core/src/tools/hook_names.rs`, `handlers/unified_exec/exec_command.rs`), the same fields the
+  guard reads from Claude Code. Codex parses `permissionDecision: "ask"` but does not support
+  it: it fails the hook run and lets the call through. With `--no-ask` the guard therefore
+  **denies** what it would ask about, and its reason tells the user to run the command
+  themselves.
+- **Hook trust.** Codex runs a non-managed hook only once its exact definition is trusted.
+  Managed hooks in `requirements.toml` are trusted by policy, but they live in a system location
+  (root) and would apply to every account, so squadrn does not use them. Instead squadrn records
+  trust the way `/hooks` does, through the documented app server. `hooks/list` returns the
+  hook's `key` (`<CODEX_HOME>/hooks.json:pre_tool_use:<group>:<handler>`) and its `currentHash`.
+  `config/batchWrite` then upserts `hooks.state."<key>"` with `trusted_hash` and
+  `enabled = true` in the account's `config.toml`. The hash is always Codex's own; squadrn never
+  computes it. `doctor` reports a hook that is missing, untrusted or modified. `account add`, the
+  installer and `self-update` (`UpdatePlugin`) re-trust it, and `account rename` rewrites the
+  path-based keys (`Relocator`). We never use `--dangerously-bypass-hook-trust`.
+- **Layer 2** stays the universal git pre-push hook (`GIT_CONFIG_*` in the session's
+  environment).
+- **Worktrees.** `codex --worktree` takes no name and picks its own location, so `srn wt
+  <name>` and grid worktrees stay Claude-only (`Caps.Worktree` false). `srn <account> --worktree`
+  passes the flag through.
+- **Sessions.** Neither the transcript layout nor the session index is documented: Codex
+  0.171 is migrating "legacy local sessions to paginated thread history" (`codex
+  migrate-rollouts`, SQLite state). `Caps.SessionTransfer` is false and there is no
+  `SessionStore`, so `srn swap` says "Codex CLI cannot transfer conversations". Resume goes
+  through the CLI: `srn <account> resume <id>` or `resume --last`.
+- **MCP.** `HasMCP` uses `codex mcp get <name>`. `AddMCP` turns a shared definition (Claude's
+  `mcpServers` form) into `codex mcp add <name> [--env K=V]… -- <command> <args>…`, or
+  `--url` for HTTP. Headers cannot be passed, so such a server is refused. Main's servers come
+  from `codex mcp list --json` (`MCPLister`). As for Claude, entries carrying env or headers are
+  never copied.
+- **Usage.** `RateLimits` reads `account/rateLimits/read` from `codex app-server` over stdio
+  JSONL, after the `initialize`/`initialized` handshake. It reads the `codex` bucket of
+  `rateLimitsByLimitId`, else `rateLimits`. A window of at most a day maps to the five-hour
+  window and a longer one to the seven-day window. A logged-out account gets an
+  error ("authentication required"), which is reported as no data. The app server is stopped
+  when the replies are in, and a deadline kills its process tree (`proc.Options.Stdout` feeds
+  the client while the server runs).
+- **Not verified without a login**: the logged-in `account/read` and
+  `account/rateLimits/read` payloads (taken from the generated schema), and the hook against a
+  real model. The hook path was exercised end to end with Codex driving a local mock Responses
+  API: the hook ran trusted and blocked `git push origin "$BRANCH"`.
 
 ## Testing
 
