@@ -330,3 +330,31 @@ func TestArgs(t *testing.T) {
 		t.Fatal("args")
 	}
 }
+
+func TestSettingsRoundTrip(t *testing.T) {
+	var f Settings
+	doc, err := f.Decode([]byte("model = \"o3\"\n[hooks.state.\"/h/.codex-w/hooks.json:pre_tool_use:0:0\"]\ntrusted_hash = \"sha256:1\"\n[[skills.config]]\npath = \"/p\"\nenabled = false\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := f.Encode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := f.Decode(b)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, b)
+	}
+	if hj, _ := json.Marshal(doc); string(hj) != func() string { a, _ := json.Marshal(again); return string(a) }() {
+		t.Fatalf("round trip changed the document:\n%s", b)
+	}
+	if empty, err := f.Decode([]byte(" \n")); err != nil || len(empty) != 0 {
+		t.Fatal("empty file")
+	}
+	if _, err := f.Decode([]byte("x = [")); err == nil {
+		t.Fatal("bad TOML")
+	}
+	if !slices.Contains(f.Private(), "mcp_servers") || !slices.Contains(f.Private(), storeKey) || !slices.Contains(f.Deep(), "sandbox_workspace_write") {
+		t.Fatal("private or deep keys")
+	}
+}

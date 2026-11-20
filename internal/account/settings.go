@@ -129,6 +129,11 @@ func (s Store) SyncSettings(a Account, f provider.SettingsFormat, layers []Layer
 	if err != nil {
 		return r, err
 	}
+	if p, ok := f.(provider.PrivateSettings); ok {
+		for _, k := range p.Private() {
+			delete(mainDoc, k)
+		}
+	}
 	m, recorded, err := ReadManaged(a.Dir)
 	if err != nil {
 		return r, err

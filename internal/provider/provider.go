@@ -233,6 +233,12 @@ type SettingsFormat interface {
 	Deep() []string
 }
 
+// PrivateSettings is a SettingsFormat with top-level keys that stay per account: main's values
+// are never merged into an account's copy (Codex: MCP servers, hook trust).
+type PrivateSettings interface {
+	Private() []string
+}
+
 // Driver is the code behind a Spec, registered by the provider's own package.
 type Driver struct {
 	// New finds the CLI and returns its driver; extraEnv is added to every invocation (the

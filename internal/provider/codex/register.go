@@ -11,6 +11,8 @@ var (
 	_ provider.MCPLister       = CLI{}
 	_ provider.Relocator       = CLI{}
 	_ provider.CredentialStore = CLI{}
+	_ provider.SettingsFormat  = Settings{}
+	_ provider.PrivateSettings = Settings{}
 )
 
 func init() {
@@ -23,5 +25,6 @@ func init() {
 			c.ExtraEnv = extraEnv
 			return c, nil
 		},
+		Settings: Settings{},
 	})
 }

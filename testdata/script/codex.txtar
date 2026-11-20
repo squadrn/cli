@@ -12,6 +12,7 @@ cp $CODEX_FAKE bin/codex
 mkdir home/.codex/skills/review
 cp agents.md home/.codex/AGENTS.md
 cp mcplist.json home/.codex/.mcplist
+cp main-config.toml home/.codex/config.toml
 env SQUADRN_SHARED_MCP='docs secret absent'
 env SQUADRN_MARKETPLACE=$REPO_ROOT
 exec squadrn account add codex/work
@@ -29,6 +30,12 @@ grep '"matcher": "Bash"' home/.codex-work/hooks.json
 grep 'plugin/bin/squadrn-hook\\" guard-git --no-ask' home/.codex-work/hooks.json
 grep 'trusted_hash = "sha256:' home/.codex-work/config.toml
 grep 'cfg=.*/home/.codex-work args=mcp add docs -- npx -y @acme/docs-mcp' home/calls.log
+# config.toml is the account's own copy, merged from main's: settings follow main, but MCP
+# servers, hooks and their trust, and the credentials store stay the account's.
+grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
+grep '^network_access = false$' home/.codex-work/config.toml
+! grep 'mcp_servers|main-only|keyring|/.codex/hooks.json' home/.codex-work/config.toml
+exists home/.codex-work/.squadrn-managed.json
 ! grep 'mcp add secret' home/calls.log
 
 # add is idempotent: nothing is re-installed or re-trusted.
@@ -131,6 +138,19 @@ grep 'cfg=.*/home/.codex-job args=logout$' home/calls.log
 }
 -- hooks-without-guard.json --
 {"hooks": {"PreToolUse": [{"matcher": "apply_patch", "hooks": [{"type": "command", "command": "my-linter"}]}]}}
+-- main-config.toml --
+model = "gpt-5.5"
+cli_auth_credentials_store = "keyring"
+
+[sandbox_workspace_write]
+network_access = false
+
+[mcp_servers.main-only]
+command = "srv"
+env = { TOKEN = "x" }
+
+[hooks.state."/home/u/.codex/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:0"
 -- keyring.toml --
 model = "gpt-5.5"
 cli_auth_credentials_store = "keyring"
