@@ -64,10 +64,12 @@ func testInstall(t *testing.T, s *sandbox) {
 	} else {
 		r = s.run(t, opt{env: env}, "sh", installer)
 	}
-	r.exit(0).out(`verified release signature`, `installed squadrn `+regexp.QuoteMeta(version))
+	// A first install without a terminal says what it found and what to run next (no setup).
+	r.exit(0).out(`verified release signature`, `installed squadrn `+regexp.QuoteMeta(version), `^agent CLIs: Claude Code`, `^next: srn setup \(guided`)
 	s.check(t, s.exists(s.lookPath("srn")) && s.lookPath("srn") != "srn", "srn is not on the sandbox PATH")
 	s.srn(t, "version").exit(0).out(`^squadrn ` + regexp.QuoteMeta(version) + `$`)
 	s.run(t, opt{}, "squadrn", "--version").exit(0).out(`^squadrn ` + regexp.QuoteMeta(version) + `$`)
+	s.srn(t, "setup").exit(0).out(`^accounts: claude/main`, `^next: srn setup`)
 }
 
 func testCLI(t *testing.T, s *sandbox) {
