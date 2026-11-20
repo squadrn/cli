@@ -74,8 +74,8 @@ func testInstall(t *testing.T, s *sandbox) {
 	testSetupTTY(t, s)
 }
 
-// testSetupTTY answers srn setup at a pseudo terminal: strict as the default profile, the other
-// tool's dir and usage tracking skipped. The sandbox is put back for the later sections.
+// testSetupTTY answers srn setup at a pseudo terminal: claude as the default provider (Codex is
+// on PATH too), strict as the default profile, the other tool's dir and usage tracking skipped. The sandbox is put back for the later sections.
 func testSetupTTY(t *testing.T, s *sandbox) {
 	if runtime.GOOS == "windows" {
 		t.Log("srn setup at a terminal: skipped on Windows (no script(1))")
@@ -85,8 +85,10 @@ func testSetupTTY(t *testing.T, s *sandbox) {
 	if err := os.Mkdir(old, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	s.srnTTY(t, "strict\nn\nn\n", "setup").exit(0).out(
+	s.srnTTY(t, "\nstrict\nn\nn\n", "setup").exit(0).out(
 		`^1\. agent CLIs$`,
+		`default provider claude / codex \[claude\]: `,
+		`strict +sandboxed, reads limited to the project`,
 		`profile +minimal / standard / strict \[standard\]: `,
 		`✓ new accounts get the strict profile$`,
 		`adopt ~/\.claude-old as claude/old\? \(another tool may own it\) \[y/N\] `,
