@@ -122,10 +122,11 @@ cd feat
 stdin ../pp-main.txt
 ! exec squadrn hook git pre-push origin ../remote.git
 stderr 'squadrn guard: direct push to protected branch "main"'
+! stderr 'pull request'
 stdin ../pp-feat.txt
 exec squadrn hook git pre-push origin ../remote.git
 cd $WORK
-grep 'deny\tpre-push\t.*feat\tdirect push to protected branch "main"' home/.local/state/squadrn/guard.log
+grep 'deny\tpre-push\t.*feat\tdirect push to protected branch "main".*\tgit push origin refs/heads/feat-x:refs/heads/main \(../remote.git\)$' home/.local/state/squadrn/guard.log
 
 # The repository's own hook still runs after the check, with the same input.
 cp repo-hook feat/.git/hooks/pre-push

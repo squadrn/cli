@@ -284,10 +284,36 @@ func (h hookEnv) prePush(ctx context.Context, cfgFile, dir, home string, args []
 	if d.Verdict == guard.Allow {
 		return exitOK
 	}
-	remote := strings.Join(args, " ")
-	guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-push", d, dir, "git push "+remote+" ("+strings.TrimSpace(strings.ReplaceAll(string(input), "\n", "; "))+")")
-	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s\nPush a feature branch and open a pull request instead.\n", d.Reason)
+	guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-push", d, dir, prePushCommand(args, input))
+	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s\n", d.Reason)
+	if !strings.Contains(d.Reason, "open a PR") {
+		_, _ = fmt.Fprintln(h.stderr, "Push a feature branch and open a pull request instead.")
+	}
 	return exitError
+}
+
+// prePushCommand describes a refused push for the guard log as the git push it amounts to:
+// git push <remote> <local ref>:<remote ref>... (<url>), with :<remote ref> for a deletion.
+func prePushCommand(args []string, input []byte) string {
+	cmd := "git push"
+	if len(args) > 0 {
+		cmd += " " + args[0]
+	}
+	updates, err := guard.ParsePrePush(bytes.NewReader(input))
+	if err != nil {
+		return cmd + " (" + strings.TrimSpace(strings.ReplaceAll(string(input), "\n", "; ")) + ")"
+	}
+	for _, u := range updates {
+		if strings.Trim(u.LocalSHA, "0") == "" {
+			cmd += " :" + u.RemoteRef
+		} else {
+			cmd += " " + u.LocalRef + ":" + u.RemoteRef
+		}
+	}
+	if len(args) > 1 && args[1] != args[0] {
+		cmd += " (" + args[1] + ")"
+	}
+	return cmd
 }
 
 func (h hookEnv) gitFail(name string, err error) int {
