@@ -136,9 +136,12 @@ func (e Env) install(ctx context.Context) []Check {
 	if c, ok := e.installedRelease(); ok {
 		out = append(out, c)
 	}
+	used := e.usedProviders()
 	for _, spec := range provider.All() {
 		bin, err := e.LookPath(spec.Binary)
 		switch {
+		case err != nil && !used[spec.ID]:
+			continue // an optional provider nobody uses
 		case err != nil:
 			out = append(out, bad(g, Fail, spec.Binary+" not on PATH", spec.InstallHint))
 			continue
@@ -202,6 +205,19 @@ func (e Env) install(ctx context.Context) []Check {
 // installedRelease compares the installed release with the running binary when that binary is
 // the installed one: an install that stopped half way leaves a new binary with an old VERSION
 // and plugin.
+// usedProviders are the default provider and those with accounts other than an implicit main.
+func (e Env) usedProviders() map[string]bool {
+	used := map[string]bool{provider.Default: true}
+	if e.Store.DefaultProvider != "" {
+		used[e.Store.DefaultProvider] = true
+	}
+	accts, _ := e.Store.List()
+	for _, a := range accts {
+		used[a.Provider] = true
+	}
+	return used
+}
+
 func (e Env) installedRelease() (Check, bool) {
 	const g = "install"
 	bin := e.Layout.Binary()
@@ -529,6 +545,13 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 	if a.Spec.Caps.Plugins {
 		out = append(out, e.plugin(ctx, ag, a, g))
 	}
+	if cs, has := ag.(provider.CredentialStore); has && !a.IsMain() {
+		if err := cs.CheckCredentials(a.ConfigDir()); err != nil {
+			out = append(out, bad(g, Fail, "credentials may be shared with other accounts: "+err.Error(), e.Command+" account add "+a.Label()))
+		} else {
+			out = append(out, ok(g, "credentials kept in "+e.tilde(a.Dir)))
+		}
+	}
 	if e.Usage != nil && a.Spec.Caps.UsageReport {
 		if e.Usage(a) {
 			out = append(out, ok(g, "usage tracking: on"))
@@ -551,19 +574,30 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 		return bad(g, Fail, "no git push guard hook for "+a.Spec.Name, "")
 	}
 	installed, enabled, err := gi.PluginState(ctx, a.ConfigDir())
+	fix := e.Command + " account add " + a.Label()
+	if a.IsMain() {
+		fix = reinstallHint
+	}
+	// Without a plugin ID the guard is a hook squadrn writes itself (Codex: hooks.json), which
+	// the CLI runs only once trusted.
+	what, off, on := "squadrn plugin", "disabled", "enabled"
+	if a.Spec.Plugin == "" {
+		what, off, on = "push guard hook", "not trusted by "+a.Spec.Binary, "installed and trusted"
+	}
 	switch {
+	case err != nil && installed:
+		return bad(g, Warn, "cannot check the "+what+": "+err.Error(), "")
 	case err != nil:
 		return bad(g, Warn, "cannot list plugins", "")
 	case !installed:
-		fix := e.Command + " account add " + a.Label()
-		if a.IsMain() {
-			fix = reinstallHint
-		}
-		return bad(g, Fail, "squadrn plugin not installed (no git push guard)", fix)
+		return bad(g, Fail, what+" not installed (no git push guard)", fix)
 	case !enabled:
-		return bad(g, Fail, "squadrn plugin disabled (no git push guard)", a.Spec.Binary+" "+strings.Join(gi.EnablePluginArgs(), " "))
+		if args := gi.EnablePluginArgs(); len(args) > 0 {
+			fix = a.Spec.Binary + " " + strings.Join(args, " ")
+		}
+		return bad(g, Fail, what+" "+off+" (no git push guard)", fix)
 	}
-	return ok(g, "squadrn plugin enabled")
+	return ok(g, what+" "+on)
 }
 
 func (e Env) links(a account.Account, g string) []Check {

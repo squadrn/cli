@@ -183,9 +183,67 @@ case "$*" in
 esac
 `
 
+// fakeCodex stands in for the Codex CLI the way fakeClaude does for Claude Code; its account dir
+// is $CODEX_HOME, else ~/.codex. `login status` reports logged in when <dir>/.loggedin exists;
+// `app-server` answers initialize, account/read, account/rateLimits/read (from <dir>/.limits),
+// hooks/list (squadrn's guard hook from hooks.json, keyed and hashed like Codex, trusted when
+// config.toml records that hash) and config/batchWrite (records the trust).
+const fakeCodex = `#!/bin/sh
+cfg=${CODEX_HOME:-<unset>}
+dir=${CODEX_HOME:-$HOME/.codex}
+log() { echo "cfg=$cfg args=$*" >>"$HOME/calls.log"; }
+case "$*" in
+  "--version") echo "codex-cli 0.171.0" ;;
+  "login status")
+    if [ -f "$dir/.loggedin" ]; then echo "Logged in using ChatGPT" >&2; exit 0; fi
+    echo "Not logged in" >&2; exit 1 ;;
+  "login") [ -n "$FAKE_LOGIN_FAILS" ] || : >"$dir/.loggedin"; log "$@" ;;
+  "logout") rm -f "$dir/.loggedin"; log "$@" ;;
+  "mcp get "*) grep -qx "$3" "$dir/.mcp" 2>/dev/null ;;
+  "mcp add "*) echo "$3" >>"$dir/.mcp"; log "$@" ;;
+  "mcp list --json") cat "$dir/.mcplist" 2>/dev/null || echo '[]' ;;
+  "app-server")
+    hooks="$dir/hooks.json"
+    key="$(cd "$dir" && pwd -P)/hooks.json:pre_tool_use:0:0"
+    while IFS= read -r line; do
+      id=$(printf '%s' "$line" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+      method=$(printf '%s' "$line" | sed -n 's/.*"method":"\([^"]*\)".*/\1/p')
+      [ -n "$id" ] || continue
+      case "$method" in
+        initialize) echo '{"id":'"$id"',"result":{"userAgent":"fake"}}' ;;
+        account/read)
+          if [ -f "$dir/.loggedin" ]; then echo '{"id":'"$id"',"result":{"account":{"type":"chatgpt","email":"me@'"$(basename "$dir")"'","planType":"pro"},"requiresOpenaiAuth":true}}'
+          else echo '{"id":'"$id"',"result":{"account":null,"requiresOpenaiAuth":true}}'; fi ;;
+        account/rateLimits/read)
+          if [ -f "$dir/.limits" ]; then echo '{"id":'"$id"',"result":'"$(cat "$dir/.limits")"'}'
+          else echo '{"id":'"$id"',"error":{"code":-32600,"message":"codex account authentication required to read rate limits"}}'; fi ;;
+        hooks/list)
+          cmd=$(sed -n 's/^ *"command": "\(.*squadrn-hook.*\)",*$/\1/p' "$hooks" 2>/dev/null | head -n 1)
+          if [ -z "$cmd" ]; then echo '{"id":'"$id"',"result":{"data":[{"cwd":"/","hooks":[],"warnings":[],"errors":[]}]}}'; continue; fi
+          hash="sha256:$(cksum <"$hooks" | cut -d' ' -f1)"
+          trust=untrusted
+          grep -q "trusted_hash = \"$hash\"" "$dir/config.toml" 2>/dev/null && trust=trusted
+          echo '{"id":'"$id"',"result":{"data":[{"cwd":"/","hooks":[{"key":"'"$key"'","eventName":"preToolUse","handlerType":"command","command":"'"$cmd"'","matcher":"Bash","sourcePath":"'"$(cd "$dir" && pwd -P)"'/hooks.json","source":"user","enabled":true,"isManaged":false,"currentHash":"'"$hash"'","trustStatus":"'"$trust"'"}],"warnings":[],"errors":[]}]}}' ;;
+        config/batchWrite)
+          hash=$(printf '%s' "$line" | sed -n 's/.*"trusted_hash":"\([^"]*\)".*/\1/p')
+          grep -v -e '^\[hooks.state.".*/hooks.json:pre_tool_use:0:0"\]$' -e '^trusted_hash = ' "$dir/config.toml" >"$dir/config.toml.new"
+          mv "$dir/config.toml.new" "$dir/config.toml"
+          printf '[hooks.state."%s"]\ntrusted_hash = "%s"\n' "$key" "$hash" >>"$dir/config.toml"
+          log app-server config/batchWrite
+          echo '{"id":'"$id"',"result":{"status":"ok"}}' ;;
+        *) echo '{"id":'"$id"',"error":{"code":-32601,"message":"unknown method"}}' ;;
+      esac
+    done ;;
+  *)
+    echo "cfg=$cfg args=$*"
+    echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"
+    if [ -n "$TMUX_PANE" ]; then sleep 60; fi ;;
+esac
+`
+
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
-	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
+	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
 	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "FAKE_LOGIN_FAILS", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
@@ -237,6 +295,13 @@ func TestScript(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(fakeClaude), 0o755); err != nil {
 				return err
 			}
+			// codex is installed by the scripts that use it (cp $CODEX_FAKE bin/codex): without it
+			// on PATH, the optional provider stays out of every other script's output.
+			fake := filepath.Join(env.WorkDir, "fake-codex")
+			if err := os.WriteFile(fake, []byte(fakeCodex), 0o755); err != nil {
+				return err
+			}
+			env.Setenv("CODEX_FAKE", fake)
 			shim, err := filepath.Abs(filepath.Join("..", "..", "plugin", "bin", "squadrn-hook"))
 			if err != nil {
 				return err
@@ -278,7 +343,7 @@ func TestScript(t *testing.T) {
 			for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 				env.Setenv(k, "t@t")
 			}
-			for _, k := range []string{"CLAUDE_CONFIG_DIR", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "GH_TOKEN", "GITHUB_TOKEN", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
+			for _, k := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "GH_TOKEN", "GITHUB_TOKEN", "TMUX", "FAKE_HOLD", "FAKE_NOREG"} {
 				env.Setenv(k, "")
 			}
 			return nil

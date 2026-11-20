@@ -431,3 +431,60 @@ func TestUsageTrackingLine(t *testing.T) {
 		t.Errorf("on: %+v", c)
 	}
 }
+
+// hookAgent is a CLI whose guard is a hook squadrn writes (Codex): no plugin ID, no enable
+// command, and a credentials store to check.
+type hookAgent struct {
+	fakeAgent
+	installed, trusted bool
+	credsErr           error
+}
+
+func (h hookAgent) PluginState(context.Context, string) (bool, bool, error) {
+	return h.installed, h.trusted, nil
+}
+func (hookAgent) EnablePluginArgs() []string      { return nil }
+func (h hookAgent) CheckCredentials(string) error { return h.credsErr }
+
+func TestOptionalProviderBinary(t *testing.T) {
+	e := env(t, fakeAgent{}, nil)
+	if _, ok := find(e.install(context.Background()), "codex not on PATH"); ok {
+		t.Fatal("a provider without accounts is optional")
+	}
+	if _, ok := find(e.install(context.Background()), "claude not on PATH"); !ok {
+		t.Fatal("the default provider is required")
+	}
+	if err := os.MkdirAll(filepath.Join(e.Store.Home, ".codex"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := find(e.install(context.Background()), "codex not on PATH"); !ok || c.Status != Fail || c.Fix != provider.Codex.InstallHint {
+		t.Fatalf("codex accounts need codex: %+v", c)
+	}
+}
+
+func TestHookGuardAccountChecks(t *testing.T) {
+	ag := hookAgent{fakeAgent: fakeAgent{loggedIn: true}, installed: true}
+	e := env(t, ag, nil)
+	a := account.Account{Ref: account.Ref{Provider: "codex", Name: "work"}, Spec: provider.Codex, Dir: filepath.Join(e.Store.Home, ".codex-work")}
+	checks := e.account(context.Background(), a)
+	if c, _ := find(checks, "push guard hook not trusted by codex"); c.Status != Fail || c.Fix != "squadrn account add codex/work" {
+		t.Errorf("untrusted: %+v", c)
+	}
+	if c, ok := find(checks, "credentials kept in"); !ok || c.Status != OK {
+		t.Errorf("credentials: %+v", c)
+	}
+	ag.trusted, ag.credsErr = true, errors.New(`cli_auth_credentials_store is keyring, not "file"`)
+	e.Agent = func(provider.Spec) (provider.Agent, error) { return ag, nil }
+	checks = e.account(context.Background(), a)
+	if _, ok := find(checks, "push guard hook installed and trusted"); !ok {
+		t.Error("trusted hook not reported")
+	}
+	if c, _ := find(checks, "credentials may be shared"); c.Status != Fail || c.Fix != "squadrn account add codex/work" {
+		t.Errorf("keyring: %+v", c)
+	}
+	ag.installed = false
+	e.Agent = func(provider.Spec) (provider.Agent, error) { return ag, nil }
+	if c, _ := find(e.account(context.Background(), a), "push guard hook not installed"); c.Status != Fail {
+		t.Errorf("missing hook: %+v", c)
+	}
+}

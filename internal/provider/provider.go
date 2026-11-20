@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strconv"
@@ -177,6 +178,18 @@ type MCP interface {
 	AddMCP(ctx context.Context, configDir, name string, config []byte) error
 }
 
+// MCPLister lists an account's user-scope MCP servers, each as a JSON definition in Claude Code's
+// mcpServers form, for a CLI that keeps them elsewhere than a JSON file (Spec.MCPConfig "").
+type MCPLister interface {
+	ListMCP(ctx context.Context, configDir string) (map[string]json.RawMessage, error)
+}
+
+// CredentialStore checks that an account keeps its credentials in its own config dir (a CLI
+// that could store them elsewhere, e.g. the OS keyring). nil means they are.
+type CredentialStore interface {
+	CheckCredentials(configDir string) error
+}
+
 // Relocator fixes absolute config-dir paths the CLI recorded, after the dir moved.
 type Relocator interface {
 	Relocate(oldDir, newDir string) error
@@ -241,7 +254,32 @@ var Claude = Spec{
 	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},
 }
 
-var registry = []Spec{Claude}
+// Codex is the OpenAI Codex CLI. Accounts are CODEX_HOME dirs; credentials are kept in each one's
+// auth.json (cli_auth_credentials_store = "file"), never in the OS keyring, so they stay per
+// account. Conversations cannot be transferred (the transcript layout is not documented) and
+// `codex --worktree` takes no name, so neither swap nor wt applies (ADR 0011).
+var Codex = Spec{
+	ID:        "codex",
+	Name:      "Codex CLI",
+	Binary:    "codex",
+	MainDir:   ".codex",
+	DirPrefix: ".codex-",
+	ConfigEnv: "CODEX_HOME",
+	Settings:  "config.toml",
+	Shared:    []string{"AGENTS.md", "rules"},
+	// skills/.system holds the skills Codex installs and updates itself in every CODEX_HOME.
+	SharedPerEntry: map[string][]string{"skills": {".system"}},
+	Subcommands: []string{
+		"a", "agents", "app", "app-server", "apply", "archive", "cloud", "debug", "delete", "e", "exec",
+		"exec-server", "features", "fork", "login", "logout", "mcp", "migrate-nfs-db", "migrate-rollouts",
+		"plugin", "queue", "remote-control", "resume", "review", "sandbox", "unarchive",
+	},
+	SessionID:   regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
+	InstallHint: "npm install -g @openai/codex",
+	Caps:        Caps{Plugins: true, SharedMCP: true},
+}
+
+var registry = []Spec{Claude, Codex}
 
 // Default is used when an account ref names no provider and for the "main" shorthand.
 const Default = "claude"

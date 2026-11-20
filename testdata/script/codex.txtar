@@ -1,0 +1,143 @@
+[windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
+# Codex CLI accounts: CODEX_HOME dirs with credentials kept in their own auth.json, the push guard
+# as a trusted PreToolUse hook in hooks.json, and codex subcommands passed through.
+
+# Without codex on PATH and without codex accounts, codex stays out of the way.
+cp empty home/.claude/.loggedin
+! exec squadrn doctor
+! stdout 'codex not on PATH|✓ codex|^account codex'
+cp $CODEX_FAKE bin/codex
+
+# Main has a shared instruction file, a skill and user MCP servers.
+mkdir home/.codex/skills/review
+cp agents.md home/.codex/AGENTS.md
+cp mcplist.json home/.codex/.mcplist
+env SQUADRN_SHARED_MCP='docs secret absent'
+env SQUADRN_MARKETPLACE=$REPO_ROOT
+exec squadrn account add codex/work
+stdout '^account codex/work → ~/.codex-work$'
+stdout 'linked ~/.codex-work/AGENTS.md'
+stdout 'linked ~/.codex-work/skills/review'
+stdout 'mcp added docs'
+stdout 'mcp skipped secret'
+stdout 'mcp missing absent'
+stdout 'push guard hook installed and trusted \(codex\)'
+stdout 'next: srn account login codex/work'
+exists home/.codex-work/.squadrn-account
+grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
+grep '"matcher": "Bash"' home/.codex-work/hooks.json
+grep 'plugin/bin/squadrn-hook\\" guard-git --no-ask' home/.codex-work/hooks.json
+grep 'trusted_hash = "sha256:' home/.codex-work/config.toml
+grep 'cfg=.*/home/.codex-work args=mcp add docs -- npx -y @acme/docs-mcp' home/calls.log
+! grep 'mcp add secret' home/calls.log
+
+# add is idempotent: nothing is re-installed or re-trusted.
+rm home/calls.log
+exec squadrn account add codex/work
+! stdout 'linked|mcp added|push guard'
+! exists home/calls.log
+
+# A user's own hooks are kept; a changed guard hook is trusted again.
+cp user-hooks.json home/.codex-work/hooks.json
+exec squadrn account add codex/work
+stdout 'push guard hook installed and trusted'
+grep 'my-linter' home/.codex-work/hooks.json
+grep 'squadrn-hook' home/.codex-work/hooks.json
+
+# Login, status and logout go through CODEX_HOME.
+exec squadrn account login codex/work
+stdout 'logged in to codex/work as me@.codex-work'
+grep 'cfg=.*/home/.codex-work args=login$' home/calls.log
+exec squadrn account ls
+stdout '^codex/work +yes +me@.codex-work +~/.codex-work$'
+
+# Sessions, resume and codex subcommands run as the account.
+exec squadrn codex/work
+stdout '^cfg=.*/home/.codex-work args=$'
+exec squadrn codex/work resume 0198e3a2-7c4b-7d10-9a55-1b2c3d4e5f60
+stdout '^cfg=.*/home/.codex-work args=resume 0198e3a2-7c4b-7d10-9a55-1b2c3d4e5f60$'
+exec squadrn -a codex/work exec 'fix the tests'
+stdout '^cfg=.*/home/.codex-work args=exec fix the tests$'
+exec squadrn work mcp list
+stdout '^cfg=.*/home/.codex-work args=mcp list$'
+# codex subcommands are not claude's: without a codex account they are not passed through.
+! exec squadrn resume
+stderr 'unknown'
+
+# Credentials always stay in the account: a session restores the setting if it was changed.
+cp keyring.toml home/.codex-work/config.toml
+! exec squadrn doctor
+! stdout 'credentials may be shared'
+grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
+grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
+
+# doctor checks the binary, login, guard hook trust and credentials store.
+exec squadrn account add codex/work
+! exec squadrn doctor
+stdout '✓ codex codex-cli 0.171.0'
+stdout '^account codex/work$'
+stdout '✓ logged in as me@.codex-work'
+stdout '✓ push guard hook installed and trusted'
+stdout '✓ credentials kept in ~/.codex-work'
+cp untrusted.toml home/.codex-work/config.toml
+! exec squadrn doctor
+stdout '✗ push guard hook not trusted by codex \(no git push guard\)  → srn account add codex/work'
+exec squadrn account add codex/work
+cp hooks-without-guard.json home/.codex-work/hooks.json
+! exec squadrn doctor
+stdout '✗ push guard hook not installed \(no git push guard\)  → srn account add codex/work'
+exec squadrn account add codex/work
+
+# The installed hook runs the guard in --no-ask mode: Codex cannot ask.
+exec sh -c 'sed -n "s/^ *\"command\": \"\\\\\"\(.*\)\\\\\" guard-git --no-ask\",*$/\1/p" home/.codex-work/hooks.json > hookpath.txt'
+grep 'plugin/bin/squadrn-hook$' hookpath.txt
+stdin push-var.json
+exec sh -c '"$(cat hookpath.txt)" guard-git --no-ask'
+stdout '"permissionDecision":"deny"'
+
+# swap and wt are Claude-only: Codex conversations cannot be transferred, worktrees not named.
+! exec squadrn swap --to codex/work
+stderr 'Codex CLI cannot transfer conversations'
+exec git init -q -b main repo
+cd repo
+! exec squadrn codex/work wt feat-a
+stderr 'codex/work: Codex CLI cannot create worktrees'
+cd $WORK
+
+# Rename keeps the guard trusted (hook trust is keyed by the hooks.json path).
+exec squadrn account rename codex/work job -y
+stdout 'renamed codex/work → codex/job'
+grep 'hooks.state."[^"]*/.codex-job/hooks.json:pre_tool_use' home/.codex-job/config.toml
+! grep '/.codex-work/hooks.json' home/.codex-job/config.toml
+
+exec squadrn account logout codex/job
+stdout 'logged out codex/job'
+grep 'cfg=.*/home/.codex-job args=logout$' home/calls.log
+
+-- empty --
+-- agents.md --
+# shared instructions
+-- mcplist.json --
+[{"name":"docs","enabled":true,"transport":{"type":"stdio","command":"npx","args":["-y","@acme/docs-mcp"],"env":null,"env_vars":[],"cwd":null}},
+ {"name":"secret","enabled":true,"transport":{"type":"stdio","command":"srv","args":[],"env":{"TOKEN":"x"},"env_vars":[],"cwd":null}}]
+-- user-hooks.json --
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "apply_patch", "hooks": [{"type": "command", "command": "my-linter", "timeout": 5}]},
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "\"/old/plugin/bin/squadrn-hook\" guard-git --no-ask", "timeout": 10}]}
+    ]
+  }
+}
+-- hooks-without-guard.json --
+{"hooks": {"PreToolUse": [{"matcher": "apply_patch", "hooks": [{"type": "command", "command": "my-linter"}]}]}}
+-- keyring.toml --
+model = "gpt-5.5"
+cli_auth_credentials_store = "keyring"
+
+[mcp_servers.docs]
+command = "npx"
+-- untrusted.toml --
+cli_auth_credentials_store = "file"
+-- push-var.json --
+{"session_id":"s","transcript_path":null,"cwd":".","hook_event_name":"PreToolUse","model":"m","permission_mode":"default","turn_id":"t","tool_name":"Bash","tool_use_id":"c","tool_input":{"command":"git push origin \"$BRANCH\""}}

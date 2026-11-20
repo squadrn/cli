@@ -237,7 +237,13 @@ func (p Provisioner) copyMCP(ctx context.Context, a Account, r *Report) error {
 	if len(p.SharedMCP) == 0 || !a.Spec.Caps.SharedMCP || !ok {
 		return nil
 	}
-	servers, err := readMCPServers(p.Store.mcpConfig(a.Spec))
+	var servers map[string]json.RawMessage
+	var err error
+	if a.Spec.MCPConfig != "" {
+		servers, err = readMCPServers(p.Store.mcpConfig(a.Spec))
+	} else if l, ok := p.Agent.(provider.MCPLister); ok {
+		servers, err = l.ListMCP(ctx, "")
+	}
 	if err != nil {
 		return err
 	}

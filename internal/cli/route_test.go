@@ -15,7 +15,7 @@ func table(interactive bool) routeTable {
 	return routeTable{
 		isAccount:   func(s string) bool { return s == "personal" || s == "claude/personal" || s == "main" },
 		subcommands: map[string]bool{"account": true, "wt": true, "version": true, "completion": true, "doctor": true},
-		passthrough: func(s string) bool { return s == "mcp" || s == "auth" },
+		passthrough: func(_, s string) bool { return s == "mcp" || s == "auth" },
 		suggestions: func() []string { return []string{"account", "wt", "version", "completion", "doctor", "personal"} },
 		interactive: interactive,
 		cmd:         "squadrn",
