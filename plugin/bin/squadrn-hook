@@ -9,7 +9,11 @@ if [ "$1" != guard-git ]; then
   cat >/dev/null
   exit 0
 fi
+# --no-ask: the agent CLI cannot ask (Codex lets the call through), so asking becomes denying.
+noask=
+[ "$2" = --no-ask ] && noask=1
 decide() {
+  if [ -n "$noask" ] && [ "$1" = ask ]; then set -- deny "$2"; fi
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"squadrn guard: squadrn is not installed, so %s. Install squadrn or remove the squadrn plugin."}}\n' "$1" "$2"
 }
 # Lower-cased, with quotes and backslashes removed, so pu''sh and P\USH still match.
