@@ -12,8 +12,11 @@ cp empty home/.claude/.loggedin
 exec squadrn account ls
 stdout '^claude/main +yes '
 exec squadrn account add work
-stdout '^account claude/work'
-exists home/.claude-work
+stdout 'new account claude/work'
+stdout '^✓ created ~.\.claude-work \(private\)$'
+stdout '^✓ settings from claude/main \+ standard profile$'
+exists home/.claude-work/settings.json
+exists home/.claude-work/.squadrn-managed.json
 
 # The guard judges the PowerShell tool.
 stdin ps-force.json

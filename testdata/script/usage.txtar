@@ -146,9 +146,9 @@ stdout 'not set up'
 mkdir home/.claude-solo
 cp emptyobj home/.claude-solo/settings.json
 exec squadrn account adopt solo --yes
-stdout 'set it up from main with: srn account add claude/solo$'
+stdout '^adopted claude/solo \(~/.claude-solo\)$'
 exec squadrn account add solo --usage
-stdout '^usage tracking on: ~/.claude-solo/settings.json \(claude/solo\)$'
+stdout '^✓ usage tracking on$'
 grep '"command": ".* hook statusline --then .echo mine' home/.claude-solo/settings.json
 exec squadrn usage setup --undo solo -y
 grep '"command": "echo mine; printf ''%s'' x"' home/.claude-solo/settings.json

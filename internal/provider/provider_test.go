@@ -31,3 +31,16 @@ func TestRegisterAttachesDrivers(t *testing.T) {
 	}
 	Register("nope", Driver{})
 }
+
+func TestParseVersion(t *testing.T) {
+	for in, want := range map[string]string{
+		"2.1.329 (Claude Code)\n": "2.1.329",
+		"codex-cli 0.171.0":       "0.171.0",
+		"cfg=<unset> args=x":      "",
+		"v1.2.3-rc.1":             "1.2.3-rc.1",
+	} {
+		if got := ParseVersion([]byte(in)); got != want {
+			t.Errorf("ParseVersion(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

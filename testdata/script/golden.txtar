@@ -118,7 +118,7 @@ Accounts:
 Setup:
   completion     Generate the autocompletion script for the specified shell
   config         Show settings; get or set one (command and aliases relink ~/.local/bin)
-  doctor         Check the install, the push guard, hooks and every account
+  doctor         Check the install, the push guard, hooks and every account (or one)
   help           Help about any command
   self-uninstall Remove squadrn: plugin from every account, command links, completions, installed files
   self-update    Update squadrn and its plugin in every account
@@ -139,8 +139,8 @@ Usage:
   srn account [command]
 
 Available Commands:
-  add         Create or repair an account (shared links, allowlisted MCP, plugin)
-  adopt       Make an existing config dir (e.g. ~/.claude-<name>) an account
+  add         Create or repair an account (settings, shared files, push guard, usage, login)
+  adopt       Make an existing config dir (e.g. ~/.claude-<name>) an account and set it up
   login       Sign an account in
   logout      Sign an account out (keeps its dir)
   ls          List accounts with login status
@@ -172,22 +172,27 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-account-add.txt --
-Create or repair an account (shared links, allowlisted MCP, plugin)
+Create or repair an account (settings, shared files, push guard, usage, login)
 
 Usage:
   srn account add [<provider>/]<name> [flags]
 
 Examples:
-  srn account add work
-  srn account add claude/work
-  srn account add work --relink   link files the account has its own copy of (keeps a backup)
+  srn account add work                     asks for the profile, usage tracking and login
+  srn account add claude/work --profile strict --usage --login
+  srn account add work --with privacy      also turn telemetry off
+  srn account add work --relink            link files the account has its own copy of (keeps a backup)
 
 Flags:
-  -h, --help       help for add
-      --no-usage   do not track usage limits and do not ask
-      --relink     move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)
-      --usage      track usage limits in the status line without asking
-  -y, --yes        do not ask for confirmation with --relink
+  -h, --help             help for add
+      --login            log in right away without asking
+      --no-login         do not log in and do not ask
+      --no-usage         do not track usage limits and do not ask
+      --profile string   settings profile for a new account: minimal, standard, strict (default standard)
+      --relink           move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)
+      --usage            track usage limits in the status line without asking
+      --with strings     opt-in settings, repeatable: privacy, no-attribution
+  -y, --yes              do not ask; use the defaults and the flags given
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)
@@ -485,10 +490,10 @@ Global Flags:
   -C, --dir string       run as if started in this directory
       --no-color         disable colors (also: NO_COLOR=1)
 -- help-doctor.txt --
-Check the install, the push guard, hooks and every account
+Check the install, the push guard, hooks and every account (or one)
 
 Usage:
-  srn doctor [flags]
+  srn doctor [<account>] [flags]
 
 Flags:
   -h, --help   help for doctor
@@ -1572,14 +1577,16 @@ srn link -> $WORK/home/.local/share/squadrn/bin/squadrn
 -- layout-config.txt --
 config.toml file -rw-r--r--
 -- help-account-adopt.txt --
-Make an existing config dir (e.g. ~/.claude-<name>) an account
+Make an existing config dir an account, then set it up like account add. Its own settings are
+kept: they become the account's copy, and keys that differ from main's stay as they are.
 
 Usage:
   srn account adopt [<provider>/]<name> [flags]
 
 Flags:
-  -h, --help   help for adopt
-  -y, --yes    do not ask for confirmation
+  -h, --help             help for adopt
+      --profile string   settings profile to apply (default: none, keep its settings)
+  -y, --yes              do not ask; use the defaults
 
 Global Flags:
   -a, --account string   account to run as (provider/name or name)

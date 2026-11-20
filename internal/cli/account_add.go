@@ -1,0 +1,525 @@
+package cli
+
+import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/provider"
+)
+
+// addOptions are account add's flags; nil pointers mean "ask at a terminal, else no".
+type addOptions struct {
+	profile string
+	with    []string
+	usage   *bool
+	login   *bool
+	relink  bool
+	yes     bool
+}
+
+func (a *app) accountAddCmd() *cobra.Command {
+	var o addOptions
+	var track, noTrack, login, noLogin bool
+	profiles := make([]string, len(provider.ProfileNames))
+	for i, p := range provider.ProfileNames {
+		profiles[i] = p.Name
+	}
+	options := make([]string, len(provider.Options))
+	for i, opt := range provider.Options {
+		options[i] = opt.Name
+	}
+	cmd := &cobra.Command{
+		Use:   "add [<provider>/]<name>",
+		Short: "Create or repair an account (settings, shared files, push guard, usage, login)",
+		Example: fmt.Sprintf(`  %[1]s account add work                     asks for the profile, usage tracking and login
+  %[1]s account add claude/work --profile strict --usage --login
+  %[1]s account add work --with privacy      also turn telemetry off
+  %[1]s account add work --relink            link files the account has its own copy of (keeps a backup)`, a.cmd),
+		Args: oneArg,
+		RunE: func(_ *cobra.Command, args []string) error {
+			if track && noTrack {
+				return usagef("--usage and --no-usage cannot be combined")
+			}
+			if login && noLogin {
+				return usagef("--login and --no-login cannot be combined")
+			}
+			if track || noTrack {
+				o.usage = &track
+			}
+			if login || noLogin {
+				o.login = &login
+			}
+			return a.accountAdd(args[0], o)
+		},
+		ValidArgsFunction: cobra.NoFileCompletions,
+	}
+	f := cmd.Flags()
+	f.StringVar(&o.profile, "profile", "", "settings profile for a new account: "+strings.Join(profiles, ", ")+" (default "+provider.DefaultProfile+")")
+	f.StringSliceVar(&o.with, "with", nil, "opt-in settings, repeatable: "+strings.Join(options, ", "))
+	f.BoolVar(&track, "usage", false, "track usage limits in the status line without asking")
+	f.BoolVar(&noTrack, "no-usage", false, "do not track usage limits and do not ask")
+	f.BoolVar(&login, "login", false, "log in right away without asking")
+	f.BoolVar(&noLogin, "no-login", false, "do not log in and do not ask")
+	f.BoolVar(&o.relink, "relink", false, "move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)")
+	f.BoolVarP(&o.yes, "yes", "y", false, "do not ask; use the defaults and the flags given")
+	_ = cmd.RegisterFlagCompletionFunc("profile", cobra.FixedCompletions(profiles, cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("with", cobra.FixedCompletions(options, cobra.ShellCompDirectiveNoFileComp))
+	return cmd
+}
+
+// addStep is one applied step, for the failure report.
+type addStep struct {
+	name    string
+	created bool // the account dir exists in place
+}
+
+// accountAdd creates or repairs an account in four steps: plan, ask everything up front, apply
+// (a new account is built in a temp dir and renamed into place), verify and summarise (ADR 0011).
+func (a *app) accountAdd(input string, o addOptions) error {
+	start := time.Now()
+	if a.cfgErr != nil {
+		return a.cfgErr
+	}
+	acct, err := a.store.Define(input)
+	if err != nil {
+		return err
+	}
+	if o.profile != "" && provider.ProfileSummary(o.profile) == "" {
+		return usagef("unknown profile %q (use %s)", o.profile, profileList())
+	}
+	for _, w := range o.with {
+		if !provider.ValidOption(w) {
+			return usagef("unknown --with %q (use %s)", w, optionList())
+		}
+	}
+	if fi, err := os.Stat(acct.Dir); err == nil && fi.IsDir() && !a.store.Managed(acct) {
+		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), config.Slug, a.cmd, input)
+	}
+	ag, err := a.agent(acct.Spec)
+	if err != nil {
+		return err
+	}
+	isNew := !a.store.Managed(acct)
+
+	// Plan: the CLI version and the login run in parallel with reading the account.
+	version := make(chan string, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+		defer cancel()
+		out, _ := ag.Output(ctx, "", "--version")
+		version <- provider.ParseVersion(out)
+	}()
+	login := make(chan provider.AuthStatus, 1)
+	if isNew {
+		login <- provider.AuthStatus{}
+	} else {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+			defer cancel()
+			s, _ := ag.Auth(ctx, acct.ConfigDir())
+			login <- s
+		}()
+	}
+	rec, _, err := account.ReadManaged(acct.Dir)
+	if err != nil {
+		return err
+	}
+	profile, options := rec.Profile, rec.Options
+	if isNew && profile == "" {
+		profile = provider.DefaultProfile
+	}
+	if o.profile != "" {
+		profile = o.profile
+	}
+	if o.with != nil {
+		options = o.with
+	}
+	head := acct.Spec.Name
+	if v := <-version; v != "" {
+		head += " " + v
+	}
+	if isNew {
+		a.out("%s · new account %s → %s\n", head, acct.Label(), a.tilde(acct.Dir))
+	} else {
+		a.out("%s · %s → %s\n", head, acct.Label(), a.tilde(acct.Dir))
+	}
+	ask := a.interactive && !o.yes
+	in := bufio.NewReader(a.stdin)
+	if isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
+		if profile, err = a.askProfile(in); err != nil {
+			return err
+		}
+	} else if profile != "" {
+		a.out("  %-14s %s\n", "profile", profileDesc(profile, options))
+	}
+	if shared := a.sharedNames(acct.Spec); isNew && len(shared) > 0 {
+		a.out("  %-14s %s from %s/%s\n", "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
+	}
+	trackUsage := o.usage != nil && *o.usage
+	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && (isNew || !a.usageTracking(acct)) {
+		if trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
+			return err
+		}
+	}
+	status := <-login
+	doLogin := o.login != nil && *o.login
+	if !status.LoggedIn && o.login == nil && ask {
+		if doLogin, err = a.askYes(in, "log in now?", ""); err != nil {
+			return err
+		}
+	}
+	if o.relink && !isNew {
+		if o.relink, err = a.confirmRelink(acct, ag, o.yes); err != nil {
+			return err
+		}
+	}
+
+	// Apply.
+	step := addStep{created: !isNew}
+	fail := func(err error) error { return a.addFailed(acct, step, err) }
+	changes := 0
+	note := func(format string, args ...any) {
+		changes++
+		a.out("%s %s\n", a.paint(a.colorOut, "32", "✓"), fmt.Sprintf(format, args...))
+	}
+	warn := func(format string, args ...any) {
+		a.out("%s %s\n", a.paint(a.colorOut, "33", "!"), fmt.Sprintf(format, args...))
+	}
+	work := acct
+	if isNew {
+		step.name = "create " + a.tilde(acct.Dir)
+		tmp, err := os.MkdirTemp(filepath.Dir(acct.Dir), filepath.Base(acct.Dir)+".tmp-")
+		if err != nil {
+			return fail(err)
+		}
+		defer func() {
+			if fsx.IsDir(tmp) && strings.HasPrefix(filepath.Base(tmp), filepath.Base(acct.Dir)+".tmp-") {
+				_ = os.RemoveAll(tmp)
+			}
+		}()
+		work.Dir = tmp
+	}
+	step.name = "set up shared files and the push guard"
+	p := a.provisioner(ag)
+	p.Relink = o.relink
+	rep, err := p.Provision(context.Background(), work)
+	if err != nil {
+		return fail(err)
+	}
+	step.name = "build settings"
+	if profile != "" && (profile != rec.Profile || !slices.Equal(options, rec.Options)) {
+		if err := account.SetManagedProfile(work, profile, options); err != nil {
+			return fail(err)
+		}
+	}
+	if d, _ := provider.DriverOf(acct.Spec.ID); isNew && d.Seed != nil {
+		if err := d.Seed.Seed(a.store.Home, work.Dir); err != nil {
+			return fail(err)
+		}
+	}
+	srep, err := a.syncSettingsAs(work, acct)
+	if err != nil {
+		return fail(err)
+	}
+	if isNew {
+		step.name = "move the new account into place"
+		if err := os.Rename(work.Dir, acct.Dir); err != nil {
+			return fail(err)
+		}
+		step.created = true
+		if r, ok := ag.(provider.Relocator); ok {
+			if err := r.Relocate(work.Dir, acct.Dir); err != nil {
+				return fail(err)
+			}
+		}
+		note("created %s (private)", a.tilde(acct.Dir))
+	}
+	a.cache.Forget(acct.Label())
+	switch {
+	case isNew || srep.Created || srep.Backup != "":
+		what := "settings from " + acct.Provider + "/" + account.Main
+		if profile != "" {
+			what += " + " + profileName(profile, options)
+		}
+		if srep.Backup != "" {
+			what += " (the link to main's is kept as " + a.tilde(srep.Backup) + ")"
+		}
+		note("%s", what)
+	case len(srep.Written)+len(srep.Removed) > 0:
+		note("settings updated: %s", strings.Join(append(srep.Written, srep.Removed...), ", "))
+	}
+	if len(srep.Kept) > 0 {
+		warn("settings: kept your change to %s (it no longer follows %s/%s)", strings.Join(srep.Kept, ", "), acct.Provider, account.Main)
+	}
+	a.reportProvision(acct, rep, isNew, note, warn)
+	if isNew || rep.PluginInstalled {
+		if guard := a.guardLine(acct, ag, rep.PluginInstalled); guard != "" {
+			note("push guard: %s", guard)
+		} else if acct.Spec.Caps.Plugins {
+			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
+		}
+	}
+	if trackUsage && !a.usageTracking(acct) {
+		step.name = "turn usage tracking on"
+		if err := a.enableUsage(acct); err != nil {
+			warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
+		} else {
+			note("usage tracking on")
+		}
+	}
+
+	// Verify.
+	if doLogin {
+		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
+		err := ag.Run(acct.ConfigDir(), ag.LoginArgs())
+		a.cache.Forget(acct.Label())
+		if err != nil {
+			warn("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label())
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+		status, _ = ag.Auth(ctx, acct.ConfigDir())
+		cancel()
+		if status.LoggedIn {
+			note("logged in as %s", loginName(status))
+		}
+	}
+	if !isNew && changes == 0 {
+		a.out("%s %s is up to date\n", a.paint(a.colorOut, "32", "✓"), acct.Label())
+	}
+	next := "start: " + a.startCommand(acct)
+	if !status.LoggedIn {
+		next = "log in: " + a.cmd + " account login " + acct.Label()
+	}
+	a.out("done in %.1fs · %s · check: %s doctor %s\n", time.Since(start).Seconds(), next, a.cmd, acct.Label())
+	return nil
+}
+
+// addFailed reports which step failed, what state the account is in and how to retry.
+func (a *app) addFailed(acct account.Account, step addStep, err error) error {
+	a.out("%s %s failed: %v\n", a.paint(a.colorOut, "31", "✗"), step.name, err)
+	if step.created {
+		a.out("  state: %s exists; what is missing is repaired by a re-run\n", a.tilde(acct.Dir))
+	} else {
+		a.out("  state: nothing was created\n")
+	}
+	a.out("  retry: %s account add %s\n", a.cmd, acct.Label())
+	return errQuiet
+}
+
+// syncSettingsAs syncs work (a new account's temp dir) as the account it becomes.
+func (a *app) syncSettingsAs(work, acct account.Account) (account.SettingsReport, error) {
+	f := settingsFormat(work.Spec)
+	layers, err := a.profileLayers(work, acct)
+	if err != nil {
+		return account.SettingsReport{}, err
+	}
+	return a.store.SyncSettings(work, f, layers, a.now())
+}
+
+// profileLayers is the settings layer of the profile recorded in work's dir, for account acct.
+func (a *app) profileLayers(work, acct account.Account) ([]account.Layer, error) {
+	d, _ := provider.DriverOf(acct.Spec.ID)
+	m, _, err := account.ReadManaged(work.Dir)
+	if err != nil || m.Profile == "" || d.Profiles == nil {
+		return nil, err
+	}
+	doc, err := d.Profiles.Profile(m.Profile, m.Options, a.profileContext(acct))
+	if err != nil {
+		return nil, err
+	}
+	return []account.Layer{{Source: account.SourceProfile, Doc: doc}}, nil
+}
+
+// profileContext describes this machine for acct's profile: every other account's credential
+// file and squadrn's own dirs, as ~/ paths with / separators.
+func (a *app) profileContext(acct account.Account) provider.ProfileContext {
+	ctx := provider.ProfileContext{Hook: a.statusLineBinary(), Home: a.store.Home}
+	accts, _ := a.store.List()
+	for _, x := range accts {
+		if x.Label() == acct.Label() || x.Spec.Credentials == "" {
+			continue
+		}
+		ctx.OtherCredentials = append(ctx.OtherCredentials, a.rulePath(filepath.Join(x.Dir, x.Spec.Credentials)))
+	}
+	for _, dir := range []string{a.layout.DataDir, config.DirsFor(a.store.Home, config.Slug).Config} {
+		ctx.OwnDirs = append(ctx.OwnDirs, a.rulePath(dir))
+	}
+	return ctx
+}
+
+// rulePath is p as permission rules write it: ~/ under home, / separators.
+func (a *app) rulePath(p string) string {
+	if rel, err := filepath.Rel(a.store.Home, p); err == nil && !strings.HasPrefix(rel, "..") {
+		return "~/" + filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(p)
+}
+
+func (a *app) reportProvision(acct account.Account, rep account.Report, isNew bool, note, warn func(string, ...any)) {
+	for _, dst := range slices.Sorted(maps.Keys(rep.Backups)) {
+		note("moved %s aside to %s", a.tilde(dst), a.tilde(rep.Backups[dst]))
+	}
+	if !isNew {
+		for _, l := range rep.Linked {
+			note("linked %s", a.tilde(l))
+		}
+	}
+	for _, l := range rep.Unlinked {
+		note("removed stale link %s", a.tilde(l))
+	}
+	for _, c := range rep.Conflicts {
+		warn("kept %s (exists and is not a link to main; to link it: %s)", a.tilde(c), a.relinkHint(acct))
+	}
+	if len(rep.MCPAdded) > 0 {
+		note("mcp %s from %s/%s", strings.Join(rep.MCPAdded, ", "), acct.Provider, account.Main)
+	}
+	for _, m := range rep.MCPSkipped {
+		warn("mcp %s not copied (has env/headers; add it yourself: %s %s -- mcp add ...)", m, a.cmd, acct.Label())
+	}
+	for _, m := range rep.MCPMissing {
+		warn("mcp %s is not configured in %s/%s", m, acct.Provider, account.Main)
+	}
+}
+
+// guardLine names the push-guard layers acct has: the CLI's pre-tool hook and git's pre-push.
+// A plugin installed just now is installed and enabled; otherwise the CLI is asked.
+func (a *app) guardLine(acct account.Account, ag provider.Agent, justInstalled bool) string {
+	var layers []string
+	if justInstalled {
+		layers = append(layers, "pre-tool hook")
+	} else if gi, ok := ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
+		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+		installed, enabled, err := gi.PluginState(ctx, acct.ConfigDir())
+		cancel()
+		if err == nil && installed && enabled {
+			layers = append(layers, "pre-tool hook")
+		}
+	}
+	if len(layers) == 0 {
+		return ""
+	}
+	if a.cfgErr != nil || a.cfg.GitHooksEnabled() {
+		layers = append(layers, "git pre-push")
+	}
+	return strings.Join(layers, " + ")
+}
+
+// sharedNames lists what main shares with every account, by name.
+func (a *app) sharedNames(spec provider.Spec) []string {
+	main := a.store.MainDir(spec)
+	var out []string
+	for _, item := range slices.Sorted(maps.Keys(spec.SharedPerEntry)) {
+		if fsx.IsDir(filepath.Join(main, item)) {
+			out = append(out, item)
+		}
+	}
+	for _, item := range spec.Shared {
+		if _, err := os.Stat(filepath.Join(main, item)); err == nil {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+// startCommand is the shortest command that starts acct: its bare name when that is unique.
+func (a *app) startCommand(acct account.Account) string {
+	if got, err := a.store.Get(acct.Name); err == nil && got.Label() == acct.Label() {
+		return a.cmd + " " + acct.Name
+	}
+	return a.cmd + " " + acct.Label()
+}
+
+func (a *app) askProfile(in *bufio.Reader) (string, error) {
+	for {
+		a.errf("  %-14s %s [%s]: ", "profile", profileList(), provider.DefaultProfile)
+		line, err := in.ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return "", err
+		}
+		answer := strings.ToLower(strings.TrimSpace(line))
+		if answer == "" {
+			return provider.DefaultProfile, nil
+		}
+		for _, p := range provider.ProfileNames {
+			if p.Name == answer || (len(answer) >= 2 && strings.HasPrefix(p.Name, answer)) {
+				return p.Name, nil
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			return "", usagef("unknown profile %q (use %s)", answer, profileList())
+		}
+		a.errf("  unknown profile %q\n", answer)
+	}
+}
+
+// askYes asks a [Y/n] question on one plan line; Enter is yes.
+func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
+	if question != "" {
+		question += " "
+	}
+	a.errf("  %-14s %s[Y/n] ", label, question)
+	line, err := in.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	return !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "n"), nil
+}
+
+func profileList() string {
+	names := make([]string, len(provider.ProfileNames))
+	for i, p := range provider.ProfileNames {
+		names[i] = p.Name
+	}
+	return strings.Join(names, " / ")
+}
+
+func optionList() string {
+	names := make([]string, len(provider.Options))
+	for i, o := range provider.Options {
+		names[i] = o.Name
+	}
+	return strings.Join(names, ", ")
+}
+
+// profileDesc is "standard (secrets denied, …)" plus the options.
+func profileDesc(profile string, options []string) string {
+	s := profile + " (" + provider.ProfileSummary(profile) + ")"
+	if len(options) > 0 {
+		s += " + " + strings.Join(options, ", ")
+	}
+	return s
+}
+
+func profileName(profile string, options []string) string {
+	s := profile + " profile"
+	if len(options) > 0 {
+		s += " + " + strings.Join(options, ", ")
+	}
+	return s
+}
+
+// loginName is "me@example.com (Max)": the email and the plan, when known.
+func loginName(s provider.AuthStatus) string {
+	who := s.Email
+	if who == "" {
+		who = "this account"
+	}
+	if s.SubscriptionType != "" {
+		who += " (" + strings.ToUpper(s.SubscriptionType[:1]) + s.SubscriptionType[1:] + ")"
+	}
+	return who
+}

@@ -56,6 +56,9 @@ type Spec struct {
 	SessionID *regexp.Regexp
 	// Plugin is the squadrn plugin's ID in the CLI.
 	Plugin string
+	// Credentials is an account's credential file relative to its dir ("" when the CLI keeps
+	// it elsewhere only); other accounts' profiles deny reading it.
+	Credentials string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
 	InstallHint  string
 	NativeMarker string
@@ -220,6 +223,70 @@ type SettingsFormat interface {
 	Deep() []string
 }
 
+// Profiles an account is created with (ADR 0011); DefaultProfile when none is chosen.
+const (
+	ProfileMinimal  = "minimal"
+	ProfileStandard = "standard"
+	ProfileStrict   = "strict"
+	DefaultProfile  = ProfileStandard
+)
+
+// ProfileNames lists the profiles in order, with what each one does in a few words.
+var ProfileNames = []struct{ Name, Summary string }{
+	{ProfileMinimal, "secrets denied"},
+	{ProfileStandard, "secrets denied, push guard, 30-day history"},
+	{ProfileStrict, "sandboxed, reads limited to the project, 14-day history"},
+}
+
+// Options are the opt-in toggles a profile can be combined with.
+var Options = []struct{ Name, Summary string }{
+	{"privacy", "telemetry and error reporting off"},
+	{"no-attribution", "no AI attribution in commits and pull requests"},
+}
+
+// ProfileSummary is the one-line description of a profile; "" for an unknown one.
+func ProfileSummary(name string) string {
+	for _, p := range ProfileNames {
+		if p.Name == name {
+			return p.Summary
+		}
+	}
+	return ""
+}
+
+// ValidOption reports whether name is a known toggle.
+func ValidOption(name string) bool {
+	for _, o := range Options {
+		if o.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// ProfileContext is what a profile needs to know about this machine, as paths in the CLI's own
+// rule syntax (~/ for home, / separators).
+type ProfileContext struct {
+	// OtherCredentials are the credential files of every other account, of every provider.
+	OtherCredentials []string
+	// OwnDirs are squadrn's data and config dirs, which agents must not edit.
+	OwnDirs []string
+	// Hook is the squadrn binary for profile hooks (the strict audit hook); Home the user's home.
+	Hook string
+	Home string
+}
+
+// Profiler builds the settings a profile and options add to main's (a SettingsFormat document).
+type Profiler interface {
+	Profile(name string, options []string, ctx ProfileContext) (map[string]any, error)
+}
+
+// Seeder copies the allowlisted onboarding state from main into a new account dir, so the CLI
+// does not run its first-time setup again; home is the user's home.
+type Seeder interface {
+	Seed(home, dir string) error
+}
+
 // Driver is the code behind a Spec, registered by the provider's own package.
 type Driver struct {
 	// New finds the CLI and returns its driver; extraEnv is added to every invocation (the
@@ -229,6 +296,9 @@ type Driver struct {
 	StatusLine StatusLine
 	// Settings is nil when accounts do not get their own settings file.
 	Settings SettingsFormat
+	// Profiles is nil when the provider has no profiles; Seed when there is nothing to seed.
+	Profiles Profiler
+	Seed     Seeder
 }
 
 var Claude = Spec{
@@ -251,6 +321,7 @@ var Claude = Spec{
 	},
 	SessionID:    regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
 	Plugin:       "squadrn@squadrn",
+	Credentials:  ".credentials.json",
 	InstallHint:  "curl -fsSL https://claude.ai/install.sh | bash",
 	NativeMarker: "/.local/share/claude/versions/",
 	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},
@@ -294,4 +365,15 @@ func Get(id string) (Spec, bool) {
 		}
 	}
 	return Spec{}, false
+}
+
+var versionPattern = regexp.MustCompile(`(?:^|[^0-9.])(\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?)`)
+
+// ParseVersion finds the version in a CLI's --version output ("2.1.329 (Claude Code)",
+// "codex-cli 0.171.0"); "" when there is none.
+func ParseVersion(out []byte) string {
+	if m := versionPattern.FindStringSubmatch(string(out)); m != nil {
+		return m[1]
+	}
+	return ""
 }
