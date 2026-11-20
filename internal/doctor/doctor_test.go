@@ -501,6 +501,10 @@ func TestHookGuardAccountChecks(t *testing.T) {
 	if c, _ := find(e.account(context.Background(), a), "push guard hook not installed"); c.Status != Fail {
 		t.Errorf("missing hook: %+v", c)
 	}
+	main := account.Account{Ref: account.Ref{Provider: "codex", Name: account.Main}, Spec: provider.Codex, Dir: filepath.Join(e.Store.Home, ".codex")}
+	if c, _ := find(e.account(context.Background(), main), "push guard hook not installed"); c.Fix != "squadrn account add codex/main" {
+		t.Errorf("missing hook in main: %+v", c)
+	}
 }
 
 func TestOnlyChecksOneAccount(t *testing.T) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `srn account add codex/main` (or `claude/main`) sets up the default account instead of refusing
+  it as a reserved name: it installs the push guard, asks about usage tracking and the login, and
+  leaves its settings alone. `doctor` suggests it when the default account has no guard, instead of
+  re-running the installer.
+
 ## 1.0.0-rc.4
 
 - **Notifications rewritten** ([ADR 0012](docs/adr/0012-notifications.md)): one notification when

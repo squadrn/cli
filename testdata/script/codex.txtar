@@ -112,6 +112,19 @@ grep 'cfg=.*/home/.codex-work args=login$' home/calls.log
 exec squadrn account ls
 stdout '^codex/work +yes +me@.codex-work +~/.codex-work$'
 
+# account add sets up the default account: the push guard and the login, not settings.
+exec squadrn account add codex/main --no-login --no-usage -y
+stdout '^Codex CLI .*· codex/main, the default account → ~/.codex$'
+stdout '^✓ push guard: pre-tool hook'
+stdout 'log in: srn account login codex/main'
+! stdout 'settings|profile|shared'
+grep 'squadrn-hook\\" guard-git --no-ask' home/.codex/hooks.json
+grep 'hooks.state."[^"]*/.codex/hooks.json:pre_tool_use' home/.codex/config.toml
+exec squadrn account add codex/main --no-login --no-usage -y
+stdout '^✓ codex/main is up to date$'
+! exec squadrn account add codex/main --profile strict
+stderr 'codex/main is the default account \(~/.codex\): --profile, --with and --relink apply to other accounts'
+
 # A bare name both providers have is ambiguous wherever it is used, not an unknown word.
 exec squadrn account add claude/work --no-usage --no-login -y
 ! exec squadrn work -- hi

@@ -94,6 +94,9 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if a.cfgErr != nil {
 		return a.cfgErr
 	}
+	if main, ok := a.store.MainOf(input); ok {
+		return a.accountAddMain(main, o, start)
+	}
 	acct, err := a.store.Define(input)
 	if err != nil {
 		return err
@@ -323,6 +326,116 @@ func (a *app) accountAdd(input string, o addOptions) error {
 		}
 	}
 	if !isNew && changes == 0 {
+		a.out("%s %s is up to date\n", a.paint(a.colorOut, "32", "✓"), acct.Label())
+	}
+	next := "start: " + a.startCommand(acct)
+	if !status.LoggedIn {
+		next = "log in: " + a.cmd + " account login " + acct.Label()
+	}
+	a.out("done in %.1fs · %s · check: %s doctor %s\n", (time.Since(start) - waited).Seconds(), next, a.cmd, acct.Label())
+	return nil
+}
+
+// accountAddMain sets up a provider's default account (~/.claude, ~/.codex), which the CLI
+// creates on its own: squadrn's push guard, usage tracking and the login. Its settings stay the
+// user's own, so profiles and shared links do not apply.
+func (a *app) accountAddMain(acct account.Account, o addOptions, start time.Time) error {
+	if o.profile != "" || o.with != nil || o.relink {
+		return usagef("%s is the default account (%s): --profile, --with and --relink apply to other accounts", acct.Label(), a.tilde(acct.Dir))
+	}
+	ag, err := a.agent(acct.Spec)
+	if err != nil {
+		return err
+	}
+	head := acct.Spec.Name
+	ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+	out, _ := ag.Output(ctx, "", "--version")
+	if v := provider.ParseVersion(out); v != "" {
+		head += " " + v
+	}
+	status, _ := ag.Auth(ctx, acct.ConfigDir())
+	cancel()
+	a.out("%s · %s, the default account → %s\n", head, acct.Label(), a.tilde(acct.Dir))
+
+	ask := a.interactive && !o.yes
+	in := bufio.NewReader(a.stdin)
+	var waited time.Duration
+	asked := time.Now()
+	trackUsage := o.usage != nil && *o.usage
+	noUsage := o.usage != nil && !*o.usage
+	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && !a.usageTracking(acct) {
+		if trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
+			return err
+		}
+	}
+	doLogin := o.login != nil && *o.login
+	if !status.LoggedIn && o.login == nil && ask {
+		if doLogin, err = a.askYes(in, "log in now?", ""); err != nil {
+			return err
+		}
+	}
+	if ask {
+		waited = time.Since(asked)
+	}
+
+	changes := 0
+	note := func(format string, args ...any) {
+		changes++
+		a.out("%s %s\n", a.paint(a.colorOut, "32", "✓"), fmt.Sprintf(format, args...))
+	}
+	warn := func(format string, args ...any) {
+		a.out("%s %s\n", a.paint(a.colorOut, "33", "!"), fmt.Sprintf(format, args...))
+	}
+	if err := os.MkdirAll(acct.Dir, 0o700); err != nil {
+		return err
+	}
+	installed := false
+	if gi, ok := ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
+		if mp := a.marketplaceDir(); mp == "" {
+			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			installed, err = gi.InstallPlugin(ctx, acct.ConfigDir(), mp)
+			cancel()
+			if err != nil {
+				return fmt.Errorf("push guard for %s: %w", acct.Label(), err)
+			}
+		}
+	}
+	if installed {
+		note("push guard: %s", a.guardLine(acct, ag, true))
+	}
+	switch tracking := a.usageTracking(acct); {
+	case trackUsage && !tracking:
+		if err := a.enableUsage(acct); err != nil {
+			warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
+		} else {
+			note("usage tracking on")
+		}
+	case noUsage && tracking:
+		if err := a.disableUsage(acct); err != nil {
+			warn("usage tracking: %v; run: %s usage setup --undo %s", err, a.cmd, acct.Label())
+		} else {
+			note("usage tracking off")
+		}
+	}
+	if doLogin {
+		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
+		loginAt := time.Now()
+		err := ag.Run(acct.ConfigDir(), ag.LoginArgs())
+		waited += time.Since(loginAt)
+		a.cache.Forget(acct.Label())
+		if err != nil {
+			warn("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label())
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+		status, _ = ag.Auth(ctx, acct.ConfigDir())
+		cancel()
+		if status.LoggedIn {
+			note("logged in as %s", loginName(status))
+		}
+	}
+	if changes == 0 {
 		a.out("%s %s is up to date\n", a.paint(a.colorOut, "32", "✓"), acct.Label())
 	}
 	next := "start: " + a.startCommand(acct)
