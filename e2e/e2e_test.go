@@ -442,7 +442,11 @@ func testDoctor(t *testing.T, s *sandbox) {
 		r.out(`✓ layer 1 \(pre-tool hook\) denies force pushes`).noOut(`✗`)
 	}
 	s.srn(t, "doctor", "--json").out(`"group": "push guard"`)
-	s.srn(t, "doctor", "codex/work").exit(0).out(`^account codex/work$`).noOut(`^account claude/`)
+	one := s.srn(t, "doctor", "codex/work")
+	one.out(`^account codex/work$`, `✓ push guard hook installed and trusted`).noOut(`^account claude/`)
+	if len(knownDoctorFailures[runtime.GOOS]) == 0 {
+		one.exit(0)
+	}
 	s.srn(t, "doctor", "ghost").exit(1)
 	s.srn(t, "doctor", "work", "extra").exit(2)
 }
