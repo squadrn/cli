@@ -1,12 +1,10 @@
 name: ci
 
-# Docs-only changes skip these jobs; commit messages are checked by commits.yml on every change.
+# Runs for every change, docs-only ones included, so the required checks always report.
 on:
   push:
     branches: [main]
-    paths-ignore: ["**.md", "docs/**", "LICENSE", "NOTICE", ".github/ISSUE_TEMPLATE/**"]
   pull_request:
-    paths-ignore: ["**.md", "docs/**", "LICENSE", "NOTICE", ".github/ISSUE_TEMPLATE/**"]
   workflow_call:
 
 permissions:
@@ -24,7 +22,24 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      # The same check as .githooks/commit-msg, for commits made without it (other clones, the web).
+      - name: Commit messages (Conventional Commits, no AI attribution)
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD_SHA"
+          elif [ -n "$BEFORE" ] && ! printf '%s' "$BEFORE" | grep -q '^0*$' && git cat-file -e "$BEFORE" 2>/dev/null; then
+            range="$BEFORE..$HEAD_SHA"
+          else
+            range="$HEAD_SHA"
+          fi
+          scripts/commitlint.sh --range "$range"
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod

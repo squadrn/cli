@@ -7,18 +7,20 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/githook"
 	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // executable: Windows has no execute bit; the extension decides (PATHEXT).
@@ -75,13 +77,7 @@ func onPath(name string) []string {
 }
 
 // gitRoot is the Git for Windows installation that provides git.exe ("" if none).
-func gitRoot() string {
-	git, err := exec.LookPath("git")
-	if err != nil {
-		return ""
-	}
-	return filepath.Dir(filepath.Dir(git)) // …\Git\cmd\git.exe
-}
+func gitRoot() string { return githook.GitRoot() }
 
 func firstFile(paths ...string) string {
 	for _, p := range paths {
@@ -201,4 +197,40 @@ func sha(p string) string {
 		return ""
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// sameProgram: command names are copies on Windows (ADR 0008), so a copy with the same content
+// as the running binary is this squadrn too.
+func sameProgram(p, self string) bool {
+	if fsx.SameFile(p, self) {
+		return true
+	}
+	h := sha(p)
+	return h != "" && h == sha(self)
+}
+
+// onFailureSince is the first Claude Code that honours "onFailure": "block" on a hook: older ones
+// let the tool call through when squadrn.exe cannot start (missing, quarantined, blocked).
+var onFailureSince = [3]int{2, 1, 295}
+
+var leadingVersion = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
+
+// versionNotes warns when the Windows guard hook (exec form, fail closed through onFailure)
+// would fail open with this Claude Code.
+func versionNotes(spec provider.Spec, version string) []Check {
+	if spec.Binary != "claude" {
+		return nil
+	}
+	m := leadingVersion.FindStringSubmatch(version)
+	if m == nil {
+		return nil
+	}
+	var v [3]int
+	for i := range v {
+		v[i], _ = strconv.Atoi(m[i+1])
+	}
+	if slices.Compare(v[:], onFailureSince[:]) >= 0 {
+		return nil
+	}
+	return []Check{bad("push guard", Warn, fmt.Sprintf("Claude Code %s lets a tool call through when squadrn.exe cannot start (fail-closed hooks need %d.%d.%d)", m[0], onFailureSince[0], onFailureSince[1], onFailureSince[2]), "claude update")}
 }
