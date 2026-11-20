@@ -57,6 +57,9 @@ func Main() {
 	if f, ok := agents[name]; ok {
 		os.Exit(f(os.Args[1:]))
 	}
+	if notifiers[name] {
+		os.Exit(Notifier(name, os.Args[1:]))
+	}
 }
 
 // logCall appends a line to $HOME/calls.log.

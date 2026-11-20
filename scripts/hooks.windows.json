@@ -7,13 +7,13 @@
       }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify", "Needs input"], "async": true }] }
+      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|auth_success|quota_auto_resume_fired|quota_auto_resume_stale|quota_auto_resume_disabled|plugin_notification", "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify"], "async": true }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify", "Done"], "async": true }] }
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify"], "async": true }] }
     ],
     "StopFailure": [
-      { "matcher": "rate_limit", "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "limit"], "async": true }] }
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}\\..\\bin\\squadrn.exe", "args": ["hook", "notify"], "async": true }] }
     ]
   }
 }
