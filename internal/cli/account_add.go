@@ -170,10 +170,12 @@ func (a *app) accountAdd(input string, o addOptions) error {
 		a.out("  %-14s %s from %s/%s\n", "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
 	}
 	trackUsage := o.usage != nil && *o.usage
+	noUsage := o.usage != nil && !*o.usage
 	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && (isNew || !a.usageTracking(acct)) {
 		if trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
 			return err
 		}
+		noUsage = !trackUsage
 	}
 	status := <-login
 	doLogin := o.login != nil && *o.login
@@ -273,13 +275,22 @@ func (a *app) accountAdd(input string, o addOptions) error {
 			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
 		}
 	}
-	if trackUsage && !a.usageTracking(acct) {
-		step.name = "turn usage tracking on"
+	// A new account copies main's status line, so it may already run the recorder.
+	switch tracking := a.usageTracking(acct); {
+	case trackUsage && !tracking:
 		if err := a.enableUsage(acct); err != nil {
 			warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
 		} else {
 			note("usage tracking on")
 		}
+	case noUsage && tracking:
+		if err := a.disableUsage(acct); err != nil {
+			warn("usage tracking: %v; run: %s usage setup --undo %s", err, a.cmd, acct.Label())
+		} else {
+			note("usage tracking off")
+		}
+	case isNew && tracking:
+		note("usage tracking on")
 	}
 
 	// Verify.

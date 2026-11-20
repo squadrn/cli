@@ -57,6 +57,21 @@ stdout 'already on'
 exec squadrn account add work
 ! stdout 'usage tracking'
 
+# A new account copies main's status line: --no-usage takes the recorder out and keeps it out,
+# tracking says so either way.
+exec squadrn account add nouse --no-usage --no-login
+stdout '^✓ usage tracking off$'
+grep '"command": "echo mine; printf ' home/.claude-nouse/settings.json
+! grep 'hook statusline' home/.claude-nouse/settings.json
+exec squadrn account add nouse --no-login
+! stdout 'usage tracking'
+! grep 'hook statusline' home/.claude-nouse/settings.json
+exec squadrn account add use --usage --no-login
+stdout '^✓ usage tracking on$'
+grep 'hook statusline' home/.claude-use/settings.json
+exec squadrn account rm nouse --yes
+exec squadrn account rm use --yes
+
 # The wrapped command still runs, with the same input, and its output and exit status pass through.
 stdin status.json
 exec squadrn hook statusline --then 'echo mine; printf ''%s'' x'

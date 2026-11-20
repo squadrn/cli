@@ -208,6 +208,38 @@ func (a *app) enableUsage(acct account.Account) error {
 	return nil
 }
 
+// disableUsage turns usage tracking off for acct without asking (account add --no-usage). An
+// account other than main keeps the status line it copied from main without the recorder, as a
+// key of its own, so the settings sync does not bring main's recorder back.
+func (a *app) disableUsage(acct account.Account) error {
+	if !a.usageTracking(acct) {
+		return nil
+	}
+	groups, err := a.settingsGroups([]account.Account{acct})
+	if err != nil {
+		return err
+	}
+	for _, g := range groups {
+		if acct.IsMain() {
+			if err := a.setupGroup(g, true, true, true); err != nil {
+				return err
+			}
+			continue
+		}
+		_, old, has, ours, err := g.tracked()
+		if err != nil || !has || !ours {
+			return err
+		}
+		if err := g.sl.SetCommand(g.path, old); err != nil {
+			return err
+		}
+		if err := g.claim(true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // restoreStatusLines undoes usage tracking in every account (self-uninstall).
 func (a *app) restoreStatusLines() {
 	accts, err := a.store.List()
