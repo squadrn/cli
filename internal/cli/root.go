@@ -63,8 +63,11 @@ type app struct {
 	colorOut, colorErr bool
 	// cfgWarned: the invalid-config warning was shown in this run.
 	cfgWarned bool
-	cache     provider.AuthCache
-	now       func() time.Time
+	// named: this run already said which account the session runs as (swap), so the banner
+	// does not repeat it.
+	named bool
+	cache provider.AuthCache
+	now   func() time.Time
 	// agents overrides how provider CLIs are found (tests); nil uses the real ones.
 	agents func(provider.Spec) (provider.Agent, error)
 	// signers are the release signing keys updates must be signed with; "" when the build has none.
@@ -531,7 +534,9 @@ func (a *app) banner(acct account.Account) {
 	if !a.ttyErr {
 		return
 	}
-	a.errf("%s: account %s (%s)\n", a.cmd, a.paint(a.colorErr, "1", acct.Label()), a.tilde(acct.Dir))
+	if !a.named {
+		a.errf("%s: account %s (%s)\n", a.cmd, a.paint(a.colorErr, "1", acct.Label()), a.tilde(acct.Dir))
+	}
 	if s, ok := a.cache.Cached(acct.Label()); ok && !s.LoggedIn {
 		a.warnf("%s is not logged in; run: %s account login %s", acct.Label(), a.cmd, acct.Label())
 	}

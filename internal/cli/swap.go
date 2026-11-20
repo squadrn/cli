@@ -144,7 +144,11 @@ func (a *app) swap(o swapOptions) error {
 	if from.Label() != to.Label() {
 		fromOrg, toOrg := st[0].Status.OrgName, st[1].Status.OrgName
 		if st[0].Err == nil && st[1].Err == nil && fromOrg != toOrg {
-			if err := a.confirm(o.yes, "Move the conversation from %s (%s) to %s (%s), another organization", from.Label(), orgOr(fromOrg), to.Label(), orgOr(toOrg)); err != nil {
+			what := "Move the conversation from %s (%s) to %s (%s)"
+			if fromOrg != "" && toOrg != "" {
+				what += ", another organization"
+			}
+			if err := a.confirm(o.yes, what, from.Label(), orgOr(fromOrg), to.Label(), orgOr(toOrg)); err != nil {
 				return err
 			}
 		}
@@ -183,6 +187,7 @@ func (a *app) swap(o swapOptions) error {
 		if err := os.Chdir(src.cwd); err != nil {
 			return err
 		}
+		a.named = true
 		return a.session(ag, *to, ss.ResumeArgs(src.session.ID), "")
 	}
 	command := proc.ShellQuote(append([]string{selfPath(), "-a", to.Label()}, ss.ResumeArgs(src.session.ID)...)...)
@@ -483,7 +488,7 @@ func (a *app) waitGone(h holder) bool {
 
 func orgOr(org string) string {
 	if org == "" {
-		return "personal"
+		return "no organization"
 	}
 	return org
 }

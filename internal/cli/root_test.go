@@ -33,6 +33,14 @@ func TestBannerAndPickerNeedATerminalNotColors(t *testing.T) {
 	if !strings.Contains(stderr.String(), "\033[1mclaude/main\033[0m") {
 		t.Fatalf("banner with colors: %q", stderr.String())
 	}
+	// A run that already named the account (swap) does not repeat it.
+	a.named = true
+	stderr.Reset()
+	a.banner(acct)
+	if stderr.Len() != 0 {
+		t.Fatalf("banner after swap named the account: %q", stderr.String())
+	}
+	a.named = false
 	// Not a terminal: no banner, and the picker lists the accounts instead of drawing.
 	a.ttyErr = false
 	stderr.Reset()

@@ -31,6 +31,10 @@ exec sh -c 'touch "$HOME/.claude/projects/$(cat ../key.txt)/sid-2.jsonl"'
 exitcode 2 squadrn swap --worktree feat-s --to personal
 ! exec squadrn swap --worktree feat-s --to personal
 stderr 'move the conversation from claude/main \(Org A\) to claude/personal \(Org B\), another organization; re-run with --yes'
+rm $WORK/home/.claude-personal/.org
+! exec squadrn swap --worktree feat-s --to personal
+stderr 'move the conversation from claude/main \(Org A\) to claude/personal \(no organization\); re-run with --yes'
+cp $WORK/org-b $WORK/home/.claude-personal/.org
 exec squadrn swap --worktree feat-s --to personal --yes
 stdout 'swap feat-s: claude/main → claude/personal'
 rm $WORK/home/.claude/.org $WORK/home/.claude-personal/.org
