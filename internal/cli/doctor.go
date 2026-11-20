@@ -50,6 +50,7 @@ func (a *app) printChecks(checks []doctor.Check) error {
 		doctor.OK:   a.paint(a.colorOut, "32", "✓"),
 		doctor.Warn: a.paint(a.colorOut, "33", "!"),
 		doctor.Fail: a.paint(a.colorOut, "31", "✗"),
+		doctor.Skip: a.paint(a.colorOut, "2", "–"),
 	}
 	group := ""
 	counts := map[doctor.Status]int{}

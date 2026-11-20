@@ -10,7 +10,8 @@ exec sh -c 'ln -s /elsewhere home/.claude-personal/agents && ln -s /gone home/.c
 ! exec squadrn doctor
 stdout '^install$'
 stdout '✓ git'
-stdout '! claude at .* is not the native build'
+stdout '! claude .* at .* is not the native build'
+! stdout '✓ claude'
 stdout '! squadrn plugin files not installed'
 stdout '^settings & hooks$'
 stdout '✓ settings.json valid'

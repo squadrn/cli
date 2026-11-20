@@ -32,6 +32,8 @@ const (
 	OK Status = iota
 	Warn
 	Fail
+	// Skip: something optional is not there; neither a pass nor a problem.
+	Skip
 )
 
 func (s Status) String() string {
@@ -40,6 +42,8 @@ func (s Status) String() string {
 		return "ok"
 	case Warn:
 		return "warn"
+	case Skip:
+		return "skip"
 	}
 	return "fail"
 }
@@ -92,7 +96,6 @@ type Env struct {
 func Run(ctx context.Context, e Env) []Check {
 	var checks []Check
 	checks = append(checks, e.install(ctx)...)
-	checks = append(checks, e.versions(ctx)...)
 	checks = append(checks, e.guard(ctx)...)
 	checks = append(checks, e.settings()...)
 	checks = append(checks, e.accounts(ctx)...)
@@ -139,22 +142,33 @@ func (e Env) install(ctx context.Context) []Check {
 		out = append(out, c)
 	}
 	used := e.usedProviders()
+	var later []Check
 	for _, spec := range provider.All() {
 		bin, err := e.LookPath(spec.Binary)
-		switch {
-		case err != nil && !used[spec.ID]:
-			continue // an optional provider nobody uses
-		case err != nil:
-			out = append(out, bad(g, Fail, spec.Binary+" not on PATH", spec.InstallHint))
+		if err != nil {
+			if used[spec.ID] {
+				out = append(out, bad(g, Fail, spec.Binary+" not on PATH", spec.InstallHint))
+			} // else an optional provider nobody uses
 			continue
+		}
+		// One line per CLI: its version, for bug reports, and how it is installed.
+		name, notes := e.version(ctx, spec)
+		switch {
 		case spec.NativeMarker != "":
 			if real, _ := filepath.EvalSymlinks(bin); !strings.Contains(real, spec.NativeMarker) {
-				out = append(out, bad(g, Warn, spec.Binary+" at "+e.tilde(bin)+" is not the native build (no auto-update)", spec.InstallHint))
+				out = append(out, bad(g, Warn, name+" at "+e.tilde(bin)+" is not the native build (no auto-update)", spec.InstallHint))
 				break
 			}
-			out = append(out, ok(g, spec.Binary+" native build"))
+			out = append(out, ok(g, name+", native build"))
 		default:
-			out = append(out, ok(g, spec.Binary))
+			out = append(out, ok(g, name))
+		}
+		for _, n := range notes {
+			if n.Group == g {
+				out = append(out, n)
+			} else {
+				later = append(later, n) // after the install group, next to its own group's checks
+			}
 		}
 		if dups := onPath(spec.Binary); len(dups) > 1 {
 			for i := range dups {
@@ -179,7 +193,7 @@ func (e Env) install(ctx context.Context) []Check {
 	}{{"git", Fail, "required"}, {"tmux", Warn, "needed by grid, ps, swap"}, {"gh", OK, "optional: PR detection in gc, the branch protection check"}} {
 		switch _, err := e.LookPath(t.name); {
 		case err != nil && t.status == OK:
-			out = append(out, ok(g, t.name+" not installed ("+t.why+")"))
+			out = append(out, bad(g, Skip, t.name+" not installed ("+t.why+")", ""))
 		case err != nil:
 			out = append(out, bad(g, t.status, t.name+" missing ("+t.why+")", "install "+t.name))
 		case t.name == "git":
@@ -201,7 +215,7 @@ func (e Env) install(ctx context.Context) []Check {
 	} else {
 		out = append(out, ok(g, "plugin marketplace"))
 	}
-	return out
+	return append(out, later...)
 }
 
 // installedRelease compares the installed release with the running binary when that binary is
@@ -239,29 +253,24 @@ func (e Env) installedRelease() (Check, bool) {
 	return ok(g, "installed release "+running), true
 }
 
-// versions reports each installed agent CLI's version, for bug reports. Information only.
-func (e Env) versions(ctx context.Context) []Check {
-	var out []Check
-	for _, spec := range provider.All() {
-		if _, err := e.LookPath(spec.Binary); err != nil || e.Agent == nil {
-			continue
-		}
-		ag, err := e.Agent(spec)
-		if err != nil {
-			continue
-		}
-		vctx, cancel := context.WithTimeout(ctx, e.Timeout)
-		b, err := ag.Output(vctx, "", "--version")
-		cancel()
-		v := strings.TrimSpace(string(b))
-		if err != nil || v == "" {
-			out = append(out, bad("install", Warn, spec.Binary+" --version failed", spec.InstallHint))
-			continue
-		}
-		out = append(out, ok("install", spec.Binary+" "+v))
-		out = append(out, versionNotes(spec, v)...)
+// version names spec's CLI with its version ("claude 2.1.0 (Claude Code)"), and adds a warning
+// when it cannot be read, plus what the platform says about that version.
+func (e Env) version(ctx context.Context, spec provider.Spec) (string, []Check) {
+	if e.Agent == nil {
+		return spec.Binary, nil
 	}
-	return out
+	ag, err := e.Agent(spec)
+	if err != nil {
+		return spec.Binary, nil
+	}
+	vctx, cancel := context.WithTimeout(ctx, e.Timeout)
+	b, err := ag.Output(vctx, "", "--version")
+	cancel()
+	v := strings.TrimSpace(string(b))
+	if err != nil || v == "" {
+		return spec.Binary, []Check{bad("install", Warn, spec.Binary+" --version failed", spec.InstallHint)}
+	}
+	return spec.Binary + " " + v, versionNotes(spec, v)
 }
 
 // guard checks the three push-guard layers.

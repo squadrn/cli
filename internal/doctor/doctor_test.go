@@ -400,22 +400,36 @@ func TestConfigAndInstalledRelease(t *testing.T) {
 	}
 }
 
-func TestVersions(t *testing.T) {
+func TestVersionsJoinTheCLILine(t *testing.T) {
 	e := env(t, fakeAgent{loggedIn: true}, nil)
-	if len(e.versions(context.Background())) != 0 {
+	if _, found := find(e.install(context.Background()), "claude 2.1.0"); found {
 		t.Fatal("version of a CLI that is not on PATH")
 	}
+	// A missing optional tool is neither a pass nor a problem.
+	if c, _ := find(e.install(context.Background()), "gh not installed"); c.Status != Skip || c.Status.String() != "skip" {
+		t.Errorf("missing gh: %+v", c)
+	}
 	e.LookPath = func(string) (string, error) { return "/bin/claude", nil }
-	if c, _ := find(e.versions(context.Background()), "claude 2.1.0 (Claude Code)"); c.Status != OK || c.Group != "install" {
+	checks := e.install(context.Background())
+	if c, _ := find(checks, "claude 2.1.0 (Claude Code) at /bin/claude is not the native build"); c.Status != Warn || c.Group != "install" {
 		t.Errorf("version: %+v", c)
 	}
+	n := 0
+	for _, c := range checks {
+		if strings.HasPrefix(c.Name, "claude ") || c.Name == "claude" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("claude listed %d times: %+v", n, checks)
+	}
 	e.Agent = func(provider.Spec) (provider.Agent, error) { return fakeAgent{}, nil }
-	if c, _ := find(e.versions(context.Background()), "--version failed"); c.Status != Warn {
+	if c, _ := find(e.install(context.Background()), "--version failed"); c.Status != Warn {
 		t.Errorf("no version: %+v", c)
 	}
 	e.Agent = func(provider.Spec) (provider.Agent, error) { return nil, errors.New("x") }
-	if len(e.versions(context.Background())) != 0 {
-		t.Error("agent error reported twice")
+	if _, found := find(e.install(context.Background()), "--version failed"); found {
+		t.Error("agent error reported as a version failure")
 	}
 }
 
