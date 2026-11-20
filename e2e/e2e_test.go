@@ -311,7 +311,7 @@ func testGrid(t *testing.T, s *sandbox) {
 	calls := filepath.Join(s.home, "calls.log")
 	s.waitFor(t, calls, `cfg=<unset> pwd=.*repo args=--worktree feat-g`)
 	s.waitFor(t, calls, `cfg=.*\.claude-personal pwd=.*repo args=--worktree feat-h`)
-	s.srn(t, "ps").exit(0).out(`^srn-repo +claude/main +feat-g `, `^srn-repo +claude/personal +feat-h `)
+	s.srn(t, "ps").exit(0).out(`^claude/main +feat-g +- +srn-repo %[0-9]+ `, `^claude/personal +feat-h +- +srn-repo %[0-9]+ `)
 	s.srn(t, "grid", "ls").exit(0).out(`^srn-repo +.*repo +2 +no$`)
 	s.srn(t, "grid", "attach", "repo").exit(1)
 	s.srnIn(t, repo, "grid", "stop").exit(2)
