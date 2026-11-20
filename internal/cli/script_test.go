@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,12 +19,13 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
-	"github.com/squadrn/squadrn/internal/release"
-
+	"github.com/squadrn/squadrn/internal/fakeagent"
 	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/release"
 )
 
 func TestMain(m *testing.M) {
+	fakeagent.Main()
 	cmds := map[string]func(){
 		"squadrn": func() {
 			// Scripts sign their fake releases with their own key, never the real one.
@@ -48,198 +48,11 @@ func TestMain(m *testing.M) {
 		},
 	}
 	if runtime.GOOS == "windows" {
-		// Windows cannot run the shell-script fake; claude.exe is this test binary instead.
-		cmds["claude"] = func() { os.Exit(fakeClaudeMain(os.Args[1:])) }
+		// Windows runs no shell-script wrapper: claude.exe is this test binary, by name.
+		cmds["claude"] = func() { os.Exit(fakeagent.Claude(os.Args[1:])) }
 	}
 	testscript.Main(m, cmds)
 }
-
-// appendCall records an invocation in $HOME/calls.log like the shell fake does.
-func appendCall(cfg, cmd string) {
-	f, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), "calls.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err == nil {
-		_, _ = fmt.Fprintf(f, "cfg=%s args=%s\n", cfg, cmd)
-		_ = f.Close()
-	}
-}
-
-// fakeClaudeMain behaves exactly like the fakeClaude shell script, for Windows.
-func fakeClaudeMain(args []string) int {
-	cfg := os.Getenv("CLAUDE_CONFIG_DIR")
-	dir := cfg
-	if cfg == "" {
-		cfg, dir = "<unset>", filepath.Join(os.Getenv("HOME"), ".claude")
-	}
-	cmd := strings.Join(args, " ")
-	exists := func(name string) bool { _, err := os.Stat(filepath.Join(dir, name)); return err == nil }
-	cat := func(name, fallback string) {
-		if b, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
-			fmt.Print(string(b))
-		} else {
-			fmt.Println(fallback)
-		}
-	}
-	switch {
-	case cmd == "auth status":
-		org, _ := os.ReadFile(filepath.Join(dir, ".org"))
-		plan, _ := os.ReadFile(filepath.Join(dir, ".plan"))
-		if exists(".loggedin") {
-			fmt.Printf(`{"loggedIn":true,"email":"me@%s","orgName":"%s","subscriptionType":"%s"}`+"\n", filepath.Base(dir), strings.TrimSpace(string(org)), strings.TrimSpace(string(plan)))
-			return 0
-		}
-		fmt.Println(`{"loggedIn":false}`)
-		return 1
-	case cmd == "auth logout":
-		_ = os.Remove(filepath.Join(dir, ".loggedin"))
-	case cmd == "auth login":
-		_ = os.WriteFile(filepath.Join(dir, ".loggedin"), nil, 0o600)
-	case strings.HasPrefix(cmd, "mcp get "):
-		b, _ := os.ReadFile(filepath.Join(dir, ".mcp"))
-		if !slices.Contains(strings.Split(strings.ReplaceAll(string(b), "\r", ""), "\n"), args[2]) {
-			return 1
-		}
-	case strings.HasPrefix(cmd, "mcp add-json -s user ") && len(args) > 4:
-		f, err := os.OpenFile(filepath.Join(dir, ".mcp"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err == nil {
-			_, _ = fmt.Fprintln(f, args[4])
-			_ = f.Close()
-		}
-	case cmd == "plugin marketplace list --json":
-		cat(".markets", "[]")
-	case strings.HasPrefix(cmd, "plugin marketplace add "):
-		_ = os.WriteFile(filepath.Join(dir, ".markets"), []byte(`[{"name":"squadrn"}]`+"\n"), 0o644)
-	case cmd == "plugin list --json":
-		cat(".plugins", "[]")
-	case strings.HasPrefix(cmd, "plugin install "):
-		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"squadrn@squadrn"}]`+"\n"), 0o644)
-	case strings.HasPrefix(cmd, "plugin uninstall "):
-		_ = os.Remove(filepath.Join(dir, ".plugins"))
-		appendCall(cfg, cmd)
-	case strings.HasPrefix(cmd, "plugin marketplace remove "):
-		_ = os.Remove(filepath.Join(dir, ".markets"))
-		appendCall(cfg, cmd)
-	default:
-		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)
-		wd, _ := os.Getwd()
-		if real, err := filepath.EvalSymlinks(wd); err == nil {
-			wd = real
-		}
-		f, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), "calls.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err == nil {
-			_, _ = fmt.Fprintf(f, "cfg=%s pwd=%s args=%s\n", cfg, wd, cmd)
-			_ = f.Close()
-		}
-		if id := os.Getenv("FAKE_HOLD"); id != "" {
-			// A running session listed in Claude Code's registry until it is terminated.
-			pid := os.Getpid()
-			entry, _ := json.Marshal(map[string]any{"pid": pid, "sessionId": id, "cwd": wd, "status": "busy", "kind": "interactive"})
-			if os.Getenv("FAKE_NOREG") == "" {
-				_ = os.MkdirAll(filepath.Join(dir, "sessions"), 0o755)
-				_ = os.WriteFile(filepath.Join(dir, "sessions", strconv.Itoa(pid)+".json"), entry, 0o644)
-			}
-			_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), "held.txt"), []byte(strconv.Itoa(pid)+"\n"), 0o644)
-			time.Sleep(60 * time.Second)
-		}
-	}
-	return 0
-}
-
-// fakeClaude answers the queries squadrn makes and records every other invocation in
-// $HOME/calls.log. Inside a tmux pane it stays alive like an interactive session. With
-// FAKE_HOLD=<session> it lists itself in the account's session registry (not with FAKE_NOREG
-// set), writes its pid to $HOME/held.txt and runs until interrupted.
-// `auth status` reports logged in when <config dir>/.loggedin exists, with .org and .plan.
-const fakeClaude = `#!/bin/sh
-cfg=${CLAUDE_CONFIG_DIR:-<unset>}
-dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
-case "$*" in
-  "auth status")
-    org=$(cat "$dir/.org" 2>/dev/null)
-    plan=$(cat "$dir/.plan" 2>/dev/null)
-    if [ -f "$dir/.loggedin" ]; then echo '{"loggedIn":true,"email":"me@'"$(basename "$dir")"'","orgName":"'"$org"'","subscriptionType":"'"$plan"'"}'; exit 0; fi
-    echo '{"loggedIn":false}'; exit 1 ;;
-  "auth logout") rm -f "$dir/.loggedin"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
-  "auth login") [ -n "$FAKE_LOGIN_FAILS" ] || : >"$dir/.loggedin"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
-  "mcp get "*) grep -qx "$3" "$dir/.mcp" 2>/dev/null ;;
-  "mcp add-json -s user "*) echo "$5" >>"$dir/.mcp" ;;
-  "plugin marketplace list --json") cat "$dir/.markets" 2>/dev/null || echo '[]' ;;
-  "plugin marketplace add "*) echo '[{"name":"squadrn"}]' >"$dir/.markets" ;;
-  "plugin list --json") cat "$dir/.plugins" 2>/dev/null || echo '[]' ;;
-  "plugin install "*) echo '[{"id":"squadrn@squadrn"}]' >"$dir/.plugins" ;;
-  "plugin uninstall "*) rm -f "$dir/.plugins"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
-  "plugin marketplace remove "*) rm -f "$dir/.markets"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
-  *)
-    echo "cfg=$cfg args=$*"
-    echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"
-    if [ -n "$FAKE_HOLD" ]; then
-      [ -n "$FAKE_NOREG" ] || mkdir -p "$dir/sessions"
-      [ -n "$FAKE_NOREG" ] || printf '{"pid":%s,"sessionId":"%s","cwd":"%s","status":"busy","kind":"interactive"}\n' $$ "$FAKE_HOLD" "$(pwd -P)" >"$dir/sessions/$$.json"
-      trap 'rm -f "$dir/sessions/$$.json"; echo "stopped $$" >>"$HOME/calls.log"; kill $! 2>/dev/null; exit 0' INT TERM
-      echo $$ >"$HOME/held.txt"
-      sleep 60 &
-      wait
-    fi
-    if [ -n "$TMUX_PANE" ]; then sleep 60; fi ;;
-esac
-`
-
-// fakeCodex stands in for the Codex CLI the way fakeClaude does for Claude Code; its account dir
-// is $CODEX_HOME, else ~/.codex. `login status` reports logged in when <dir>/.loggedin exists;
-// `app-server` answers initialize, account/read, account/rateLimits/read (from <dir>/.limits),
-// hooks/list (squadrn's guard hook from hooks.json, keyed and hashed like Codex, trusted when
-// config.toml records that hash) and config/batchWrite (records the trust).
-const fakeCodex = `#!/bin/sh
-cfg=${CODEX_HOME:-<unset>}
-dir=${CODEX_HOME:-$HOME/.codex}
-log() { echo "cfg=$cfg args=$*" >>"$HOME/calls.log"; }
-case "$*" in
-  "--version") echo "codex-cli 0.171.0" ;;
-  "login status")
-    if [ -f "$dir/.loggedin" ]; then echo "Logged in using ChatGPT" >&2; exit 0; fi
-    echo "Not logged in" >&2; exit 1 ;;
-  "login") [ -n "$FAKE_LOGIN_FAILS" ] || : >"$dir/.loggedin"; log "$@" ;;
-  "logout") rm -f "$dir/.loggedin"; log "$@" ;;
-  "mcp get "*) grep -qx "$3" "$dir/.mcp" 2>/dev/null ;;
-  "mcp add "*) echo "$3" >>"$dir/.mcp"; log "$@" ;;
-  "mcp list --json") cat "$dir/.mcplist" 2>/dev/null || echo '[]' ;;
-  "app-server")
-    hooks="$dir/hooks.json"
-    key="$(cd "$dir" && pwd -P)/hooks.json:pre_tool_use:0:0"
-    while IFS= read -r line; do
-      id=$(printf '%s' "$line" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
-      method=$(printf '%s' "$line" | sed -n 's/.*"method":"\([^"]*\)".*/\1/p')
-      [ -n "$id" ] || continue
-      case "$method" in
-        initialize) echo '{"id":'"$id"',"result":{"userAgent":"fake"}}' ;;
-        account/read)
-          if [ -f "$dir/.loggedin" ]; then echo '{"id":'"$id"',"result":{"account":{"type":"chatgpt","email":"me@'"$(basename "$dir")"'","planType":"pro"},"requiresOpenaiAuth":true}}'
-          else echo '{"id":'"$id"',"result":{"account":null,"requiresOpenaiAuth":true}}'; fi ;;
-        account/rateLimits/read)
-          if [ -f "$dir/.limits" ]; then echo '{"id":'"$id"',"result":'"$(cat "$dir/.limits")"'}'
-          else echo '{"id":'"$id"',"error":{"code":-32600,"message":"codex account authentication required to read rate limits"}}'; fi ;;
-        hooks/list)
-          cmd=$(sed -n 's/^ *"command": "\(.*squadrn-hook.*\)",*$/\1/p' "$hooks" 2>/dev/null | head -n 1)
-          if [ -z "$cmd" ]; then echo '{"id":'"$id"',"result":{"data":[{"cwd":"/","hooks":[],"warnings":[],"errors":[]}]}}'; continue; fi
-          hash="sha256:$(cksum <"$hooks" | cut -d' ' -f1)"
-          trust=untrusted
-          grep -q "trusted_hash = \"$hash\"" "$dir/config.toml" 2>/dev/null && trust=trusted
-          echo '{"id":'"$id"',"result":{"data":[{"cwd":"/","hooks":[{"key":"'"$key"'","eventName":"preToolUse","handlerType":"command","command":"'"$cmd"'","matcher":"Bash","sourcePath":"'"$(cd "$dir" && pwd -P)"'/hooks.json","source":"user","enabled":true,"isManaged":false,"currentHash":"'"$hash"'","trustStatus":"'"$trust"'"}],"warnings":[],"errors":[]}]}}' ;;
-        config/batchWrite)
-          hash=$(printf '%s' "$line" | sed -n 's/.*"trusted_hash":"\([^"]*\)".*/\1/p')
-          grep -v -e '^\[hooks.state.".*/hooks.json:pre_tool_use:0:0"\]$' -e '^trusted_hash = ' "$dir/config.toml" >"$dir/config.toml.new"
-          mv "$dir/config.toml.new" "$dir/config.toml"
-          printf '[hooks.state."%s"]\ntrusted_hash = "%s"\n' "$key" "$hash" >>"$dir/config.toml"
-          log app-server config/batchWrite
-          echo '{"id":'"$id"',"result":{"status":"ok"}}' ;;
-        *) echo '{"id":'"$id"',"error":{"code":-32601,"message":"unknown method"}}' ;;
-      esac
-    done ;;
-  *)
-    echo "cfg=$cfg args=$*"
-    echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"
-    if [ -n "$TMUX_PANE" ]; then sleep 60; fi ;;
-esac
-`
 
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
@@ -292,16 +105,32 @@ func TestScript(t *testing.T) {
 					return err
 				}
 			}
-			if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(fakeClaude), 0o755); err != nil {
-				return err
+			if runtime.GOOS != "windows" {
+				// The shared fake (internal/fakeagent) is this test binary; a wrapper script, so a
+				// script can replace or move bin/claude without touching the binary.
+				self, err := os.Executable()
+				if err != nil {
+					return err
+				}
+				wrapper := "#!/bin/sh\nFAKE_AGENT=claude exec '" + strings.ReplaceAll(self, "'", `'\''`) + "' \"$@\"\n"
+				if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(wrapper), 0o755); err != nil {
+					return err
+				}
 			}
-			// codex is installed by the scripts that use it (cp $CODEX_FAKE bin/codex): without it
-			// on PATH, the optional provider stays out of every other script's output.
-			fake := filepath.Join(env.WorkDir, "fake-codex")
-			if err := os.WriteFile(fake, []byte(fakeCodex), 0o755); err != nil {
-				return err
+			if runtime.GOOS != "windows" {
+				// codex is installed by the scripts that use it (cp $CODEX_FAKE bin/codex): without
+				// it on PATH, the optional provider stays out of every other script's output.
+				self, err := os.Executable()
+				if err != nil {
+					return err
+				}
+				fake := filepath.Join(env.WorkDir, "fake-codex")
+				wrapper := "#!/bin/sh\nFAKE_AGENT=codex exec '" + strings.ReplaceAll(self, "'", `'\''`) + "' \"$@\"\n"
+				if err := os.WriteFile(fake, []byte(wrapper), 0o755); err != nil {
+					return err
+				}
+				env.Setenv("CODEX_FAKE", fake)
 			}
-			env.Setenv("CODEX_FAKE", fake)
 			shim, err := filepath.Abs(filepath.Join("..", "..", "plugin", "bin", "squadrn-hook"))
 			if err != nil {
 				return err
