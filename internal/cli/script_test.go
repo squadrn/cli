@@ -108,10 +108,12 @@ func fakeClaudeMain(args []string) int {
 		cat(".markets", "[]")
 	case strings.HasPrefix(cmd, "plugin marketplace add "):
 		_ = os.WriteFile(filepath.Join(dir, ".markets"), []byte(`[{"name":"squadrn"}]`+"\n"), 0o644)
+	case cmd == "--version" && os.Getenv("FAKE_VERSION") != "":
+		fmt.Println(os.Getenv("FAKE_VERSION") + " (Claude Code)")
 	case cmd == "plugin list --json":
 		cat(".plugins", "[]")
 	case strings.HasPrefix(cmd, "plugin install "):
-		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"squadrn@squadrn"}]`+"\n"), 0o644)
+		_ = os.WriteFile(filepath.Join(dir, ".plugins"), []byte(`[{"id":"squadrn@squadrn","enabled":true}]`+"\n"), 0o644)
 	case strings.HasPrefix(cmd, "plugin uninstall "):
 		_ = os.Remove(filepath.Join(dir, ".plugins"))
 		appendCall(cfg, cmd)
@@ -165,7 +167,8 @@ case "$*" in
   "plugin marketplace list --json") cat "$dir/.markets" 2>/dev/null || echo '[]' ;;
   "plugin marketplace add "*) echo '[{"name":"squadrn"}]' >"$dir/.markets" ;;
   "plugin list --json") cat "$dir/.plugins" 2>/dev/null || echo '[]' ;;
-  "plugin install "*) echo '[{"id":"squadrn@squadrn"}]' >"$dir/.plugins" ;;
+  "plugin install "*) echo '[{"id":"squadrn@squadrn","enabled":true}]' >"$dir/.plugins" ;;
+  "--version") if [ -n "$FAKE_VERSION" ]; then echo "$FAKE_VERSION (Claude Code)"; else echo "cfg=$cfg args=$*"; echo "cfg=$cfg pwd=$(pwd -P) args=$*" >>"$HOME/calls.log"; fi ;;
   "plugin uninstall "*) rm -f "$dir/.plugins"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
   "plugin marketplace remove "*) rm -f "$dir/.markets"; echo "cfg=$cfg args=$*" >>"$HOME/calls.log" ;;
   *)
@@ -186,7 +189,7 @@ esac
 // scriptEnv lists the variables Setup controls; exitcode forwards them to its child.
 var scriptEnv = []string{
 	"HOME", "PATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "CLAUDE_CONFIG_DIR",
-	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "FAKE_LOGIN_FAILS", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
+	"SQUADRN_MARKETPLACE", "SQUADRN_SHARED_MCP", "SQUADRN_REPO", "SQUADRN_TEST_SIGNERS", "SQUADRN_TEST_VERSION", "SQUADRN_TEST_TTY", "SQUADRN_TEST_API", "GH_TOKEN", "GITHUB_TOKEN", "USERPROFILE", "FAKE_HOLD", "FAKE_NOREG", "FAKE_LOGIN_FAILS", "FAKE_VERSION", "XDG_STATE_HOME", "TMUX", "TMUX_TMPDIR", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
 	"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 }
 

@@ -402,7 +402,7 @@ func (a *app) usageSetup(target string, all, undo, yes bool) error {
 		yes = true
 	}
 	for _, g := range groups {
-		if err := a.setupGroup(g, undo, yes); err != nil {
+		if err := a.setupGroup(g, undo, yes, false); err != nil {
 			return err
 		}
 	}

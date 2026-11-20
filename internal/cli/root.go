@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -602,11 +601,11 @@ func (a *app) addInteractively() error {
 	if err != nil {
 		return err
 	}
-	if err := a.provision(acct, ag); err != nil {
+	yes := true
+	if err := a.accountAdd(acct.Label(), addOptions{login: &yes}); err != nil {
 		return err
 	}
-	a.cache.Forget(acct.Label())
-	return a.session(ag, acct, ag.LoginArgs(), "")
+	return a.session(ag, acct, nil, "")
 }
 
 // marketplaceDir locates the local squadrn plugin marketplace: $SQUADRN_MARKETPLACE, else the
@@ -622,51 +621,6 @@ func (a *app) marketplaceDir() string {
 
 func (a *app) provisioner(ag provider.Agent) account.Provisioner {
 	return account.Provisioner{Store: a.store, Agent: ag, SharedMCP: a.cfg.SharedMCP, Marketplace: a.marketplaceDir()}
-}
-
-func (a *app) provision(acct account.Account, ag provider.Agent) error {
-	return a.provisionWith(acct, ag, false)
-}
-
-// provisionWith creates or repairs acct; relink moves its own copies of shared files aside.
-func (a *app) provisionWith(acct account.Account, ag provider.Agent, relink bool) error {
-	if a.cfgErr != nil {
-		return a.cfgErr
-	}
-	p := a.provisioner(ag)
-	p.Relink = relink
-	rep, err := p.Provision(context.Background(), acct)
-	a.out("account %s → %s\n", acct.Label(), a.tilde(acct.Dir))
-	for _, dst := range slices.Sorted(maps.Keys(rep.Backups)) {
-		a.out("  moved %s aside to %s\n", a.tilde(dst), a.tilde(rep.Backups[dst]))
-	}
-	for _, l := range rep.Linked {
-		a.out("  linked %s\n", a.tilde(l))
-	}
-	for _, l := range rep.Unlinked {
-		a.out("  removed stale link %s\n", a.tilde(l))
-	}
-	for _, c := range rep.Conflicts {
-		a.out("  kept %s (exists and is not a link to main; to link it: %s)\n", a.tilde(c), a.relinkHint(acct))
-	}
-	for _, m := range rep.MCPAdded {
-		a.out("  mcp added %s\n", m)
-	}
-	for _, m := range rep.MCPSkipped {
-		a.out("  mcp skipped %s (has env/headers; add it manually: %s %s -- mcp add ...)\n", m, a.cmd, acct.Label())
-	}
-	for _, m := range rep.MCPMissing {
-		a.out("  mcp missing %s (not configured in main)\n", m)
-	}
-	if rep.PluginInstalled {
-		a.out("  plugin installed %s\n", acct.Spec.Plugin)
-	}
-	if err != nil {
-		return err
-	}
-	srep, err := a.syncSettings(acct)
-	a.printSettings(acct, srep)
-	return err
 }
 
 // commandName is the command path without the program name, which error messages already carry.

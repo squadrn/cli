@@ -6,24 +6,65 @@ cp empty home/.claude/CLAUDE.md
 cp claude.json home/.claude.json
 cp empty home/.claude/.loggedin
 
-# add provisions links, allowlisted MCP (never entries carrying env) and the plugin.
+# add plans, applies and verifies: settings from main + the standard profile, links, allowlisted
+# MCP (never entries carrying env), the plugin; without a terminal nothing is asked.
 env SQUADRN_MARKETPLACE=$WORK/market
+env FAKE_VERSION=2.1.329
+cp onboarded.json home/.claude.json
 exec squadrn account add claude/work
-stdout '^account claude/work → ~/.claude-work$'
-stdout 'settings ~/.claude-work/settings.json from main'
-stdout 'linked ~/.claude-work/skills/find-skills'
-! stdout 'synced'
-stdout 'mcp added codegraph'
-stdout 'mcp skipped secret'
-stdout 'mcp missing absent'
-stdout 'plugin installed squadrn@squadrn'
-stdout 'next: srn account login claude/work'
+stdout '^Claude Code 2.1.329 · new account claude/work → ~/.claude-work$'
+stdout '^  profile        standard \(secrets denied, push guard, 30-day history\)$'
+stdout '^  shared         skills, CLAUDE.md, agents from claude/main$'
+stdout '^✓ created ~/.claude-work \(private\)$'
+stdout '^✓ settings from claude/main \+ standard profile$'
+stdout '^✓ mcp codegraph from claude/main$'
+stdout '^! mcp secret not copied'
+stdout '^! mcp absent is not configured in claude/main$'
+stdout '^✓ push guard: pre-tool hook \+ git pre-push$'
+stdout '^done in [0-9.]+s · log in: srn account login claude/work · check: srn doctor claude/work$'
+! stdout 'synced|usage tracking'
 exists home/.claude-work/agents
 ! exists home/.claude-work/skills/synced
+exec sh -c 'ls -a home | grep -c tmp- || true'
+stdout '^0$'
+grep '"Read\(~/.ssh/\*\*\)"' home/.claude-work/settings.json
+grep '"Bash\(git push \*\)"' home/.claude-work/settings.json
+grep '"Read\(~/.claude/.credentials.json\)"' home/.claude-work/settings.json
+grep '"Edit\(~/.config/squadrn/\*\*\)"' home/.claude-work/settings.json
+grep '"profile": "standard"' home/.claude-work/.squadrn-managed.json
+grep '"hasCompletedOnboarding": true' home/.claude-work/.claude.json
+! grep 'mcpServers' home/.claude-work/.claude.json
 
-# add is idempotent: a second run changes nothing.
+# add is idempotent: a second run says so and changes nothing.
 exec squadrn account add work
-! stdout 'linked|mcp added|plugin installed'
+stdout '^Claude Code 2.1.329 · claude/work → ~/.claude-work$'
+stdout '^✓ claude/work is up to date$'
+stdout '^done in .* · check: srn doctor claude/work$'
+! stdout '^✓ (linked|mcp|push guard|created)'
+
+# A new account's profile denies reading the credential files of the other accounts.
+exec squadrn account add other --profile minimal --with privacy,no-attribution -y
+stdout '^  profile        minimal \(secrets denied\) \+ privacy, no-attribution$'
+stdout '^✓ settings from claude/main \+ minimal profile \+ privacy, no-attribution$'
+grep '"DISABLE_TELEMETRY": "1"' home/.claude-other/settings.json
+grep '"commit": ""' home/.claude-other/settings.json
+! grep 'Bash\(git push' home/.claude-other/settings.json
+exec squadrn work -- hi
+grep '"Read\(~/.claude-other/.credentials.json\)"' home/.claude-work/settings.json
+exec squadrn account rm other --yes
+exitcode 2 squadrn account add x1 --profile lax
+exitcode 2 squadrn account add x1 --with nope
+exitcode 2 squadrn account add x1 --login --no-login
+! exists home/.claude-x1
+
+# A step that fails says which, what state the account is in and how to retry.
+chmod 0500 home
+! exec squadrn account add broken
+stdout '^✗ create ~/.claude-broken failed: '
+stdout '^  state: nothing was created$'
+stdout '^  retry: srn account add claude/broken$'
+chmod 0700 home
+! exists home/.claude-broken
 
 # Removing a shared item from main removes the link instead of leaving it dangling.
 rm home/.claude/agents
@@ -61,8 +102,10 @@ stderr 'account not found: claude/tool; its dir exists but is not a squadrn acco
 stderr 'exists but is not a squadrn account .*run: srn account adopt tool$'
 exitcode 2 squadrn account adopt tool
 exec squadrn account adopt tool --yes
-stdout 'adopted claude/tool'
-stdout 'set it up from main with: srn account add claude/tool$'
+stdout '^adopted claude/tool \(~/.claude-tool\)$'
+stdout '^Claude Code 2.1.329 · claude/tool → ~/.claude-tool$'
+stdout '^✓ settings from claude/main$'
+stdout '^✓ linked ~/.claude-tool/CLAUDE.md$'
 exists home/.claude-tool/.squadrn-account
 exec squadrn account adopt tool
 stdout 'already an account'
@@ -160,6 +203,10 @@ exec squadrn account rm claude/work --yes
 [!darwin] stdout '^DeletionDate=[0-9-]+T[0-9:]+$'
 exitcode 1 squadrn account rm work --yes
 
+-- onboarded.json --
+{"hasCompletedOnboarding":true,"lastOnboardingVersion":"2.1.300","oauthAccount":{"emailAddress":"secret@x"},"mcpServers":{
+  "codegraph":{"command":"codegraph","args":["serve","--mcp"]},
+  "secret":{"command":"x","env":{"TOKEN":"t"}}}}
 -- empty --
 -- settings.json --
 {}

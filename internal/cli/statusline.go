@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,15 +138,20 @@ func (a *app) groupWhere(g settingsGroup) string {
 	return fmt.Sprintf("%s (%s)", a.tilde(fsx.Real(g.path)), strings.Join(labels, ", "))
 }
 
-func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
+// setupGroup turns usage tracking on (or off, undo) in g; quiet skips the result line.
+func (a *app) setupGroup(g settingsGroup, undo, yes, quiet bool) error {
 	where := a.groupWhere(g)
+	say := a.out
+	if quiet {
+		say = func(string, ...any) {}
+	}
 	cmd, old, has, ours, err := g.tracked()
 	if err != nil {
 		return err
 	}
 	if undo {
 		if !has || !ours {
-			a.out("usage tracking is not set up in %s\n", where)
+			say("usage tracking is not set up in %s\n", where)
 			return nil
 		}
 		if err := a.confirm(yes, "Restore the previous status line in %s", where); err != nil {
@@ -161,11 +163,11 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 		if err := g.claim(false); err != nil {
 			return err
 		}
-		a.out("usage tracking off: %s\n", where)
+		say("usage tracking off: %s\n", where)
 		return nil
 	}
 	if has && ours {
-		a.out("usage tracking already on: %s\n", where)
+		say("usage tracking already on: %s\n", where)
 		return nil
 	}
 	wrapped, err := a.wrapStatusLine(g.sl, cmd)
@@ -185,29 +187,13 @@ func (a *app) setupGroup(g settingsGroup, undo, yes bool) error {
 	if err := g.claim(true); err != nil {
 		return err
 	}
-	a.out("usage tracking on: %s\n", where)
+	say("usage tracking on: %s\n", where)
 	return nil
 }
 
-// offerUsageTracking asks once, at account add, whether to record the account's usage. choice
-// is the --usage/--no-usage flag; nil asks at a terminal and does nothing otherwise.
-func (a *app) offerUsageTracking(acct account.Account, choice *bool) error {
-	if !acct.Spec.Caps.UsageReport || a.usageTracking(acct) {
-		return nil
-	}
-	if choice == nil {
-		if !a.interactive {
-			return nil
-		}
-		a.errf("Track usage limits for this account in its status line? [Y/n] ")
-		line, err := bufio.NewReader(a.stdin).ReadString('\n')
-		if err != nil && !errors.Is(err, io.EOF) {
-			return err
-		}
-		yes := !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "n")
-		choice = &yes
-	}
-	if !*choice {
+// enableUsage turns usage tracking on for acct without asking (account add).
+func (a *app) enableUsage(acct account.Account) error {
+	if statusLineOf(acct.Spec) == nil || a.usageTracking(acct) {
 		return nil
 	}
 	groups, err := a.settingsGroups([]account.Account{acct})
@@ -215,7 +201,7 @@ func (a *app) offerUsageTracking(acct account.Account, choice *bool) error {
 		return err
 	}
 	for _, g := range groups {
-		if err := a.setupGroup(g, false, true); err != nil {
+		if err := a.setupGroup(g, false, true, true); err != nil {
 			return err
 		}
 	}
