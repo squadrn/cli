@@ -15,6 +15,50 @@ import (
 // State is what the policy remembers between hook runs (state/notify.json).
 type State struct {
 	Sessions map[string]Last `json:"sessions"`
+	// Agents is what each session last reported, for ps, next and focus.
+	Agents map[string]Agent `json:"agents,omitempty"`
+}
+
+// Agent is where a session runs and its state (working, input, failed, done).
+type Agent struct {
+	State   string    `json:"state"`
+	At      time.Time `json:"at"`
+	Account string    `json:"account,omitempty"`
+	Cwd     string    `json:"cwd,omitempty"`
+	// Pane is the tmux pane (%3) and Socket the tmux server's socket the session runs in.
+	Pane   string `json:"pane,omitempty"`
+	Socket string `json:"socket,omitempty"`
+	// Bundle is the macOS bundle id of the terminal app running the session.
+	Bundle string `json:"bundle,omitempty"`
+}
+
+// SetAgent records a session's state; it reports whether the state changed.
+func (st *State) SetAgent(session string, a Agent) bool {
+	if session == "" || a.State == "" {
+		return false
+	}
+	if st.Agents == nil {
+		st.Agents = map[string]Agent{}
+	}
+	prev, ok := st.Agents[session]
+	st.Agents[session] = a
+	return !ok || prev.State != a.State || prev.Pane != a.Pane
+}
+
+// AgentAt returns the newest state recorded for a session of account working in cwd.
+func (st State) AgentAt(account, cwd string) (Agent, bool) {
+	var best Agent
+	found := false
+	for _, a := range st.Agents {
+		if a.Account == account && samePath(a.Cwd, cwd) && (!found || a.At.After(best.At)) {
+			best, found = a, true
+		}
+	}
+	return best, found
+}
+
+func samePath(a, b string) bool {
+	return a != "" && b != "" && filepath.Clean(a) == filepath.Clean(b)
 }
 
 // Last is a session's most recent notification. ReplaceID is the desktop notifier's id of it,
@@ -43,6 +87,11 @@ func (st *State) prune(now time.Time) {
 	for k, l := range st.Sessions {
 		if now.Sub(l.At) > keep {
 			delete(st.Sessions, k)
+		}
+	}
+	for k, a := range st.Agents {
+		if now.Sub(a.At) > keep {
+			delete(st.Agents, k)
 		}
 	}
 }

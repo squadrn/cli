@@ -71,3 +71,33 @@ func Decide(e Event, s Settings, st *State, now time.Time, f Focus) Decision {
 	st.record(e, now)
 	return Decision{Deliver: true, Sound: s.SoundFor(e.Kind)}
 }
+
+// Channels say how one notification is delivered.
+type Channels struct {
+	// Terminal: as an escape sequence the agent CLI writes to its terminal.
+	Terminal bool
+	// Desktop: through the OS notifier.
+	Desktop bool
+	// Bell: rung in the session's tmux pane (input and failed only).
+	Bell bool
+}
+
+// Route picks the channels for a notification of kind k. terminal: the hook can answer with a
+// terminal sequence and the terminal shows it; tmux: the session runs in a tmux pane. With
+// method auto, a terminal that notifies replaces the desktop notifier outside tmux (inside,
+// tmux would have to pass the sequence through), and tmux sessions also get the bell.
+func (s Settings) Route(k Kind, terminal, tmux bool) Channels {
+	bell := tmux && (k == Input || k == Failed)
+	switch s.MethodName() {
+	case MethodTerminal:
+		return Channels{Terminal: terminal}
+	case MethodDesktop:
+		return Channels{Desktop: true}
+	case MethodTmux:
+		return Channels{Bell: bell}
+	case MethodOff:
+		return Channels{}
+	}
+	t := terminal && !tmux
+	return Channels{Terminal: t, Desktop: !t, Bell: bell}
+}
