@@ -75,7 +75,8 @@ func testInstall(t *testing.T, s *sandbox) {
 }
 
 // testSetupTTY answers srn setup at a pseudo terminal: claude as the default provider (Codex is
-// on PATH too), strict as the default profile, the other tool's dir and usage tracking skipped. The sandbox is put back for the later sections.
+// on PATH too), strict as the default profile, the self-protection rules, the other tool's dir
+// and usage tracking skipped. The sandbox is put back for the later sections.
 func testSetupTTY(t *testing.T, s *sandbox) {
 	if runtime.GOOS == "windows" {
 		t.Log("srn setup at a terminal: skipped on Windows (no script(1))")
@@ -85,12 +86,13 @@ func testSetupTTY(t *testing.T, s *sandbox) {
 	if err := os.Mkdir(old, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	s.srnTTY(t, "\nstrict\nn\nn\n", "setup").exit(0).out(
+	s.srnTTY(t, "\nstrict\nn\nn\nn\n", "setup").exit(0).out(
 		`^1\. agent CLIs$`,
 		`default provider claude / codex \[claude\]: `,
 		`strict +sandboxed, reads limited to the project`,
 		`profile +minimal / standard / strict \[standard\]: `,
 		`✓ new accounts get the strict profile$`,
+		`deny agents edits of squadrn's files in ~/\.claude/settings\.json\? \[Y/n\] `,
 		`adopt ~/\.claude-old as claude/old\? \(another tool may own it\) \[y/N\] `,
 		`– skipped ~/\.claude-old \(later: srn account adopt claude/old\)`,
 		`usage limits for claude/main\? \[Y/n\] `,
@@ -135,19 +137,19 @@ func testAccounts(t *testing.T, s *sandbox) {
 		`^Claude Code .*· new account claude/work → ~/.claude-work$`,
 		`^  profile +standard \(secrets denied, push guard, 30-day history\)$`,
 		`^✓ created ~.\.claude-work \(private\)$`,
-		`^✓ settings from claude/main \+ standard profile$`,
+		`^✓ settings: standard profile$`,
 		`^✓ push guard: pre-tool hook \+ git pre-push$`,
 		`^done in [0-9.]+s · log in: srn account login claude/work · check: srn doctor claude/work$`)
 	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-work", "settings.json")), `Bash(git push *)`), "the standard profile did not reach claude/work's settings")
 	s.srn(t, "account", "add", "work").exit(0).within(time.Second).out(`^✓ claude/work is up to date$`).noOut(`^✓ created`)
-	s.srn(t, "account", "add", "strictacct", "--profile", "strict", "--with", "privacy", "-y").exit(0).out(`^✓ settings from claude/main \+ strict profile \+ privacy$`)
+	s.srn(t, "account", "add", "strictacct", "--profile", "strict", "--with", "privacy", "-y").exit(0).out(`^✓ settings: strict profile \+ privacy$`)
 	strict := read(t, filepath.Join(s.home, ".claude-strictacct", "settings.json"))
 	s.check(t, strings.Contains(strict, `"blockReadsOutsideWorkingDirectories": true`) && strings.Contains(strict, `"DISABLE_TELEMETRY": "1"`) && strings.Contains(strict, `.claude-work/.credentials.json`), "strict profile settings missing")
 	s.srn(t, "doctor", "strictacct").exit(1).out(`^account claude/strictacct$`, `settings.json follows main \+ strict profile`).noOut(`^account claude/work$`)
 	s.srn(t, "account", "rm", "strictacct", "--yes").exit(0)
 	s.srn(t, "account", "add", "mini", "--profile", "minimal", "--with", "no-attribution", "-y").exit(0).out(
 		`^  profile +minimal \(secrets denied\) \+ no-attribution$`,
-		`^✓ settings from claude/main \+ minimal profile \+ no-attribution$`)
+		`^✓ settings: minimal profile \+ no-attribution$`)
 	mini := read(t, filepath.Join(s.home, ".claude-mini", "settings.json"))
 	s.check(t, strings.Contains(mini, `"commit": ""`) && strings.Contains(mini, `Read(~/.ssh/**)`) && !strings.Contains(mini, `Bash(git push *)`), "minimal profile settings wrong")
 	s.srn(t, "account", "add", "mini", "--profile", "standard", "-y").exit(0).out(`^✓ settings updated: .*permissions\.ask`).noOut(`^✓ created`)
