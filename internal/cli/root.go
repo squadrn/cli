@@ -289,7 +289,7 @@ func (a *app) rootCmd() *cobra.Command {
 	}
 	add("agents", a.wtCmd(), a.gridCmd(), a.psCmd(), a.swapCmd(), a.gcCmd(), a.depsCmd())
 	add("accounts", a.accountCmd(), a.usageCmd())
-	add("setup", a.setupCmd(), a.doctorCmd(), a.configCmd(), a.selfUpdateCmd(), a.selfUninstallCmd(), a.versionCmd())
+	add("setup", a.setupCmd(), a.doctorCmd(), a.notifyCmd(), a.configCmd(), a.selfUpdateCmd(), a.selfUninstallCmd(), a.versionCmd())
 	root.AddCommand(a.selfInstallCmd())
 	root.SetCompletionCommandGroupID("setup")
 	defaultHelp := root.HelpFunc()

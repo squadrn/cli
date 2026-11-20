@@ -89,6 +89,9 @@ func (a *app) uninstall(purge bool) error {
 		a.removeCompletions(name)
 	}
 	a.removeProfileLines()
+	if err := unregisterToastApp(); err != nil {
+		a.warnf("cannot remove squadrn's notification registration: %v", err)
+	}
 	// Executables still running (this one, a session, a hook) cannot be deleted on Windows; they
 	// are removed once squadrn has exited.
 	var later []string

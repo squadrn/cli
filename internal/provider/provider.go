@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/squadrn/squadrn/internal/notify"
 	"github.com/squadrn/squadrn/internal/usage"
 )
 
@@ -311,6 +312,8 @@ type ProfileContext struct {
 	// Hook is the squadrn binary for profile hooks (the strict audit hook); Home the user's home.
 	Hook string
 	Home string
+	// Notify: squadrn's notifications are on, so the CLI's own are turned off.
+	Notify bool
 }
 
 // Profiler builds the settings a profile and options add to main's (a SettingsFormat document).
@@ -336,6 +339,14 @@ type Driver struct {
 	// Profiles is nil when the provider has no profiles; Seed when there is nothing to seed.
 	Profiles Profiler
 	Seed     Seeder
+	// Events is nil when the CLI reports nothing squadrn notifies about.
+	Events HookEvents
+}
+
+// HookEvents turns the payload of the CLI's notification hooks into an event (ADR 0012). An
+// event with no Kind is not a notification (a Stop hook while background tasks run).
+type HookEvents interface {
+	ParseEvent(raw []byte) (notify.Event, error)
 }
 
 var Claude = Spec{

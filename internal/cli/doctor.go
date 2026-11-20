@@ -98,6 +98,10 @@ func (a *app) doctorEnv(only string) doctor.Env {
 		ConfigErr: a.cfgErr,
 		Usage:     a.usageTracking,
 		Only:      only,
+		Notifier: func() (string, string, bool) {
+			n, ok := findNotifier()
+			return n.Tool, n.Note, ok
+		},
 	}
 	if latest, ok := update.Available(Version, update.Load(a.updateStatePath()), a.cfg.Channel()); ok {
 		env.Latest = latest

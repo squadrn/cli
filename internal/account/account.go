@@ -36,7 +36,7 @@ var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,23}$`)
 // name is matched before the subcommand is passed through (ADR 0011).
 var Commands = []string{
 	"account", "completion", "config", "deps", "doctor", "gc", "grid", "help", "hook", "ps",
-	"self-install", "self-uninstall", "self-update", "setup", "swap", "usage", "version", "wt",
+	"notify", "self-install", "self-uninstall", "self-update", "setup", "swap", "usage", "version", "wt",
 }
 
 func reserved(name string) bool { return slices.Contains(Commands, name) }

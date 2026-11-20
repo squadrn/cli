@@ -94,32 +94,29 @@ func compactUsage(name string, s usage.Snapshot, now time.Time) string {
 	return strings.Join(parts, " · ")
 }
 
-// limit records a turn that stopped on a usage limit (StopFailure, matcher rate_limit) and
-// tells the user which command moves the session to another account.
+// limit is the rc.3 plugin's StopFailure hook (matcher rate_limit): the usage limit is recorded
+// and notified like any StopFailure through notify.
 func (h hookEnv) limit() int {
 	raw, _ := h.readInput()
-	if msg := h.recordLimit(raw); msg != "" {
-		desktopNotify("Claude: usage limit", msg)
-	}
+	h.notifyEvent(hookSpec(), raw)
 	return exitOK
 }
 
-func (h hookEnv) recordLimit(raw []byte) (msg string) {
+// recordLimit records a turn that stopped on a usage limit in the account's usage file and
+// returns when the limit resets (zero when unknown).
+func (h hookEnv) recordLimit(raw []byte) (resets time.Time) {
 	defer func() { _ = recover() }()
 	now := h.now()
 	f, err := hookStatusLine().ParseLimit(raw, now, time.Local)
 	if err != nil || !f.Limited {
-		return ""
+		return time.Time{}
 	}
-	cfg, cfgErr := config.Load()
-	store, err := newStore(cfg, cfgErr)
-	if err != nil {
-		return ""
-	}
-	label := "this account"
 	snap := f.Observation
+	store, err := newStore(config.Load())
+	if err != nil {
+		return snap.LimitResets()
+	}
 	if acct, ok := hookAccount(store); ok {
-		label = acct.Label()
 		us := usageStore(store.Home)
 		if snap.ResetEstimate.IsZero() {
 			if old, ok, _ := us.Load(acct.Provider, acct.Name); ok && old.Five != nil && old.Five.ResetsAt.After(now) {
@@ -130,11 +127,7 @@ func (h hookEnv) recordLimit(raw []byte) (msg string) {
 			snap = merged
 		}
 	}
-	msg = label + " hit its usage limit"
-	if r := snap.LimitResets(); !r.IsZero() {
-		msg += " (resets " + clock(r, now) + ")"
-	}
-	return msg + " — " + cfg.CommandName() + " swap"
+	return snap.LimitResets()
 }
 
 // clock shows t as 15:45 when it is today, else with the weekday (Thu 15:45).

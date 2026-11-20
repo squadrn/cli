@@ -91,10 +91,19 @@ through `provider.SessionStore`.
 the `rate_limits` it receives (`provider/claude`), finds the account from `CLAUDE_CONFIG_DIR`,
 merges the observation into `~/.local/state/squadrn/usage/<provider>-<name>.json` (`usage.Store`)
 and passes the wrapped command's output through. The plugin's `StopFailure` hook (matcher
-`rate_limit`) runs `squadrn hook limit`, which records the limit with a reset estimate and sends a
-desktop notification. `srn usage` reads the store, derives each account's state
+`rate_limit`) records the limit with a reset estimate through `squadrn hook notify`, which also
+notifies. `srn usage` reads the store, derives each account's state
 (`usage.Effective`) and ranks the accounts a conversation could move to (`usage.Rank`), the same
 ranking `swap` offers ([ADR 0009](adr/0009-usage-and-session-handoff.md)).
+
+**Notifications.** See [ADR 0012](adr/0012-notifications.md). The plugin's `Notification`,
+`Stop` and `StopFailure` hooks run `squadrn hook notify` (async). The provider's `HookEvents`
+(`provider/claude`) turns the input into a `notify.Event` (input, failed, done, info); `cli` adds
+the account, repository and worktree, asks tmux and the window server whether the session is in
+view, and `notify.Decide` applies the settings and the per-session history in
+`~/.local/state/squadrn/notify.json` (dedupe, throttle, quiet hours, focus). A notification to
+show is handed to a detached `squadrn hook deliver`, which runs the platform's notifier
+(`notify_<os>.go`) and logs the result in `notify.log`; the hook returns at once.
 
 **Guard.** See [ADR 0006](adr/0006-layered-push-guard.md). Layer 1: `guard.Decide` parses with
 `mvdan.cc/sh`, normalises words, follows wrappers, nested shells and aliases, and judges each push
@@ -121,6 +130,7 @@ embedded keys, then the checksum, snapshots the installed release to `previous/`
 ~/.local/state/squadrn/          guard.log (0600, dir 0700, credentials masked)
 ~/.local/state/squadrn/usage/    <provider>-<name>.json usage per account (0600)
 ~/.local/state/squadrn/handoffs.jsonl  one line per swap (time, session, from, to, cwd)
+~/.local/state/squadrn/notify.json     last notification per session (24 h); notify.log deliveries
 ~/.cache/squadrn/auth.json       login status cache (60 s; failures 15 s; 0600)
 ~/.cache/squadrn/update.json     last update check and notice
 ```

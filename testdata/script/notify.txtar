@@ -1,0 +1,113 @@
+# Notifications (ADR 0012). The test binary replaces the desktop notifier: every notification is
+# appended to $SQUADRN_TEST_NOTIFY.
+env SQUADRN_TEST_NOTIFY=$WORK/sent.jsonl
+
+# Defaults: input, failed and done, sound for input and failed, only when unfocused.
+exec squadrn notify status
+stdout '^notifications +on$'
+stdout '^events +input, failed, done$'
+stdout '^sound +input · when unfocused · quiet hours none · preview off$'
+stdout '^last +none yet \(try: srn notify test\)$'
+
+# Account profiles turn Claude Code's own notifications off while squadrn's are on.
+exec squadrn account add work --no-usage
+grep '"preferredNotifChannel": "notifications_disabled"' home/.claude-work/settings.json
+
+# A test notification goes out whatever the policy says.
+exec squadrn notify test
+stdout 'sent via fake: Claude Code · main · .* — Needs approval: Bash$'
+grep '"kind":"input","sound":true,"group":"squadrn-test"' sent.jsonl
+exec squadrn notify test failed
+stdout 'Usage limit · resets .* · srn swap$'
+exec squadrn notify test done
+stdout '— Done$'
+exitcode 2 squadrn notify test bogus
+exitcode 2 squadrn notify test done extra
+exec squadrn notify status
+stdout '^  .* sent +done +Claude Code · main · .* \(fake\)$'
+[!windows] stdout '^log: ~/.local/state/squadrn/notify.log$'
+[windows] stdout '^log: ~\\.local\\state\\squadrn\\notify.log$'
+rm sent.jsonl
+
+# Claude Code's hooks: an approval names the tool; the reply itself is never shown.
+stdin permission.json
+exec squadrn hook notify
+! stdout .
+grep '"title":"Claude Code · main · api/fix-auth","body":"Needs approval: Bash","kind":"input","sound":true,"group":"s1"' sent.jsonl
+# The idle prompt of a turn whose done notification was shown is left out.
+stdin stop-s2.json
+exec squadrn hook notify
+grep '"body":"Done","kind":"done","group":"s2"' sent.jsonl
+! grep 'secret plan' sent.jsonl
+stdin idle-s2.json
+exec squadrn hook notify
+! grep 'Waiting for your reply' sent.jsonl
+grep '"result":"skipped","why":"the turn.s done notification was shown"' home/.local/state/squadrn/notify.log
+# Within 30s a session gets one notification, except when it needs input.
+stdin stop-s1.json
+exec squadrn hook notify
+grep '"result":"skipped","why":"throttled"' home/.local/state/squadrn/notify.log
+# Work left running in the background is not done.
+stdin stop-background.json
+exec squadrn hook notify
+! grep '"group":"s3"' sent.jsonl
+# Failures say what to run.
+stdin login.json
+exec squadrn hook notify
+grep '"body":"Login expired · srn account login claude/main","kind":"failed","sound":true,"group":"s4"' sent.jsonl
+# A newer notification of a session replaces the older one where the notifier replaces by id.
+stdin permission-p2.json
+exec squadrn hook notify
+grep '"group":"s1"},"replace":"7"' sent.jsonl
+
+# Settings: preview shows the reply, events limit what is sent, off sends nothing.
+exec squadrn config set notify.preview true
+stdin stop-s5.json
+exec squadrn hook notify
+grep '"body":"Done · secret plan"' sent.jsonl
+exec squadrn config set notify.events input,failed
+stdin stop-s6.json
+exec squadrn hook notify
+grep '"why":"done events are off"' home/.local/state/squadrn/notify.log
+exec squadrn config set notify.enabled false
+stdin login-s7.json
+exec squadrn hook notify
+! grep '"group":"s7"' sent.jsonl
+exec squadrn notify status
+stdout '^notifications +off$'
+exec squadrn account add work
+! grep preferredNotifChannel home/.claude-work/settings.json
+! exec squadrn config set notify.sound loud
+stderr 'notify.sound "loud" is not one of input, all, none'
+! exec squadrn config set notify.quiet_hours 10pm
+stderr 'notify.quiet_hours "10pm" is not HH:MM-HH:MM'
+exec squadrn config get notify.events
+stdout '^input,failed$'
+
+# Broken input never fails the hook.
+stdin garbage.txt
+exec squadrn hook notify
+! stdout .
+
+-- permission.json --
+{"session_id":"s1","prompt_id":"p1","cwd":"/src/api/.claude/worktrees/fix-auth","hook_event_name":"Notification","message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}
+-- permission-p2.json --
+{"session_id":"s1","prompt_id":"p2","cwd":"/src/api/.claude/worktrees/fix-auth","hook_event_name":"Notification","message":"Claude needs your permission to use Edit","notification_type":"permission_prompt"}
+-- stop-s1.json --
+{"session_id":"s1","prompt_id":"p1","cwd":"/src/api/.claude/worktrees/fix-auth","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"secret plan"}
+-- stop-s2.json --
+{"session_id":"s2","prompt_id":"p1","cwd":"/src/api","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"secret plan"}
+-- idle-s2.json --
+{"session_id":"s2","prompt_id":"p1","cwd":"/src/api","hook_event_name":"Notification","message":"Claude is waiting for your input","notification_type":"idle_prompt"}
+-- stop-background.json --
+{"session_id":"s3","prompt_id":"p1","cwd":"/src/api","hook_event_name":"Stop","stop_hook_active":false,"background_tasks":[{"id":"b1"}]}
+-- login.json --
+{"session_id":"s4","prompt_id":"p1","cwd":"/src/api","hook_event_name":"StopFailure","error":"authentication_failed"}
+-- stop-s5.json --
+{"session_id":"s5","prompt_id":"p1","cwd":"/src/api","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"secret plan"}
+-- stop-s6.json --
+{"session_id":"s6","prompt_id":"p1","cwd":"/src/api","hook_event_name":"Stop","stop_hook_active":false}
+-- login-s7.json --
+{"session_id":"s7","prompt_id":"p1","cwd":"/src/api","hook_event_name":"StopFailure","error":"authentication_failed"}
+-- garbage.txt --
+not json

@@ -18,6 +18,7 @@ var (
 	_ provider.SettingsFormat = Settings{}
 	_ provider.Profiler       = Profiles{}
 	_ provider.Seeder         = Profiles{}
+	_ provider.HookEvents     = Events{}
 )
 
 func init() {
@@ -34,6 +35,7 @@ func init() {
 		Settings:   Settings{},
 		Profiles:   Profiles{},
 		Seed:       Profiles{},
+		Events:     Events{},
 	})
 }
 

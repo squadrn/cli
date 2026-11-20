@@ -274,3 +274,36 @@ func TestDefaultProfile(t *testing.T) {
 		t.Errorf("set lax: %v", err)
 	}
 }
+
+func TestNotifyKeys(t *testing.T) {
+	var c Config
+	for k, want := range map[string]string{"notify.enabled": "true", "notify.events": "input,failed,done", "notify.sound": "input", "notify.when": "unfocused", "notify.quiet_hours": "", "notify.preview": "false", "notify.method": "auto"} {
+		if v, err := c.Get(k); err != nil || v != want {
+			t.Errorf("Get(%s) = %q, %v; want %q", k, v, err, want)
+		}
+	}
+	for k, v := range map[string]string{"notify.enabled": "false", "notify.events": "input, info", "notify.sound": "all", "notify.when": "always", "notify.quiet_hours": "22:00-08:00", "notify.preview": "true", "notify.method": "desktop"} {
+		if err := c.Set(k, v); err != nil {
+			t.Fatalf("Set(%s, %s): %v", k, v, err)
+		}
+	}
+	if c.Notify.On() || !slices.Equal(c.Notify.Events, []string{"input", "info"}) || !c.Notify.Preview || c.Notify.QuietHours != "22:00-08:00" {
+		t.Fatalf("after Set: %+v", c.Notify)
+	}
+	if v, _ := c.Value("notify.events"); !slices.Equal(v.([]string), []string{"input", "info"}) {
+		t.Errorf("Value(notify.events) = %v", v)
+	}
+	for k, v := range map[string]string{"notify.enabled": "maybe", "notify.events": "everything", "notify.sound": "loud", "notify.when": "never", "notify.quiet_hours": "late", "notify.method": "pigeon"} {
+		if err := c.Set(k, v); !errors.Is(err, ErrInvalidValue) {
+			t.Errorf("Set(%s, %s) = %v", k, v, err)
+		}
+	}
+	path := writeConfig(t, "[notify]\nenabled = false\nquiet_hours = \"23:00-07:00\"\n")
+	got, err := Read(path)
+	if err != nil || got.Notify.On() || got.Notify.QuietHours != "23:00-07:00" {
+		t.Fatalf("read = %+v, %v", got.Notify, err)
+	}
+	if _, err := Read(writeConfig(t, "[notify]\nsound = \"loud\"\n")); !errors.Is(err, ErrInvalidValue) {
+		t.Errorf("invalid [notify] read: %v", err)
+	}
+}

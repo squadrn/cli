@@ -16,8 +16,8 @@ and worktrees. Architecture: `docs/architecture.md`. Decisions: `docs/adr/`.
 ## Rules
 
 - Domain packages (`account`, `provider`, `grid`, `worktree`, `guard`, `githook`, `install`,
-  `release`, `update`, `doctor`, `inuse`, `usage`) never print; `cli` owns output and exit codes
-  (`cli/exit.go`).
+  `release`, `update`, `doctor`, `inuse`, `usage`, `notify`) never print; `cli` owns output and
+  exit codes (`cli/exit.go`).
 - Provider differences are data in `provider.Spec`; behaviour is behind `provider.Agent` and the
   optional capability interfaces (ADR 0011). Only `internal/provider/claude` knows Claude Code
   internals (env vars, transcript layout, plugin registry). New providers get their own package
@@ -61,8 +61,8 @@ job for every pushed commit.
 
 - **type**: `feat` `fix` `perf` `refactor` `docs` `test` `build` `ci` `chore` `style` `revert`.
 - **scope** (optional, lower case): a package (`account`, `cli`, `config`, `doctor`, `fsx`,
-  `githook`, `grid`, `guard`, `install`, `inuse`, `proc`, `provider`, `release`, `ui`, `update`,
-  `usage`, `worktree`) or `plugin`, `scripts`, `deps`; several are comma separated:
+  `githook`, `grid`, `guard`, `install`, `inuse`, `notify`, `proc`, `provider`, `release`, `ui`,
+  `update`, `usage`, `worktree`) or `plugin`, `scripts`, `deps`; several are comma separated:
   `feat(cli,guard): …`.
 - **subject**: imperative, lower-case first letter, no full stop, header ≤ 100 characters
   (aim for 72). `!` after the scope marks a breaking change; explain it in a `BREAKING CHANGE:`

@@ -60,7 +60,7 @@ func (h hookEnv) readInput() ([]byte, error) {
 // squadrn-hook) and the git hook shims run them through the installed binary whatever it is called.
 func hookUsage() string {
 	cfg, _ := config.Load()
-	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] | notify <title> | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change\n" +
+	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] | notify | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
 		"internal: the " + config.Slug + " plugin (squadrn-hook) and git hooks run this through the installed binary"
 }
 
@@ -86,12 +86,20 @@ func runHook(args []string, h hookEnv) int {
 		h.guardGit(noAsk)
 		return exitOK
 	case "notify":
+		// The rc.3 plugin passed a title (notify 'Done'); the event now comes from the input.
+		if len(args) > 2 {
+			_, _ = fmt.Fprintln(h.stderr, hookUsage())
+			return exitUsage
+		}
+		raw, _ := h.readInput()
+		h.notifyEvent(hookSpec(), raw)
+		return exitOK
+	case "deliver":
 		if len(args) != 2 {
 			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
-		h.notify(args[1])
-		return exitOK
+		return h.deliver(args[1])
 	case "git":
 		cfgFile := ""
 		if len(args) > 2 && args[1] == githook.ConfigFlag {
@@ -319,30 +327,6 @@ func prePushCommand(args []string, input []byte) string {
 func (h hookEnv) gitFail(name string, err error) int {
 	_, _ = fmt.Fprintf(h.stderr, "squadrn guard: %s hook failed: %v\n", name, err)
 	return exitError
-}
-
-// notify shows a desktop notification titled "Claude: <title>" with the project name.
-// It is fire-and-forget: a missing notifier is not an error.
-func (h hookEnv) notify(title string) {
-	raw, _ := h.readInput()
-	var in hookInput
-	_ = json.Unmarshal(raw, &in)
-	project := in.Cwd
-	if project == "" {
-		project, _ = os.Getwd()
-	}
-	desktopNotify("Claude: "+title, filepath.Base(project))
-}
-
-// desktopNotify shows a desktop notification where the platform has a notifier; best effort.
-func desktopNotify(title, body string) {
-	argv := notifyCommand(title, body)
-	if argv == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, _ = proc.Output(ctx, proc.Options{}, argv[0], argv[1:]...)
 }
 
 // configChangeLog is the audit log of the strict profile's ConfigChange hook.

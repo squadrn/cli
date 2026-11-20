@@ -70,6 +70,16 @@ func TestProfiles(t *testing.T) {
 	if !strings.Contains(string(b), "hook config-change") {
 		t.Errorf("hooks = %s", b)
 	}
+	if _, has := std["preferredNotifChannel"]; has {
+		t.Error("Claude Code's own notifications are turned off only while squadrn's are on")
+	}
+	ctx.Notify = true
+	for _, p := range []string{provider.ProfileMinimal, provider.ProfileStandard, provider.ProfileStrict} {
+		doc, err := Profiles{}.Profile(p, nil, ctx)
+		if err != nil || doc["preferredNotifChannel"] != "notifications_disabled" {
+			t.Errorf("%s with notifications: %v %v", p, doc["preferredNotifChannel"], err)
+		}
+	}
 	if _, err := (Profiles{}).Profile("lax", nil, ctx); err == nil {
 		t.Error("unknown profile accepted")
 	}

@@ -103,7 +103,9 @@ stdin force.json
 exec squadrn hook guard-git
 stdout '"permissionDecision":"deny"'
 
-exitcode 2 squadrn hook notify
+exitcode 2 squadrn hook notify extra arg
+exitcode 2 squadrn hook deliver
+exitcode 2 squadrn hook deliver not-a-payload
 exitcode 2 squadrn hook guard-git extra
 exitcode 2 squadrn hook
 exitcode 2 squadrn hook bogus

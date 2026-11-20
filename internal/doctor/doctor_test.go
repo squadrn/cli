@@ -522,3 +522,35 @@ func TestOnlyChecksOneAccount(t *testing.T) {
 		}
 	}
 }
+
+func TestNotifications(t *testing.T) {
+	e := env(t, fakeAgent{}, nil)
+	if got := e.notifications(); got != nil {
+		t.Errorf("no probe: %+v", got)
+	}
+	found := func(tool, note string, ok bool) func() (string, string, bool) {
+		return func() (string, string, bool) { return tool, note, ok }
+	}
+	for _, tc := range []struct {
+		probe  func() (string, string, bool)
+		off    bool
+		msg    string
+		status Status
+	}{
+		{found("terminal-notifier", "", true), false, "desktop notifications via terminal-notifier", OK},
+		{found("osascript", "needs permission", true), false, "desktop notifications via osascript", Warn},
+		{found("", "install notify-send", false), false, "no desktop notifier", Warn},
+		{found("", "install notify-send", false), true, "notifications off", OK},
+	} {
+		e.Notifier = tc.probe
+		f := false
+		e.Config.Notify.Enabled = nil
+		if tc.off {
+			e.Config.Notify.Enabled = &f
+		}
+		got := e.notifications()
+		if len(got) != 1 || got[0].Status != tc.status || got[0].Group != "notifications" || !strings.HasPrefix(got[0].Name, tc.msg) {
+			t.Errorf("%s: %+v", tc.msg, got)
+		}
+	}
+}

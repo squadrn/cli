@@ -372,7 +372,7 @@ func (a *app) profileLayers(work, acct account.Account) ([]account.Layer, error)
 // profileContext describes this machine for acct's profile: every other account's credential
 // file and squadrn's own dirs, as ~/ paths with / separators.
 func (a *app) profileContext(acct account.Account) provider.ProfileContext {
-	ctx := provider.ProfileContext{Hook: a.statusLineBinary(), Home: a.store.Home}
+	ctx := provider.ProfileContext{Hook: a.statusLineBinary(), Home: a.store.Home, Notify: a.cfgErr == nil && a.cfg.Notify.On()}
 	accts, _ := a.store.List()
 	for _, x := range accts {
 		if x.Label() == acct.Label() || x.Spec.Credentials == "" {
