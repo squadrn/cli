@@ -233,6 +233,8 @@ type opt struct {
 	env   []string
 	// cmdLine (Windows) is the exact command line the process gets, without Go's quoting.
 	cmdLine string
+	// open keeps stdin open until the command exits: script(1) ends the session at EOF.
+	open bool
 }
 
 type result struct {
@@ -259,6 +261,18 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	}
 	cmd.Env = append(append([]string{}, s.env...), o.env...)
 	cmd.Stdin = strings.NewReader(o.stdin)
+	if o.open {
+		pr, pw, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = pw.Close() }()
+		defer func() { _ = pr.Close() }()
+		if _, err := pw.WriteString(o.stdin); err != nil {
+			t.Fatal(err)
+		}
+		cmd.Stdin = pr
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 5 * time.Second
@@ -361,6 +375,21 @@ func norm(s string) string {
 func (s *sandbox) srn(t *testing.T, args ...string) *result {
 	t.Helper()
 	return s.run(t, opt{}, "srn", args...)
+}
+
+// srnTTY runs srn at a pseudo terminal through script(1), typing stdin; stdout holds everything
+// the terminal showed (both streams and the echoed answers). Unix only.
+func (s *sandbox) srnTTY(t *testing.T, stdin string, args ...string) *result {
+	t.Helper()
+	srn := s.lookPath("srn")
+	if runtime.GOOS == "darwin" {
+		return s.run(t, opt{stdin: stdin, open: true}, "script", append([]string{"-q", "/dev/null", srn}, args...)...)
+	}
+	line := srn
+	for _, a := range args {
+		line += " '" + a + "'"
+	}
+	return s.run(t, opt{stdin: stdin, open: true, env: []string{"SHELL=/bin/sh"}}, "script", "-qec", line, "/dev/null")
 }
 
 func (s *sandbox) srnIn(t *testing.T, dir string, args ...string) *result {

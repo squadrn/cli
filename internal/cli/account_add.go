@@ -140,7 +140,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	}
 	profile, options := rec.Profile, rec.Options
 	if isNew && profile == "" {
-		profile = provider.DefaultProfile
+		profile = a.cfg.ProfileName()
 	}
 	if o.profile != "" {
 		profile = o.profile
@@ -160,7 +160,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	ask := a.interactive && !o.yes
 	in := bufio.NewReader(a.stdin)
 	if isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
-		if profile, err = a.askProfile(in, acct.Spec); err != nil {
+		if profile, err = a.askProfile(in, acct.Spec, profile); err != nil {
 			return err
 		}
 	} else if profile != "" {
@@ -443,9 +443,8 @@ func (a *app) startCommand(acct account.Account) string {
 	return a.cmd + " " + acct.Label()
 }
 
-// askProfile lists spec's profiles with what each one does, then asks for one; Enter is the
-// default.
-func (a *app) askProfile(in *bufio.Reader, spec provider.Spec) (string, error) {
+// askProfile lists spec's profiles with what each one does, then asks for one; Enter takes def.
+func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (string, error) {
 	for i, p := range provider.ProfileNames {
 		label := ""
 		if i == 0 {
@@ -454,14 +453,14 @@ func (a *app) askProfile(in *bufio.Reader, spec provider.Spec) (string, error) {
 		a.errf("  %-14s %-9s %s\n", label, p.Name, spec.ProfileSummary(p.Name))
 	}
 	for {
-		a.errf("  %-14s %s [%s]: ", "profile", profileList(), provider.DefaultProfile)
+		a.errf("  %-14s %s [%s]: ", "profile", profileList(), def)
 		line, err := in.ReadString('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
 			return "", err
 		}
 		answer := strings.ToLower(strings.TrimSpace(line))
 		if answer == "" {
-			return provider.DefaultProfile, nil
+			return def, nil
 		}
 		for _, p := range provider.ProfileNames {
 			if p.Name == answer || (len(answer) >= 2 && strings.HasPrefix(p.Name, answer)) {

@@ -18,12 +18,12 @@ func TestAskProfileAndYes(t *testing.T) {
 		"\n": provider.DefaultProfile, "strict\n": "strict", "mi\n": "minimal", "bogus\nst\n": "standard",
 		"": provider.DefaultProfile,
 	} {
-		got, err := a.askProfile(bufio.NewReader(strings.NewReader(input)), provider.Claude)
+		got, err := a.askProfile(bufio.NewReader(strings.NewReader(input)), provider.Claude, provider.DefaultProfile)
 		if err != nil || got != want {
 			t.Errorf("askProfile(%q) = %q, %v; want %q", input, got, err, want)
 		}
 	}
-	if _, err := a.askProfile(bufio.NewReader(strings.NewReader("bogus")), provider.Claude); err == nil {
+	if _, err := a.askProfile(bufio.NewReader(strings.NewReader("bogus")), provider.Claude, provider.DefaultProfile); err == nil {
 		t.Error("an unknown profile at EOF was accepted")
 	}
 	for _, want := range []string{
@@ -36,7 +36,7 @@ func TestAskProfileAndYes(t *testing.T) {
 		}
 	}
 	errOut.Reset()
-	if got, err := a.askProfile(bufio.NewReader(strings.NewReader("\n")), provider.Codex); err != nil || got != provider.DefaultProfile {
+	if got, err := a.askProfile(bufio.NewReader(strings.NewReader("\n")), provider.Codex, provider.DefaultProfile); err != nil || got != provider.DefaultProfile {
 		t.Errorf("codex askProfile = %q, %v", got, err)
 	}
 	if !strings.Contains(errOut.String(), "                 strict    read-only workspace; use standard for daily work\n") {

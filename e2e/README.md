@@ -23,14 +23,16 @@ On Windows it uses Windows PowerShell for `install.ps1`. It takes about 10 secon
    local bare remote. The developer's `GIT_*`, `CLAUDE_*`, `SQUADRN_*`, `GH_*`, tokens and PATH
    entries under the real home are dropped. PATH starts with the fakes, then `~/.local/bin` of
    the sandbox. On macOS a failing `security` stub keeps the login Keychain out of reach.
-3. **Flows** (`e2e_test.go`, one subtest per section, in order): install, help/version/
+3. **Flows** (`e2e_test.go`, one subtest per section, in order): install (the first-install
+   summary, `srn setup` without a terminal and, on Unix, answered at a pseudo terminal through
+   `script(1)`), help/version/
    completion, config and command rename, accounts (add, ls, login, rename, adopt, `--relink`,
    rm), running as an account, Codex accounts (add, login, run, subcommands, the guard hook,
    layer 2), worktrees (wt, deps, in-use refusal, wt rm, gc), grid/ps/stop
    (Unix), usage (status line, limit hook, setup, undo), swap (no argument, `--session`,
    divergence, `--worktree`), the guard (layer 1 decisions; layer 2 with real pushes to the bare
    remote from a session: a feature branch goes through, `main` is denied by the pre-push hook),
-   doctor, `self-update --check`, `self-uninstall --purge`.
+   doctor and `srn setup -y` (twice: idempotent), `self-update --check`, `self-uninstall --purge`.
 
 Each step asserts the exit code and key output. The first failure stops the run and prints the
 transcript of every command so far (directory, environment overrides, exit code, stdout, stderr).

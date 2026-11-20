@@ -39,7 +39,11 @@ curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.s
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
 `~/.local/share/squadrn/bin/squadrn`, links your command name(s) from `~/.local/bin`, and installs
-the squadrn plugin into every Claude account. Releases also carry GitHub build provenance; verify
+the squadrn plugin into every Claude account. On the first install at a terminal it then runs
+`srn setup`: it finds the agent CLIs on PATH, asks for the default settings profile, offers to adopt
+existing `~/.claude-<name>` dirs and to track usage limits, and runs `srn doctor` (every step can be
+skipped; run it again any time). Without a terminal it prints what it found and the next steps.
+Releases also carry GitHub build provenance; verify
 an archive by hand with `gh attestation verify <archive> --repo squadrn/squadrn`.
 
 ### Windows (beta)
@@ -129,9 +133,17 @@ people or to get around usage limits: each account stays bound by its own plan, 
 
 An account is a provider's config dir, written `provider/name`: `claude/main` is `~/.claude`,
 `claude/personal` is `~/.claude-personal`. A bare name works when it is unique across providers;
-`main` always means the default provider's main account. Settings, `CLAUDE.md`, agents, hooks and
-skills are shared from the provider's main account through symlinks; logins, history and plugins
-stay per account.
+`main` always means the default provider's main account. `CLAUDE.md`, agents, commands, rules,
+output styles, hooks and skills are shared from the provider's main account through symlinks;
+logins, history and plugins stay per account. Each account has its own `settings.json`, built from
+main's plus a profile and kept in step with main before every session; a key you change in the
+account (`/model`) stays yours and is reported once ([ADR 0011](docs/adr/0011-provider-model-v2.md)).
+
+New accounts get a settings profile: `minimal` (secrets denied), `standard` (the default: secrets
+and other accounts' credentials denied, asks before `git push`, `git reset --hard` and `rm -rf`,
+30-day history) or `strict` (also sandboxed, reads limited to the project, 14-day history).
+`--with privacy` turns telemetry off, `--with no-attribution` drops AI attribution; neither is on
+by default, and the model, effort and permission mode are left to the CLI.
 
 ```sh
 srn                              # pick an account interactively (offers login when needed)
@@ -139,11 +151,13 @@ srn personal                     # run as claude/personal (also: claude/personal
 srn personal -p "summarize"      # agent flags go to the agent CLI unchanged
 srn personal -- "fix the bug"    # a prompt goes after --
 srn personal mcp list            # agent subcommands pass through
-srn account add work             # create or repair claude/work
+srn setup                        # guided first run (CLIs, profile, adopt, usage, doctor)
+srn account add work             # create or repair claude/work (asks profile, usage, login)
+srn account add work --profile strict --with privacy --usage --login -y
 srn account login work
 srn account ls [--json]
 srn account logout work
-srn account adopt other          # make an existing ~/.claude-other an account (asks; --yes)
+srn account adopt other          # make an existing ~/.claude-other an account and set it up
 srn account rename work job      # logs work out first; log in again as job
 srn account rm work              # logs out and moves the dir to the trash (macOS ~/.Trash)
 ```
@@ -155,8 +169,9 @@ Global options before the command: `-a <account>`, `-C <dir>`, `--no-color` (als
 A dir named like an account but not made by squadrn (no `.squadrn-account` marker) is not an
 account: `account ls` lists it as unmanaged and `account adopt` makes it one.
 
-Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `acme-2`. Names that are squadrn or
-provider subcommands (`mcp`, `wt`, …) are rejected. Account dirs are created private (`0700`).
+Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `acme-2`. squadrn's own commands
+(`wt`, `grid`, …) are rejected; an agent subcommand name (`mcp`) is fine, and such an account is
+matched before the subcommand. Account dirs are created private (`0700`).
 
 ### Several providers
 
@@ -205,8 +220,7 @@ srn usage setup --undo           # restore the previous status line
 
 `usage setup` wraps the status line command in `settings.json`: squadrn records what it receives, then
 runs your own command with the same input and shows its output unchanged (without one, it shows
-`work · 5h 42% · 7d 18%`). Accounts that share main's `settings.json` are all covered by one
-change. `account add` offers it once (`--usage`/`--no-usage` decide without asking);
+`work · 5h 42% · 7d 18%`). Each account's own `settings.json` is set up on its own. `account add` offers it once (`--usage`/`--no-usage` decide without asking);
 `self-uninstall` restores the previous command; `doctor` shows whether each account is tracked.
 When a session hits its limit, the plugin's hook records it and notifies
 *"claude/work hit its usage limit (resets 15:45) — srn swap"*.

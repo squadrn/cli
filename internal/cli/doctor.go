@@ -23,7 +23,6 @@ func (a *app) doctorCmd() *cobra.Command {
 		Args:              optionalArg,
 		ValidArgsFunction: a.completeAccounts,
 		RunE: func(_ *cobra.Command, args []string) error {
-			ctx := context.Background()
 			only := ""
 			if len(args) == 1 {
 				acct, err := a.store.Get(args[0])
@@ -32,52 +31,10 @@ func (a *app) doctorCmd() *cobra.Command {
 				}
 				only = acct.Label()
 			}
-			env := doctor.Env{
-				Store:     a.store,
-				Agent:     a.agent,
-				Layout:    a.layout,
-				Config:    a.cfg,
-				LookPath:  exec.LookPath,
-				Self:      selfPath(),
-				Names:     append([]string{a.cmd}, a.cfg.Aliases...),
-				Command:   a.cmd,
-				Timeout:   10 * time.Second,
-				Version:   Version,
-				Signed:    a.signers != "",
-				Git:       gitver.Detect,
-				GitHint:   gitver.Hint(),
-				ConfigErr: a.cfgErr,
-				Usage:     a.usageTracking,
-				Only:      only,
-			}
-			if latest, ok := update.Available(Version, update.Load(a.updateStatePath()), a.cfg.Channel()); ok {
-				env.Latest = latest
-			}
-			if cwd, err := os.Getwd(); err == nil {
-				if repo, err := worktree.Open(ctx, cwd, ""); err == nil {
-					env.Repo = repo.Root
-				}
-			}
-			if bin, err := exec.LookPath("gh"); err == nil {
-				env.GH = func(ctx context.Context, args ...string) ([]byte, error) {
-					return proc.Output(ctx, proc.Options{Dir: env.Repo}, bin, args...)
-				}
-			}
-			stop := a.spin("checking…")
-			checks := doctor.Run(ctx, env)
-			stop()
 			if asJSON {
-				if err := a.printJSON(checks); err != nil {
-					return err
-				}
-				for _, c := range checks {
-					if c.Status == doctor.Fail {
-						return errQuiet
-					}
-				}
-				return nil
+				return a.doctorJSON(only)
 			}
-			return a.printChecks(checks)
+			return a.runDoctor(only)
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
@@ -112,6 +69,65 @@ func (a *app) printChecks(checks []doctor.Check) error {
 		a.out("ok with %d warning(s)\n", counts[doctor.Warn])
 	default:
 		a.out("all checks passed\n")
+	}
+	return nil
+}
+
+// doctorEnv is what doctor checks with; only limits the account checks to one account.
+func (a *app) doctorEnv(only string) doctor.Env {
+	ctx := context.Background()
+	env := doctor.Env{
+		Store:     a.store,
+		Agent:     a.agent,
+		Layout:    a.layout,
+		Config:    a.cfg,
+		LookPath:  exec.LookPath,
+		Self:      selfPath(),
+		Names:     append([]string{a.cmd}, a.cfg.Aliases...),
+		Command:   a.cmd,
+		Timeout:   10 * time.Second,
+		Version:   Version,
+		Signed:    a.signers != "",
+		Git:       gitver.Detect,
+		GitHint:   gitver.Hint(),
+		ConfigErr: a.cfgErr,
+		Usage:     a.usageTracking,
+		Only:      only,
+	}
+	if latest, ok := update.Available(Version, update.Load(a.updateStatePath()), a.cfg.Channel()); ok {
+		env.Latest = latest
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		if repo, err := worktree.Open(ctx, cwd, ""); err == nil {
+			env.Repo = repo.Root
+		}
+	}
+	if bin, err := exec.LookPath("gh"); err == nil {
+		env.GH = func(ctx context.Context, args ...string) ([]byte, error) {
+			return proc.Output(ctx, proc.Options{Dir: env.Repo}, bin, args...)
+		}
+	}
+	return env
+}
+
+func (a *app) checks(only string) []doctor.Check {
+	stop := a.spin("checking…")
+	defer stop()
+	return doctor.Run(context.Background(), a.doctorEnv(only))
+}
+
+// runDoctor prints the checks; errQuiet when one fails.
+func (a *app) runDoctor(only string) error { return a.printChecks(a.checks(only)) }
+
+func (a *app) doctorJSON(only string) error {
+	checks := a.checks(only)
+	if err := a.printJSON(checks); err != nil {
+		return err
+	}
+	for _, c := range checks {
+		if c.Status == doctor.Fail {
+			return errQuiet
+		}
 	}
 	return nil
 }
