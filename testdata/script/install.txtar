@@ -14,7 +14,7 @@ exec squadrn self-install rel --interactive
 stderr 'Command name \[srn\]: '
 stderr 'Short alias \[squadrn\] \(''-'' for none\): '
 stderr 'invalid command name "con": it is a reserved device name on Windows'
-stdout '^command: srn → ai \(removed: srn, squadrn, added: ai, sx\)$'
+stdout '^command: srn → ai; aliases: sx$'
 exists home/.local/bin/ai
 exists home/.local/bin/sx
 ! exists home/.local/bin/squadrn

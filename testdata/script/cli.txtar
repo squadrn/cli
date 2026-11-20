@@ -54,6 +54,10 @@ stdout '^protected_branches = main,master,develop,release/\* \(default\)$'
 exec squadrn config set git_hooks true
 stdout '^git_hooks = true$'
 
+# An empty value shows as -.
+exec squadrn config
+stdout '^shared_mcp +-$'
+
 # Values an environment variable overrides are marked.
 env SQUADRN_SHARED_MCP='a b'
 exec squadrn config
