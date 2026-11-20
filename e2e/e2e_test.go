@@ -41,6 +41,7 @@ func TestE2E(t *testing.T) {
 		{"usage", testUsage},
 		{"swap", testSwap},
 		{"guard", testGuard},
+		{"codex", testCodex},
 		{"doctor", testDoctor},
 		{"update", testUpdate},
 		{"uninstall", testUninstall},
@@ -106,13 +107,13 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.srn(t, "account", "add", "personal").exit(0)
 	s.srn(t, "account", "login", "personal").exit(0)
 
-	// A dir another tool made becomes an account by adopt; --relink then links main's settings.
+	// A dir another tool made becomes an account by adopt; add (--relink) then sets it up from main.
 	write(t, filepath.Join(s.home, ".claude-tool", "settings.json"), "{}\n")
 	write(t, filepath.Join(s.home, ".claude", "settings.json"), "{}\n")
 	s.srn(t, "account", "ls").exit(0).out(`unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)`)
 	s.srn(t, "account", "adopt", "tool").exit(2)
-	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `--relink`)
-	s.srn(t, "account", "add", "tool", "--relink", "--yes").exit(0).out(`settings.json`)
+	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`adopted claude/tool`, `srn account add claude/tool`)
+	s.srn(t, "account", "add", "tool", "--relink", "--yes").exit(0).out(`^account claude/tool → ~/.claude-tool$`)
 	s.srn(t, "account", "rm", "tool").exit(2)
 	s.srn(t, "account", "rm", "main", "--yes").exit(2)
 	s.srn(t, "account", "rm", "tool", "--yes").exit(0).out(`removed account claude/tool`)
@@ -235,7 +236,7 @@ func testGrid(t *testing.T, s *sandbox) {
 func testUsage(t *testing.T, s *sandbox) {
 	s.srn(t, "usage").exit(0).out(`^ACCOUNT +PLAN`, `^claude/work .* nodata`, `not tracked: `)
 	s.srn(t, "usage", "setup").exit(2)
-	s.srn(t, "usage", "setup", "--all", "-y").exit(0).out(`^usage tracking on: ~/.claude/settings.json \(.*claude/work.*\)$`)
+	s.srn(t, "usage", "setup", "--all", "-y").exit(0).out(`^usage tracking on: ~/.claude-work/settings.json \(claude/work\)$`)
 	s.srn(t, "usage", "setup", "work").exit(0).out(`already on`)
 
 	status := `{"session_id":"s1","cwd":"/repo","rate_limits":{"five_hour":{"used_percentage":42,"resets_at":4102444800},"seven_day":{"used_percentage":18.2,"resets_at":4102444800}}}`
@@ -350,6 +351,45 @@ func testGuard(t *testing.T, s *sandbox) {
 	s.git(t, repo, "checkout", "-q", "main")
 }
 
+// testCodex drives codex/<name> accounts: CODEX_HOME dirs with their own credentials store, the
+// guard as a trusted hooks.json hook that cannot ask, codex subcommands and layer 2.
+func testCodex(t *testing.T, s *sandbox) {
+	dir := filepath.Join(s.home, ".codex-work")
+	s.srn(t, "account", "add", "codex/work").exit(0).
+		out(`^account codex/work → ~/.codex-work$`, `push guard hook installed and trusted \(codex\)`, `next: srn account login codex/work`)
+	s.srn(t, "account", "add", "codex/work").exit(0).noOut(`push guard`)
+	cfg, _ := os.ReadFile(filepath.Join(dir, "config.toml"))
+	s.check(t, strings.Contains(string(cfg), `cli_auth_credentials_store = "file"`), "config.toml does not keep credentials in the account:\n%s", cfg)
+	s.check(t, strings.Contains(string(cfg), "trusted_hash"), "the guard hook is not trusted:\n%s", cfg)
+	hooks, _ := os.ReadFile(filepath.Join(dir, "hooks.json"))
+	s.check(t, strings.Contains(string(hooks), "guard-git --no-ask"), "hooks.json has no guard hook:\n%s", hooks)
+	s.srn(t, "account", "ls").exit(0).out(`^codex/work +no +`)
+	s.srn(t, "account", "login", "codex/work").exit(0).out(`^logged in to codex/work as me@.codex-work$`)
+	s.srn(t, "codex/work", "--", "hi").exit(0).out(`^cfg=.*\.codex-work args=hi$`)
+	s.srn(t, "codex/work", "resume", sessionA).exit(0).out(`^cfg=.*\.codex-work args=resume ` + sessionA + `$`)
+	s.srn(t, "-a", "codex/work", "exec", "fix it").exit(0).out(`^cfg=.*\.codex-work args=exec fix it$`)
+	s.srn(t, "resume").exit(2)
+	s.srn(t, "swap", "--to", "codex/work").exit(1).err(`Codex CLI cannot transfer conversations`)
+
+	// Layer 1 as Codex runs it: what Claude Code would be asked about is denied.
+	repo := s.repo(t)
+	payload := fmt.Sprintf(`{"session_id":"s","transcript_path":null,"cwd":%q,"hook_event_name":"PreToolUse","model":"m","permission_mode":"default","turn_id":"t","tool_name":"Bash","tool_use_id":"c","tool_input":{"command":"git push origin \"$BRANCH\""}}`, strings.ReplaceAll(repo, `\`, `/`))
+	s.run(t, opt{stdin: payload}, "srn", "hook", "guard-git", "--no-ask").exit(0).out(`"permissionDecision":"deny"`, `cannot ask for confirmation`)
+	if runtime.GOOS != "windows" {
+		shim := filepath.Join(s.home, ".local", "share", "squadrn", "plugin", "bin", "squadrn-hook")
+		s.check(t, strings.Contains(string(hooks), shim), "hooks.json does not run the installed shim %s:\n%s", shim, hooks)
+		s.run(t, opt{stdin: payload}, shim, "guard-git", "--no-ask").exit(0).out(`"permissionDecision":"deny"`)
+	}
+
+	// Layer 2 holds in Codex sessions too.
+	s.git(t, repo, "checkout", "-q", "-b", "feat-codex")
+	s.git(t, repo, "commit", "-q", "--allow-empty", "-m", "codex")
+	defer s.git(t, repo, "checkout", "-q", "main")
+	r := s.run(t, opt{dir: repo, env: []string{`FAKE_EXEC=["git","push","origin","HEAD:main"]`}}, "srn", "codex/work", "--", "push")
+	s.check(t, r.code != 0, "a push to main from a codex session was not denied")
+	r.err(`squadrn guard: direct push to protected branch "main"`)
+}
+
 // knownDoctorFailures lists doctor problems (✗) a platform is known to report in the sandbox;
 // each is an open product issue. Windows: the layer-1 probe starts the cmd.exe line of
 // hooks.windows.json with Go's argument quoting, and cmd.exe misreads the escaped quotes
@@ -379,7 +419,8 @@ func testDoctor(t *testing.T, s *sandbox) {
 		r.exit(0)
 	}
 	r.out(`^install$`, `✓ installed release `+regexp.QuoteMeta(version), `✓ git`, `✓ layer 2 \(git pre-push hook\) installed`,
-		`^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`)
+		`^account claude/work$`, `✓ logged in as me@.claude-work`, `✓ squadrn plugin enabled`,
+		`^account codex/work$`, `✓ logged in as me@.codex-work`, `✓ push guard hook installed and trusted`, `✓ credentials kept in ~/.codex-work`)
 	if len(knownDoctorFailures[runtime.GOOS]) == 0 {
 		r.out(`✓ layer 1 \(pre-tool hook\) denies force pushes`).noOut(`✗`)
 	}
