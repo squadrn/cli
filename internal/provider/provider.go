@@ -63,8 +63,13 @@ type Spec struct {
 	Subcommands []string
 	// SessionID is the form of a conversation's ID (Caps.SessionTransfer).
 	SessionID *regexp.Regexp
-	// Plugin is the squadrn plugin's ID in the CLI.
-	Plugin string
+	// Plugin is the squadrn plugin's ID in the CLI; "" when the guard is a hook squadrn writes
+	// itself. GuardOff then says why such a hook does not run ("" for "not trusted by <binary>").
+	Plugin   string
+	GuardOff string
+	// NoGitHooks: the CLI turns git hooks off in the shell commands it runs (Gemini sets
+	// core.hooksPath=""), so its sessions have no git pre-push layer.
+	NoGitHooks bool
 	// Credentials are an account's credential files relative to its state dir (none when the CLI
 	// keeps them elsewhere only); other accounts' profiles deny reading them.
 	Credentials []string
@@ -390,6 +395,32 @@ type Driver struct {
 	Seed     Seeder
 	// Events is nil when the CLI reports nothing squadrn notifies about.
 	Events HookEvents
+	// Guard reads the pre-tool hook of a CLI whose payload or reply differs from Claude Code's
+	// (Gemini); nil means Claude Code's form.
+	Guard GuardHook
+}
+
+// Shells a pre-tool hook's command runs in.
+const (
+	ShellSh         = "sh"
+	ShellPowerShell = "powershell"
+)
+
+// ToolCall is the shell command a pre-tool hook judges. Shell is ShellSh or ShellPowerShell;
+// "" means the tool is not a shell, which the guard cannot judge.
+type ToolCall struct {
+	Command, Dir, Shell string
+	// Tool names the tool for messages.
+	Tool string
+}
+
+// GuardHook is the pre-tool hook of a CLI: how its payload names the command and how it reads a
+// block. It needs no CLI binary: it runs on every tool call.
+type GuardHook interface {
+	ParseTool(raw []byte) (ToolCall, error)
+	// Block is the reply that stops the call: what to print on stdout and stderr, and the exit
+	// code (Gemini: exit 2 with the reason on stderr).
+	Block(reason string) (stdout, stderr string, code int)
 }
 
 // HookEvents turns the payload of the CLI's notification hooks into an event (ADR 0012). An
@@ -463,7 +494,7 @@ var Codex = Spec{
 
 // geminiProfiles: the Gemini profiles (policy files, the guard hook) come in a later phase of
 // ADR 0013; until then every profile only keeps credentials per account.
-const geminiProfiles = "credentials per account; Gemini profile settings are not available yet"
+const geminiProfiles = "credentials per account, push guard hook; other Gemini profile settings are not available yet"
 
 // Gemini is Google's Gemini CLI (ADR 0013). GEMINI_CLI_HOME names a home: an account is
 // ~/.gemini-<name>, holding the CLI's state in its .gemini/ (StateDir); main is ~/.gemini, run
@@ -492,9 +523,10 @@ var Gemini = Spec{
 	},
 	MinVersion:  "0.70.0",
 	InstallHint: "npm install -g @google/gemini-cli",
-	// Plugins stays off until the guard hook installer lands (ADR 0013, plan step 2): without it
-	// doctor and account add would report a guard that is not there.
-	Caps: Caps{SharedMCP: true},
+	// The guard is a BeforeTool hook squadrn writes into each account's settings.json.
+	GuardOff:   "turned off or changed (hooksConfig, matcher or command)",
+	NoGitHooks: true,
+	Caps:       Caps{Plugins: true, SharedMCP: true},
 }
 
 var registry = []Spec{Claude, Codex, Gemini}

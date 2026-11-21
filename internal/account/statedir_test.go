@@ -144,4 +144,19 @@ func TestSyncSettingsDropsSquadrnHooksFromMain(t *testing.T) {
 	if strings.Contains(string(b), "squadrn") || strings.Contains(string(b), "Stop") || !strings.Contains(string(b), `"lint"`) {
 		t.Fatalf("account settings = %s", b)
 	}
+
+	// The account's own squadrn entries (its guard) are kept, not compared with main's.
+	doc := readDoc(t, a)
+	hooks := doc["hooks"].(map[string]any)
+	hooks["PreToolUse"] = append(hooks["PreToolUse"].([]any), map[string]any{"matcher": "Bash", "hooks": []any{map[string]any{"command": "/mine/squadrn-hook guard-git"}}})
+	writeDoc(t, a, doc)
+	setMain(t, s, `{"model":"m","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"lint"}]}]}}`)
+	r, err := s.SyncSettings(a, filterFormat{}, nil, time.Now())
+	if err != nil || len(r.Kept) > 0 {
+		t.Fatalf("sync = %+v, %v", r, err)
+	}
+	b, _ = os.ReadFile(SettingsPath(a))
+	if !strings.Contains(string(b), "/mine/squadrn-hook") || !strings.Contains(string(b), `"model"`) {
+		t.Fatalf("account settings = %s", b)
+	}
 }

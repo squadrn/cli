@@ -158,6 +158,12 @@ func (s Store) SyncSettings(a Account, f provider.SettingsFormat, layers []Layer
 		return r, err
 	}
 	r.Created = !exists && r.Backup == ""
+	// squadrn's own hook entries in the account (the guard and notification hooks it writes
+	// there) are neither compared with main's nor recorded: they are kept as they are.
+	var own map[string][]any
+	if _, ok := f.(provider.MainFilter); ok {
+		own = provider.SplitSquadrnHooks(doc)
+	}
 	want := merge(append([]Layer{{Source: SourceMain, Doc: mainDoc}}, layers...), f.Deep())
 	deep := f.Deep()
 	before := len(m.Keys)
@@ -200,6 +206,7 @@ func (s Store) SyncSettings(a Account, f provider.SettingsFormat, layers []Layer
 		}
 	}
 	if len(r.Written) > 0 || len(r.Removed) > 0 || !exists {
+		provider.AddHooks(doc, own)
 		b, err := f.Encode(doc)
 		if err != nil {
 			return r, err

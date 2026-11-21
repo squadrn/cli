@@ -626,6 +626,9 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 	what, off, on := "squadrn plugin", "disabled", "enabled"
 	if a.Spec.Plugin == "" {
 		what, off, on = "push guard hook", "not trusted by "+a.Spec.Binary, "installed and trusted"
+		if a.Spec.GuardOff != "" {
+			off, on = a.Spec.GuardOff, "installed"
+		}
 	}
 	switch {
 	case err != nil && installed:

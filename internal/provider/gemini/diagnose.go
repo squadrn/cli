@@ -63,7 +63,7 @@ func diagnose(ctx context.Context, getenv func(string) string, node func(context
 func (CLI) AccountNotices(string) []provider.Notice {
 	return []provider.Notice{{
 		Warn: true,
-		Text: "no layer-2 push guard: Gemini CLI turns git hooks off (core.hooksPath=\"\") in the shell commands it runs; rely on the server's branch protection",
+		Text: "no layer-2 push guard: Gemini CLI turns git hooks off (core.hooksPath=\"\") in the shell commands it runs; the pre-tool hook (layer 1) and the server's branch protection remain",
 	}}
 }
 
