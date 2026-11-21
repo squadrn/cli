@@ -88,7 +88,7 @@ func testSetupTTY(t *testing.T, s *sandbox) {
 	}
 	s.srnTTY(t, "\nstrict\nn\nn\nn\n", "setup").exit(0).out(
 		`^1\. agent CLIs$`,
-		`default provider claude / codex \[claude\]: `,
+		`default provider claude / codex / gemini \[claude\]: `,
 		`strict +sandboxed, reads limited to the project`,
 		`profile +minimal / standard / strict \[standard\]: `,
 		`✓ new accounts get the strict profile$`,
