@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -192,7 +193,7 @@ func (a *app) accountLogin(input string) error {
 		return err
 	}
 	a.banner(acct)
-	err = ag.Run(acct.ConfigDir(), ag.LoginArgs())
+	err = a.runLogin(ag, acct)
 	a.cache.Forget(acct.Label())
 	if err != nil {
 		return err
@@ -219,11 +220,30 @@ func (a *app) accountLogout(input string) error {
 		return err
 	}
 	a.cache.Forget(acct.Label())
-	if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
+	if fl, ok := ag.(provider.FileLogout); ok {
+		moved, err := a.store.TrashFiles(acct, fl.LogoutFiles(acct.ConfigDir()), a.now())
+		if err != nil {
+			return err
+		}
+		if len(moved) == 0 {
+			a.out("%s holds no login\n", acct.Label())
+			return nil
+		}
+		a.out("moved the login files of %s to the trash (%s)\n", acct.Label(), a.tilde(filepath.Dir(moved[0])))
+	} else if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
 		return err
 	}
 	a.out("logged out %s\n", acct.Label())
 	return nil
+}
+
+// runLogin runs the CLI's login for acct, after the hint of a CLI whose login is a session that
+// does not end by itself.
+func (a *app) runLogin(ag provider.Agent, acct account.Account) error {
+	if h, ok := ag.(provider.LoginHinter); ok {
+		a.out("%s\n", h.LoginHint())
+	}
+	return ag.Run(acct.ConfigDir(), ag.LoginArgs())
 }
 
 func (a *app) accountRename(input, newName string, force, yes bool) error {
@@ -238,18 +258,27 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 	if err != nil {
 		return err
 	}
-	if err := a.confirm(yes, "Rename %s to %s; it will be logged out and has to log in again", acct.Label(), to.Label()); err != nil {
+	ag, err := a.agent(acct.Spec)
+	if err != nil {
 		return err
 	}
-	ag, err := a.agent(acct.Spec)
+	// A login kept in files of the account (FileLogout) moves with its dir.
+	_, keepsLogin := ag.(provider.FileLogout)
+	if keepsLogin {
+		err = a.confirm(yes, "Rename %s to %s", acct.Label(), to.Label())
+	} else {
+		err = a.confirm(yes, "Rename %s to %s; it will be logged out and has to log in again", acct.Label(), to.Label())
+	}
 	if err != nil {
 		return err
 	}
 	// The login is stored under a key derived from the config dir (the macOS keychain item is
 	// named after it): sign out first so the old item does not stay behind.
 	a.cache.Forget(acct.Label())
-	if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
-		a.warnf("cannot log %s out before renaming: %v", acct.Label(), err)
+	if !keepsLogin {
+		if _, err := ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...); err != nil {
+			a.warnf("cannot log %s out before renaming: %v", acct.Label(), err)
+		}
 	}
 	to, err = a.store.Rename(acct, newName)
 	if err != nil {
@@ -262,6 +291,10 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 		if err := r.Relocate(acct.Dir, to.Dir); err != nil {
 			a.warnf("cannot update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
 		}
+	}
+	if keepsLogin {
+		a.out("renamed %s → %s (%s)\n", acct.Label(), to.Label(), a.tilde(to.Dir))
+		return nil
 	}
 	a.out("renamed %s → %s (%s), logged out\n", acct.Label(), to.Label(), a.tilde(to.Dir))
 	a.out("next: %s account login %s\n", a.cmd, to.Label())
@@ -320,11 +353,15 @@ func (a *app) accountRmCmd() *cobra.Command {
 	return cmd
 }
 
-// logoutQuiet signs acct out without printing.
+// logoutQuiet signs acct out without printing, before its dir is trashed or deleted. A login
+// kept in files of the account (FileLogout) goes with the dir.
 func (a *app) logoutQuiet(acct account.Account) error {
 	ag, err := a.agent(acct.Spec)
 	if err != nil {
 		return err
+	}
+	if _, ok := ag.(provider.FileLogout); ok {
+		return nil
 	}
 	_, err = ag.Output(context.Background(), acct.ConfigDir(), ag.LogoutArgs()...)
 	return err

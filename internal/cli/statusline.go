@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/squadrn/squadrn/internal/account"
@@ -13,7 +12,7 @@ import (
 
 // settingsPath is the account's settings file, which holds its status line.
 func settingsPath(acct account.Account) string {
-	return filepath.Join(acct.Dir, acct.Spec.Settings)
+	return account.SettingsPath(acct)
 }
 
 // statusLineOf is the status line of spec's CLI; nil when it reports no usage that way.

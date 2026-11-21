@@ -42,13 +42,18 @@ type Spec struct {
 	DirPrefix string
 	// ConfigEnv selects an account's config dir. It must be unset for the main account.
 	ConfigEnv string
+	// StateDir is where the CLI keeps its state inside a secondary account's dir, for a CLI whose
+	// ConfigEnv names a home rather than the state dir itself (Gemini: GEMINI_CLI_HOME holds
+	// .gemini/). "" means the account dir is the state dir; main's dir always is.
+	StateDir string
 	// MCPConfig is the main account's file holding user-scope MCP servers, relative to home.
 	MCPConfig string
-	// Settings is an account's settings file, relative to its dir; secondary accounts get their
-	// own copy, merged from main's (Driver.Settings).
+	// Settings is an account's settings file, relative to its state dir; secondary accounts get
+	// their own copy, merged from main's (Driver.Settings).
 	Settings string
-	// Shared are linked from the main account into every other account. SharedPerEntry dirs are
-	// linked entry by entry, skipping the listed entries (managed per account by the CLI).
+	// Shared are linked from the main account into every other account's state dir.
+	// SharedPerEntry dirs are linked entry by entry, skipping the listed entries (managed per
+	// account by the CLI).
 	Shared         []string
 	SharedPerEntry map[string][]string
 	// WorktreeDir is where the CLI creates worktrees, relative to the repository root.
@@ -60,11 +65,13 @@ type Spec struct {
 	SessionID *regexp.Regexp
 	// Plugin is the squadrn plugin's ID in the CLI.
 	Plugin string
-	// Credentials is an account's credential file relative to its dir ("" when the CLI keeps
-	// it elsewhere only); other accounts' profiles deny reading it.
-	Credentials string
+	// Credentials are an account's credential files relative to its state dir (none when the CLI
+	// keeps them elsewhere only); other accounts' profiles deny reading them.
+	Credentials []string
 	// ProfileSummaries describe the profiles where the shared summaries do not fit this CLI.
 	ProfileSummaries map[string]string
+	// MinVersion is the oldest CLI version squadrn supports ("" for no floor); doctor warns below.
+	MinVersion string
 	// InstallHint installs the CLI; NativeMarker is a path fragment of its self-updating build.
 	InstallHint  string
 	NativeMarker string
@@ -252,6 +259,48 @@ type PrivateSettings interface {
 	Private() []string
 }
 
+// MainFilter is a SettingsFormat that drops parts of main's settings before they are merged
+// into an account's copy: squadrn's own hook entries, which each account gets (or not) from its
+// profile, so removing the guard from one account sticks (ADR 0013). It edits doc in place.
+type MainFilter interface {
+	FromMain(doc map[string]any)
+}
+
+// CommentedSettings is a SettingsFormat whose files may hold comments that Encode drops. Squadrn
+// never rewrites such a file when it has them (main's settings); an account's own copy is
+// written without them.
+type CommentedSettings interface {
+	HasComments(b []byte) bool
+}
+
+// FileLogout is an Agent whose CLI has no logout command (LogoutArgs is nil): logging out moves
+// the files LogoutFiles lists, those that exist in the account, to the trash.
+type FileLogout interface {
+	LogoutFiles(configDir string) []string
+}
+
+// LoginHinter is an Agent whose login is an interactive session that does not end by itself:
+// squadrn prints LoginHint before it starts.
+type LoginHinter interface {
+	LoginHint() string
+}
+
+// Notice is something doctor reports about a provider's CLI or accounts. Warn marks a problem;
+// otherwise it is shown as information.
+type Notice struct {
+	Warn      bool
+	Text, Fix string
+}
+
+// Diagnoser adds provider-specific checks to doctor.
+type Diagnoser interface {
+	// Diagnose reports on what the installed CLI needs (a runtime) and the user's environment,
+	// once, with the install checks.
+	Diagnose(ctx context.Context) []Notice
+	// AccountNotices reports what to know about one account (configDir "" is main).
+	AccountNotices(configDir string) []Notice
+}
+
 // Profiles an account is created with (ADR 0011); DefaultProfile when none is chosen.
 const (
 	ProfileMinimal  = "minimal"
@@ -375,7 +424,7 @@ var Claude = Spec{
 	},
 	SessionID:    regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
 	Plugin:       "squadrn@squadrn",
-	Credentials:  ".credentials.json",
+	Credentials:  []string{".credentials.json"},
 	InstallHint:  "curl -fsSL https://claude.ai/install.sh | bash",
 	NativeMarker: "/.local/share/claude/versions/",
 	Caps:         Caps{Worktree: true, SessionTransfer: true, Plugins: true, SharedMCP: true, UsageReport: true},
@@ -402,7 +451,7 @@ var Codex = Spec{
 		"plugin", "queue", "remote-control", "resume", "review", "sandbox", "unarchive",
 	},
 	SessionID:   regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`),
-	Credentials: "auth.json",
+	Credentials: []string{"auth.json"},
 	ProfileSummaries: map[string]string{
 		ProfileMinimal:  "credentials per account, secret env vars not passed",
 		ProfileStandard: "workspace-write sandbox, no network, asks before leaving it",
@@ -412,7 +461,43 @@ var Codex = Spec{
 	Caps:        Caps{Plugins: true, SharedMCP: true, UsageQuery: true},
 }
 
-var registry = []Spec{Claude, Codex}
+// geminiProfiles: the Gemini profiles (policy files, the guard hook) come in a later phase of
+// ADR 0013; until then every profile only keeps credentials per account.
+const geminiProfiles = "credentials per account; Gemini profile settings are not available yet"
+
+// Gemini is Google's Gemini CLI (ADR 0013). GEMINI_CLI_HOME names a home: an account is
+// ~/.gemini-<name>, holding the CLI's state in its .gemini/ (StateDir); main is ~/.gemini, run
+// with the variable unset. Gemini has no login or logout command: auth is file-based.
+var Gemini = Spec{
+	ID:        "gemini",
+	Name:      "Gemini CLI",
+	Binary:    "gemini",
+	MainDir:   ".gemini",
+	DirPrefix: ".gemini-",
+	ConfigEnv: "GEMINI_CLI_HOME",
+	StateDir:  ".gemini",
+	Settings:  "settings.json",
+	// Never shared: credentials, installation_id, projects.json, tmp/, history/, the trust files
+	// (the CLI rewrites them), policies/ (would apply to every account) and extensions/.
+	Shared:         []string{"GEMINI.md", "commands", "agents"},
+	SharedPerEntry: map[string][]string{"skills": nil},
+	Subcommands:    []string{"mcp", "extensions", "extension", "skills", "skill", "hooks", "hook", "gemma", "models"},
+	// gemini-credentials.json is the encrypted fallback store; its key derives from host and
+	// user, so any account could decrypt another's.
+	Credentials: []string{"oauth_creds.json", "google_accounts.json", "gemini-credentials.json"},
+	ProfileSummaries: map[string]string{
+		ProfileMinimal:  geminiProfiles,
+		ProfileStandard: geminiProfiles,
+		ProfileStrict:   geminiProfiles,
+	},
+	MinVersion:  "0.70.0",
+	InstallHint: "npm install -g @google/gemini-cli",
+	// Plugins stays off until the guard hook installer lands (ADR 0013, plan step 2): without it
+	// doctor and account add would report a guard that is not there.
+	Caps: Caps{SharedMCP: true},
+}
+
+var registry = []Spec{Claude, Codex, Gemini}
 
 // Default is used when an account ref names no provider and for the "main" shorthand.
 const Default = "claude"

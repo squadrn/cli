@@ -19,7 +19,8 @@ import (
 	"github.com/squadrn/squadrn/internal/provider"
 )
 
-// ManagedFile records, in an account's dir, the settings keys squadrn wrote there (ADR 0011).
+// ManagedFile records, in an account's dir (Account.Dir, next to Marker, never the CLI's state dir,
+// which the CLI owns), the settings keys squadrn wrote to its settings file (ADR 0011).
 const ManagedFile = "." + config.Slug + "-managed.json"
 
 // Sources of a settings key.
@@ -69,7 +70,7 @@ func (r SettingsReport) Changed() bool {
 }
 
 // SettingsPath is the account's settings file.
-func SettingsPath(a Account) string { return filepath.Join(a.Dir, a.Spec.Settings) }
+func SettingsPath(a Account) string { return filepath.Join(a.StateDir(), a.Spec.Settings) }
 
 // ReadManaged reads an account's record; ok is false when there is none.
 func ReadManaged(dir string) (m Managed, ok bool, err error) {
@@ -124,7 +125,7 @@ func (s Store) SyncSettings(a Account, f provider.SettingsFormat, layers []Layer
 	if a.IsMain() || a.Spec.Settings == "" || f == nil {
 		return r, nil
 	}
-	mainPath := filepath.Join(s.MainDir(a.Spec), a.Spec.Settings)
+	mainPath := SettingsPath(s.account(a.Spec, Main))
 	mainDoc, _, err := readSettings(mainPath, f)
 	if err != nil {
 		return r, err
@@ -133,6 +134,9 @@ func (s Store) SyncSettings(a Account, f provider.SettingsFormat, layers []Layer
 		for _, k := range p.Private() {
 			delete(mainDoc, k)
 		}
+	}
+	if mf, ok := f.(provider.MainFilter); ok {
+		mf.FromMain(mainDoc)
 	}
 	m, recorded, err := ReadManaged(a.Dir)
 	if err != nil {
@@ -381,12 +385,38 @@ func MissingFromList(path string, f provider.SettingsFormat, key string, values 
 	return missing, nil
 }
 
+// ErrCommented: a settings file holds comments that re-encoding it would drop. Squadrn never
+// rewrites such a file (main's Gemini settings.json, ADR 0013); it says what to add by hand.
+var ErrCommented = errors.New("the file has comments squadrn would drop; edit it by hand")
+
+// CheckRewritable refuses (ErrCommented) to rewrite the settings file at path when it holds
+// comments f would drop. A missing file is fine.
+func CheckRewritable(path string, f provider.SettingsFormat) error {
+	c, ok := f.(provider.CommentedSettings)
+	if !ok {
+		return nil
+	}
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if c.HasComments(b) {
+		return fmt.Errorf("%s: %w", path, ErrCommented)
+	}
+	return nil
+}
+
 // AddToList appends the values the list at key of the settings file at path does not hold yet,
 // keeping everything else; a missing file is created. Links are followed, so main's file is
-// edited in place.
+// edited in place. A file with comments the format would drop is refused (ErrCommented).
 func AddToList(path string, f provider.SettingsFormat, key string, values []string) error {
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
+	}
+	if err := CheckRewritable(path, f); err != nil {
+		return err
 	}
 	doc, _, err := readSettings(path, f)
 	if err != nil {

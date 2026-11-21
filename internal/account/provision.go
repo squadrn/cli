@@ -56,6 +56,9 @@ func (p Provisioner) Provision(ctx context.Context, a Account) (Report, error) {
 		if err := Mark(a); err != nil {
 			return r, err
 		}
+		if err := os.MkdirAll(a.StateDir(), 0o700); err != nil {
+			return r, err
+		}
 	}
 	if err := p.linkShared(a, &r); err != nil {
 		return r, err
@@ -82,12 +85,12 @@ func (p Provisioner) linkShared(a Account, r *Report) error {
 		l.now = time.Now()
 	}
 	for _, item := range a.Spec.Shared {
-		if err := l.one(filepath.Join(main, item), filepath.Join(a.Dir, item), r); err != nil {
+		if err := l.one(filepath.Join(main, item), filepath.Join(a.StateDir(), item), r); err != nil {
 			return err
 		}
 	}
 	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
-		if err := l.entries(filepath.Join(main, dir), filepath.Join(a.Dir, dir), a.Spec.SharedPerEntry[dir], r); err != nil {
+		if err := l.entries(filepath.Join(main, dir), filepath.Join(a.StateDir(), dir), a.Spec.SharedPerEntry[dir], r); err != nil {
 			return err
 		}
 	}
@@ -108,13 +111,13 @@ func (p Provisioner) Conflicts(a Account) []string {
 		}
 	}
 	for _, item := range a.Spec.Shared {
-		check(filepath.Join(main, item), filepath.Join(a.Dir, item))
+		check(filepath.Join(main, item), filepath.Join(a.StateDir(), item))
 	}
 	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
 		entries, _ := os.ReadDir(filepath.Join(main, dir))
 		for _, e := range entries {
 			if !slices.Contains(a.Spec.SharedPerEntry[dir], e.Name()) {
-				check(filepath.Join(main, dir, e.Name()), filepath.Join(a.Dir, dir, e.Name()))
+				check(filepath.Join(main, dir, e.Name()), filepath.Join(a.StateDir(), dir, e.Name()))
 			}
 		}
 	}
@@ -303,10 +306,10 @@ func (s Store) RefreshShared(a Account) Refresh {
 	for _, item := range a.Spec.Shared {
 		sources[item] = filepath.Join(main, item)
 	}
-	out.Conflicts = refreshCopies(a.Dir, sources)
+	out.Conflicts = refreshCopies(a.StateDir(), sources)
 	for _, dir := range slices.Sorted(maps.Keys(a.Spec.SharedPerEntry)) {
 		var r Report
-		src, dst := filepath.Join(main, dir), filepath.Join(a.Dir, dir)
+		src, dst := filepath.Join(main, dir), filepath.Join(a.StateDir(), dir)
 		_ = linkEntries(src, dst, a.Spec.SharedPerEntry[dir], &r)
 		entries, _ := os.ReadDir(src)
 		perEntry := map[string]string{}
@@ -316,7 +319,7 @@ func (s Store) RefreshShared(a Account) Refresh {
 		out.Conflicts = append(out.Conflicts, refreshCopies(dst, perEntry)...)
 	}
 	for _, item := range a.Spec.Shared {
-		dst, src := filepath.Join(a.Dir, item), sources[item]
+		dst, src := filepath.Join(a.StateDir(), item), sources[item]
 		fi, err := os.Lstat(dst)
 		if errors.Is(err, fs.ErrNotExist) {
 			if _, err := os.Stat(src); err == nil && link(src, dst) == nil {

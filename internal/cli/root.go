@@ -689,6 +689,9 @@ func (a *app) pick() error {
 	if statuses[choice].Err == nil && !statuses[choice].Status.LoggedIn {
 		if err := a.confirm(false, "%s is not logged in. Log in now", acct.Label()); err == nil {
 			a.cache.Forget(acct.Label())
+			if h, ok := ag.(provider.LoginHinter); ok {
+				a.out("%s\n", h.LoginHint())
+			}
 			return a.session(ag, acct, ag.LoginArgs(), "")
 		} else if !errors.Is(err, errAborted) {
 			return err

@@ -36,6 +36,7 @@ import (
 var agents = map[string]func(args []string) int{
 	"claude": Claude,
 	"codex":  Codex,
+	"gemini": Gemini,
 }
 
 // Names lists the fakes, sorted.

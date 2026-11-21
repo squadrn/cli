@@ -1,0 +1,185 @@
+[windows] skip 'Unix script: sh, symlinks or mode bits'
+# Gemini CLI accounts: GEMINI_CLI_HOME homes holding the CLI's state in .gemini/, settings.json
+# with comments, file-based auth and no layer-2 push guard (ADR 0013).
+
+# Without gemini on PATH and without gemini accounts, gemini stays out of the way.
+cp empty home/.claude/.loggedin
+! exec squadrn doctor
+! stdout 'gemini not on PATH|✓ gemini|^account gemini'
+cp $GEMINI_FAKE bin/gemini
+cp node.sh bin/node
+chmod 755 bin/node
+
+# Main has a commented settings.json, a shared instruction file, a command, a skill and files
+# that stay per account.
+mkdir home/.gemini/skills/review home/.gemini/commands home/.gemini/policies home/.gemini/tmp
+cp main-settings.jsonc home/.gemini/settings.json
+cp gemini.md home/.gemini/GEMINI.md
+cp empty home/.gemini/commands/fix.toml
+cp empty home/.gemini/installation_id
+cp empty home/.gemini/trustedFolders.json
+exec squadrn account add gemini/work --no-login -y
+stdout '^Gemini CLI 0.70.0 · new account gemini/work → ~/.gemini-work$'
+stdout '^  shared         skills, GEMINI.md, commands from gemini/main$'
+stdout '^✓ created ~/.gemini-work \(private\)$'
+stdout '^✓ settings from gemini/main \+ standard profile$'
+! stdout 'push guard'
+stdout 'log in: srn account login gemini/work'
+
+# The account dir is the GEMINI_CLI_HOME: squadrn's files there, the CLI's in .gemini/.
+exists home/.gemini-work/.squadrn-account
+exists home/.gemini-work/.squadrn-managed.json
+exists home/.gemini-work/.gemini/GEMINI.md
+exists home/.gemini-work/.gemini/commands
+exists home/.gemini-work/.gemini/skills/review
+exists home/.gemini-work/.gemini/settings.json
+! exists home/.gemini-work/GEMINI.md
+! exists home/.gemini-work/settings.json
+! exists home/.gemini-work/.gemini/policies
+! exists home/.gemini-work/.gemini/tmp
+! exists home/.gemini-work/.gemini/installation_id
+! exists home/.gemini-work/.gemini/trustedFolders.json
+exec sh -c 'ls -a home | grep -c tmp- || true'
+stdout '^0$'
+
+# The account's copy is plain JSON merged from main's: comments, MCP servers and squadrn's own
+# hook entries stay out; the user's other hooks, the auth type and the theme come along.
+! grep '^ *//|/\*|mcpServers|squadrn-hook' home/.gemini-work/.gemini/settings.json
+grep '"selectedType": "oauth-personal"' home/.gemini-work/.gemini/settings.json
+grep '"theme": "GitHub"' home/.gemini-work/.gemini/settings.json
+grep '"command": "my-linter"' home/.gemini-work/.gemini/settings.json
+grep '"url": "https://example.com/a//b"' home/.gemini-work/.gemini/settings.json
+# Main's commented file is never rewritten.
+cmp home/.gemini/settings.json main-settings.jsonc
+
+# Logged out until the token file holds a refresh token.
+exec squadrn account ls
+stdout '^gemini/work +no +- +~/.gemini-work$'
+exec squadrn account login gemini/work
+stdout 'finish the Google login in Gemini CLI, then type /quit'
+stdout '^logged in to gemini/work as me@.gemini-work$'
+grep 'cfg=.*/home/.gemini-work args=--skip-trust$' home/calls.log
+exists home/.gemini-work/.gemini/oauth_creds.json
+exec squadrn account ls
+stdout '^gemini/work +yes +me@.gemini-work +~/.gemini-work$'
+# A token file without a refresh token is not a login.
+cp no-refresh.json home/.gemini-work/.gemini/oauth_creds.json
+exec squadrn account ls
+stdout '^gemini/work +no +'
+cp creds.json home/.gemini-work/.gemini/oauth_creds.json
+exec squadrn account ls
+stdout '^gemini/work +yes +me@.gemini-work'
+
+# Sessions run as the account, with the encrypted keychain storage switched off; main runs
+# with GEMINI_CLI_HOME unset.
+env GEMINI_FORCE_ENCRYPTED_FILE_STORAGE=true
+exec squadrn gemini/work -p hi
+stdout '^cfg=.*/home/.gemini-work args=-p hi$'
+exec squadrn gemini/main -p hi
+stdout '^cfg=<unset> args=-p hi$'
+! grep 'encrypted-storage' home/calls.log
+exec squadrn gemini/work mcp list
+stdout '^cfg=.*/home/.gemini-work args=mcp list$'
+
+# Other providers' profiles deny reading every Gemini credential file.
+exec squadrn account add claude/work --no-usage --no-login -y
+grep '"Read\(~/.gemini-work/.gemini/oauth_creds.json\)"' home/.claude-work/settings.json
+grep '"Read\(~/.gemini-work/.gemini/google_accounts.json\)"' home/.claude-work/settings.json
+grep '"Read\(~/.gemini-work/.gemini/gemini-credentials.json\)"' home/.claude-work/settings.json
+grep '"Read\(~/.gemini/oauth_creds.json\)"' home/.claude-work/settings.json
+exec squadrn account rm claude/work --yes
+
+# doctor: the CLI and Node versions, the environment, the login, credentials and the missing
+# layer-2 guard.
+env GOOGLE_APPLICATION_CREDENTIALS=/k.json
+! exec squadrn doctor gemini/work
+stdout '✓ gemini 0.70.0'
+stdout '✓ node v22.3.0 \(Gemini CLI\)'
+stdout '! GEMINI_FORCE_ENCRYPTED_FILE_STORAGE is set'
+stdout '! GOOGLE_APPLICATION_CREDENTIALS is set'
+stdout '^account gemini/work$'
+stdout '✓ logged in as me@.gemini-work'
+stdout '✓ credentials kept in ~/.gemini-work/.gemini'
+stdout '! no layer-2 push guard: Gemini CLI turns git hooks off'
+stdout '✓ settings.json follows main \+ standard profile'
+! stdout 'plugin (enabled|disabled|not installed \(no)|push guard hook'
+env GEMINI_FORCE_ENCRYPTED_FILE_STORAGE= GOOGLE_APPLICATION_CREDENTIALS=
+env FAKE_VERSION=0.69.2
+! exec squadrn doctor gemini/work
+stdout '! gemini 0.69.2 is older than 0.70.0, the oldest version squadrn supports  → npm install -g @google/gemini-cli'
+env FAKE_VERSION=
+cp old-node.sh bin/node
+! exec squadrn doctor gemini/work
+stdout '! node v18.19.0 is too old: Gemini CLI needs Node.js 20 or newer'
+cp node.sh bin/node
+cp empty home/.gemini-work/.gemini/gemini-credentials.json
+! exec squadrn doctor gemini/work
+stdout '✗ credentials may be shared with other accounts: gemini-credentials.json found'
+rm home/.gemini-work/.gemini/gemini-credentials.json
+
+# Logout moves the login files to the trash.
+exec squadrn account logout gemini/work
+[darwin] stdout '^moved the login files of gemini/work to the trash \(~/.Trash\)$'
+[!darwin] stdout '^moved the login files of gemini/work to the trash \(~/.local/share/Trash/files\)$'
+stdout '^logged out gemini/work$'
+! exists home/.gemini-work/.gemini/oauth_creds.json
+! exists home/.gemini-work/.gemini/google_accounts.json
+[darwin] exec sh -c 'ls -a home/.Trash | grep -c "^.gemini-work-"'
+[!darwin] exec sh -c 'ls -a home/.local/share/Trash/files | grep -c "^.gemini-work-"'
+stdout '^2$'
+[!darwin] exec sh -c 'cat home/.local/share/Trash/info/.gemini-work-oauth_creds.json-*.trashinfo'
+[!darwin] stdout '^Path=.*/home/.gemini-work/.gemini/oauth_creds.json$'
+exec squadrn account ls
+stdout '^gemini/work +no +'
+exec squadrn account logout gemini/work
+stdout '^gemini/work holds no login$'
+
+# Rename keeps a file-based login: it moves with the dir.
+cp creds.json home/.gemini-work/.gemini/oauth_creds.json
+exec squadrn account rename gemini/work job -y
+stdout '^renamed gemini/work → gemini/job \(~/.gemini-job\)$'
+! stdout 'logged out'
+exists home/.gemini-job/.gemini/oauth_creds.json
+exec squadrn account ls
+stdout '^gemini/job +yes +'
+
+# rm moves the whole account, login included, to the trash.
+exec squadrn account rm gemini/job --yes
+[darwin] stdout '^removed account gemini/job \(moved to ~/.Trash/.gemini-job-'
+[!darwin] stdout '^removed account gemini/job \(moved to ~/.local/share/Trash/files/.gemini-job-'
+! exists home/.gemini-job
+exec squadrn account add gemini/tmp --no-login -y
+exec squadrn account rm gemini/tmp --purge --yes
+stdout '^deleted ~/.gemini-tmp$'
+! exists home/.gemini-tmp
+
+-- empty --
+-- gemini.md --
+# shared instructions
+-- node.sh --
+#!/bin/sh
+echo v22.3.0
+-- old-node.sh --
+#!/bin/sh
+echo v18.19.0
+-- creds.json --
+{"access_token":"a","refresh_token":"r","token_type":"Bearer"}
+-- no-refresh.json --
+{"access_token":"a","token_type":"Bearer"}
+-- main-settings.jsonc --
+// Main's settings, with comments Gemini accepts.
+{
+  "security": {
+    "auth": { "selectedType": "oauth-personal" } // Google login
+  },
+  /* the theme */
+  "ui": { "theme": "GitHub" },
+  "general": { "url": "https://example.com/a//b" },
+  "mcpServers": { "main-only": { "command": "srv", "env": { "TOKEN": "x" } } },
+  "hooks": {
+    "BeforeTool": [
+      { "matcher": "run_shell_command", "hooks": [{ "type": "command", "name": "squadrn-guard", "command": "\"/old/plugin/bin/squadrn-hook\" guard-git --no-ask --agent gemini" }] },
+      { "matcher": "write_file", "hooks": [{ "type": "command", "command": "my-linter" }] }
+    ]
+  }
+}

@@ -258,7 +258,8 @@ func (e Env) installedRelease() (Check, bool) {
 }
 
 // version names spec's CLI with its version ("claude 2.1.0 (Claude Code)"), and adds a warning
-// when it cannot be read, plus what the platform says about that version.
+// when it cannot be read or is older than spec.MinVersion, plus what the platform and the
+// provider (Diagnoser) say about it.
 func (e Env) version(ctx context.Context, spec provider.Spec) (string, []Check) {
 	if e.Agent == nil {
 		return spec.Binary, nil
@@ -271,10 +272,33 @@ func (e Env) version(ctx context.Context, spec provider.Spec) (string, []Check) 
 	b, err := ag.Output(vctx, "", "--version")
 	cancel()
 	v := strings.TrimSpace(string(b))
-	if err != nil || v == "" {
-		return spec.Binary, []Check{bad("install", Warn, spec.Binary+" --version failed", spec.InstallHint)}
+	var notes []Check
+	if d, ok := ag.(provider.Diagnoser); ok {
+		dctx, cancel := context.WithTimeout(ctx, e.Timeout)
+		notes = notices("install", d.Diagnose(dctx))
+		cancel()
 	}
-	return spec.Binary + " " + v, versionNotes(spec, v)
+	if err != nil || v == "" {
+		return spec.Binary, append([]Check{bad("install", Warn, spec.Binary+" --version failed", spec.InstallHint)}, notes...)
+	}
+	if pv := provider.ParseVersion(b); spec.MinVersion != "" {
+		if order, ok := release.Compare(pv, spec.MinVersion); ok && order < 0 {
+			notes = append([]Check{bad("install", Warn, fmt.Sprintf("%s %s is older than %s, the oldest version squadrn supports", spec.Binary, pv, spec.MinVersion), spec.InstallHint)}, notes...)
+		}
+	}
+	return spec.Binary + " " + v, append(notes, versionNotes(spec, v)...)
+}
+
+// notices are a provider's Diagnoser notices as checks of group g.
+func notices(g string, ns []provider.Notice) []Check {
+	out := make([]Check, len(ns))
+	for i, n := range ns {
+		out[i] = ok(g, n.Text)
+		if n.Warn {
+			out[i] = bad(g, Warn, n.Text, n.Fix)
+		}
+	}
+	return out
 }
 
 // guard checks the three push-guard layers.
@@ -568,8 +592,11 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 		if err := cs.CheckCredentials(a.ConfigDir()); err != nil {
 			out = append(out, bad(g, Fail, "credentials may be shared with other accounts: "+err.Error(), e.Command+" account add "+a.Label()))
 		} else {
-			out = append(out, ok(g, "credentials kept in "+e.tilde(a.Dir)))
+			out = append(out, ok(g, "credentials kept in "+e.tilde(a.StateDir())))
 		}
+	}
+	if d, has := ag.(provider.Diagnoser); has {
+		out = append(out, notices(g, d.AccountNotices(a.ConfigDir()))...)
 	}
 	if e.Usage != nil && a.Spec.Caps.UsageReport {
 		if e.Usage(a) {
@@ -618,9 +645,9 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 
 func (e Env) links(a account.Account, g string) []Check {
 	var out []Check
-	entries, _ := os.ReadDir(a.Dir)
+	entries, _ := os.ReadDir(a.StateDir())
 	for _, ent := range entries {
-		p := filepath.Join(a.Dir, ent.Name())
+		p := filepath.Join(a.StateDir(), ent.Name())
 		if ent.Type()&fs.ModeSymlink != 0 {
 			if _, err := os.Stat(p); err != nil {
 				out = append(out, bad(g, Warn, "dangling link "+ent.Name(), e.Command+" account add "+a.Label()))
@@ -633,7 +660,7 @@ func (e Env) links(a account.Account, g string) []Check {
 		if _, err := os.Stat(src); err != nil {
 			continue
 		}
-		dst := filepath.Join(a.Dir, item)
+		dst := filepath.Join(a.StateDir(), item)
 		switch _, err := os.Lstat(dst); {
 		case errors.Is(err, fs.ErrNotExist):
 			// main gained it later: the next session or account add links it.
