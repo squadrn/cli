@@ -184,10 +184,13 @@ Examples:
   srn account add work                     asks for the profile, usage tracking and login
   srn account add claude/work --profile strict --usage --login
   srn account add work --with privacy      also turn telemetry off
+  srn account add work --dry-run           show what would be done, change nothing
   srn account add work --relink            link files the account has its own copy of (keeps a backup)
 
 Flags:
+      --dry-run          print the plan and change nothing
   -h, --help             help for add
+      --json             print the result as JSON (implies --yes)
       --login            log in right away without asking
       --no-login         do not log in and do not ask
       --no-usage         do not track usage limits and do not ask

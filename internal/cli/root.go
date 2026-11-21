@@ -26,6 +26,7 @@ import (
 	_ "github.com/squadrn/squadrn-cli/internal/provider/all"
 	"github.com/squadrn/squadrn-cli/internal/release"
 	"github.com/squadrn/squadrn-cli/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 )
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
@@ -698,9 +699,9 @@ func (a *app) pick() error {
 	stop := a.spin("checking accounts…")
 	statuses := a.statuses(accts, false)
 	stop()
-	items := make([]ui.Item, 0, len(accts)+1)
+	items := make([]prompt.Item, 0, len(accts)+1)
 	for i, acct := range accts {
-		item := ui.Item{Label: acct.Label(), Detail: statuses[i].Status.Email, Active: statuses[i].Status.LoggedIn}
+		item := prompt.Item{Label: acct.Label(), Detail: statuses[i].Status.Email, Active: statuses[i].Status.LoggedIn}
 		switch {
 		case statuses[i].Err != nil:
 			item.Status = "status unavailable"
@@ -709,9 +710,9 @@ func (a *app) pick() error {
 		}
 		items = append(items, item)
 	}
-	items = append(items, ui.Item{Label: addAccountItem})
+	items = append(items, prompt.Item{Label: addAccountItem})
 
-	choice, err := ui.Pick(a.cmd+" ›", items, a.stdin, a.stderr, a.colorErr)
+	choice, err := prompt.Pick(a.cmd+" ›", items, a.stdin, a.stderr, a.colorErr)
 	if err != nil {
 		return err
 	}

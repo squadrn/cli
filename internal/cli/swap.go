@@ -19,7 +19,7 @@ import (
 	"github.com/squadrn/squadrn-cli/internal/inuse"
 	"github.com/squadrn/squadrn-cli/internal/proc"
 	"github.com/squadrn/squadrn-cli/internal/provider"
-	"github.com/squadrn/squadrn-cli/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 	"github.com/squadrn/squadrn-cli/internal/usage"
 	"github.com/squadrn/squadrn-cli/internal/worktree"
 )
@@ -265,11 +265,11 @@ func (a *app) swapSource(ss provider.SessionStore, o swapOptions, spec provider.
 		}
 		return swapSource{}, usagef("several conversations could be moved; pass one with --session:%s", b.String())
 	}
-	items := make([]ui.Item, len(cands))
+	items := make([]prompt.Item, len(cands))
 	for i, c := range cands {
-		items[i] = ui.Item{Label: accts[c.session.Owner].Label() + " " + shortID(c.session.ID), Detail: a.sourceDetail(c, accts), Active: true}
+		items[i] = prompt.Item{Label: accts[c.session.Owner].Label() + " " + shortID(c.session.ID), Detail: a.sourceDetail(c, accts), Active: true}
 	}
-	choice, err := ui.Pick(a.cmd+" swap › conversation", items, a.stdin, a.stderr, a.colorErr)
+	choice, err := prompt.Pick(a.cmd+" swap › conversation", items, a.stdin, a.stderr, a.colorErr)
 	if err != nil {
 		return swapSource{}, err
 	}
@@ -398,16 +398,16 @@ func (a *app) pickTarget(accts []account.Account, from account.Account) (account
 	if !a.interactive {
 		return account.Account{}, usagef("pass the account to move the conversation to with --to (best: %s)", ranked[0].Account)
 	}
-	items := make([]ui.Item, len(ranked))
+	items := make([]prompt.Item, len(ranked))
 	for i, c := range ranked {
 		s := c.Snapshot
-		items[i] = ui.Item{
+		items[i] = prompt.Item{
 			Label:  c.Account,
 			Detail: fmt.Sprintf("5h %s · 7d %s · %s", plainPct(s.Five, now), plainPct(s.Seven, now), c.State(now)),
 			Active: true,
 		}
 	}
-	choice, err := ui.Pick(fmt.Sprintf("%s swap › move %s's conversation to", a.cmd, from.Label()), items, a.stdin, a.stderr, a.colorErr)
+	choice, err := prompt.Pick(fmt.Sprintf("%s swap › move %s's conversation to", a.cmd, from.Label()), items, a.stdin, a.stderr, a.colorErr)
 	if err != nil {
 		return account.Account{}, err
 	}

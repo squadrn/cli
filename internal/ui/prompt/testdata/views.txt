@@ -1,0 +1,150 @@
+-- utf8 intro --
+┌  New account
+│
+-- utf8 select --
+◆  Provider
+│  ○ Claude Code  2.1.0    3 accounts
+│  ● Codex CLI    0.171.0  new
+│  ○ Gemini CLI            not installed · npm install -g @google/gemini-cli
+└  ↑↓ move · enter select · esc back
+-- utf8 select answered --
+◇  Provider ·································· Codex CLI 0.171.0
+│
+-- utf8 multiselect --
+◆  Options
+│  ◼ privacy         telemetry off
+│  ◻ no-attribution
+└  ↑↓ move · space toggle · enter confirm · esc back
+-- utf8 multiselect answered --
+◇  Options ············································· privacy
+│
+-- utf8 text empty --
+◆  Account name
+│  ▌e.g. work
+└  enter confirm · ctrl-u clear · esc back
+-- utf8 text --
+◆  Account name
+│  home▌
+│  → ~/.codex-home · start with: srn home
+└  enter confirm · ctrl-u clear · esc back
+-- utf8 text warning --
+◆  Account name
+│  work▌
+│  "work" is also claude/work: start it with srn codex/work
+└  enter confirm · ctrl-u clear · esc back
+-- utf8 text answered --
+◇  Account name ··········································· work
+│  "work" is also claude/work: start it with srn codex/work
+│
+-- utf8 text invalid --
+◆  Account name
+│  work x▌
+│  letters, digits and - only
+└  enter confirm · ctrl-u clear · esc back
+-- utf8 review --
+◆  Review
+│  account   codex/work → ~/.codex-work (private)
+│  profile   standard
+│
+│  Create codex/work?  ● Yes  ○ No
+└  y/n answer · ←→ switch · enter confirm · esc back
+-- utf8 review answered --
+◇  Review
+│  account   codex/work → ~/.codex-work (private)
+│  profile   standard
+│
+│  Create codex/work? Yes
+│
+-- utf8 confirm --
+◆  Log in now?  ● Yes  ○ No
+└  y/n answer · ←→ switch · enter confirm · esc back
+-- utf8 confirm answered --
+◇  Log in now? ·············································· No
+│
+-- utf8 note --
+◇  Created codex/work
+│  ✓ ~/.codex-work (private)
+│
+-- utf8 warn --
+▲  not logged in · srn account login codex/work
+│
+-- utf8 outro --
+└  Ready in 3.2s · start: srn codex/work
+   Same without questions: srn account add codex/work --login
+-- utf8 cancel --
+■  Cancelled · nothing changed
+-- ascii intro --
++  New account
+|
+-- ascii select --
+>  Provider
+|  ( ) Claude Code  2.1.0    3 accounts
+|  (*) Codex CLI    0.171.0  new
+|  ( ) Gemini CLI            not installed · npm install -g @google/gemini-cli
+\  up/down move - enter select - esc back
+-- ascii select answered --
+*  Provider .................................. Codex CLI 0.171.0
+|
+-- ascii multiselect --
+>  Options
+|  [x] privacy         telemetry off
+|  [ ] no-attribution
+\  up/down move - space toggle - enter confirm - esc back
+-- ascii multiselect answered --
+*  Options ............................................. privacy
+|
+-- ascii text empty --
+>  Account name
+|  _e.g. work
+\  enter confirm - ctrl-u clear - esc back
+-- ascii text --
+>  Account name
+|  home_
+|  → ~/.codex-home · start with: srn home
+\  enter confirm - ctrl-u clear - esc back
+-- ascii text warning --
+>  Account name
+|  work_
+|  "work" is also claude/work: start it with srn codex/work
+\  enter confirm - ctrl-u clear - esc back
+-- ascii text answered --
+*  Account name ........................................... work
+|  "work" is also claude/work: start it with srn codex/work
+|
+-- ascii text invalid --
+>  Account name
+|  work x_
+|  letters, digits and - only
+\  enter confirm - ctrl-u clear - esc back
+-- ascii review --
+>  Review
+|  account   codex/work → ~/.codex-work (private)
+|  profile   standard
+|
+|  Create codex/work?  (*) Yes  ( ) No
+\  y/n answer - left/right switch - enter confirm - esc back
+-- ascii review answered --
+*  Review
+|  account   codex/work → ~/.codex-work (private)
+|  profile   standard
+|
+|  Create codex/work? Yes
+|
+-- ascii confirm --
+>  Log in now?  (*) Yes  ( ) No
+\  y/n answer - left/right switch - enter confirm - esc back
+-- ascii confirm answered --
+*  Log in now? .............................................. No
+|
+-- ascii note --
+*  Created codex/work
+|  v ~/.codex-work (private)
+|
+-- ascii warn --
+!  not logged in · srn account login codex/work
+|
+-- ascii outro --
+\  Ready in 3.2s · start: srn codex/work
+   Same without questions: srn account add codex/work --login
+-- ascii cancel --
+x  Cancelled · nothing changed

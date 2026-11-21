@@ -10,7 +10,7 @@ import (
 	"github.com/squadrn/squadrn-cli/internal/install"
 	"github.com/squadrn/squadrn-cli/internal/provider"
 	"github.com/squadrn/squadrn-cli/internal/release"
-	"github.com/squadrn/squadrn-cli/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 	"github.com/squadrn/squadrn-cli/internal/worktree"
 )
 
@@ -52,7 +52,7 @@ func exitCode(err error) int {
 		return ce.code
 	case errors.As(err, &es):
 		return es.Code
-	case errors.Is(err, ui.ErrCancelled):
+	case errors.Is(err, prompt.ErrCancelled):
 		return exitCancelled
 	case errors.As(err, &ue), errors.Is(err, account.ErrInvalidName), errors.Is(err, account.ErrReserved),
 		errors.Is(err, account.ErrAmbiguous), errors.Is(err, account.ErrUnknownProvider),
@@ -69,5 +69,6 @@ func exitCode(err error) int {
 func silent(err error) bool {
 	var ce childExit
 	var es provider.ExitStatus
-	return errors.Is(err, errQuiet) || errors.Is(err, ui.ErrCancelled) || errors.As(err, &ce) || errors.As(err, &es)
+	var rep reported
+	return errors.As(err, &rep) || errors.Is(err, errQuiet) || errors.Is(err, prompt.ErrCancelled) || errors.As(err, &ce) || errors.As(err, &es)
 }

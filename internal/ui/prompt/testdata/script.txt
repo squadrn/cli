@@ -1,0 +1,28 @@
++  New account
+|
+|  ! gemini cannot be chosen
+*  Provider .................................. Codex CLI 0.171.0
+|
+|  ! nope cannot be chosen
+*  Options ............................................. privacy
+|
+|  ! letters, digits and - only
+*  Account name ........................................... work
+|  "work" is also claude/work: start it with srn codex/work
+|
+*  Review
+|  account   codex/work → ~/.codex-work (private)
+|  profile   standard
+|
+|  Create codex/work? Yes
+|
+*  Log in now? .............................................. No
+|
+*  Created
+|  x
+|
+|  line
+!  careful
+|
+\  done
+x  gone
