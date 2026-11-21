@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.5
 
 - **Gemini CLI accounts** (`gemini/<name>`, [ADR 0013](docs/adr/0013-gemini-provider.md), core):
   `~/.gemini-<name>` is the account's `GEMINI_CLI_HOME`, with Gemini's files in its `.gemini/`;
