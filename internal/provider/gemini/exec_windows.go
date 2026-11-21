@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // lookPath finds gemini. npm installs gemini.cmd, which cmd.exe re-parses (quotes or carets in

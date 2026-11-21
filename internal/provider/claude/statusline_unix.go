@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // statusLineWord quotes s as one word for the shell Claude Code runs status line commands in.

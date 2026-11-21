@@ -16,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/githook"
-	"github.com/squadrn/squadrn/internal/gitver"
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/githook"
+	"github.com/squadrn/squadrn-cli/internal/gitver"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/release"
 )
 
 type Status int

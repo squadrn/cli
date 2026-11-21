@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // The status line is configured in settings.json (documented):

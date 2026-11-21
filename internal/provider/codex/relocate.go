@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // Relocate fixes a CODEX_HOME moved from oldDir to newDir. Codex keys hook trust by the hook's

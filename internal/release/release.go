@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/githook"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/githook"
 )
 
 // AssetName is the archive goreleaser publishes for one platform.

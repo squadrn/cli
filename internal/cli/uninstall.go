@@ -9,13 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/install"
-	"github.com/squadrn/squadrn/internal/inuse"
-	"github.com/squadrn/squadrn/internal/release"
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/install"
+	"github.com/squadrn/squadrn-cli/internal/inuse"
+	"github.com/squadrn/squadrn-cli/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 func (a *app) selfUninstallCmd() *cobra.Command {

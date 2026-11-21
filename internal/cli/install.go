@@ -12,12 +12,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/doctor"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/gitver"
-	"github.com/squadrn/squadrn/internal/install"
-	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/doctor"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/gitver"
+	"github.com/squadrn/squadrn-cli/internal/install"
+	"github.com/squadrn/squadrn-cli/internal/release"
 )
 
 // nameChoice is what the user asked for at install; empty fields keep the configured names.

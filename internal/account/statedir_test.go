@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // homeSpec is a provider whose ConfigEnv names a home holding the CLI's state dir, like Gemini.

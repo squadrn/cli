@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // toastAppID is the AppUserModelID toasts are shown under. Windows shows a toast from an

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/config"
 )
 
 func TestStateRoundTripAndDue(t *testing.T) {

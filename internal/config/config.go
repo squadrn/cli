@@ -15,9 +15,9 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/notify"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // Slug names every fixed on-disk identifier: dirs, env vars, plugin id, git config keys.

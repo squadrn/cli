@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // Folder trust is per account: <state>/trustedFolders.json maps absolute paths to TRUST_FOLDER

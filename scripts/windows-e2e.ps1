@@ -17,7 +17,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $env:USERPROFILE ".claude")
 
 function Release([string]$dir, [string]$version) {
     New-Item -ItemType Directory -Force -Path "$dir\plugin\hooks", "$dir\.claude-plugin" | Out-Null
-    & go build -trimpath -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=$version" -o "$dir\squadrn.exe" ./cmd/squadrn
+    & go build -trimpath -ldflags "-X github.com/squadrn/squadrn-cli/internal/cli.Version=$version" -o "$dir\squadrn.exe" ./cmd/squadrn
     if ($LASTEXITCODE -ne 0) { throw "go build failed" }
     Copy-Item -Recurse -Force plugin\.claude-plugin, plugin\agents, plugin\README.md "$dir\plugin\"
     Copy-Item -Force scripts\hooks.windows.json "$dir\plugin\hooks\hooks.json"

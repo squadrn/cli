@@ -1,10 +1,10 @@
 version: 2
 project_name: squadrn
 
-# Releases are published in this public repository, squadrn/squadrn (ADR 0007).
+# Releases are published in this public repository, squadrn/squadrn-cli (ADR 0007).
 before:
   hooks:
-    - sh scripts/render-install.sh squadrn/squadrn {{ .Tag }}
+    - sh scripts/render-install.sh squadrn/squadrn-cli {{ .Tag }}
 
 builds:
   - id: unix
@@ -17,7 +17,7 @@ builds:
     # Reproducible: file times come from the commit, not the build machine.
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags: &ldflags
-      - -s -w -X github.com/squadrn/squadrn/internal/cli.Version={{ .Version }} -X github.com/squadrn/squadrn/internal/cli.Repo=squadrn/squadrn
+      - -s -w -X github.com/squadrn/squadrn-cli/internal/cli.Version={{ .Version }} -X github.com/squadrn/squadrn-cli/internal/cli.Repo=squadrn/squadrn-cli
 
   - id: windows
     main: ./cmd/squadrn

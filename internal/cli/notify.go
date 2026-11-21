@@ -13,11 +13,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/notify"
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // delivery is one notification handed to the desktop notifier, by the hook to a detached

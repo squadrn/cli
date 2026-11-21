@@ -12,9 +12,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // encryptedStorageEnv makes Gemini keep Google tokens in a keychain entry every home shares;

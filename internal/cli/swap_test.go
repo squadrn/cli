@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // copies is a SessionStore holding one conversation's copy per config dir, newest first wins.

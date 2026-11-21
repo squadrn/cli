@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 const osascriptNote = "notifications appear as Script Editor and need its permission (System Settings → Notifications); clicking does nothing. brew install terminal-notifier for grouping and click-to-focus"

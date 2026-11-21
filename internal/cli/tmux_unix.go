@@ -12,8 +12,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/grid"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 func (a *app) requireTmux(what string) error {

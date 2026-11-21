@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 func TestParseLoginStatus(t *testing.T) {

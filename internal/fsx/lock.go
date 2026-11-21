@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // LockedError reports that another process holds a lock.

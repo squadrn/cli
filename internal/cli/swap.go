@@ -12,16 +12,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/inuse"
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/ui"
-	"github.com/squadrn/squadrn/internal/usage"
-	"github.com/squadrn/squadrn/internal/worktree"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/grid"
+	"github.com/squadrn/squadrn-cli/internal/inuse"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/worktree"
 )
 
 // stopWait is how long a stopped session gets to exit before the next step.

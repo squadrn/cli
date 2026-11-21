@@ -5,7 +5,7 @@ package account
 import (
 	"path/filepath"
 
-	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/config"
 )
 
 // trashDirs is the freedesktop trash ($XDG_DATA_HOME/Trash): files, and the .trashinfo files

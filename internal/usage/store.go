@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // writeEvery is how often an unchanged observation is written again, to keep ObservedAt fresh.

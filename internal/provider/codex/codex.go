@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // CLI runs the installed codex binary.

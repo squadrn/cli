@@ -3,7 +3,7 @@
 # built from this checkout into a local directory that SQUADRN_INSTALL_BASE points at; nothing is
 # downloaded. The fixture dir holds an ed25519 key pair (key, key.pub) and build/install.ps1 must
 # be rendered with that key and $Tag:
-#   scripts/render-install.sh squadrn/squadrn v1.2.0-rc.99 FIXTURE/key.pub
+#   scripts/render-install.sh squadrn/squadrn-cli v1.2.0-rc.99 FIXTURE/key.pub
 param(
     [Parameter(Mandatory = $true)][string]$Fixture,
     [string]$Tag = "v1.2.0-rc.99"
@@ -29,7 +29,7 @@ $rel = Join-Path $root "rel"
 New-Item -ItemType Directory -Force -Path $pub, "$rel\plugin\hooks", "$rel\.claude-plugin" | Out-Null
 
 # The release: what goreleaser puts into the Windows zip, built from this checkout.
-& go build -trimpath -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=$version" -o "$rel\squadrn.exe" ./cmd/squadrn
+& go build -trimpath -ldflags "-X github.com/squadrn/squadrn-cli/internal/cli.Version=$version" -o "$rel\squadrn.exe" ./cmd/squadrn
 if ($LASTEXITCODE -ne 0) { throw "go build failed" }
 Copy-Item -Recurse -Force plugin\.claude-plugin, plugin\agents, plugin\README.md "$rel\plugin\"
 Copy-Item -Force scripts\hooks.windows.json "$rel\plugin\hooks\hooks.json"

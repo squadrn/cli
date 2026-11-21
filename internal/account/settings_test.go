@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // jsonFormat is a SettingsFormat for tests (the real ones live in the provider packages).

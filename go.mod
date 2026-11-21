@@ -1,4 +1,4 @@
-module github.com/squadrn/squadrn
+module github.com/squadrn/squadrn-cli
 
 go 1.27.4
 

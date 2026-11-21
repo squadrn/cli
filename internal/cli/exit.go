@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/install"
-	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/release"
-	"github.com/squadrn/squadrn/internal/ui"
-	"github.com/squadrn/squadrn/internal/worktree"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/grid"
+	"github.com/squadrn/squadrn-cli/internal/install"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/worktree"
 )
 
 // Exit codes: 0 ok, 1 runtime error (or "no" at a prompt), 2 usage or invalid input,

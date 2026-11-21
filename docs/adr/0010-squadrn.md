@@ -48,6 +48,11 @@ first published as `github.com/squadrn/cli`, and versions of that module path ar
 good in the Go checksum database (sum.golang.org). Reusing it would tie new code to tags that no
 longer exist, so the repository and the module were renamed together and those tags removed.
 
+Update (v1.0.0-rc.5): the repository and the module path became `github.com/squadrn/squadrn-cli`,
+naming the repository for what it holds. v1.0.0-rc.1 to rc.5 have `squadrn/squadrn` built in
+(`-X …/cli.Repo`) and update through GitHub's redirect from the old name, so no repository may be
+created under `squadrn/squadrn` again.
+
 ## Consequences
 
 - Code, docs and help say Squadrn; user-facing text uses the command name the user chose.

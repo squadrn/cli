@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // A command copy listed in commands.json is the installed binary byte for byte, not "a different

@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/grid"
+	"github.com/squadrn/squadrn-cli/internal/notify"
 )
 
 func (a *app) nextCmd() *cobra.Command {

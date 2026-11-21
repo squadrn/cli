@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/account"
 )
 
 // Hooks find the account they run in from the config-dir variable and record its usage.

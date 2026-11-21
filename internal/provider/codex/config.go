@@ -11,8 +11,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // storeKey selects where Codex keeps credentials. "file" is auth.json in CODEX_HOME: the OS

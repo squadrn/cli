@@ -10,10 +10,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/grid"
-	"github.com/squadrn/squadrn/internal/inuse"
-	"github.com/squadrn/squadrn/internal/notify"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/grid"
+	"github.com/squadrn/squadrn-cli/internal/inuse"
+	"github.com/squadrn/squadrn-cli/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // agentRow is one running agent: a session squadrn started (in-use registry), a tmux pane, or

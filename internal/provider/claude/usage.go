@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 // Status line input (documented: code.claude.com/docs/en/statusline). rate_limits is present

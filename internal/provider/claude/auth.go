@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // auth reads `claude auth status`. Logged-out accounts print valid JSON but exit non-zero,

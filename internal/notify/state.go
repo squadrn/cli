@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // State is what the policy remembers between hook runs (state/notify.json).

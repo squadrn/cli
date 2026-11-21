@@ -7,7 +7,7 @@ is lost. Design: [ADR 0007](adr/0007-public-distribution.md).
 
 | Name | Where | What | Expires / lost |
 |---|---|---|---|
-| `SQUADRN_SIGNING_KEY` | Actions secret, `squadrn/squadrn` | private ed25519 key that signs `checksums.txt` | never; backups below — [if lost](#signing-key-lost) |
+| `SQUADRN_SIGNING_KEY` | Actions secret, `squadrn/squadrn-cli` | private ed25519 key that signs `checksums.txt` | never; backups below — [if lost](#signing-key-lost) |
 | signing key backup | your password manager (and `pass` if installed) | copy of the private key | keep it there; GitHub cannot show a secret again |
 | `internal/release/signers.pub` | this repository | public keys every build and installer trusts | — |
 
@@ -33,18 +33,18 @@ that release by default; their checksums are in the signed `checksums.txt`. Chec
 will get:
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/download/vX.Y.Z/install.sh | sh        # macOS, Linux
+curl -fsSL https://github.com/squadrn/squadrn-cli/releases/download/vX.Y.Z/install.sh | sh        # macOS, Linux
 ```
 
 ```powershell
-irm https://github.com/squadrn/squadrn/releases/download/vX.Y.Z/install.ps1 | iex
+irm https://github.com/squadrn/squadrn-cli/releases/download/vX.Y.Z/install.ps1 | iex
 ```
 
 Pre-releases (`vX.Y.Z-rc.N`) need their own `## X.Y.Z-rc.N` CHANGELOG section; installing a
 pre-release switches an install without a chosen channel to the beta channel (`self-install`).
 
 If the release workflow fails before `publish`, the draft stays invisible: fix the problem, push
-`main`, delete the draft (`gh release delete vX.Y.Z -R squadrn/squadrn --yes`), then move the tag:
+`main`, delete the draft (`gh release delete vX.Y.Z -R squadrn/squadrn-cli --yes`), then move the tag:
 `git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`, tag again and push it. The upgrade jobs
 read the draft with the workflow token (`contents: write`): GitHub shows drafts only to tokens
 with push access.
@@ -129,17 +129,17 @@ gpg --gen-revoke you@example.com > /Volumes/<offline-drive>/gpg-revoke.asc
 
 # 6. the release signing key: secret SQUADRN_SIGNING_KEY, pass entry
 #    squadrn/release-signing-key, public key appended to internal/release/signers.pub
-scripts/release-key.sh squadrn/squadrn
+scripts/release-key.sh squadrn/squadrn-cli
 
 # 7. check without printing the key
 pass ls squadrn
-gh secret list -R squadrn/squadrn
+gh secret list -R squadrn/squadrn-cli
 ```
 
 Then commit `internal/release/signers.pub` through a pull request. Without `pass`, mount an
 encrypted volume (`hdiutil create -encryption AES-256 -size 20m -fs APFS -volname Keys keys.dmg`,
 then `hdiutil attach keys.dmg`) and run
-`scripts/release-key.sh squadrn/squadrn --backup /Volumes/Keys/release-signing-key`.
+`scripts/release-key.sh squadrn/squadrn-cli --backup /Volumes/Keys/release-signing-key`.
 
 ### Backups
 
@@ -151,16 +151,16 @@ Keep a **spare key** so that never happens. Its public key is trusted by every b
 next release on; CI keeps signing with the current key.
 
 ```sh
-scripts/release-key.sh squadrn/squadrn --spare --backup ~/squadrn-spare-signing-key
+scripts/release-key.sh squadrn/squadrn-cli --spare --backup ~/squadrn-spare-signing-key
 # move the file into your password manager, delete it, commit signers.pub, release
 ```
 
 ### Signing key lost
 
 - **Spare key exists** (in `signers.pub` of the release users run):
-  `gh secret set SQUADRN_SIGNING_KEY --repo squadrn/squadrn < spare-key-file`, then
+  `gh secret set SQUADRN_SIGNING_KEY --repo squadrn/squadrn-cli < spare-key-file`, then
   create a new spare.
-- **No spare:** `scripts/release-key.sh squadrn/squadrn --backup FILE`, remove the
+- **No spare:** `scripts/release-key.sh squadrn/squadrn-cli --backup FILE`, remove the
   old public key from `signers.pub`, release, and ask users to reinstall once with `install.sh`.
 
 ### Rotate (key suspected leaked)

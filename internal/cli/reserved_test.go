@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/account"
 )
 
 // Every top-level command and alias must be a reserved account name: otherwise an account of

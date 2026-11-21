@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // Facts is what the guard needs to know about one repository, read once per decision.

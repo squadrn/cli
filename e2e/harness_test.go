@@ -26,13 +26,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/fakeagent"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/fakeagent"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/release"
 )
 
 const (
-	module = "github.com/squadrn/squadrn"
+	module = "github.com/squadrn/squadrn-cli"
 	// version is the release the harness builds and installs; newer is what the fake release
 	// server offers to self-update --check.
 	version = "0.99.0"
@@ -59,13 +59,13 @@ func TestMain(m *testing.M) {
 }
 
 // serveReleases is the part of the GitHub REST API self-update --check reads: one newer stable
-// release of squadrn/squadrn.
+// release of squadrn/squadrn-cli.
 func serveReleases(w http.ResponseWriter, r *http.Request) {
 	rel := map[string]any{"tag_name": newer, "prerelease": false, "draft": false, "body": notes, "assets": []any{}}
 	switch r.URL.Path {
-	case "/repos/squadrn/squadrn/releases":
+	case "/repos/squadrn/squadrn-cli/releases":
 		_ = json.NewEncoder(w).Encode([]any{rel})
-	case "/repos/squadrn/squadrn/releases/tags/" + newer:
+	case "/repos/squadrn/squadrn-cli/releases/tags/" + newer:
 		_ = json.NewEncoder(w).Encode(rel)
 	default:
 		http.NotFound(w, r)
@@ -492,7 +492,7 @@ func (s *sandbox) buildRelease(t *testing.T) (pub, installer string) {
 		t.Fatal(err)
 	}
 	// The substitutions of scripts/render-install.sh.
-	text := strings.NewReplacer("__SQUADRN_REPO__", "squadrn/squadrn", "__SQUADRN_VERSION__", tag).Replace(string(src))
+	text := strings.NewReplacer("__SQUADRN_REPO__", "squadrn/squadrn-cli", "__SQUADRN_VERSION__", tag).Replace(string(src))
 	text = strings.Replace(text, "\n__SQUADRN_SIGNERS__\n", "\n"+strings.TrimSpace(string(pubkey))+"\n", 1)
 	installer = filepath.Join(dir, name)
 	write(t, installer, text)

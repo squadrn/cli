@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 func TestLock(t *testing.T) {

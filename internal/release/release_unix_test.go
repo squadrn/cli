@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 func TestExtract(t *testing.T) {

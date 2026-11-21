@@ -2,7 +2,7 @@
 package all
 
 import (
-	_ "github.com/squadrn/squadrn/internal/provider/claude"
-	_ "github.com/squadrn/squadrn/internal/provider/codex"
-	_ "github.com/squadrn/squadrn/internal/provider/gemini"
+	_ "github.com/squadrn/squadrn-cli/internal/provider/claude"
+	_ "github.com/squadrn/squadrn-cli/internal/provider/codex"
+	_ "github.com/squadrn/squadrn-cli/internal/provider/gemini"
 )

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 func write(t *testing.T, path, content string) {

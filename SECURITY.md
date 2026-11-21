@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through GitHub:
-[Report a vulnerability](https://github.com/squadrn/squadrn/security/advisories/new) (Security →
+[Report a vulnerability](https://github.com/squadrn/squadrn-cli/security/advisories/new) (Security →
 Advisories). Do not open a public issue.
 
 Include what you found, how to reproduce it, the squadrn version (`srn version`), the OS and

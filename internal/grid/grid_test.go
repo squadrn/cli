@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/worktree"
+	"github.com/squadrn/squadrn-cli/internal/worktree"
 )
 
 func TestAssign(t *testing.T) {

@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/githook"
-	"github.com/squadrn/squadrn/internal/guard"
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/githook"
+	"github.com/squadrn/squadrn-cli/internal/guard"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/release"
 )
 
 // hookDeadline bounds a pre-tool decision; the plugin gives the hook 5 seconds.

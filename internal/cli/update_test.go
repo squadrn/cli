@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/release"
 )
 
 func TestVerifyRelease(t *testing.T) {
