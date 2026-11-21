@@ -1,0 +1,233 @@
+# 0016 — Antigravity CLI provider
+
+Status: proposed
+
+## Context
+
+Since 2026-06-18 Google refuses Gemini CLI for personal Google accounts, Google AI Pro and Ultra
+([ADR 0013](0013-gemini-provider.md) §10). Those users moved to **Antigravity CLI** (`agy`), a
+closed-source Go binary, distributed by Google's own installer
+(`curl -fsSL https://antigravity.google/cli/install.sh | bash`, into `~/.local/bin`), which
+updates itself in the background. This ADR adds it as squadrn's fourth provider.
+
+It differs from every provider so far in one way that shapes the design: **it has no variable
+to relocate its config dir** (google-antigravity/antigravity-cli#155, open since 2026-05-24).
+Everything hangs off the home directory, so an account can only be isolated by running `agy`
+with another `HOME`, which every command the agent runs inherits.
+
+Facts checked on 2026-11-21 against agy 1.5.14 (macOS x86_64). **P** = observed in the probe
+below, **D** = the docs agy ships in its builtin `agy-customizations` skill, **S** = read from
+the binary's strings, **W** = Google's web docs or the issue tracker, not verified locally. A
+fact marked W is not relied on before P0 verifies it.
+
+| Fact | |
+|---|---|
+| `agy --version` prints the bare version (`1.5.14`); no `login`, `logout` or auth-status subcommand. Subcommands: `acp`, `agent(s)`, `changelog`, `help`, `install`, `mcp`, `mic-serve`, `models`, `plugin(s)` | P |
+| Flags: `-p/--print`, `--output-format text\|json\|stream-json`, `--print-timeout`, `-c/--continue`, `--conversation <id>`, `--mode accept-edits\|auto\|plan`, `--model`, `--effort`, `--sandbox`, `--dangerously-skip-permissions`, `--add-dir`, `--settings <json or file>` ("for this session only, never saved"), `--log-file`, `--project` | P |
+| All state is under `$HOME/.gemini/`: `antigravity-cli/` (`settings.json`, `installation_id`, `conversations/<id>.db` SQLite, `conversation_summaries.db`, `brain/<id>/` transcripts, `cache/`, `log/`, `presence/<id>.lock`) and `config/` (`config.json`, `mcp_config.json`, `projects/`, `hooks.json`, `plugins/`). Nothing is written outside `HOME` (checked with `env -i`) | P |
+| Paths come from `os.UserHomeDir()` (`$HOME` on Unix); no `GEMINI_CLI_HOME` or `AGY_*_HOME` | S, P |
+| Login: Google OAuth with PKCE, redirect `https://antigravity.google/oauth-callback`, the code is pasted into the terminal (no localhost listener: works over SSH and in tmux). `-p` without a login starts that flow and waits 60 s, then exits 1 with a JSON `"status":"ERROR"` | P |
+| Credentials go through `zalando/go-keyring` (macOS: the `security` tool by absolute path, so a stub first on `PATH` does not intercept it), with a file fallback when the keychain write fails | S |
+| With `HOME` pointing elsewhere, macOS has no default keychain (`security default-keychain`: "A default keychain could not be found"), and after a real login the token was in **`$HOME/.gemini/antigravity-cli/antigravity-oauth-token`** (589 bytes); the user's login keychain had no Antigravity item before or after | P |
+| With the real `HOME` (squadrn's main account) the login presumably goes to the login keychain; Linux (Secret Service over D-Bus) and Windows (Credential Manager) do not depend on `HOME` | S, W (not verified) |
+| Hooks: `$HOME/.gemini/config/hooks.json` (or a plugin's `hooks.json`; hooks in `settings.json` are not loaded) is an object of **named** hooks, each `{enabled?, SessionStart, PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop}`; tool events take `[{matcher (regex on the tool name), hooks: [{type: "command", command, timeout (s, default 30)}]}]` | D, P |
+| A hook runs through `sh -c` (Windows `cmd /c`) in the dir of its `hooks.json`; `~` is expanded; payloads are camelCase JSON on stdin; hooks are synchronous | D |
+| `PreToolUse` stdin: `toolCall: {id, name: "run_command", args: {CommandLine, WaitMsBeforeAsync, toolSummary}}`, `cwd`, `workspacePaths`, `conversationId`, `transcriptPath`, `artifactDirectoryPath`, `modelName`, `lastUserInput`, `stepIdx`, `hookEventName` | P |
+| `PreToolUse` stdout `{"decision": "allow"\|"deny"\|"ask"\|"force_ask", "reason", "permissionOverrides", "overwrite"}`; `ask` respects the user's cached "always allow", `force_ask` does not | D |
+| A `deny` blocked `git push --force origin main` under `--dangerously-skip-permissions`; the agent received "tool call denied by pre-tool hook: <reason>" | P |
+| `Stop` stdin: `terminationReason` (`NO_TOOL_CALL`, `ERROR`, `USER_CANCELED`, `MAX_INVOCATIONS`, …), `error`, `fullyIdle`, `continuationActive`; `{"decision":"continue"}` keeps the agent going, anything else lets it stop. `PreInvocation` stdin: `invocationNum`, `initialNumSteps` | D |
+| Hook failure semantics (non-zero exit, timeout, invalid JSON) are not documented | — |
+| `/usage` (alias `/quota`) reports quota, also as `agy -p "/usage" --output-format json`; Pro refreshes every 5 hours with a weekly limit, Free weekly | W |
+| Permissions in `settings.json` accept rules like `"deny": ["command(git push)"]`; deny beats ask beats allow | W |
+| `AGY_CLI_DISABLE_AUTO_UPDATE=true` stops the background self-update | W, used in the probe |
+| `agy plugin import gemini\|claude` converts other CLIs' plugins; `agy plugin install\|uninstall\|list\|enable\|disable\|validate` | P |
+
+## Decision
+
+### 1. Spec and account layout
+
+`provider.Antigravity`: ID **`agy`** (account refs `agy/work`; the binary's name, short to type),
+name "Antigravity CLI", binary `agy`, install hint the official installer, `DirPrefix` **`.agy-`**
+(never `.gemini-`, which Gemini CLI accounts own).
+
+An account is a home directory:
+
+- **main** is the user's real home, run with nothing changed. It exists when
+  `~/.gemini/antigravity-cli` does. Its state dir is `~/.gemini`, shared on disk with Gemini CLI's
+  main account (`gemini/main` is `~/.gemini` too). The two CLIs use different files; squadrn never
+  removes or relinks `~/.gemini` for either.
+- **other accounts** are `~/.agy-<name>`, run with `HOME=~/.agy-<name>`; their state is
+  `~/.agy-<name>/.gemini/`. The marker and squadrn's record stay in `~/.agy-<name>`.
+
+`Spec` gains `HomeEnv`: the provider isolates accounts by replacing `HOME`, so `ConfigEnv` is
+`HOME`, and the main account's state dir is a separate field (`MainState: ".gemini"`) from the
+dir that proves it exists (`MainDir: ".gemini/antigravity-cli"`). `Account.StateDir()` uses it.
+Provider files are then relative to the state dir: `antigravity-cli/settings.json`,
+`config/hooks.json`, `config/mcp_config.json`, `antigravity-cli/antigravity-oauth-token`.
+
+### 2. Restoring the user's home for the agent's commands
+
+Replacing `HOME` hides the user's own configuration from every command the agent runs. For a
+secondary account squadrn adds, only when the variable is unset and the target exists:
+
+| Variable | Value | Restores |
+|---|---|---|
+| `GIT_CONFIG_GLOBAL` | `<home>/.gitconfig` (or the XDG one) | identity, aliases, signing, credential helpers |
+| `GH_CONFIG_DIR` | `<home>/.config/gh` | `gh` login |
+| `XDG_CONFIG_HOME` | `<home>/.config` | tools that follow XDG |
+| `NPM_CONFIG_USERCONFIG` | `<home>/.npmrc` | registry auth |
+| `CARGO_HOME`, `RUSTUP_HOME`, `GOPATH` | `<home>/.cargo`, `<home>/.rustup`, `<home>/go` | toolchains |
+
+`ssh` needs nothing: OpenSSH takes the home from the password database, not `$HOME`. Squadrn's
+layer-2 entries (`GIT_CONFIG_*`) are unaffected. Anything else that reads `~` (shell rc files,
+`~/.netrc`, cloud CLIs) sees the account's home; `doctor` and `account add` say so once, and the
+main account has none of this. Linking dotfiles into the account home was rejected: partial,
+fragile, and it puts secrets in a second place.
+
+When agy gains a config-dir variable (#155), squadrn switches to it and drops this section.
+
+### 3. Credentials
+
+- `Spec.Credentials`: `antigravity-cli/antigravity-oauth-token`; every profile of every provider
+  denies the other accounts' copies.
+- A secondary account counts as isolated only when its login is in that file. After a login,
+  `account add`/`login` check that the file exists; if agy reports a login but the file is absent,
+  the login went to a shared OS keyring, and squadrn says so and marks the account
+  (`CredentialStore`). On Linux and Windows this is expected until P0 shows otherwise: `doctor`
+  warns that secondary accounts may share one login there.
+- The main account's login stays wherever agy keeps it (the keychain on macOS).
+
+### 4. Auth
+
+No auth command, so:
+
+- **Status**: secondary accounts: logged in when the token file exists (never read). Main: the
+  keychain cannot be read without prompting, so the status comes from a headless `agy -p /usage
+  --output-format json` with stdin closed and a short deadline, only when that is shown (P0) to
+  fail fast instead of starting the 60 s login flow; otherwise "unknown".
+- **Login**: `agy -p /usage --output-format text`, which runs the OAuth flow and exits by itself
+  when done (no `/quit` needed), if P0 confirms `/usage` costs no model request; else a one-word
+  prompt.
+- **Logout**: secondary accounts: the token file goes to the trash (`FileLogout`). Main: agy's
+  `/logout`, if P0 finds a non-interactive form; else squadrn prints it.
+
+### 5. Push guard
+
+**Layer 1** is a named hook `squadrn` in each account's `config/hooks.json` (an object of named
+hooks, so squadrn owns one key and never edits the user's others):
+
+```json
+{"squadrn": {"PreToolUse": [{"matcher": "run_command", "hooks": [{"type": "command",
+  "command": "\"<data dir>/plugin/bin/squadrn-hook\" guard-git --agent agy", "timeout": 5}]}]}}
+```
+
+- `guard-git --agent agy` reads `toolCall.args.CommandLine` and `cwd`, and replies with agy's
+  JSON. **Ask maps to `force_ask`**, so a cached "always allow" never waives a push the guard
+  wants confirmed; deny stays deny. agy is the first provider since Claude Code where the guard
+  can ask instead of deny.
+- The matcher is widened to every tool that runs a shell command once P0 lists them (a terminal
+  input tool may exist besides `run_command`).
+- The fail-closed path depends on how agy treats a hook that fails (P0). Until then the shim
+  prints a JSON deny on stdout *and* exits 2.
+- Not a plugin: `agy plugin install` adds a marketplace step for one hook. `hooks.json` is
+  deterministic and per account. Revisit if squadrn ships agy skills.
+- Windows: the command runs under `cmd /c`, as for Codex (ADR 0011).
+
+**Layer 2** is the universal git pre-push hook, unless agy, like Gemini CLI, disables git hooks
+in the commands it runs (P0). If it does, the same notice as for Gemini applies.
+
+The standard profile also adds `"ask": ["command(git push)"]` to the settings (if P0 confirms
+the syntax): a second, independent prompt before every push.
+
+### 6. Notifications
+
+Hooks in the same named `squadrn` entry:
+
+- `PreInvocation` with `invocationNum` 0 → working;
+- `Stop` with `NO_TOOL_CALL` → done (input when the response ends in a question), `ERROR` →
+  failed (a usage limit when the error says so), `USER_CANCELED` → nothing;
+- the guard's own `ask`/`force_ask` → needs input.
+
+agy has no event for its own permission prompts; tmux pane titles are the fallback if agy sets
+them (P0). Hooks are synchronous: the notify hook prints `{}`, never `"decision":"continue"`
+(which would keep the agent running), exits 0 within 2 s and delivers in the background.
+
+### 7. Profiles
+
+Profiles are passed per session with `--settings <state>/antigravity-cli/squadrn-settings.json`,
+a file squadrn owns, so the user's `settings.json` is never merged or re-encoded. How `--settings`
+combines with `settings.json` (merge or replace) is checked in P0. If it replaces it, profiles are
+merged into the account's own `settings.json` as for the other providers (ADR 0011).
+
+| Profile | Keys (subject to P0 confirming each) |
+|---|---|
+| minimal | credential isolation (§3); deny reads of `.env`, `.env.*`, `~/.ssh/**` and other accounts' token files |
+| standard | minimal, the guard, `ask` for `git push`, background self-update off in secondary accounts (`AGY_CLI_DISABLE_AUTO_UPDATE=true`: parallel panes would update one binary at once) |
+| strict | standard, `--sandbox`, no `--dangerously-skip-permissions` passthrough |
+
+### 8. Usage, swap, MCP, shared items
+
+- **Usage**: `RateLimiter` from `agy -p /usage --output-format json` (5-hour and weekly
+  windows, matching `usage.Snapshot`), at most every 5 minutes unless `--refresh`, as for Codex.
+- **Swap**: a conversation is `conversations/<id>.db` plus `brain/<id>/`, which squadrn may
+  copy between accounts and resume with `--conversation <id>`. `Caps.SessionTransfer` stays off
+  until P0 shows a copied conversation resumes; the summary index may need rebuilding.
+- **MCP**: `config/mcp_config.json` (`mcpServers`, `serverUrl` for remote servers); `shared_mcp`
+  copies the allowlisted servers with `agy mcp add`.
+- **Shared from main**: `GEMINI.md` (agy reads `~/.gemini/GEMINI.md` and `AGENTS.md`), global
+  skills and agents once their paths are confirmed. Never shared: the token file, `installation_id`,
+  conversations, `brain/`, caches, `hooks.json`, `config.json`.
+
+### 9. Provider selection
+
+Under [ADR 0015](0015-provider-selection.md) agy is a selectable provider, detected by `agy` on
+`PATH`. Setup offers it to users who have Gemini CLI configured for a personal account (the
+ADR 0013 §10 warning).
+
+## Probe so far
+
+agy 1.5.14, downloaded through the official installer's manifest (sha512 matched, signed by
+Google, Apple team `EQHXZ8M8AV`), run with `env -i`, a temporary `HOME` and
+`AGY_CLI_DISABLE_AUTO_UPDATE=true`:
+
+- without a login: `--version`, `--help`, `plugin --help`; the state tree above; `-p` started
+  the OAuth flow and timed out after 60 s with a JSON error;
+- one real login with a personal account: `-p` answered, the token landed in
+  `antigravity-oauth-token` inside the temporary home, and the login keychain was untouched;
+- a `PreToolUse` hook in `config/hooks.json` received the payload above and denied
+  `git push --force origin main` under `--dangerously-skip-permissions`.
+
+The temporary home holding the token was deleted afterwards.
+
+## P0 (before implementation)
+
+With one real login in a temporary home:
+
+1. hook failure: non-zero exits, exit 2, timeout, invalid or empty stdout → blocked or let through;
+2. the git environment of `run_command` (`env | grep GIT_`): does agy override `core.hooksPath`?
+3. every tool that runs shell commands (matcher);
+4. `-p /usage`: JSON shape, whether it costs a model request, its behaviour without a login and
+   with stdin closed;
+5. a non-interactive logout;
+6. `--settings` vs `settings.json`: merge or replace; the permission rule syntax;
+7. a conversation copied to another home resumes with `--conversation`;
+8. whether agy sets the terminal title;
+9. on Linux (a container with and without D-Bus): where the token goes with another `HOME`;
+10. the main account on macOS: keychain item name and whether a second home's login touches it.
+
+## Plan
+
+1. **P0** as above; amend this ADR.
+2. **Core**: `HomeEnv`/`MainState`, the home-restoring environment (§2), file auth, login, logout,
+   credential check, doctor (layer-2 status, shared-keyring warning), fake `agy`, `agy.txtar`.
+3. **Guard**: the named hook, `--agent agy` with `force_ask`, the shim's fail-closed reply.
+4. **Notifications and usage**.
+5. **Profiles, MCP, swap**.
+
+## Consequences
+
+- Personal Google accounts get a supported path in squadrn again, through agy.
+- agy accounts other than main run with a different `HOME`. Squadrn restores the common tools,
+  and says plainly that others see the account's home until agy can relocate its config.
+- On Linux and Windows, secondary agy accounts may share one login until P0 shows otherwise.
+- The provider model gains `HomeEnv` and `MainState`, which no other provider uses.
