@@ -38,6 +38,7 @@ worktree. Running grid again for the same repository adds panes.`,
 			}
 			return nil
 		},
+		ValidArgsFunction: a.completeGrid,
 		RunE: func(_ *cobra.Command, args []string) error {
 			if spread && a.account != "" {
 				return usagef("--spread picks the accounts itself; it cannot be combined with an account")
@@ -210,9 +211,10 @@ func firstOr(args []string) string {
 
 func (a *app) gridAttachCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "attach [repo]",
-		Short: "Attach to the grid of a repository (default: this one)",
-		Args:  optionalRepo,
+		Use:               "attach [repo]",
+		Short:             "Attach to the grid of a repository (default: this one)",
+		Args:              optionalRepo,
+		ValidArgsFunction: completeRepo,
 		RunE: func(_ *cobra.Command, args []string) error {
 			if err := a.requireTmux("grid attach"); err != nil {
 				return err
@@ -232,9 +234,10 @@ func (a *app) gridAttachCmd() *cobra.Command {
 func (a *app) gridStopCmd() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "stop [repo]",
-		Short: "Stop the grid of a repository and every agent in it (worktrees are kept)",
-		Args:  optionalRepo,
+		Use:               "stop [repo]",
+		Short:             "Stop the grid of a repository and every agent in it (worktrees are kept)",
+		Args:              optionalRepo,
+		ValidArgsFunction: completeRepo,
 		RunE: func(_ *cobra.Command, args []string) error {
 			if err := a.requireTmux("grid stop"); err != nil {
 				return err
@@ -373,4 +376,34 @@ func selfPath() string {
 		return abs
 	}
 	return p
+}
+
+// completeGrid completes grid's arguments: the repository, then [<account>:]<name>: worktree
+// names of that repository, then each account followed by ":".
+func (a *app) completeGrid(_ *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		return nil, cobra.ShellCompDirectiveFilterDirs
+	}
+	keep := cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	if acct, _, ok := strings.Cut(toComplete, ":"); ok {
+		var out []cobra.Completion
+		for _, n := range a.worktreeNames(args[0], a.accountSpec(acct)) {
+			out = append(out, acct+":"+n)
+		}
+		return out, keep
+	}
+	out := a.worktreeNames(args[0], a.accountSpec(a.account))
+	for _, c := range a.accountCompletions(toComplete) {
+		name, desc, _ := strings.Cut(c, "\t")
+		out = append(out, cobra.CompletionWithDesc(name+":", "run as "+desc))
+	}
+	return out, keep | cobra.ShellCompDirectiveNoSpace
+}
+
+// completeRepo completes an optional repository argument.
+func completeRepo(_ *cobra.Command, args []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	return nil, cobra.ShellCompDirectiveFilterDirs
 }

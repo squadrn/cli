@@ -51,7 +51,7 @@ func splitCompletion(words []string, t routeTable) completionLine {
 // the first word after it (account, subcommand or agent subcommand) is completed here too.
 // Nothing here runs an agent CLI.
 func (a *app) complete(req string, words []string) error {
-	a.completionFlags()
+	a.completionDefaults()
 	t := a.routeTable()
 	l := splitCompletion(words, t)
 	noDesc := req == cobra.ShellCompNoDescRequestCmd
@@ -86,14 +86,38 @@ func (a *app) cobraComplete(req string, words []string) error {
 	return a.root.Execute()
 }
 
-// completionFlags completes the values of the global flags.
-func (a *app) completionFlags() {
-	_ = a.root.RegisterFlagCompletionFunc("account", func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
-		return a.accountCompletions(toComplete), cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
-	})
+// completionDefaults completes the values of the global flags, and nothing (rather than file
+// names) for the arguments of commands that complete none.
+func (a *app) completionDefaults() {
+	_ = a.root.RegisterFlagCompletionFunc("account", a.completeAccountFlag)
 	_ = a.root.RegisterFlagCompletionFunc("dir", func(*cobra.Command, []string, string) ([]cobra.Completion, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveFilterDirs
 	})
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		if c.ValidArgsFunction == nil && len(c.ValidArgs) == 0 {
+			c.ValidArgsFunction = cobra.NoFileCompletions
+		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	for _, c := range a.root.Commands() {
+		walk(c)
+	}
+}
+
+// completeAccountArg completes a command's one account argument.
+func (a *app) completeAccountArg(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	return a.completeAccountFlag(cmd, args, toComplete)
+}
+
+// completeAccountFlag completes the value of a flag that names an account.
+func (a *app) completeAccountFlag(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	return a.accountCompletions(toComplete), cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 }
 
 // firstWords completes the first word after the globals: accounts, then subcommands. After an
@@ -128,7 +152,8 @@ func (a *app) firstWords(account, toComplete string) []cobra.Completion {
 
 // accountCompletions offers each account by the shortest name that runs it: its bare name when
 // that names only this account (personal, main), else provider/name. A prefix its bare name does
-// not match (cl, claude/) is matched against its provider/name.
+// not match (cl, claude/) is matched against its provider/name. The description adds the login
+// last cached (auth.json); completion never asks the agent CLI.
 func (a *app) accountCompletions(toComplete string) []cobra.Completion {
 	accts, _ := a.store.List()
 	var out []cobra.Completion
@@ -138,12 +163,23 @@ func (a *app) accountCompletions(toComplete string) []cobra.Completion {
 		if x, err := a.store.Get(acct.Name); err == nil && x.Ref == acct.Ref {
 			word, desc = acct.Name, label
 		}
-		switch {
-		case strings.HasPrefix(word, toComplete):
-			out = append(out, cobra.CompletionWithDesc(word, desc))
-		case strings.HasPrefix(label, toComplete):
-			out = append(out, cobra.CompletionWithDesc(label, acct.Spec.Name))
+		if !strings.HasPrefix(word, toComplete) {
+			word, desc = label, acct.Spec.Name
 		}
+		if !strings.HasPrefix(word, toComplete) {
+			continue
+		}
+		if s, ok := a.cache.Last(label); ok {
+			switch {
+			case !s.LoggedIn:
+				desc += " · logged out"
+			case s.Email != "":
+				desc += " · " + s.Email
+			default:
+				desc += " · logged in"
+			}
+		}
+		out = append(out, cobra.CompletionWithDesc(word, desc))
 	}
 	return out
 }

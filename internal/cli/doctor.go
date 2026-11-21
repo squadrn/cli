@@ -25,7 +25,7 @@ func (a *app) doctorCmd() *cobra.Command {
 			"doctor personal", "the install and claude/personal only",
 			"doctor --json", "the checks as JSON (exit 1 when one fails)"),
 		Args:              optionalArg,
-		ValidArgsFunction: a.completeAccounts,
+		ValidArgsFunction: a.completeAccountArg,
 		RunE: func(_ *cobra.Command, args []string) error {
 			only := ""
 			if len(args) == 1 {
