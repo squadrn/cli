@@ -81,6 +81,9 @@ func wizApp(t *testing.T, clis ...string) (*app, *prompt.Script) {
 
 func (a *app) dir(name string) string { return filepath.Join(a.store.Home, name) }
 
+// slashed makes ~\.codex-work (Windows) read ~/.codex-work, so one expectation fits both.
+func slashed(s string) string { return strings.ReplaceAll(s, `\`, "/") }
+
 func TestWizardHappyPath(t *testing.T) {
 	a, s := wizApp(t, "claude", "codex")
 	s.Answers = []any{"codex", "work", "Recommended", true, true}
@@ -107,8 +110,8 @@ func TestWizardHappyPath(t *testing.T) {
 		"└  Ready in ", " · start: srn work\n",
 		"   Same without questions: srn account add codex/work --default --login\n",
 	} {
-		if !strings.Contains(s.Out.String(), want) {
-			t.Errorf("transcript lacks %q:\n%s", want, s.Out.String())
+		if out := slashed(s.Out.String()); !strings.Contains(out, want) {
+			t.Errorf("transcript lacks %q:\n%s", want, out)
 		}
 	}
 	if a.cfg.DefaultAccount != "codex/work" {
@@ -290,7 +293,7 @@ func TestWizardCrossProviderName(t *testing.T) {
 		}
 	}
 	w := &wizard{a: a, spec: provider.Codex}
-	if h := w.nameHint("solo"); h.Warn || !strings.Contains(h.Text, "~/.codex-solo · start with: srn solo") {
+	if h := w.nameHint("solo"); h.Warn || !strings.Contains(slashed(h.Text), "~/.codex-solo · start with: srn solo") {
 		t.Errorf("hint %+v", h)
 	}
 	if h := w.nameHint("Bad"); h.Text != "" {

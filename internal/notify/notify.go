@@ -155,6 +155,25 @@ func or(v, def string) string {
 }
 
 // Validate reports the first invalid value.
+// Choices lists the values a setting accepts (sound, when, method, events); nil for free text.
+func Choices(setting string) []string {
+	switch setting {
+	case "sound":
+		return slices.Clone(sounds)
+	case "when":
+		return slices.Clone(whens)
+	case "method":
+		return slices.Clone(methods)
+	case "events":
+		out := make([]string, len(Kinds))
+		for i, k := range Kinds {
+			out[i] = string(k)
+		}
+		return out
+	}
+	return nil
+}
+
 func (s Settings) Validate() error {
 	for _, e := range s.Events {
 		if !slices.Contains(Kinds, Kind(e)) {

@@ -60,7 +60,7 @@ already holds the conversation and it went on there, the swap is refused unless 
 	cmd.Flags().BoolVarP(&o.yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "move it even if the target's copy went on and differs")
 	_ = cmd.RegisterFlagCompletionFunc("worktree", a.completeWorktrees)
-	_ = cmd.RegisterFlagCompletionFunc("to", a.completeAccounts)
+	_ = cmd.RegisterFlagCompletionFunc("to", a.completeAccountFlag)
 	return cmd
 }
 

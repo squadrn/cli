@@ -37,7 +37,7 @@ Usage is recorded by the status line, so it needs a one-time setup per account:
   %[1]s usage setup --all     record usage for every account
   %[1]s usage setup --undo    restore the previous status line`, a.cmd),
 		Args:              optionalArg,
-		ValidArgsFunction: a.completeAccounts,
+		ValidArgsFunction: a.completeAccountArg,
 		RunE: func(_ *cobra.Command, args []string) error {
 			target := ""
 			if len(args) == 1 {
@@ -78,7 +78,7 @@ func (a *app) usageSetupCmd() *cobra.Command {
 settings.json is wrapped, so squadrn sees what Claude Code reports while your own command keeps
 running and showing. Each account has its own settings.json, so each is set up on its own.`,
 		Args:              optionalArg,
-		ValidArgsFunction: a.completeAccounts,
+		ValidArgsFunction: a.completeAccountArg,
 		RunE: func(_ *cobra.Command, args []string) error {
 			target := ""
 			if len(args) == 1 {
