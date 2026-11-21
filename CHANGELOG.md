@@ -11,7 +11,16 @@
   `account logout` moves the login files to the trash. Sessions never use Gemini's shared
   keychain store. `doctor` checks Gemini 0.70.0+, Node.js 20+, the keychain and Google Cloud
   credential variables, and says that Gemini sessions have no git pre-push guard (Gemini turns
-  git hooks off). Profiles for Gemini come next.
+  git hooks off).
+- **Gemini profiles, MCP, trust and worktrees** (ADR 0013 §7–8): every profile keeps the git and
+  tmux variables Gemini must not redact, turns worktrees on and writes a policy file
+  (`squadrn-policy.toml`, passed with `--policy` to every session) that denies Gemini's file tools
+  `.env` files, `~/.ssh` and every other account's credential files; `standard` denies the full
+  secret list, asks before `git push`, turns yolo mode and auto-update off and keeps 30 days of
+  history, `strict` 14 days and approval for every tool; `--with privacy` turns usage statistics
+  and telemetry off. `shared_mcp` copies main's allowlisted servers into Gemini accounts. A
+  session in a repository the account has no trust decision for asks once and trusts the
+  repository root (and its worktrees). `srn wt` and grids run `gemini --worktree <name>`.
 - **Push guard for Gemini CLI** (ADR 0013 §5): `account add`, the installer and `self-update`
   write a `BeforeTool` hook (`squadrn-guard`, shell tool only, 5 s) into each Gemini account's own
   `settings.json`; it blocks with exit 2, which Gemini honours even in yolo mode. A main
