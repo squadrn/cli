@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -84,8 +86,8 @@ func (a *app) configCmd() *cobra.Command {
 		Short: "Change one setting",
 		Long: `Change one setting. Lists are comma separated; "" clears a list, or restores the default
 protected_branches. Changing command or aliases relinks them in the bin dir.`,
-		Args:      exactArgs(2),
-		ValidArgs: config.Keys,
+		Args:              exactArgs(2),
+		ValidArgsFunction: completeSetting,
 		RunE: func(_ *cobra.Command, args []string) error {
 			path, err := config.Path()
 			if err != nil {
@@ -145,4 +147,30 @@ func onPATH(dir string) bool {
 		}
 	}
 	return false
+}
+
+// completeSetting completes `config set`: a key, then the values it accepts; a list key takes
+// them comma separated (notify.events input,f<Tab>).
+func completeSetting(_ *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	switch len(args) {
+	case 0:
+		return config.Keys, cobra.ShellCompDirectiveNoFileComp
+	case 1:
+		values := config.Values(args[0])
+		if !config.ListKey(args[0]) {
+			return values, cobra.ShellCompDirectiveNoFileComp
+		}
+		prefix := ""
+		if i := strings.LastIndex(toComplete, ","); i >= 0 {
+			prefix = toComplete[:i+1]
+		}
+		var out []cobra.Completion
+		for _, v := range values {
+			if !slices.Contains(strings.Split(prefix, ","), v) {
+				out = append(out, prefix+v)
+			}
+		}
+		return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
+	}
+	return nil, cobra.ShellCompDirectiveNoFileComp
 }

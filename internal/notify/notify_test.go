@@ -416,3 +416,27 @@ func TestAgents(t *testing.T) {
 		}
 	}
 }
+
+func TestChoicesValidate(t *testing.T) {
+	for _, setting := range []string{"sound", "when", "method", "events"} {
+		for _, v := range Choices(setting) {
+			s := Settings{}
+			switch setting {
+			case "sound":
+				s.Sound = v
+			case "when":
+				s.When = v
+			case "method":
+				s.Method = v
+			default:
+				s.Events = []string{v}
+			}
+			if err := s.Validate(); err != nil {
+				t.Errorf("%s %s: %v", setting, v, err)
+			}
+		}
+	}
+	if Choices("quiet_hours") != nil {
+		t.Error("free text has choices")
+	}
+}

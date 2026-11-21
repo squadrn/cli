@@ -155,4 +155,10 @@ func TestAuthCacheCached(t *testing.T) {
 	if _, ok := c.Cached("/amain"); ok {
 		t.Fatal("stale entry served")
 	}
+	if s, ok := c.Last("/amain"); !ok || !s.LoggedIn {
+		t.Fatalf("Last of a stale entry = %+v, %v", s, ok)
+	}
+	if _, ok := c.Last("missing"); ok {
+		t.Fatal("Last of a missing entry")
+	}
 }

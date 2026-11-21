@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -435,14 +436,35 @@ func (a *app) depsCmd() *cobra.Command {
 	}
 }
 
+// completeWorktrees completes one worktree name, of the account named before the subcommand
+// (its provider keeps worktrees in its own dir).
 func (a *app) completeWorktrees(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
+	return a.worktreeNames(".", a.accountSpec(a.account)), cobra.ShellCompDirectiveNoFileComp
+}
+
+// accountSpec is the provider of the account input names, else the default one.
+func (a *app) accountSpec(input string) provider.Spec {
+	if input != "" {
+		if acct, err := a.store.Get(input); err == nil {
+			return acct.Spec
+		}
+	}
+	return a.defaultSpec()
+}
+
+// worktreeNames lists the agent worktrees of the repository at dir; none when it is not one.
+func (a *app) worktreeNames(dir string, spec provider.Spec) []string {
 	ctx := context.Background()
-	repo, err := a.repoHere(ctx, a.defaultSpec())
+	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
+		return nil
+	}
+	repo, err := a.openRepo(ctx, abs, spec.WorktreeDir)
+	if err != nil {
+		return nil
 	}
 	wts, _ := repo.Agents(ctx)
 	var names []string
@@ -451,5 +473,5 @@ func (a *app) completeWorktrees(_ *cobra.Command, args []string, _ string) ([]st
 			names = append(names, n)
 		}
 	}
-	return names, cobra.ShellCompDirectiveNoFileComp
+	return names
 }
