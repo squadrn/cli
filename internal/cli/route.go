@@ -26,7 +26,7 @@ type route struct {
 
 type routeTable struct {
 	isAccount func(string) bool
-	// isUnmanaged reports a dir named like an account that is not one yet (account adopt).
+	// isUnmanaged reports a dir named like an account that is not one yet (account add --adopt).
 	isUnmanaged func(string) bool
 	subcommands map[string]bool
 	// passthrough reports subcommands of the agent CLI of an account ("" is the default
@@ -134,7 +134,7 @@ func unknownWord(word string, t routeTable) error {
 		msg += fmt.Sprintf(" (did you mean %s?)", strings.Join(s, " or "))
 	}
 	if t.isUnmanaged != nil && t.isUnmanaged(word) {
-		return usagef("%s\n  to give the agent a prompt: %s -- %q\n  to make the existing dir an account: %s account adopt %s", msg, t.cmd, word, t.cmd, word)
+		return usagef("%s\n  to give the agent a prompt: %s -- %q\n  to make the existing dir an account: %s account add %s --adopt", msg, t.cmd, word, t.cmd, word)
 	}
 	return usagef("%s\n  to give the agent a prompt: %s -- %q\n  to create an account:       %s account add %s", msg, t.cmd, word, t.cmd, word)
 }

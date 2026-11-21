@@ -287,6 +287,18 @@ func TestAccountChecks(t *testing.T) {
 		t.Errorf("permissions: %+v", c)
 	}
 
+	if _, found := find(checks, "default_account"); found {
+		t.Error("no default account set, no check")
+	}
+	e.Config.DefaultAccount = "claude/work"
+	if _, found := find(e.accounts(context.Background()), "default_account"); found {
+		t.Error("an existing default account is fine")
+	}
+	e.Config.DefaultAccount = "claude/gone"
+	if c, _ := find(e.accounts(context.Background()), "default_account claude/gone does not exist"); c.Status != Warn || c.Fix != "squadrn account default --unset" {
+		t.Errorf("dangling default account: %+v", c)
+	}
+
 	e = env(t, fakeAgent{authErr: errors.New("timeout")}, nil)
 	if c, _ := find(e.accounts(context.Background()), "login status unavailable"); c.Status != Fail {
 		t.Errorf("auth error: %+v", c)
@@ -481,7 +493,7 @@ func TestHookGuardAccountChecks(t *testing.T) {
 	e := env(t, ag, nil)
 	a := account.Account{Ref: account.Ref{Provider: "codex", Name: "work"}, Spec: provider.Codex, Dir: filepath.Join(e.Store.Home, ".codex-work")}
 	checks := e.account(context.Background(), a)
-	if c, _ := find(checks, "push guard hook not trusted by codex"); c.Status != Fail || c.Fix != "squadrn account add codex/work" {
+	if c, _ := find(checks, "push guard hook not trusted by codex"); c.Status != Fail || c.Fix != "squadrn account repair codex/work" {
 		t.Errorf("untrusted: %+v", c)
 	}
 	if c, ok := find(checks, "credentials kept in"); !ok || c.Status != OK {
@@ -493,7 +505,7 @@ func TestHookGuardAccountChecks(t *testing.T) {
 	if _, ok := find(checks, "push guard hook installed and trusted"); !ok {
 		t.Error("trusted hook not reported")
 	}
-	if c, _ := find(checks, "credentials may be shared"); c.Status != Fail || c.Fix != "squadrn account add codex/work" {
+	if c, _ := find(checks, "credentials may be shared"); c.Status != Fail || c.Fix != "squadrn account repair codex/work" {
 		t.Errorf("keyring: %+v", c)
 	}
 	ag.installed = false
@@ -502,7 +514,7 @@ func TestHookGuardAccountChecks(t *testing.T) {
 		t.Errorf("missing hook: %+v", c)
 	}
 	main := account.Account{Ref: account.Ref{Provider: "codex", Name: account.Main}, Spec: provider.Codex, Dir: filepath.Join(e.Store.Home, ".codex")}
-	if c, _ := find(e.account(context.Background(), main), "push guard hook not installed"); c.Fix != "squadrn account add codex/main" {
+	if c, _ := find(e.account(context.Background(), main), "push guard hook not installed"); c.Fix != "squadrn account repair codex/main" {
 		t.Errorf("missing hook in main: %+v", c)
 	}
 }

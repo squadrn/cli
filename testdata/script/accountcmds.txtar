@@ -1,0 +1,75 @@
+[windows] skip 'Unix script: sh and symlinks'
+# ADR 0014 §1: account default, add -p/--default, repair <ref>|--all.
+cp settings.json home/.claude/settings.json
+cp empty home/.claude/.loggedin
+env FAKE_VERSION=2.1.329
+
+# -p names the provider; it must agree with one in the name.
+cp $CODEX_FAKE bin/codex
+exec squadrn account add work -p codex --no-login -y
+stdout '^Codex CLI .*· new account codex/work → ~/.codex-work$'
+exitcode 2 squadrn account add claude/x2 -p codex
+! exec squadrn account add claude/x2 -p codex
+stderr 'claude/x2 names provider claude, -p says codex'
+exitcode 2 squadrn account add x2 -p nope
+
+# No default account: a bare command runs the default provider's main account.
+exec squadrn account default
+stdout '^claude/main \(no default account set; set one: srn account default <account>\)$'
+exec squadrn
+stdout '^cfg=<unset> args=$'
+
+# add --default makes the new account the default: a bare command runs it, and agent
+# subcommands without an account pass through to its CLI.
+exec squadrn account add personal --default --no-usage -y
+stdout '^✓ default account: a bare srn runs claude/personal$'
+exec squadrn account default
+stdout '^claude/personal$'
+exec squadrn config get default_account
+stdout '^claude/personal$'
+exec squadrn
+stdout '^cfg=.*/home/.claude-personal args=$'
+exec squadrn mcp list
+stdout '^cfg=.*/home/.claude-personal args=mcp list$'
+exec squadrn main
+stdout '^cfg=<unset> args=$'
+exec squadrn account repair personal --json
+stdout '"default":true'
+
+exec squadrn account default codex/work
+stdout '^default account: a bare srn runs codex/work$'
+exitcode 1 squadrn account default ghost
+exitcode 2 squadrn account default work --unset
+
+# A default account that no longer exists: the bare command fails, doctor warns.
+exec squadrn config set default_account claude/gone
+exec squadrn account default
+stdout '^claude/gone$'
+stderr 'the default account claude/gone does not exist'
+! exec squadrn
+stderr 'account not found: claude/gone'
+exec sh -c 'squadrn doctor; true'
+stdout '! default_account claude/gone does not exist: a bare srn fails  → srn account default --unset'
+exec squadrn account default --unset
+stdout '^no default account: a bare srn runs claude/main$'
+exec squadrn config get default_account
+! stdout .
+
+# repair: one account, every account, or neither (a usage error).
+exitcode 2 squadrn account repair
+exitcode 2 squadrn account repair work --all
+! exec squadrn account repair ghost
+stderr 'account not found: claude/ghost \(run: srn account add claude/ghost\)'
+exec squadrn account repair work
+stdout '^Codex CLI .*· codex/work → ~/.codex-work$'
+exec squadrn account repair --all
+stdout '^Claude Code 2.1.329 · claude/main, the default account → ~/.claude$'
+stdout '^Claude Code 2.1.329 · claude/personal → ~/.claude-personal$'
+stdout '^Codex CLI .*· codex/work → ~/.codex-work$'
+exec squadrn account repair --all --json
+stdout '^\{"account":"claude/personal",'
+stdout '^\{"account":"codex/work",'
+
+-- empty --
+-- settings.json --
+{"model": "opus"}

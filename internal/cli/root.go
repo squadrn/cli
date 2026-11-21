@@ -97,7 +97,7 @@ func Run(args []string) int {
 	switch {
 	case err == nil, silent(err):
 	case errors.As(err, &nf) && unmanaged(nf.Ref.String()):
-		_, _ = fmt.Fprintf(os.Stderr, "%s: %s; its dir exists but is not a %s account (run: %s account adopt %s)\n", name, err, config.Slug, name, nf.Ref)
+		_, _ = fmt.Fprintf(os.Stderr, "%s: %s; its dir exists but is not a %s account (run: %s account add %s --adopt)\n", name, err, config.Slug, name, nf.Ref)
 	case errors.As(err, &nf):
 		_, _ = fmt.Fprintf(os.Stderr, "%s: %s (run: %s account add %s)\n", name, err, name, nf.Ref)
 	default:
@@ -160,7 +160,7 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 	a.account = r.account
 	a.updateNotice(r)
 	switch {
-	case r.pick:
+	case r.pick && a.defaultAccount() == "":
 		return a.pick()
 	case r.sub == "":
 		return a.runAgent(r.account, r.args)
@@ -197,6 +197,9 @@ func (a *app) routeTable() routeTable {
 		subcommands: subs,
 		passthrough: func(acct, w string) bool {
 			specs := provider.All()
+			if acct == "" {
+				acct = a.defaultAccount()
+			}
 			if acct == "" {
 				specs = []provider.Spec{a.defaultSpec()}
 			} else if x, err := a.store.Get(acct); err == nil {
@@ -518,6 +521,9 @@ func (a *app) sessionEnv() []string {
 }
 
 func (a *app) runAgent(accountInput string, args []string) error {
+	if accountInput == "" {
+		accountInput = a.defaultAccount()
+	}
 	acct, err := a.resolve(accountInput)
 	if err != nil {
 		return err
@@ -527,6 +533,15 @@ func (a *app) runAgent(accountInput string, args []string) error {
 		return err
 	}
 	return a.session(ag, acct, args, "")
+}
+
+// defaultAccount is the account a bare command runs (account default); "" is the default
+// provider's main account.
+func (a *app) defaultAccount() string {
+	if a.cfgErr != nil {
+		return ""
+	}
+	return a.cfg.DefaultAccount
 }
 
 func (a *app) resolve(input string) (account.Account, error) {
@@ -612,7 +627,7 @@ func (a *app) askTrust(ag provider.Agent, acct account.Account) {
 
 // relinkHint is the command that links an account's own copies of shared files to main again.
 func (a *app) relinkHint(acct account.Account) string {
-	return a.cmd + " account add " + acct.Label() + " --relink"
+	return a.cmd + " account repair " + acct.Label() + " --relink"
 }
 
 func (a *app) tilde(path string) string {

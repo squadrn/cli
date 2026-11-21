@@ -187,15 +187,11 @@ func (a *app) setup(yes bool) error {
 			adopt = strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "y")
 		}
 		if !adopt {
-			a.out("   %s skipped %s (later: %s account adopt %s)\n", mark, a.tilde(acct.Dir), a.cmd, acct.Label())
+			a.out("   %s skipped %s (later: %s account add %s --adopt)\n", mark, a.tilde(acct.Dir), a.cmd, acct.Label())
 			continue
 		}
-		if _, err := a.store.Adopt(acct.Label()); err != nil {
-			return err
-		}
-		a.out("   adopted %s\n", acct.Label())
 		if err := a.indented(func() error {
-			return a.accountAdd(acct.Label(), addOptions{yes: true, usage: new(bool), login: new(bool)})
+			return a.accountAdd(acct.Label(), addOptions{adopt: true, yes: true, usage: new(bool), login: new(bool)})
 		}); err != nil {
 			a.warnf("%s: %v", acct.Label(), err)
 		}

@@ -247,3 +247,16 @@ internal/cli/
 - A bare `srn` may run a secondary account when `default_account` is set.
 - New package `internal/ui/prompt`; the picker becomes one of its components.
 - Every creation path, interactive or not, goes through one plan and one apply.
+
+## Implementation notes
+
+Where the implementation differs from the decision above, and why:
+
+- `add <provider>/main` keeps setting up the default account (push guard, usage, login) rather
+  than failing as an existing account: the CLI creates `~/.<provider>` itself, so "set it up" is
+  the only meaning `add` can have for it, and branch 2c of the wizard offers exactly that.
+  `repair <provider>/main` does the same.
+- With `default_account` set, a bare `srn` at a terminal runs that account instead of opening the
+  account picker; without one the picker stays. `wt`, `grid` and `usage` without an account keep
+  using the default provider's main account.
+- `--relink` moved from `add` to `repair` (only an existing account has copies to relink).
