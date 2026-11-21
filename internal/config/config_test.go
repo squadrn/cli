@@ -326,7 +326,7 @@ func TestValuesAreAccepted(t *testing.T) {
 	for _, key := range Keys {
 		values := Values(key)
 		switch key {
-		case "command", "aliases", "shared_mcp", "protected_branches", "notify.quiet_hours":
+		case "command", "aliases", "default_account", "shared_mcp", "protected_branches", "notify.quiet_hours":
 			if values != nil {
 				t.Errorf("%s: free text, got %v", key, values)
 			}
