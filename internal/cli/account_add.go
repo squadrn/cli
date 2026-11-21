@@ -29,6 +29,8 @@ type addOptions struct {
 	login   *bool
 	relink  bool
 	yes     bool
+	dryRun  bool
+	json    bool
 }
 
 func (a *app) accountAddCmd() *cobra.Command {
@@ -48,6 +50,7 @@ func (a *app) accountAddCmd() *cobra.Command {
 		Example: fmt.Sprintf(`  %[1]s account add work                     asks for the profile, usage tracking and login
   %[1]s account add claude/work --profile strict --usage --login
   %[1]s account add work --with privacy      also turn telemetry off
+  %[1]s account add work --dry-run           show what would be done, change nothing
   %[1]s account add work --relink            link files the account has its own copy of (keeps a backup)`, a.cmd),
 		Args: oneArg,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -63,7 +66,7 @@ func (a *app) accountAddCmd() *cobra.Command {
 			if login || noLogin {
 				o.login = &login
 			}
-			return a.accountAdd(args[0], o)
+			return a.jsonErrors(o.json, a.accountAdd(args[0], o))
 		},
 		ValidArgsFunction: cobra.NoFileCompletions,
 	}
@@ -75,6 +78,8 @@ func (a *app) accountAddCmd() *cobra.Command {
 	f.BoolVar(&login, "login", false, "log in right away without asking")
 	f.BoolVar(&noLogin, "no-login", false, "do not log in and do not ask")
 	f.BoolVar(&o.relink, "relink", false, "move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)")
+	f.BoolVar(&o.dryRun, "dry-run", false, "print the plan and change nothing")
+	f.BoolVar(&o.json, "json", false, "print the result as JSON (implies --yes)")
 	f.BoolVarP(&o.yes, "yes", "y", false, "do not ask; use the defaults and the flags given")
 	_ = cmd.RegisterFlagCompletionFunc("profile", cobra.FixedCompletions(profiles, cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("with", cobra.FixedCompletions(options, cobra.ShellCompDirectiveNoFileComp))
@@ -87,38 +92,115 @@ type addStep struct {
 	created bool // the account dir exists in place
 }
 
-// accountAdd creates or repairs an account in four steps: plan, ask everything up front, apply
-// (a new account is built in a temp dir and renamed into place), verify and summarise (ADR 0011).
+// addPlan is everything account add will do, read before anything is written (planAdd). The
+// questions of the flag path and the wizard fill in what is left to decide.
+type addPlan struct {
+	acct account.Account
+	ag   provider.Agent
+	// main: the provider's default account, which the CLI creates on its own; only the push
+	// guard, usage tracking and the login apply.
+	main    bool
+	isNew   bool
+	version string
+	rec     account.Managed
+	profile string
+	options []string
+	// shared names what main shares with a new account.
+	shared []string
+	relink bool
+	// trackUsage and noUsage turn usage tracking on or off; neither leaves it as it is.
+	trackUsage, noUsage bool
+	login               bool
+	// status is the login before the add, then after the login step.
+	status provider.AuthStatus
+	start  time.Time
+	// waited is the time spent on the user (questions, the login), left out of "done in".
+	waited time.Duration
+}
+
+// addResult is what account add did; --json prints it.
+type addResult struct {
+	Account  string   `json:"account"`
+	Provider string   `json:"provider"`
+	Dir      string   `json:"dir"`
+	Created  bool     `json:"created"`
+	Adopted  bool     `json:"adopted"`
+	Profile  string   `json:"profile"`
+	Options  []string `json:"options"`
+	Guard    string   `json:"guard"`
+	Usage    bool     `json:"usage"`
+	LoggedIn bool     `json:"loggedIn"`
+	Default  bool     `json:"default"`
+	Start    string   `json:"start"`
+	DryRun   bool     `json:"dryRun,omitempty"`
+	// changes counts the steps that changed something; guard is the guard line once known.
+	changes int
+	guard   string
+}
+
+// accountAdd creates or repairs an account: plan (read only), ask what is left (at a terminal),
+// apply (a new account is built in a temp dir and renamed into place), then log in and summarise
+// (ADR 0011, ADR 0014).
 func (a *app) accountAdd(input string, o addOptions) error {
 	start := time.Now()
 	if a.cfgErr != nil {
 		return a.cfgErr
 	}
+	if o.json {
+		o.yes = true
+	}
+	p, err := a.planAdd(input, o)
+	if err != nil {
+		return err
+	}
+	p.start = start
+	r := a.addReporter(o.json)
+	if o.dryRun {
+		return a.reportPlan(p, o.json)
+	}
+	r.header(p)
+	if err := a.askAdd(p, o, r); err != nil {
+		return err
+	}
+	res, err := a.applyAdd(p, r)
+	if err != nil {
+		return err
+	}
+	if p.login {
+		a.addLogin(p, r, &res)
+	}
+	return r.done(p, res)
+}
+
+// planAdd reads what account add would do to input with o; it writes nothing. The CLI's version
+// and the login state are read in parallel with the account.
+func (a *app) planAdd(input string, o addOptions) (*addPlan, error) {
 	if main, ok := a.store.MainOf(input); ok {
-		return a.accountAddMain(main, o, start)
+		return a.planAddMain(main, o)
 	}
 	acct, err := a.store.Define(input)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if o.profile != "" && provider.ProfileSummary(o.profile) == "" {
-		return usagef("unknown profile %q (use %s)", o.profile, profileList())
+		return nil, usagef("unknown profile %q (use %s)", o.profile, profileList())
 	}
 	for _, w := range o.with {
 		if !provider.ValidOption(w) {
-			return usagef("unknown --with %q (use %s)", w, optionList())
+			return nil, usagef("unknown --with %q (use %s)", w, optionList())
 		}
 	}
 	if fi, err := os.Stat(acct.Dir); err == nil && fi.IsDir() && !a.store.Managed(acct) {
-		return fmt.Errorf("%s exists but is not a %s account (another tool may use it); to manage it, run: %s account adopt %s", a.tilde(acct.Dir), config.Slug, a.cmd, input)
+		return nil, fixError{
+			msg: fmt.Sprintf("%s exists but is not a %s account (another tool may use it)", a.tilde(acct.Dir), config.Slug),
+			how: "to manage it, run", fix: a.cmd + " account adopt " + input,
+		}
 	}
 	ag, err := a.agent(acct.Spec)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	isNew := !a.store.Managed(acct)
-
-	// Plan: the CLI version and the login run in parallel with reading the account.
+	p := &addPlan{acct: acct, ag: ag, isNew: !a.store.Managed(acct)}
 	version := make(chan string, 1)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
@@ -127,7 +209,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 		version <- provider.ParseVersion(out)
 	}()
 	login := make(chan provider.AuthStatus, 1)
-	if isNew {
+	if p.isNew {
 		login <- provider.AuthStatus{}
 	} else {
 		go func() {
@@ -137,81 +219,114 @@ func (a *app) accountAdd(input string, o addOptions) error {
 			login <- s
 		}()
 	}
-	rec, _, err := account.ReadManaged(acct.Dir)
-	if err != nil {
-		return err
+	if p.rec, _, err = account.ReadManaged(acct.Dir); err != nil {
+		return nil, err
 	}
-	profile, options := rec.Profile, rec.Options
-	if isNew && profile == "" {
-		profile = a.cfg.ProfileName()
+	p.profile, p.options = p.rec.Profile, p.rec.Options
+	if p.isNew && p.profile == "" {
+		p.profile = a.cfg.ProfileName()
 	}
 	if o.profile != "" {
-		profile = o.profile
+		p.profile = o.profile
 	}
 	if o.with != nil {
-		options = o.with
+		p.options = o.with
 	}
-	head := acct.Spec.Name
-	if v := <-version; v != "" {
-		head += " " + v
+	if p.isNew {
+		p.shared = a.sharedNames(acct.Spec)
 	}
-	if isNew {
-		a.out("%s · new account %s → %s\n", head, acct.Label(), a.tilde(acct.Dir))
-	} else {
-		a.out("%s · %s → %s\n", head, acct.Label(), a.tilde(acct.Dir))
+	p.relink = o.relink && !p.isNew
+	p.usageFlags(o)
+	p.version = <-version
+	p.status = <-login
+	return p, nil
+}
+
+// planAddMain plans the setup of a provider's default account (~/.claude, ~/.codex), which the
+// CLI creates on its own: squadrn's push guard, usage tracking and the login. Its settings stay
+// the user's own, so profiles and shared links do not apply.
+func (a *app) planAddMain(acct account.Account, o addOptions) (*addPlan, error) {
+	if o.profile != "" || o.with != nil || o.relink {
+		return nil, usagef("%s is the default account (%s): --profile, --with and --relink apply to other accounts", acct.Label(), a.tilde(acct.Dir))
 	}
+	ag, err := a.agent(acct.Spec)
+	if err != nil {
+		return nil, err
+	}
+	p := &addPlan{acct: acct, ag: ag, main: true}
+	ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+	out, _ := ag.Output(ctx, "", "--version")
+	p.version = provider.ParseVersion(out)
+	p.status, _ = ag.Auth(ctx, acct.ConfigDir())
+	cancel()
+	p.usageFlags(o)
+	return p, nil
+}
+
+func (p *addPlan) usageFlags(o addOptions) {
+	p.trackUsage = o.usage != nil && *o.usage
+	p.noUsage = o.usage != nil && !*o.usage
+	p.login = o.login != nil && *o.login
+}
+
+// askAdd asks the flag path's questions at a terminal, as plan lines: what the flags leave open.
+func (a *app) askAdd(p *addPlan, o addOptions, r addReporter) error {
 	ask := a.interactive && !o.yes
 	in := bufio.NewReader(a.stdin)
-	// waited is the time spent on the user (questions, the login), left out of "done in".
-	var waited time.Duration
 	asked := time.Now()
-	if isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
-		if profile, err = a.askProfile(in, acct.Spec, profile); err != nil {
+	acct := p.acct
+	var err error
+	if !p.main {
+		if p.isNew && o.profile == "" && ask && settingsFormat(acct.Spec) != nil {
+			if p.profile, err = a.askProfile(in, acct.Spec, p.profile); err != nil {
+				return err
+			}
+		} else if p.profile != "" {
+			r.planLine("profile", profileDesc(acct.Spec, p.profile, p.options))
+		}
+		if len(p.shared) > 0 {
+			r.planLine("shared", fmt.Sprintf("%s from %s/%s", strings.Join(p.shared, ", "), acct.Provider, account.Main))
+		}
+		if p.relink {
+			if p.relink, err = a.confirmRelink(in, acct, p.ag, ask, o.yes); err != nil {
+				return err
+			}
+		}
+	}
+	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && (p.isNew || !a.usageTracking(acct)) {
+		if p.trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
 			return err
 		}
-	} else if profile != "" {
-		a.out("%s%-14s %s\n", a.padding(), "profile", profileDesc(acct.Spec, profile, options))
+		p.noUsage = !p.trackUsage
 	}
-	if shared := a.sharedNames(acct.Spec); isNew && len(shared) > 0 {
-		a.out("%s%-14s %s from %s/%s\n", a.padding(), "shared", strings.Join(shared, ", "), acct.Provider, account.Main)
-	}
-	if o.relink && !isNew {
-		if o.relink, err = a.confirmRelink(in, acct, ag, ask, o.yes); err != nil {
-			return err
-		}
-	}
-	trackUsage := o.usage != nil && *o.usage
-	noUsage := o.usage != nil && !*o.usage
-	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && (isNew || !a.usageTracking(acct)) {
-		if trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
-			return err
-		}
-		noUsage = !trackUsage
-	}
-	status := <-login
-	doLogin := o.login != nil && *o.login
-	if !status.LoggedIn && o.login == nil && ask {
-		if doLogin, err = a.askYes(in, "log in now?", ""); err != nil {
+	if !p.status.LoggedIn && o.login == nil && ask {
+		if p.login, err = a.askYes(in, "log in now?", ""); err != nil {
 			return err
 		}
 	}
 	if ask {
-		waited = time.Since(asked)
+		p.waited = time.Since(asked)
 	}
+	return nil
+}
 
-	// Apply.
-	step := addStep{created: !isNew}
-	fail := func(err error) error { return a.addFailed(acct, step, err) }
-	changes := 0
+// applyAdd carries out p: the only writer of account add. A new account is built in a temp dir
+// and renamed into place, so a failure leaves nothing half made.
+func (a *app) applyAdd(p *addPlan, r addReporter) (addResult, error) {
+	res := addResult{Account: p.acct.Label(), Provider: p.acct.Provider, Dir: p.acct.Dir, Created: p.isNew, Profile: p.profile, Options: p.options}
 	note := func(format string, args ...any) {
-		changes++
-		a.out("%s %s\n", a.paint(a.colorOut, "32", "✓"), fmt.Sprintf(format, args...))
+		res.changes++
+		r.note(fmt.Sprintf(format, args...))
 	}
-	warn := func(format string, args ...any) {
-		a.out("%s %s\n", a.paint(a.colorOut, "33", "!"), fmt.Sprintf(format, args...))
+	warn := func(format string, args ...any) { r.warn(fmt.Sprintf(format, args...)) }
+	if p.main {
+		return res, a.applyAddMain(p, &res, note, warn)
 	}
+	acct, ag := p.acct, p.ag
+	step := addStep{created: !p.isNew}
+	fail := func(err error) (addResult, error) { return res, r.failed(acct, step, err) }
 	work := acct
-	if isNew {
+	if p.isNew {
 		step.name = "create " + a.tilde(acct.Dir)
 		tmp, err := os.MkdirTemp(filepath.Dir(acct.Dir), filepath.Base(acct.Dir)+".tmp-")
 		if err != nil {
@@ -225,19 +340,19 @@ func (a *app) accountAdd(input string, o addOptions) error {
 		work.Dir = tmp
 	}
 	step.name = "set up shared files and the push guard"
-	p := a.provisioner(ag)
-	p.Relink = o.relink
-	rep, err := p.Provision(context.Background(), work)
+	prov := a.provisioner(ag)
+	prov.Relink = p.relink
+	rep, err := prov.Provision(context.Background(), work)
 	if err != nil {
 		return fail(err)
 	}
 	step.name = "build settings"
-	if profile != "" && (profile != rec.Profile || !slices.Equal(options, rec.Options)) {
-		if err := account.SetManagedProfile(work, profile, options); err != nil {
+	if p.profile != "" && (p.profile != p.rec.Profile || !slices.Equal(p.options, p.rec.Options)) {
+		if err := account.SetManagedProfile(work, p.profile, p.options); err != nil {
 			return fail(err)
 		}
 	}
-	if d, _ := provider.DriverOf(acct.Spec.ID); isNew && d.Seed != nil {
+	if d, _ := provider.DriverOf(acct.Spec.ID); p.isNew && d.Seed != nil {
 		if err := d.Seed.Seed(a.store.Home, work.StateDir()); err != nil {
 			return fail(err)
 		}
@@ -246,14 +361,14 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if err != nil {
 		return fail(err)
 	}
-	if isNew {
+	if p.isNew {
 		step.name = "move the new account into place"
 		if err := os.Rename(work.Dir, acct.Dir); err != nil {
 			return fail(err)
 		}
 		step.created = true
-		if r, ok := ag.(provider.Relocator); ok {
-			if err := r.Relocate(work.Dir, acct.Dir); err != nil {
+		if rl, ok := ag.(provider.Relocator); ok {
+			if err := rl.Relocate(work.Dir, acct.Dir); err != nil {
 				return fail(err)
 			}
 		}
@@ -261,16 +376,16 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	}
 	a.cache.Forget(acct.Label())
 	switch {
-	case isNew || srep.Created || srep.Backup != "":
+	case p.isNew || srep.Created || srep.Backup != "":
 		what := "settings from " + acct.Provider + "/" + account.Main
 		if mainAcct, _ := a.store.MainOf(acct.Provider + "/" + account.Main); !fsx.IsFile(account.SettingsPath(mainAcct)) {
 			// No main account (or no settings in it) to start from.
 			what = "settings created"
-			if profile != "" {
-				what = "settings: " + profileName(profile, options)
+			if p.profile != "" {
+				what = "settings: " + profileName(p.profile, p.options)
 			}
-		} else if profile != "" {
-			what += " + " + profileName(profile, options)
+		} else if p.profile != "" {
+			what += " + " + profileName(p.profile, p.options)
 		}
 		if srep.Backup != "" {
 			what += " (the link to main's is kept as " + a.tilde(srep.Backup) + ")"
@@ -282,119 +397,39 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if len(srep.Kept) > 0 {
 		warn("settings: kept your change to %s (it no longer follows %s/%s)", strings.Join(srep.Kept, ", "), acct.Provider, account.Main)
 	}
-	a.reportProvision(acct, rep, isNew, note, warn)
-	if isNew || rep.PluginInstalled {
-		if guard := a.guardLine(acct, ag, rep.PluginInstalled); guard != "" {
-			note("push guard: %s", guard)
+	a.reportProvision(acct, rep, p.isNew, note, warn)
+	if p.isNew || rep.PluginInstalled {
+		if res.guard = a.guardLine(acct, ag, rep.PluginInstalled); res.guard != "" {
+			note("push guard: %s", res.guard)
 		} else if acct.Spec.Caps.Plugins {
 			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
 		}
 	}
 	// A new account copies main's status line, so it may already run the recorder.
 	switch tracking := a.usageTracking(acct); {
-	case trackUsage && !tracking:
-		if err := a.enableUsage(acct); err != nil {
-			warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
-		} else {
-			note("usage tracking on")
-		}
-	case noUsage && tracking:
-		if err := a.disableUsage(acct); err != nil {
-			warn("usage tracking: %v; run: %s usage setup --undo %s", err, a.cmd, acct.Label())
-		} else {
-			note("usage tracking off")
-		}
-	case isNew && tracking:
+	case p.trackUsage && !tracking:
+		a.turnUsageOn(acct, note, warn)
+	case p.noUsage && tracking:
+		a.turnUsageOff(acct, note, warn)
+	case p.isNew && tracking:
 		note("usage tracking on")
 	}
-
-	// Verify.
-	if doLogin {
-		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
-		loginAt := time.Now()
-		err := a.runLogin(ag, acct)
-		waited += time.Since(loginAt)
-		a.cache.Forget(acct.Label())
-		if err != nil {
-			warn("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label())
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
-		status, _ = ag.Auth(ctx, acct.ConfigDir())
-		cancel()
-		if status.LoggedIn {
-			note("logged in as %s", loginName(status))
-		}
-	}
-	if !isNew && changes == 0 {
-		a.out("%s %s is up to date\n", a.paint(a.colorOut, "32", "✓"), acct.Label())
-	}
-	next := "start: " + a.startCommand(acct)
-	if !status.LoggedIn {
-		next = "log in: " + a.cmd + " account login " + acct.Label()
-	}
-	a.out("done in %.1fs · %s · check: %s doctor %s\n", (time.Since(start) - waited).Seconds(), next, a.cmd, acct.Label())
-	return nil
+	return res, nil
 }
 
-// accountAddMain sets up a provider's default account (~/.claude, ~/.codex), which the CLI
-// creates on its own: squadrn's push guard, usage tracking and the login. Its settings stay the
-// user's own, so profiles and shared links do not apply.
-func (a *app) accountAddMain(acct account.Account, o addOptions, start time.Time) error {
-	if o.profile != "" || o.with != nil || o.relink {
-		return usagef("%s is the default account (%s): --profile, --with and --relink apply to other accounts", acct.Label(), a.tilde(acct.Dir))
-	}
-	ag, err := a.agent(acct.Spec)
-	if err != nil {
-		return err
-	}
-	head := acct.Spec.Name
-	ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
-	out, _ := ag.Output(ctx, "", "--version")
-	if v := provider.ParseVersion(out); v != "" {
-		head += " " + v
-	}
-	status, _ := ag.Auth(ctx, acct.ConfigDir())
-	cancel()
-	a.out("%s · %s, the default account → %s\n", head, acct.Label(), a.tilde(acct.Dir))
-
-	ask := a.interactive && !o.yes
-	in := bufio.NewReader(a.stdin)
-	var waited time.Duration
-	asked := time.Now()
-	trackUsage := o.usage != nil && *o.usage
-	noUsage := o.usage != nil && !*o.usage
-	if statusLineOf(acct.Spec) != nil && o.usage == nil && ask && !a.usageTracking(acct) {
-		if trackUsage, err = a.askYes(in, "usage limits", "track for "+acct.Label()+"?"); err != nil {
-			return err
-		}
-	}
-	doLogin := o.login != nil && *o.login
-	if !status.LoggedIn && o.login == nil && ask {
-		if doLogin, err = a.askYes(in, "log in now?", ""); err != nil {
-			return err
-		}
-	}
-	if ask {
-		waited = time.Since(asked)
-	}
-
-	changes := 0
-	note := func(format string, args ...any) {
-		changes++
-		a.out("%s %s\n", a.paint(a.colorOut, "32", "✓"), fmt.Sprintf(format, args...))
-	}
-	warn := func(format string, args ...any) {
-		a.out("%s %s\n", a.paint(a.colorOut, "33", "!"), fmt.Sprintf(format, args...))
-	}
+// applyAddMain sets up a provider's default account: the push guard and usage tracking.
+func (a *app) applyAddMain(p *addPlan, res *addResult, note, warn func(string, ...any)) error {
+	acct := p.acct
 	if err := os.MkdirAll(acct.Dir, 0o700); err != nil {
 		return err
 	}
 	installed := false
-	if gi, ok := ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
+	if gi, ok := p.ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
 		if mp := a.marketplaceDir(); mp == "" {
 			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			var err error
 			installed, err = gi.InstallPlugin(ctx, acct.ConfigDir(), mp)
 			cancel()
 			if err != nil {
@@ -403,59 +438,178 @@ func (a *app) accountAddMain(acct account.Account, o addOptions, start time.Time
 		}
 	}
 	if installed {
-		note("push guard: %s", a.guardLine(acct, ag, true))
+		res.guard = a.guardLine(acct, p.ag, true)
+		note("push guard: %s", res.guard)
 	}
 	switch tracking := a.usageTracking(acct); {
-	case trackUsage && !tracking:
-		if err := a.enableUsage(acct); err != nil {
-			warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
-		} else {
-			note("usage tracking on")
-		}
-	case noUsage && tracking:
-		if err := a.disableUsage(acct); err != nil {
-			warn("usage tracking: %v; run: %s usage setup --undo %s", err, a.cmd, acct.Label())
-		} else {
-			note("usage tracking off")
-		}
+	case p.trackUsage && !tracking:
+		a.turnUsageOn(acct, note, warn)
+	case p.noUsage && tracking:
+		a.turnUsageOff(acct, note, warn)
 	}
-	if doLogin {
-		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
-		loginAt := time.Now()
-		err := a.runLogin(ag, acct)
-		waited += time.Since(loginAt)
-		a.cache.Forget(acct.Label())
-		if err != nil {
-			warn("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label())
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
-		status, _ = ag.Auth(ctx, acct.ConfigDir())
-		cancel()
-		if status.LoggedIn {
-			note("logged in as %s", loginName(status))
-		}
-	}
-	if changes == 0 {
-		a.out("%s %s is up to date\n", a.paint(a.colorOut, "32", "✓"), acct.Label())
-	}
-	next := "start: " + a.startCommand(acct)
-	if !status.LoggedIn {
-		next = "log in: " + a.cmd + " account login " + acct.Label()
-	}
-	a.out("done in %.1fs · %s · check: %s doctor %s\n", (time.Since(start) - waited).Seconds(), next, a.cmd, acct.Label())
 	return nil
 }
 
-// addFailed reports which step failed, what state the account is in and how to retry.
-func (a *app) addFailed(acct account.Account, step addStep, err error) error {
-	a.out("%s %s failed: %v\n", a.paint(a.colorOut, "31", "✗"), step.name, err)
-	if step.created {
-		a.out("  state: %s exists; what is missing is repaired by a re-run\n", a.tilde(acct.Dir))
+func (a *app) turnUsageOn(acct account.Account, note, warn func(string, ...any)) {
+	if err := a.enableUsage(acct); err != nil {
+		warn("usage tracking: %v; run: %s usage setup %s", err, a.cmd, acct.Label())
 	} else {
-		a.out("  state: nothing was created\n")
+		note("usage tracking on")
 	}
-	a.out("  retry: %s account add %s\n", a.cmd, acct.Label())
-	return errQuiet
+}
+
+func (a *app) turnUsageOff(acct account.Account, note, warn func(string, ...any)) {
+	if err := a.disableUsage(acct); err != nil {
+		warn("usage tracking: %v; run: %s usage setup --undo %s", err, a.cmd, acct.Label())
+	} else {
+		note("usage tracking off")
+	}
+}
+
+// addLogin runs the CLI's login for p's account and reads the login state again. A login that
+// does not finish leaves a valid account and says how to log in later.
+func (a *app) addLogin(p *addPlan, r addReporter, res *addResult) {
+	acct := p.acct
+	r.loginStart()
+	if h, ok := p.ag.(provider.LoginHinter); ok {
+		r.info(h.LoginHint())
+	}
+	loginAt := time.Now()
+	err := p.ag.Run(acct.ConfigDir(), p.ag.LoginArgs())
+	p.waited += time.Since(loginAt)
+	a.cache.Forget(acct.Label())
+	if err != nil {
+		r.warn(fmt.Sprintf("login did not finish (%v); run: %s account login %s", err, a.cmd, acct.Label()))
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
+	p.status, _ = p.ag.Auth(ctx, acct.ConfigDir())
+	cancel()
+	if p.status.LoggedIn {
+		res.changes++
+		r.note("logged in as " + loginName(p.status))
+	}
+}
+
+// result completes res for p once everything ran: what is true of the account now.
+func (a *app) result(p *addPlan, res addResult) addResult {
+	if res.Options == nil {
+		res.Options = []string{}
+	}
+	guard := res.guard
+	if guard == "" {
+		guard = a.guardLine(p.acct, p.ag, false)
+	}
+	res.Guard = "missing"
+	if guard != "" {
+		res.Guard = "installed"
+	}
+	res.Usage = a.usageTracking(p.acct)
+	res.LoggedIn = p.status.LoggedIn
+	res.Start = a.startCommand(p.acct)
+	return res
+}
+
+// planLines describe p for --dry-run and the wizard's review: label and text.
+func (a *app) planLines(p *addPlan) [][2]string {
+	acct := p.acct
+	var lines [][2]string
+	if !p.main {
+		profile := "none (keeps its own settings)"
+		if p.profile != "" {
+			profile = p.profile
+			if len(p.options) > 0 {
+				profile += " + " + strings.Join(p.options, ", ")
+			}
+			profile += "   " + acct.Spec.ProfileSummary(p.profile)
+		}
+		lines = append(lines, [2]string{"profile", profile})
+		if len(p.shared) > 0 {
+			lines = append(lines, [2]string{"shared", strings.Join(p.shared, ", ") + " ← " + acct.Provider + "/" + account.Main})
+		}
+		main, _ := a.store.MainOf(acct.Provider + "/" + account.Main)
+		settings := "kept, follows " + acct.Provider + "/" + account.Main
+		switch {
+		case p.isNew && fsx.IsFile(account.SettingsPath(main)) && p.profile != "":
+			settings = "copy of " + acct.Provider + "/" + account.Main + " + " + p.profile + " (follows main)"
+		case p.isNew && fsx.IsFile(account.SettingsPath(main)):
+			settings = "copy of " + acct.Provider + "/" + account.Main + " (follows main)"
+		case p.isNew:
+			settings = "created"
+			if p.profile != "" {
+				settings += " from the " + p.profile + " profile"
+			}
+		}
+		lines = append(lines, [2]string{"settings", settings})
+	}
+	lines = append(lines, [2]string{"guard", a.plannedGuard(acct)})
+	if statusLineOf(acct.Spec) != nil {
+		usage := "unchanged"
+		switch {
+		case p.trackUsage:
+			usage = "on"
+		case p.noUsage:
+			usage = "off"
+		}
+		lines = append(lines, [2]string{"usage", usage})
+	}
+	login := "no (--login to log in)"
+	switch {
+	case p.status.LoggedIn:
+		login = "already logged in"
+	case p.login:
+		login = "yes"
+	}
+	return append(lines, [2]string{"login", login})
+}
+
+// plannedGuard names the push-guard layers an account gets, without asking its CLI.
+func (a *app) plannedGuard(acct account.Account) string {
+	var layers []string
+	if acct.Spec.Caps.Plugins {
+		if a.marketplaceDir() == "" {
+			layers = append(layers, "no pre-tool hook (the plugin is not available here)")
+		} else {
+			layers = append(layers, "pre-tool hook")
+		}
+	}
+	if (a.cfgErr != nil || a.cfg.GitHooksEnabled()) && !acct.Spec.NoGitHooks {
+		layers = append(layers, "git pre-push")
+	}
+	if len(layers) == 0 {
+		return "none"
+	}
+	return strings.Join(layers, " + ")
+}
+
+// reportPlan prints p for --dry-run: the plan lines, or with --json the result it would have.
+func (a *app) reportPlan(p *addPlan, asJSON bool) error {
+	if asJSON {
+		res := addResult{
+			Account: p.acct.Label(), Provider: p.acct.Provider, Dir: p.acct.Dir, Created: p.isNew,
+			Profile: p.profile, Options: p.options, Usage: p.trackUsage || (!p.noUsage && a.usageTracking(p.acct)),
+			LoggedIn: p.status.LoggedIn, Start: a.startCommand(p.acct), DryRun: true, Guard: "installed",
+		}
+		if res.Options == nil {
+			res.Options = []string{}
+		}
+		if strings.HasPrefix(a.plannedGuard(p.acct), "no ") || a.plannedGuard(p.acct) == "none" {
+			res.Guard = "missing"
+		}
+		return a.printJSONLine(res)
+	}
+	state := "exists"
+	switch {
+	case p.main:
+		state = "the default account"
+	case p.isNew:
+		state = "new"
+	}
+	a.out("plan: %s → %s (%s)\n", p.acct.Label(), a.tilde(p.acct.Dir), state)
+	for _, l := range a.planLines(p) {
+		a.out("  %-9s %s\n", l[0], l[1])
+	}
+	a.out("nothing was changed\n")
+	return nil
 }
 
 // syncSettingsAs syncs work (a new account's temp dir) as the account it becomes.

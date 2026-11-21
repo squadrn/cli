@@ -69,5 +69,6 @@ func exitCode(err error) int {
 func silent(err error) bool {
 	var ce childExit
 	var es provider.ExitStatus
-	return errors.Is(err, errQuiet) || errors.Is(err, prompt.ErrCancelled) || errors.As(err, &ce) || errors.As(err, &es)
+	var rep reported
+	return errors.As(err, &rep) || errors.Is(err, errQuiet) || errors.Is(err, prompt.ErrCancelled) || errors.As(err, &ce) || errors.As(err, &es)
 }

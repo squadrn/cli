@@ -154,6 +154,7 @@ srn personal mcp list            # agent subcommands pass through
 srn setup                        # guided first run (CLIs, profile, adopt, usage, doctor)
 srn account add work             # create or repair claude/work (asks profile, usage, login)
 srn account add work --profile strict --with privacy --usage --login -y
+srn account add work --dry-run   # print the plan, change nothing (--json: one result object)
 srn account login work
 srn account ls [--json]
 srn account logout work
