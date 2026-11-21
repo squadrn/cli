@@ -4,21 +4,21 @@ import "strings"
 
 // Glyphs are the frame and marker characters: Unicode, or ASCII where the terminal cannot show it.
 type Glyphs struct {
-	Start, Bar, Active, Done, Warn, Cancel, End                    string
-	On, Off, Checked, Unchecked                                    string
-	Check, Arrow, Dot, Leader, Ellipsis, Cursor, UpDown, LeftRight string
+	Start, Bar, Active, Done, Warn, Cancel, End                          string
+	On, Off, Checked, Unchecked                                          string
+	Check, Arrow, Dot, Leader, Ellipsis, Cursor, UpDown, LeftRight, Open string
 }
 
 var (
 	Unicode = Glyphs{
 		Start: "┌", Bar: "│", Active: "◆", Done: "◇", Warn: "▲", Cancel: "■", End: "└",
 		On: "●", Off: "○", Checked: "◼", Unchecked: "◻",
-		Check: "✓", Arrow: "→", Dot: "·", Leader: "·", Ellipsis: "…", Cursor: "▌", UpDown: "↑↓", LeftRight: "←→",
+		Check: "✓", Arrow: "→", Dot: "·", Leader: "·", Ellipsis: "…", Cursor: "▌", UpDown: "↑↓", LeftRight: "←→", Open: "↗",
 	}
 	ASCII = Glyphs{
 		Start: "+", Bar: "|", Active: ">", Done: "*", Warn: "!", Cancel: "x", End: "\\",
 		On: "(*)", Off: "( )", Checked: "[x]", Unchecked: "[ ]",
-		Check: "v", Arrow: "->", Dot: "-", Leader: ".", Ellipsis: "...", Cursor: "_", UpDown: "up/down", LeftRight: "left/right",
+		Check: "v", Arrow: "->", Dot: "-", Leader: ".", Ellipsis: "...", Cursor: "_", UpDown: "up/down", LeftRight: "left/right", Open: "^",
 	}
 )
 

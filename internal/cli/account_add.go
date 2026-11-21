@@ -42,15 +42,19 @@ type addOptions struct {
 func (a *app) accountAddCmd() *cobra.Command {
 	var o addOptions
 	cmd := &cobra.Command{
-		Use:   "add [<provider>/]<name>",
+		Use:   "add [[<provider>/]<name>]",
 		Short: "Create an account (settings, shared files, push guard, usage, login)",
-		Example: fmt.Sprintf(`  %[1]s account add work                     asks for the profile, usage tracking and login
+		Long: "Create an account. Without a name, at a terminal, a guided setup asks for the provider, the name\n" +
+			"and the settings, shows a review, creates the account and offers the login; flags given answer\n" +
+			"their questions. Without a terminal the name is required.",
+		Example: fmt.Sprintf(`  %[1]s account add                          guided: provider, name, settings, review, login
+  %[1]s account add work                     asks for the profile, usage tracking and login
   %[1]s account add work -p codex --profile strict --usage --login
   %[1]s account add work --with privacy,no-attribution
   %[1]s account add work --default           a bare %[1]s runs it
   %[1]s account add tool --adopt             take over an existing ~/.claude-tool
   %[1]s account add work --dry-run           show what would be done, change nothing`, a.cmd),
-		Args:              oneArg,
+		Args:              optionalArg,
 		ValidArgsFunction: cobra.NoFileCompletions,
 	}
 	finish := addFlags(cmd, &o, false)
@@ -62,6 +66,9 @@ func (a *app) accountAddCmd() *cobra.Command {
 	cmd.RunE = func(_ *cobra.Command, args []string) error {
 		if err := finish(); err != nil {
 			return err
+		}
+		if len(args) == 0 {
+			return a.addWizard(o)
 		}
 		ref, err := withProvider(args[0], o.provider)
 		if err != nil {

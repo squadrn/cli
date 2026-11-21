@@ -152,6 +152,7 @@ srn personal -p "summarize"      # agent flags go to the agent CLI unchanged
 srn personal -- "fix the bug"    # a prompt goes after --
 srn personal mcp list            # agent subcommands pass through
 srn setup                        # guided first run (CLIs, profile, adopt, usage, doctor)
+srn account add                  # guided: provider, name, settings, review, then the login
 srn account add work             # create claude/work (asks profile, usage, login)
 srn account add work -p codex --profile strict --with privacy,no-attribution --usage --login -y
 srn account add work --dry-run   # print the plan, change nothing (--json: one result object)
