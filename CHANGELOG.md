@@ -14,6 +14,36 @@
   `completion = auto|off`: updates refresh the scripts unless off; they never edit startup files
   and say `completion install` when the shell does not load the dir. `doctor` warns when the login
   shell's completion is missing, out of date or not loaded; `self-uninstall` removes the block.
+- **Guided account creation** ([ADR 0014](docs/adr/0014-account-creation.md)): `srn account add`
+  without a name, at a terminal, asks the provider (installed CLIs with their version and account
+  count; missing ones dimmed with their install command), the name (checked as you type, with the
+  dir, the start command and a warning when another provider uses the name), then Recommended or
+  Customize (profile, options, usage tracking, default account). A taken name offers repair, an
+  unmanaged dir adoption, `main` the default account's setup. Nothing is written before the
+  review; the login is offered once the account exists, and the end prints the same command
+  without questions. Esc goes back, Ctrl-C cancels (exit 130) and changes nothing. Without a
+  terminal the name is required (exit 2). The account picker's "+ add a new account" runs it too.
+- `srn setup` offers the wizard ("Add an account?", then "Add another account?") as its new step 4;
+  usage tracking and doctor become steps 5 and 6.
+- At a terminal that understands ANSI, every question of `setup` and `account add`/`repair` is drawn
+  in place: arrow keys or j/k, Space, Enter, y/n, Esc back, Ctrl-C cancel; answered questions
+  collapse to one line. Other terminals keep the line prompts. Glyphs fall back to ASCII when the
+  locale is not UTF-8, `TERM=dumb` or the Windows console code page is not 65001.
+- `account add`/`repair --dry-run` prints the plan and changes nothing; `--json` prints one result
+  object (or `{"error", "fix"}` with the usual exit codes) and asks nothing.
+- **Breaking:** `account add` only creates an account; on an existing one it fails with
+  `<account> already exists (repair: srn account repair <account>)`. The new `account repair
+  [<account>|--all]` brings accounts up to date (what re-running `add` did, including `--relink`
+  and switching `--profile`); scripts that re-ran `add` must call `repair`. The installer,
+  `self-update` and `doctor` hints name `repair` (ADR 0014).
+- **Breaking:** `account adopt` is removed, with no alias: `account add <name> --adopt` takes over
+  an existing `~/.<provider>-<name>` dir (ADR 0014).
+- `account default [<account>|--unset]` and the config key `default_account`: a bare `srn` (and an
+  agent subcommand without an account) runs that account instead of the default provider's main
+  account; `doctor` warns when it names an account that no longer exists. `account add --default`
+  sets it.
+- `account add -p/--provider <id>` names the provider (it must agree with one in the name);
+  `--with` takes comma-separated values.
 
 ## 1.0.0-rc.5
 

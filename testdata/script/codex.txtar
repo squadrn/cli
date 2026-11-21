@@ -92,15 +92,15 @@ stdout '^deleted ~/.codex-ro$'
 grep 'cfg=.*/home/.codex-ro args=logout$' home/calls.log
 ! exists home/.codex-ro
 
-# add is idempotent: nothing is re-installed or re-trusted.
+# repair is idempotent: nothing is re-installed or re-trusted.
 rm home/calls.log
-exec squadrn account add codex/work
+exec squadrn account repair codex/work
 stdout 'codex/work is up to date'
 ! exists home/calls.log
 
 # A user's own hooks are kept; a changed guard hook is trusted again.
 cp user-hooks.json home/.codex-work/hooks.json
-exec squadrn account add codex/work
+exec squadrn account repair codex/work
 stdout '^✓ push guard: pre-tool hook \+ git pre-push$'
 grep 'my-linter' home/.codex-work/hooks.json
 grep 'squadrn-hook' home/.codex-work/hooks.json
@@ -195,7 +195,7 @@ grep '^cli_auth_credentials_store = "file"$' home/.codex-work/config.toml
 grep '^model = "gpt-5.5"$' home/.codex-work/config.toml
 
 # doctor checks the binary, login, guard hook trust and credentials store.
-exec squadrn account add codex/work
+exec squadrn account repair codex/work
 ! exec squadrn doctor
 stdout '✓ codex codex-cli 0.171.0'
 stdout '^account codex/work$'
@@ -204,12 +204,12 @@ stdout '✓ push guard hook installed and trusted'
 stdout '✓ credentials kept in ~/.codex-work'
 cp untrusted.toml home/.codex-work/config.toml
 ! exec squadrn doctor
-stdout '✗ push guard hook not trusted by codex \(no git push guard\)  → srn account add codex/work'
-exec squadrn account add codex/work
+stdout '✗ push guard hook not trusted by codex \(no git push guard\)  → srn account repair codex/work'
+exec squadrn account repair codex/work
 cp hooks-without-guard.json home/.codex-work/hooks.json
 ! exec squadrn doctor
-stdout '✗ push guard hook not installed \(no git push guard\)  → srn account add codex/work'
-exec squadrn account add codex/work
+stdout '✗ push guard hook not installed \(no git push guard\)  → srn account repair codex/work'
+exec squadrn account repair codex/work
 
 # The installed hook runs the guard in --no-ask mode: Codex cannot ask.
 exec sh -c 'sed -n "s/^ *\"command\": \"\\\\\"\(.*\)\\\\\" guard-git --no-ask\",*$/\1/p" home/.codex-work/hooks.json > hookpath.txt'

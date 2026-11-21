@@ -48,7 +48,7 @@ stdout '^usage tracking already on: ~/.claude-work/settings.json \(claude/work\)
 cmp home/.claude/settings.json before.json
 exec squadrn usage setup --all -y
 stdout 'already on'
-exec squadrn account add work
+exec squadrn account repair work
 ! stdout 'usage tracking'
 
 # A new account copies main's status line: --no-usage takes the recorder out and keeps it out,
@@ -57,7 +57,7 @@ exec squadrn account add nouse --no-usage --no-login
 stdout '^✓ usage tracking off$'
 grep '"command": "echo mine; printf ' home/.claude-nouse/settings.json
 ! grep 'hook statusline' home/.claude-nouse/settings.json
-exec squadrn account add nouse --no-login
+exec squadrn account repair nouse --no-login
 ! stdout 'usage tracking'
 ! grep 'hook statusline' home/.claude-nouse/settings.json
 exec squadrn account add use --usage --no-login
@@ -159,14 +159,14 @@ stdout 'not set up'
 # main's command back.
 mkdir home/.claude-solo
 cp emptyobj home/.claude-solo/settings.json
-exec squadrn account adopt solo --yes
-stdout '^adopted claude/solo \(~/.claude-solo\)$'
-exec squadrn account add solo --usage
+exec squadrn account add solo --adopt --yes
+stdout '^✓ adopted ~/.claude-solo as claude/solo$'
+exec squadrn account repair solo --usage
 stdout '^✓ usage tracking on$'
 grep '"command": ".* hook statusline --then .echo mine' home/.claude-solo/settings.json
 exec squadrn usage setup --undo solo -y
 grep '"command": "echo mine; printf ''%s'' x"' home/.claude-solo/settings.json
-exitcode 2 squadrn account add solo --usage --no-usage
+exitcode 2 squadrn account repair solo --usage --no-usage
 
 # --all asks once and names every settings file with the accounts it covers.
 ! exec squadrn usage setup --all

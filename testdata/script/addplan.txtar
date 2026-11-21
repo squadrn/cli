@@ -22,19 +22,19 @@ stdout '^\{"account":"claude/work","provider":"claude","dir":".*\.claude-work","
 exists home/.claude-work/.squadrn-account
 
 # A dry run of an existing account and of main.
-exec squadrn account add work --dry-run
+exec squadrn account repair work --dry-run
 stdout '^plan: claude/work → ~/.claude-work \(exists\)$'
 stdout '^  settings  kept, follows claude/main$'
 stdout '^  login     no \(--login to log in\)$'
 exec squadrn account add main --dry-run
 cmp stdout plan-main.txt
-exec squadrn account add work --dry-run --json
+exec squadrn account repair work --dry-run --json
 stdout '^\{"account":"claude/work",.*"created":false,.*"dryRun":true\}$'
 
 # Errors keep their exit codes and print {"error", "fix"} on stdout.
 mkdir home/.claude-tool
 ! exec squadrn account add tool --json
-stdout '^\{"error":"~/.claude-tool exists but is not a squadrn account \(another tool may use it\)","fix":"srn account adopt tool"\}$'
+stdout '^\{"error":"~/.claude-tool exists but is not a squadrn account \(another tool may use it\)","fix":"srn account add tool --adopt"\}$'
 ! stderr .
 exitcode 2 squadrn account add xy --json --profile lax
 ! exec squadrn account add xy --json --profile lax

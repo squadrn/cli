@@ -33,7 +33,7 @@ exec squadrn account add old --no-usage
 rm home/.claude-old/settings.json home/.claude-old/.squadrn-managed.json
 symlink home/.claude-old/settings.json -> $WORK/home/.claude/settings.json
 exec sh -c 'squadrn doctor; true'
-stdout '! settings.json is still a link to main.s .*→ srn account add claude/old'
+stdout '! settings.json is still a link to main.s .*→ srn account repair claude/old'
 exec squadrn old -- hi
 stderr 'claude/old now has its own settings file, kept in step with the main account.s \(the link was moved to ~/.claude-old/settings.json.bak-[0-9]{8}-[0-9]{6}\)'
 exec sh -c 'test ! -L home/.claude-old/settings.json && test -L home/.claude-old/settings.json.bak-* && echo migrated'
@@ -44,9 +44,9 @@ cmp home/.claude/settings.json main2.json
 # An account with settings of its own keeps them: they become the user's keys.
 mkdir home/.claude-mine
 cp own.json home/.claude-mine/settings.json
-exec squadrn account adopt mine -y
+exec squadrn account add mine --adopt -y
 stdout '^! settings: kept your change to model \(it no longer follows claude/main\)$'
-exec squadrn account add mine --no-usage
+exec squadrn account repair mine --no-usage
 stdout '^✓ claude/mine is up to date$'
 grep '"model": "haiku"' home/.claude-mine/settings.json
 grep '"theme": "light"' home/.claude-mine/settings.json

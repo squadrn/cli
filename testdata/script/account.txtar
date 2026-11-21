@@ -35,8 +35,12 @@ grep '"profile": "standard"' home/.claude-work/.squadrn-managed.json
 grep '"hasCompletedOnboarding": true' home/.claude-work/.claude.json
 ! grep 'mcpServers' home/.claude-work/.claude.json
 
-# add is idempotent: a second run says so and changes nothing.
-exec squadrn account add work
+# add refuses an existing account and points at repair; repair is idempotent: a second run says
+# so and changes nothing.
+! exec squadrn account add work
+stderr '^srn: claude/work already exists \(repair: srn account repair claude/work\)$'
+exitcode 1 squadrn account add work
+exec squadrn account repair work
 stdout '^Claude Code 2.1.329 · claude/work → ~/.claude-work$'
 stdout '^✓ claude/work is up to date$'
 stdout '^done in .* · check: srn doctor claude/work$'
@@ -76,7 +80,7 @@ chmod 0700 home
 
 # Removing a shared item from main removes the link instead of leaving it dangling.
 rm home/.claude/agents
-exec squadrn account add work
+exec squadrn account repair work
 stdout 'removed stale link ~/.claude-work/agents'
 ! exists home/.claude-work/agents
 
@@ -95,29 +99,34 @@ stdout '"logged_in": true'
 exec squadrn account --json
 stdout '"account": "claude/main"'
 
-# Dirs named like accounts but not made by squadrn are not accounts; adopt makes them one.
+# Dirs named like accounts but not made by squadrn are not accounts; add --adopt makes them one.
 mkdir home/.claude-tool
 exec squadrn account ls
-stdout '^unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)$'
+stdout '^unmanaged: ~/.claude-tool \(srn account add claude/tool --adopt\)$'
 ! stdout '^claude/tool '
 exitcode 2 squadrn tool
 ! exec squadrn tool
-stderr 'to make the existing dir an account: srn account adopt tool'
-! stderr 'account add'
+stderr 'to make the existing dir an account: srn account add tool --adopt'
 ! exec squadrn -a claude/tool
-stderr 'account not found: claude/tool; its dir exists but is not a squadrn account \(run: srn account adopt claude/tool\)'
+stderr 'account not found: claude/tool; its dir exists but is not a squadrn account \(run: srn account add claude/tool --adopt\)'
 ! exec squadrn account add tool
-stderr 'exists but is not a squadrn account .*run: srn account adopt tool$'
-exitcode 2 squadrn account adopt tool
-exec squadrn account adopt tool --yes
-stdout '^adopted claude/tool \(~/.claude-tool\)$'
+stderr 'exists but is not a squadrn account .*run: srn account add tool --adopt$'
+! exec squadrn account repair tool
+stderr 'its dir exists but is not a squadrn account \(run: srn account add claude/tool --adopt\)'
+exec squadrn account add tool --adopt --dry-run
+stdout '^plan: claude/tool → ~/.claude-tool \(exists, adopt it\)$'
+! exists home/.claude-tool/.squadrn-account
+exec squadrn account add tool --adopt
 stdout '^Claude Code 2.1.329 · claude/tool → ~/.claude-tool$'
+stdout '^✓ adopted ~/.claude-tool as claude/tool$'
 stdout '^✓ settings from claude/main$'
 stdout '^✓ linked ~/.claude-tool/CLAUDE.md$'
 exists home/.claude-tool/.squadrn-account
-exec squadrn account adopt tool
-stdout 'already an account'
-exitcode 1 squadrn account adopt ghost --yes
+! exec squadrn account add tool --adopt
+stderr 'claude/tool already exists \(repair: srn account repair claude/tool\)'
+exitcode 2 squadrn account add ghost --adopt
+# account adopt is gone, with no alias.
+exitcode 2 squadrn account adopt tool
 exec squadrn account ls
 ! stdout unmanaged
 
@@ -132,14 +141,14 @@ cp settings.json home/.claude-work/CLAUDE.md
 exec squadrn work
 stderr 'warning: ~/.claude-work/CLAUDE.md was replaced in claude/work, so it no longer follows the main account'
 # --relink moves the own copy aside; without a terminal that needs --yes.
-! exec squadrn account add work --relink
+! exec squadrn account repair work --relink
 stderr 'move ~/.claude-work/CLAUDE.md aside \(.bak-<time>\) and link to the main account.s; re-run with --yes'
-exec squadrn account add work --relink --yes
+exec squadrn account repair work --relink --yes
 stdout '^✓ moved ~/.claude-work/CLAUDE.md aside to ~/.claude-work/CLAUDE.md.bak-'
 stdout '^✓ linked ~/.claude-work/CLAUDE.md$'
 exec sh -c 'rm home/.claude-work/CLAUDE.md.bak-*'
 rm home/.claude-work/CLAUDE.md
-exec squadrn account add work
+exec squadrn account repair work
 stdout 'linked ~/.claude-work/CLAUDE.md'
 
 # A session in progress blocks rename and rm unless --force.

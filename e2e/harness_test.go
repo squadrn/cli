@@ -23,6 +23,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -240,6 +241,37 @@ type opt struct {
 	cmdLine string
 	// open keeps stdin open until the command exits: script(1) ends the session at EOF.
 	open bool
+	// keys are typed one step at a time, each once the output shows what it waits for (a
+	// question drawn in raw mode), instead of stdin; stdin stays open (as with open).
+	keys []keystep
+}
+
+// keystep types send once the output, without ANSI sequences, matches wait.
+type keystep struct{ wait, send string }
+
+// screenText is what a terminal showed, without ANSI sequences.
+func screenText(s string) string {
+	return ansiSeq.ReplaceAllString(strings.ReplaceAll(s, "\r", ""), "")
+}
+
+var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
+
+// syncBuffer is a bytes.Buffer safe for a reader while the command writes.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.String()
 }
 
 type result struct {
@@ -265,7 +297,37 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 	}
 	cmd.Env = append(append([]string{}, s.env...), o.env...)
 	cmd.Stdin = strings.NewReader(o.stdin)
-	if o.open {
+	var stdout, stderr syncBuffer
+	var typing chan string
+	if len(o.keys) > 0 {
+		pr, pw, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = pr.Close() }()
+		cmd.Stdin = pr
+		typing = make(chan string, 1)
+		go func() {
+			defer func() { _ = pw.Close() }()
+			for _, k := range o.keys {
+				re := regexp.MustCompile("(?m)" + k.wait)
+				deadline := time.Now().Add(30 * time.Second)
+				for !re.MatchString(screenText(stdout.String())) {
+					if time.Now().After(deadline) || ctx.Err() != nil {
+						typing <- fmt.Sprintf("no %q on the screen within 30s", k.wait)
+						return
+					}
+					time.Sleep(20 * time.Millisecond)
+				}
+				if _, err := pw.WriteString(k.send); err != nil {
+					typing <- err.Error()
+					return
+				}
+			}
+			typing <- ""
+			<-ctx.Done()
+		}()
+	} else if o.open {
 		pr, pw, err := os.Pipe()
 		if err != nil {
 			t.Fatal(err)
@@ -277,11 +339,16 @@ func (s *sandbox) run(t *testing.T, o opt, name string, args ...string) *result 
 		}
 		cmd.Stdin = pr
 	}
-	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 5 * time.Second
 	begin := time.Now()
 	err := cmd.Run()
+	if typing != nil {
+		cancel()
+		if msg := <-typing; msg != "" {
+			stderr.b.WriteString("\n[harness] " + msg)
+		}
+	}
 	r := &result{s: s, t: t, line: strings.TrimSpace(name + " " + strings.Join(args, " ")), stdout: stdout.String(), errs: stderr.String(), took: time.Since(begin)}
 	switch {
 	case cmd.ProcessState != nil:
@@ -381,19 +448,20 @@ func (s *sandbox) srn(t *testing.T, args ...string) *result {
 	return s.run(t, opt{}, "srn", args...)
 }
 
-// srnTTY runs srn at a pseudo terminal through script(1), typing stdin; stdout holds everything
-// the terminal showed (both streams and the echoed answers). Unix only.
-func (s *sandbox) srnTTY(t *testing.T, stdin string, args ...string) *result {
+// srnKeys runs srn at a pseudo terminal through script(1) in a UTF-8 locale, typing each key
+// step once the screen shows what it waits for. Unix only.
+func (s *sandbox) srnKeys(t *testing.T, keys []keystep, args ...string) *result {
 	t.Helper()
 	srn := s.lookPath("srn")
+	env := []string{"LANG=en_US.UTF-8", "LC_ALL=", "LC_CTYPE=", "TERM=xterm-256color"}
 	if runtime.GOOS == "darwin" {
-		return s.run(t, opt{stdin: stdin, open: true}, "script", append([]string{"-q", "/dev/null", srn}, args...)...)
+		return s.run(t, opt{keys: keys, env: env}, "script", append([]string{"-q", "/dev/null", srn}, args...)...)
 	}
 	line := srn
 	for _, a := range args {
 		line += " '" + a + "'"
 	}
-	return s.run(t, opt{stdin: stdin, open: true, env: []string{"SHELL=/bin/sh"}}, "script", "-qec", line, "/dev/null")
+	return s.run(t, opt{keys: keys, env: append(env, "SHELL=/bin/sh")}, "script", "-qec", line, "/dev/null")
 }
 
 func (s *sandbox) srnIn(t *testing.T, dir string, args ...string) *result {

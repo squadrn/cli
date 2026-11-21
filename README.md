@@ -168,13 +168,16 @@ srn personal -p "summarize"      # agent flags go to the agent CLI unchanged
 srn personal -- "fix the bug"    # a prompt goes after --
 srn personal mcp list            # agent subcommands pass through
 srn setup                        # guided first run (CLIs, profile, adopt, usage, doctor)
-srn account add work             # create or repair claude/work (asks profile, usage, login)
-srn account add work --profile strict --with privacy --usage --login -y
+srn account add                  # guided: provider, name, settings, review, then the login
+srn account add work             # create claude/work (asks profile, usage, login)
+srn account add work -p codex --profile strict --with privacy,no-attribution --usage --login -y
 srn account add work --dry-run   # print the plan, change nothing (--json: one result object)
+srn account add other --adopt    # make an existing ~/.claude-other an account and set it up
+srn account repair work          # bring claude/work up to date (--all: every account)
+srn account default work         # a bare srn runs claude/work (--unset: main again)
 srn account login work
 srn account ls [--json]
 srn account logout work
-srn account adopt other          # make an existing ~/.claude-other an account and set it up
 srn account rename work job      # logs work out first; log in again as job
 srn account rm work              # logs out and moves the dir to the trash (macOS ~/.Trash)
 ```
@@ -193,7 +196,13 @@ a suggestion (`srn acount` → *did you mean account?*), so a typo never becomes
 Global options before the command: `-a <account>`, `-C <dir>`, `--no-color` (also `NO_COLOR=1`).
 
 A dir named like an account but not made by squadrn (no `.squadrn-account` marker) is not an
-account: `account ls` lists it as unmanaged and `account adopt` makes it one.
+account: `account ls` lists it as unmanaged and `account add <name> --adopt` makes it one.
+
+`account add` only creates: on an existing account it fails and names `account repair`, which
+brings an account up to date (shared links, settings, push guard, usage tracking, `--relink`); the
+installer, `self-update` and `doctor` point at it. `account default <account>` stores
+`default_account` in the config: a bare `srn` (and an agent subcommand such as `srn mcp list`)
+then runs that account instead of the default provider's main account.
 
 Account names: `^[a-z][a-z0-9-]{1,23}$`, e.g. `personal`, `acme-2`. squadrn's own commands
 (`wt`, `grid`, …) are rejected; an agent subcommand name (`mcp`) is fine, and such an account is

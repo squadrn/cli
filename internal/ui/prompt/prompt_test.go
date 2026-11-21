@@ -247,6 +247,9 @@ func TestColorAndCut(t *testing.T) {
 	if got := narrow.collapsed("Provider", "Codex CLI 0.171.0"); strings.Contains(got, "··") {
 		t.Fatalf("no leader when it does not fit: %q", got)
 	}
+	if got := narrow.collapsed("A long question", "Yes"); got != "◇  A lo… Yes\n" {
+		t.Fatalf("the title gives way to the answer: %q", got)
+	}
 	m := newConfirm(Confirm{Title: "Go?"})
 	if v := m.view(style{g: Unicode, color: true}); !strings.Contains(v, "\033[36m● No\033[0m") {
 		t.Fatalf("coloured choice: %q", v)

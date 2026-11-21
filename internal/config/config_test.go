@@ -275,6 +275,19 @@ func TestDefaultProfile(t *testing.T) {
 	}
 }
 
+func TestDefaultAccount(t *testing.T) {
+	var c Config
+	if v, _ := c.Get("default_account"); v != "" {
+		t.Errorf("default = %q", v)
+	}
+	if err := c.Set("default_account", "claude/work"); err != nil || c.DefaultAccount != "claude/work" {
+		t.Errorf("set: %v", err)
+	}
+	if v, _ := c.Get("default_account"); v != "claude/work" {
+		t.Errorf("get = %q", v)
+	}
+}
+
 func TestNotifyKeys(t *testing.T) {
 	var c Config
 	for k, want := range map[string]string{"notify.enabled": "true", "notify.events": "input,failed,done", "notify.sound": "input", "notify.when": "unfocused", "notify.quiet_hours": "", "notify.preview": "false", "notify.method": "auto"} {
@@ -313,7 +326,7 @@ func TestValuesAreAccepted(t *testing.T) {
 	for _, key := range Keys {
 		values := Values(key)
 		switch key {
-		case "command", "aliases", "shared_mcp", "protected_branches", "notify.quiet_hours":
+		case "command", "aliases", "default_account", "shared_mcp", "protected_branches", "notify.quiet_hours":
 			if values != nil {
 				t.Errorf("%s: free text, got %v", key, values)
 			}

@@ -74,9 +74,10 @@ func testInstall(t *testing.T, s *sandbox) {
 	testSetupTTY(t, s)
 }
 
-// testSetupTTY answers srn setup at a pseudo terminal: claude as the default provider (Codex is
-// on PATH too), strict as the default profile, the self-protection rules, the other tool's dir
-// and usage tracking skipped. The sandbox is put back for the later sections.
+// testSetupTTY answers srn setup at a pseudo terminal, where its questions are drawn in place
+// (ADR 0014): claude as the default provider (Codex is on PATH too), strict as the default profile,
+// the self-protection rules, the other tool's dir, a new account and usage tracking skipped. The
+// sandbox is put back for the later sections.
 func testSetupTTY(t *testing.T, s *sandbox) {
 	if runtime.GOOS == "windows" {
 		t.Log("srn setup at a terminal: skipped on Windows (no script(1))")
@@ -86,18 +87,24 @@ func testSetupTTY(t *testing.T, s *sandbox) {
 	if err := os.Mkdir(old, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	s.srnTTY(t, "\nstrict\nn\nn\nn\n", "setup").exit(0).out(
-		`^1\. agent CLIs$`,
-		`default provider claude / codex / gemini \[claude\]: `,
-		`strict +sandboxed, reads limited to the project`,
-		`profile +minimal / standard / strict \[standard\]: `,
-		`✓ new accounts get the strict profile$`,
-		`deny agents edits of squadrn's files in ~/\.claude/settings\.json\? \[Y/n\] `,
-		`adopt ~/\.claude-old as claude/old\? \(another tool may own it\) \[y/N\] `,
-		`– skipped ~/\.claude-old \(later: srn account adopt claude/old\)`,
-		`usage limits for claude/main\? \[Y/n\] `,
+	s.srnKeys(t, []keystep{
+		{`◆  Default provider`, "\r"},
+		{`◆  Profile`, "j\r"},
+		{`◆  Protect: deny agents edits`, "n"},
+		{`◆  Adopt: ~/\.claude-old as claude/old\?`, "n"},
+		{`◆  Accounts: Add an account\?`, "n"},
+		{`◆  Track: usage limits for claude/main\?`, "n"},
+	}, "setup").exit(0).out(
+		`^1\. agent CLIs`,
+		`◇  Default provider ·+ claude`,
+		`◇  Profile ·+ strict`,
+		`✓ new accounts get the strict profile`,
+		`– skipped \(later: srn doctor shows the rules to add\)`,
+		`– skipped ~/\.claude-old \(later: srn account add claude/old --adopt\)`,
+		`^4\. new accounts`,
+		`– skipped \(later: srn account add\)`,
 		`– skipped \(later: srn usage setup --all\)`,
-		`^5\. doctor$`,
+		`^6\. doctor`,
 		`^next: srn account add <name>`)
 	s.srn(t, "config", "get", "default_profile").exit(0).out(`^strict$`)
 	s.check(t, !s.exists(filepath.Join(old, ".squadrn-account")), "setup adopted ~/.claude-old although the answer was no")
@@ -141,7 +148,8 @@ func testAccounts(t *testing.T, s *sandbox) {
 		`^✓ push guard: pre-tool hook \+ git pre-push$`,
 		`^done in [0-9.]+s · log in: srn account login claude/work · check: srn doctor claude/work$`)
 	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-work", "settings.json")), `Bash(git push *)`), "the standard profile did not reach claude/work's settings")
-	s.srn(t, "account", "add", "work").exit(0).within(time.Second).out(`^✓ claude/work is up to date$`).noOut(`^✓ created`)
+	s.srn(t, "account", "add", "work").exit(1).err(`claude/work already exists \(repair: srn account repair claude/work\)`)
+	s.srn(t, "account", "repair", "work").exit(0).within(time.Second).out(`^✓ claude/work is up to date$`).noOut(`^✓ created`)
 	s.srn(t, "account", "add", "strictacct", "--profile", "strict", "--with", "privacy", "-y").exit(0).out(`^✓ settings: strict profile \+ privacy$`)
 	strict := read(t, filepath.Join(s.home, ".claude-strictacct", "settings.json"))
 	s.check(t, strings.Contains(strict, `"blockReadsOutsideWorkingDirectories": true`) && strings.Contains(strict, `"DISABLE_TELEMETRY": "1"`) && strings.Contains(strict, `.claude-work/.credentials.json`), "strict profile settings missing")
@@ -152,9 +160,9 @@ func testAccounts(t *testing.T, s *sandbox) {
 		`^✓ settings: minimal profile \+ no-attribution$`)
 	mini := read(t, filepath.Join(s.home, ".claude-mini", "settings.json"))
 	s.check(t, strings.Contains(mini, `"commit": ""`) && strings.Contains(mini, `Read(~/.ssh/**)`) && !strings.Contains(mini, `Bash(git push *)`), "minimal profile settings wrong")
-	s.srn(t, "account", "add", "mini", "--profile", "standard", "-y").exit(0).out(`^✓ settings updated: .*permissions\.ask`).noOut(`^✓ created`)
+	s.srn(t, "account", "repair", "mini", "--profile", "standard", "-y").exit(0).out(`^✓ settings updated: .*permissions\.ask`).noOut(`^✓ created`)
 	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-mini", "settings.json")), `Bash(git push *)`), "switching to the standard profile did not reach claude/mini")
-	s.srn(t, "account", "add", "mini", "-y").exit(0).out(`^  profile +standard .*\+ no-attribution$`, `^✓ claude/mini is up to date$`)
+	s.srn(t, "account", "repair", "mini", "-y").exit(0).out(`^  profile +standard .*\+ no-attribution$`, `^✓ claude/mini is up to date$`)
 	s.srn(t, "account", "rm", "mini", "--yes").exit(0)
 
 	// A failing step says which, what state the account is in and how to retry; nothing is left behind.
@@ -181,13 +189,15 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.srn(t, "account", "add", "personal").exit(0)
 	s.srn(t, "account", "login", "personal").exit(0)
 
-	// A dir another tool made becomes an account by adopt; its own settings stay its own (ADR 0011).
+	// A dir another tool made becomes an account by add --adopt; its own settings stay its own
+	// (ADR 0011). account adopt is gone (ADR 0014).
 	write(t, filepath.Join(s.home, ".claude-tool", "settings.json"), `{"model":"haiku"}`+"\n")
 	write(t, filepath.Join(s.home, ".claude", "settings.json"), `{"model":"opus","theme":"dark"}`+"\n")
-	s.srn(t, "account", "ls").exit(0).out(`unmanaged: ~/.claude-tool \(srn account adopt claude/tool\)`)
+	s.srn(t, "account", "ls").exit(0).out(`unmanaged: ~/.claude-tool \(srn account add claude/tool --adopt\)`)
 	s.srn(t, "account", "adopt", "tool").exit(2)
-	s.srn(t, "account", "adopt", "tool", "--yes").exit(0).out(`^adopted claude/tool`, `^! settings: kept your change to model`)
-	s.srn(t, "account", "add", "tool", "--yes").exit(0).out(`^✓ claude/tool is up to date$`)
+	s.srn(t, "account", "add", "tool").exit(1).err(`run: srn account add tool --adopt`)
+	s.srn(t, "account", "add", "tool", "--adopt", "--yes").exit(0).out(`^✓ adopted ~/\.claude-tool as claude/tool$`, `^! settings: kept your change to model`)
+	s.srn(t, "account", "repair", "tool", "--yes").exit(0).out(`^✓ claude/tool is up to date$`)
 	s.check(t, strings.Contains(read(t, filepath.Join(s.home, ".claude-tool", "settings.json")), `"theme": "dark"`), "main's settings did not reach the adopted account")
 	s.srn(t, "account", "rm", "tool").exit(2)
 	s.srn(t, "account", "rm", "main", "--yes").exit(2)
@@ -208,6 +218,40 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.check(t, len(trashed) == 0, "account rm --purge moved the dir instead of deleting it: %v", trashed)
 	s.srn(t, "account", "add", "Bad").exit(2)
 	s.srn(t, "-a", "ghost").exit(1).err(`account not found: claude/ghost`)
+	testWizardTTY(t, s)
+}
+
+// testWizardTTY drives account add without a name at a pseudo terminal (ADR 0014 §3): each key
+// is typed once its question is drawn. Without a terminal the name is required.
+func testWizardTTY(t *testing.T, s *sandbox) {
+	s.srn(t, "account", "add").exit(2).err(`name the account: srn account add \[<provider>/\]<name>`)
+	if runtime.GOOS == "windows" {
+		t.Log("account add at a terminal: skipped on Windows (no script(1))")
+		return
+	}
+	dir := filepath.Join(s.home, ".claude-wiz")
+	s.srnKeys(t, []keystep{
+		{`Provider`, "\r"},
+		{`Account name`, "wiz"},
+		{`→ ~/\.claude-wiz · start with: srn wiz`, "\r"},
+		{`Setup`, "\r"},
+		{`Create claude/wiz\?`, "y"},
+		{`Log in now\?`, "n"},
+	}, "account", "add").exit(0).out(
+		`┌  New account`,
+		`◇  Provider ·+ Claude Code`,
+		`◇  Account name ·+ wiz`,
+		`◇  Created claude/wiz`,
+		`✓ created ~/\.claude-wiz \(private\)`,
+		`▲  not logged in · srn account login claude/wiz`,
+		`└  Ready in [0-9.]+s · start: srn wiz`,
+		`Same without questions: srn account add claude/wiz .*--no-login`)
+	s.check(t, s.exists(filepath.Join(dir, ".squadrn-account")), "the wizard did not create ~/.claude-wiz")
+
+	// Ctrl-C at a question cancels: nothing is created, exit 130.
+	s.srnKeys(t, []keystep{{`Provider`, "\r"}, {`Account name`, "gone"}, {`gone`, "\x03"}}, "account", "add").exit(130).out(`■  Cancelled · nothing changed`)
+	s.check(t, !s.exists(filepath.Join(s.home, ".claude-gone")), "a cancelled wizard created ~/.claude-gone")
+	s.srn(t, "account", "rm", "wiz", "--yes").exit(0)
 }
 
 func testRun(t *testing.T, s *sandbox) {
@@ -446,7 +490,7 @@ func testCodex(t *testing.T, s *sandbox) {
 	dir := filepath.Join(s.home, ".codex-work")
 	s.srn(t, "account", "add", "codex/work").exit(0).
 		out(`^Codex CLI .*· new account codex/work → ~/.codex-work$`, `^✓ push guard: pre-tool hook \+ git pre-push$`, `log in: srn account login codex/work`)
-	s.srn(t, "account", "add", "codex/work").exit(0).out(`codex/work is up to date`).noOut(`✓ push guard`)
+	s.srn(t, "account", "repair", "codex/work").exit(0).out(`codex/work is up to date`).noOut(`✓ push guard`)
 	cfg, _ := os.ReadFile(filepath.Join(dir, "config.toml"))
 	s.check(t, strings.Contains(string(cfg), `cli_auth_credentials_store = "file"`), "config.toml does not keep credentials in the account:\n%s", cfg)
 	s.check(t, strings.Contains(string(cfg), "trusted_hash"), "the guard hook is not trusted:\n%s", cfg)
@@ -493,7 +537,7 @@ func testDoctor(t *testing.T, s *sandbox) {
 	s.srn(t, "doctor", "codex/work").exit(0).out(`^account codex/work$`, `✓ push guard hook installed and trusted`).noOut(`^account claude/`)
 	s.srn(t, "doctor", "ghost").exit(1)
 	s.srn(t, "doctor", "work", "extra").exit(2)
-	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ Codex CLI 0\.171\.0 `, `^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^5\. doctor$`, `^next: srn account add <name>`)
+	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ Codex CLI 0\.171\.0 `, `^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^6\. doctor$`, `^next: srn account add <name>`)
 	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ on for every account that reports usage$`).noOut(`new accounts get`)
 }
 

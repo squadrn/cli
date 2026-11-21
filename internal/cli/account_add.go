@@ -19,6 +19,7 @@ import (
 	"github.com/squadrn/squadrn-cli/internal/config"
 	"github.com/squadrn/squadrn-cli/internal/fsx"
 	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 )
 
 // addOptions are account add's flags; nil pointers mean "ask at a terminal, else no".
@@ -31,10 +32,90 @@ type addOptions struct {
 	yes     bool
 	dryRun  bool
 	json    bool
+	// provider is -p; adopt takes over an unmanaged dir; makeDefault sets default_account.
+	provider    string
+	adopt       bool
+	makeDefault bool
+	// repair: account repair, which brings an existing account up to date; add refuses one.
+	repair bool
 }
 
 func (a *app) accountAddCmd() *cobra.Command {
 	var o addOptions
+	cmd := &cobra.Command{
+		Use:   "add [[<provider>/]<name>]",
+		Short: "Create an account (settings, shared files, push guard, usage, login)",
+		Long: "Create an account. Without a name, at a terminal, a guided setup asks for the provider, the name\n" +
+			"and the settings, shows a review, creates the account and offers the login; flags given answer\n" +
+			"their questions. Without a terminal the name is required.",
+		Example: fmt.Sprintf(`  %[1]s account add                          guided: provider, name, settings, review, login
+  %[1]s account add work                     asks for the profile, usage tracking and login
+  %[1]s account add work -p codex --profile strict --usage --login
+  %[1]s account add work --with privacy,no-attribution
+  %[1]s account add work --default           a bare %[1]s runs it
+  %[1]s account add tool --adopt             take over an existing ~/.claude-tool
+  %[1]s account add work --dry-run           show what would be done, change nothing`, a.cmd),
+		Args:              optionalArg,
+		ValidArgsFunction: cobra.NoFileCompletions,
+	}
+	finish := addFlags(cmd, &o, false)
+	f := cmd.Flags()
+	f.StringVarP(&o.provider, "provider", "p", "", "agent CLI: "+strings.Join(providerIDs(), ", ")+" (or provider/ in the name)")
+	f.BoolVar(&o.makeDefault, "default", false, "make it the default account (a bare "+a.cmd+" runs it)")
+	f.BoolVar(&o.adopt, "adopt", false, "take over an existing dir named like the account that "+config.Slug+" did not make")
+	_ = cmd.RegisterFlagCompletionFunc("provider", cobra.FixedCompletions(providerIDs(), cobra.ShellCompDirectiveNoFileComp))
+	cmd.RunE = func(_ *cobra.Command, args []string) error {
+		if err := finish(); err != nil {
+			return err
+		}
+		if len(args) == 0 {
+			return a.addWizard(o)
+		}
+		ref, err := withProvider(args[0], o.provider)
+		if err != nil {
+			return err
+		}
+		return a.jsonErrors(o.json, a.accountAdd(ref, o))
+	}
+	return cmd
+}
+
+func (a *app) accountRepairCmd() *cobra.Command {
+	var o addOptions
+	var all bool
+	cmd := &cobra.Command{
+		Use:   "repair [<account> | --all]",
+		Short: "Bring existing accounts up to date (shared files, settings, push guard)",
+		Example: examples(a.cmd,
+			"account repair work", "asks about usage tracking and the login when they are off",
+			"account repair --all", "every account, without asking",
+			"account repair work --profile strict", "switch the settings profile",
+			"account repair work --relink", "link files the account has its own copy of (keeps a backup)"),
+		Args:              optionalArg,
+		ValidArgsFunction: a.completeAccounts,
+	}
+	finish := addFlags(cmd, &o, true)
+	cmd.Flags().BoolVar(&all, "all", false, "repair every account, without asking")
+	cmd.RunE = func(_ *cobra.Command, args []string) error {
+		if err := finish(); err != nil {
+			return err
+		}
+		o.repair = true
+		switch {
+		case all && len(args) > 0:
+			return usagef("name an account or --all, not both")
+		case all:
+			return a.jsonErrors(o.json, a.repairAll(o))
+		case len(args) == 0:
+			return usagef("name an account to repair, or --all: %s account repair <account>", a.cmd)
+		}
+		return a.jsonErrors(o.json, a.accountRepair(args[0], o))
+	}
+	return cmd
+}
+
+// addFlags declares the flags add and repair share; the returned func checks them once parsed.
+func addFlags(cmd *cobra.Command, o *addOptions, repair bool) func() error {
 	var track, noTrack, login, noLogin bool
 	profiles := make([]string, len(provider.ProfileNames))
 	for i, p := range provider.ProfileNames {
@@ -44,46 +125,65 @@ func (a *app) accountAddCmd() *cobra.Command {
 	for i, opt := range provider.Options {
 		options[i] = opt.Name
 	}
-	cmd := &cobra.Command{
-		Use:   "add [<provider>/]<name>",
-		Short: "Create or repair an account (settings, shared files, push guard, usage, login)",
-		Example: fmt.Sprintf(`  %[1]s account add work                     asks for the profile, usage tracking and login
-  %[1]s account add claude/work --profile strict --usage --login
-  %[1]s account add work --with privacy      also turn telemetry off
-  %[1]s account add work --dry-run           show what would be done, change nothing
-  %[1]s account add work --relink            link files the account has its own copy of (keeps a backup)`, a.cmd),
-		Args: oneArg,
-		RunE: func(_ *cobra.Command, args []string) error {
-			if track && noTrack {
-				return usagef("--usage and --no-usage cannot be combined")
-			}
-			if login && noLogin {
-				return usagef("--login and --no-login cannot be combined")
-			}
-			if track || noTrack {
-				o.usage = &track
-			}
-			if login || noLogin {
-				o.login = &login
-			}
-			return a.jsonErrors(o.json, a.accountAdd(args[0], o))
-		},
-		ValidArgsFunction: cobra.NoFileCompletions,
-	}
 	f := cmd.Flags()
-	f.StringVar(&o.profile, "profile", "", "settings profile for a new account: "+strings.Join(profiles, ", ")+" (default "+provider.DefaultProfile+")")
-	f.StringSliceVar(&o.with, "with", nil, "opt-in settings, repeatable: "+strings.Join(options, ", "))
+	profileHelp := "settings profile: " + strings.Join(profiles, ", ") + " (default: default_profile, else " + provider.DefaultProfile + ")"
+	if repair {
+		profileHelp = "switch the settings profile: " + strings.Join(profiles, ", ") + " (default: keep the account's)"
+	}
+	f.StringVar(&o.profile, "profile", "", profileHelp)
+	f.StringSliceVar(&o.with, "with", nil, "opt-in settings, repeatable or comma separated: "+strings.Join(options, ", "))
 	f.BoolVar(&track, "usage", false, "track usage limits in the status line without asking")
 	f.BoolVar(&noTrack, "no-usage", false, "do not track usage limits and do not ask")
 	f.BoolVar(&login, "login", false, "log in right away without asking")
 	f.BoolVar(&noLogin, "no-login", false, "do not log in and do not ask")
-	f.BoolVar(&o.relink, "relink", false, "move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)")
+	if repair {
+		f.BoolVar(&o.relink, "relink", false, "move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)")
+	}
 	f.BoolVar(&o.dryRun, "dry-run", false, "print the plan and change nothing")
 	f.BoolVar(&o.json, "json", false, "print the result as JSON (implies --yes)")
 	f.BoolVarP(&o.yes, "yes", "y", false, "do not ask; use the defaults and the flags given")
 	_ = cmd.RegisterFlagCompletionFunc("profile", cobra.FixedCompletions(profiles, cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("with", cobra.FixedCompletions(options, cobra.ShellCompDirectiveNoFileComp))
-	return cmd
+	return func() error {
+		if track && noTrack {
+			return usagef("--usage and --no-usage cannot be combined")
+		}
+		if login && noLogin {
+			return usagef("--login and --no-login cannot be combined")
+		}
+		if track || noTrack {
+			o.usage = &track
+		}
+		if login || noLogin {
+			o.login = &login
+		}
+		return nil
+	}
+}
+
+func providerIDs() []string {
+	var ids []string
+	for _, s := range provider.All() {
+		ids = append(ids, s.ID)
+	}
+	return ids
+}
+
+// withProvider qualifies ref with -p: they must agree when ref names a provider too.
+func withProvider(ref, id string) (string, error) {
+	if id == "" {
+		return ref, nil
+	}
+	if _, ok := provider.Get(id); !ok {
+		return "", usagef("unknown provider %q (use %s)", id, strings.Join(providerIDs(), ", "))
+	}
+	if pid, _, ok := strings.Cut(ref, "/"); ok {
+		if pid != id {
+			return "", usagef("%s names provider %s, -p says %s", ref, pid, id)
+		}
+		return ref, nil
+	}
+	return id + "/" + ref, nil
 }
 
 // addStep is one applied step, for the failure report.
@@ -99,12 +199,16 @@ type addPlan struct {
 	ag   provider.Agent
 	// main: the provider's default account, which the CLI creates on its own; only the push
 	// guard, usage tracking and the login apply.
-	main    bool
-	isNew   bool
-	version string
-	rec     account.Managed
-	profile string
-	options []string
+	main  bool
+	isNew bool
+	// adopt takes over a dir another tool made (add --adopt).
+	adopt bool
+	// makeDefault sets default_account to the account (add --default).
+	makeDefault bool
+	version     string
+	rec         account.Managed
+	profile     string
+	options     []string
 	// shared names what main shares with a new account.
 	shared []string
 	relink bool
@@ -138,7 +242,7 @@ type addResult struct {
 	guard   string
 }
 
-// accountAdd creates or repairs an account: plan (read only), ask what is left (at a terminal),
+// accountAdd creates (or, for account repair, repairs) an account: plan (read only), ask what is left (at a terminal),
 // apply (a new account is built in a temp dir and renamed into place), then log in and summarise
 // (ADR 0011, ADR 0014).
 func (a *app) accountAdd(input string, o addOptions) error {
@@ -190,17 +294,26 @@ func (a *app) planAdd(input string, o addOptions) (*addPlan, error) {
 			return nil, usagef("unknown --with %q (use %s)", w, optionList())
 		}
 	}
-	if fi, err := os.Stat(acct.Dir); err == nil && fi.IsDir() && !a.store.Managed(acct) {
+	managed := a.store.Managed(acct)
+	unmanaged := !managed && fsx.IsDir(acct.Dir)
+	switch {
+	case unmanaged && !o.adopt:
 		return nil, fixError{
 			msg: fmt.Sprintf("%s exists but is not a %s account (another tool may use it)", a.tilde(acct.Dir), config.Slug),
-			how: "to manage it, run", fix: a.cmd + " account adopt " + input,
+			how: "to manage it, run", fix: a.cmd + " account add " + input + " --adopt",
 		}
+	case o.repair && !managed:
+		return nil, account.NotFoundError{Ref: acct.Ref}
+	case !o.repair && managed:
+		return nil, fixError{msg: acct.Label() + " already exists", how: "repair", fix: a.cmd + " account repair " + acct.Label(), paren: true}
+	case o.adopt && !unmanaged:
+		return nil, usagef("nothing to adopt: %s does not exist (to create the account, leave out --adopt)", a.tilde(acct.Dir))
 	}
 	ag, err := a.agent(acct.Spec)
 	if err != nil {
 		return nil, err
 	}
-	p := &addPlan{acct: acct, ag: ag, isNew: !a.store.Managed(acct)}
+	p := &addPlan{acct: acct, ag: ag, isNew: !managed && !unmanaged, adopt: unmanaged, makeDefault: o.makeDefault}
 	version := make(chan string, 1)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
@@ -253,7 +366,7 @@ func (a *app) planAddMain(acct account.Account, o addOptions) (*addPlan, error) 
 	if err != nil {
 		return nil, err
 	}
-	p := &addPlan{acct: acct, ag: ag, main: true}
+	p := &addPlan{acct: acct, ag: ag, main: true, makeDefault: o.makeDefault}
 	ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
 	out, _ := ag.Output(ctx, "", "--version")
 	p.version = provider.ParseVersion(out)
@@ -313,14 +426,18 @@ func (a *app) askAdd(p *addPlan, o addOptions, r addReporter) error {
 // applyAdd carries out p: the only writer of account add. A new account is built in a temp dir
 // and renamed into place, so a failure leaves nothing half made.
 func (a *app) applyAdd(p *addPlan, r addReporter) (addResult, error) {
-	res := addResult{Account: p.acct.Label(), Provider: p.acct.Provider, Dir: p.acct.Dir, Created: p.isNew, Profile: p.profile, Options: p.options}
+	res := addResult{Account: p.acct.Label(), Provider: p.acct.Provider, Dir: p.acct.Dir, Created: p.isNew, Adopted: p.adopt, Profile: p.profile, Options: p.options}
 	note := func(format string, args ...any) {
 		res.changes++
 		r.note(fmt.Sprintf(format, args...))
 	}
 	warn := func(format string, args ...any) { r.warn(fmt.Sprintf(format, args...)) }
 	if p.main {
-		return res, a.applyAddMain(p, &res, note, warn)
+		if err := a.applyAddMain(p, &res, note, warn); err != nil {
+			return res, err
+		}
+		a.applyDefault(p, note, warn)
+		return res, nil
 	}
 	acct, ag := p.acct, p.ag
 	step := addStep{created: !p.isNew}
@@ -338,6 +455,13 @@ func (a *app) applyAdd(p *addPlan, r addReporter) (addResult, error) {
 			}
 		}()
 		work.Dir = tmp
+	}
+	if p.adopt {
+		step.name = "adopt " + a.tilde(acct.Dir)
+		if _, err := a.store.Adopt(acct.Label()); err != nil {
+			return fail(err)
+		}
+		note("adopted %s as %s", a.tilde(acct.Dir), acct.Label())
 	}
 	step.name = "set up shared files and the push guard"
 	prov := a.provisioner(ag)
@@ -402,7 +526,7 @@ func (a *app) applyAdd(p *addPlan, r addReporter) (addResult, error) {
 		if res.guard = a.guardLine(acct, ag, rep.PluginInstalled); res.guard != "" {
 			note("push guard: %s", res.guard)
 		} else if acct.Spec.Caps.Plugins {
-			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
+			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account repair %s", config.Slug, a.cmd, acct.Label())
 		}
 	}
 	// A new account copies main's status line, so it may already run the recorder.
@@ -414,7 +538,78 @@ func (a *app) applyAdd(p *addPlan, r addReporter) (addResult, error) {
 	case p.isNew && tracking:
 		note("usage tracking on")
 	}
+	a.applyDefault(p, note, warn)
 	return res, nil
+}
+
+// applyDefault makes p's account the default account (add --default).
+func (a *app) applyDefault(p *addPlan, note, warn func(string, ...any)) {
+	if !p.makeDefault || (a.cfgErr == nil && a.cfg.DefaultAccount == p.acct.Label()) {
+		return
+	}
+	if err := a.saveDefaultAccount(p.acct.Label()); err != nil {
+		warn("default account: %v; run: %s account default %s", err, a.cmd, p.acct.Label())
+		return
+	}
+	note("default account: a bare %s runs %s", a.cmd, p.acct.Label())
+}
+
+// saveDefaultAccount writes default_account ("" clears it) to the config file.
+func (a *app) saveDefaultAccount(label string) error {
+	if a.cfgErr != nil {
+		return a.cfgErr
+	}
+	path, err := config.Path()
+	if err != nil {
+		return err
+	}
+	cfg := a.cfg
+	cfg.DefaultAccount = label
+	if err := config.Save(path, cfg); err != nil {
+		return err
+	}
+	a.cfg = cfg
+	return nil
+}
+
+// accountRepair brings an existing account up to date: account add's plan and apply for an
+// account that exists.
+func (a *app) accountRepair(input string, o addOptions) error {
+	if a.cfgErr != nil {
+		return a.cfgErr
+	}
+	acct, err := a.store.Get(input)
+	if err != nil {
+		return err
+	}
+	return a.accountAdd(acct.Label(), o)
+}
+
+// repairAll repairs every account without asking; one that fails does not stop the others.
+func (a *app) repairAll(o addOptions) error {
+	if a.cfgErr != nil {
+		return a.cfgErr
+	}
+	accts, err := a.store.List()
+	if err != nil {
+		return err
+	}
+	o.yes = true
+	failed := 0
+	for _, acct := range accts {
+		err := a.accountAdd(acct.Label(), o)
+		if err == nil {
+			continue
+		}
+		failed++
+		if err = a.jsonErrors(o.json, err); !silent(err) {
+			a.errf("%s: %s: %v\n", a.cmd, acct.Label(), err)
+		}
+	}
+	if failed > 0 {
+		return errQuiet
+	}
+	return nil
 }
 
 // applyAddMain sets up a provider's default account: the push guard and usage tracking.
@@ -426,7 +621,7 @@ func (a *app) applyAddMain(p *addPlan, res *addResult, note, warn func(string, .
 	installed := false
 	if gi, ok := p.ag.(provider.GuardInstaller); ok && acct.Spec.Caps.Plugins {
 		if mp := a.marketplaceDir(); mp == "" {
-			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account add %s", config.Slug, a.cmd, acct.Label())
+			warn("push guard: the %s plugin is not available here; re-run install.sh, then: %s account repair %s", config.Slug, a.cmd, acct.Label())
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			var err error
@@ -506,6 +701,7 @@ func (a *app) result(p *addPlan, res addResult) addResult {
 	res.Usage = a.usageTracking(p.acct)
 	res.LoggedIn = p.status.LoggedIn
 	res.Start = a.startCommand(p.acct)
+	res.Default = a.cfgErr == nil && a.cfg.DefaultAccount == p.acct.Label()
 	return res
 }
 
@@ -559,7 +755,11 @@ func (a *app) planLines(p *addPlan) [][2]string {
 	case p.login:
 		login = "yes"
 	}
-	return append(lines, [2]string{"login", login})
+	lines = append(lines, [2]string{"login", login})
+	if p.makeDefault {
+		lines = append(lines, [2]string{"default", "yes: a bare " + a.cmd + " runs it"})
+	}
+	return lines
 }
 
 // plannedGuard names the push-guard layers an account gets, without asking its CLI.
@@ -588,6 +788,7 @@ func (a *app) reportPlan(p *addPlan, asJSON bool) error {
 			Account: p.acct.Label(), Provider: p.acct.Provider, Dir: p.acct.Dir, Created: p.isNew,
 			Profile: p.profile, Options: p.options, Usage: p.trackUsage || (!p.noUsage && a.usageTracking(p.acct)),
 			LoggedIn: p.status.LoggedIn, Start: a.startCommand(p.acct), DryRun: true, Guard: "installed",
+			Adopted: p.adopt, Default: p.makeDefault || (a.cfgErr == nil && a.cfg.DefaultAccount == p.acct.Label()),
 		}
 		if res.Options == nil {
 			res.Options = []string{}
@@ -599,6 +800,8 @@ func (a *app) reportPlan(p *addPlan, asJSON bool) error {
 	}
 	state := "exists"
 	switch {
+	case p.adopt:
+		state = "exists, adopt it"
 	case p.main:
 		state = "the default account"
 	case p.isNew:
@@ -774,6 +977,21 @@ func (a *app) startCommand(acct account.Account) string {
 
 // askProfile lists spec's profiles with what each one does, then asks for one; Enter takes def.
 func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (string, error) {
+	if a.framed() {
+		var opts []prompt.Option
+		choice := 0
+		for i, p := range provider.ProfileNames {
+			opts = append(opts, prompt.Option{Label: p.Name, Detail: spec.ProfileSummary(p.Name)})
+			if p.Name == def {
+				choice = i
+			}
+		}
+		i, err := a.prompter().Select(prompt.Select{Title: "Profile", Options: opts, Default: choice})
+		if err != nil {
+			return "", standalone(err)
+		}
+		return provider.ProfileNames[i].Name, nil
+	}
 	for i, p := range provider.ProfileNames {
 		label := ""
 		if i == 0 {
@@ -803,8 +1021,12 @@ func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (stri
 	}
 }
 
-// askYes asks a [Y/n] question on one plan line; Enter is yes.
+// askYes asks a [Y/n] question on one plan line; Enter is yes. At a terminal that understands
+// ANSI it is a Confirm of the Prompter.
 func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
+	if a.framed() {
+		return a.confirmQ(label, question, true)
+	}
 	if question != "" {
 		question += " "
 	}
@@ -826,6 +1048,9 @@ func (a *app) padding() string {
 
 // askNo is askYes for a question whose default is no.
 func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
+	if a.framed() {
+		return a.confirmQ(label, question, false)
+	}
 	a.errf("%s%-14s %s [y/N] ", a.padding(), label, question)
 	line, err := in.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -833,6 +1058,31 @@ func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
 	}
 	s := strings.ToLower(strings.TrimSpace(line))
 	return s == "y" || s == "yes", nil
+}
+
+// framed reports whether questions are asked with the Prompter in place (a terminal that
+// understands ANSI) rather than as line prompts.
+func (a *app) framed() bool {
+	return a.prompt != nil || (a.interactive && a.ttyErr && os.Getenv("TERM") != "dumb")
+}
+
+// confirmQ asks label and question as one Confirm.
+func (a *app) confirmQ(label, question string, def bool) (bool, error) {
+	title := label
+	if question != "" {
+		title += ": " + question
+	}
+	yes, err := a.prompter().Confirm(prompt.Confirm{Title: strings.ToUpper(title[:1]) + title[1:], Default: def})
+	return yes, standalone(err)
+}
+
+// standalone is the error of a question asked on its own: going back has nowhere to go, so it
+// cancels.
+func standalone(err error) error {
+	if errors.Is(err, prompt.ErrBack) {
+		return prompt.ErrCancelled
+	}
+	return err
 }
 
 func profileList() string {

@@ -571,6 +571,11 @@ func (e Env) accounts(ctx context.Context) []Check {
 	}
 	wg.Wait()
 	var out []Check
+	if def := e.Config.DefaultAccount; def != "" && e.Only == "" {
+		if _, err := e.Store.Get(def); err != nil {
+			out = append(out, bad("default account", Warn, "default_account "+def+" does not exist: a bare "+e.Command+" fails", e.Command+" account default --unset"))
+		}
+	}
 	for _, c := range per {
 		out = append(out, c...)
 	}
@@ -597,7 +602,7 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 	}
 	if cs, has := ag.(provider.CredentialStore); has && !a.IsMain() {
 		if err := cs.CheckCredentials(a.ConfigDir()); err != nil {
-			out = append(out, bad(g, Fail, "credentials may be shared with other accounts: "+err.Error(), e.Command+" account add "+a.Label()))
+			out = append(out, bad(g, Fail, "credentials may be shared with other accounts: "+err.Error(), e.Command+" account repair "+a.Label()))
 		} else {
 			out = append(out, ok(g, "credentials kept in "+e.tilde(a.StateDir())))
 		}
@@ -627,7 +632,7 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 		return bad(g, Fail, "no git push guard hook for "+a.Spec.Name, "")
 	}
 	installed, enabled, err := gi.PluginState(ctx, a.ConfigDir())
-	fix := e.Command + " account add " + a.Label()
+	fix := e.Command + " account repair " + a.Label()
 	// Without a plugin ID the guard is a hook squadrn writes itself (Codex: hooks.json), which
 	// the CLI runs only once trusted.
 	what, off, on := "squadrn plugin", "disabled", "enabled"
@@ -660,7 +665,7 @@ func (e Env) links(a account.Account, g string) []Check {
 		p := filepath.Join(a.StateDir(), ent.Name())
 		if ent.Type()&fs.ModeSymlink != 0 {
 			if _, err := os.Stat(p); err != nil {
-				out = append(out, bad(g, Warn, "dangling link "+ent.Name(), e.Command+" account add "+a.Label()))
+				out = append(out, bad(g, Warn, "dangling link "+ent.Name(), e.Command+" account repair "+a.Label()))
 			}
 		}
 	}
@@ -673,10 +678,10 @@ func (e Env) links(a account.Account, g string) []Check {
 		dst := filepath.Join(a.StateDir(), item)
 		switch _, err := os.Lstat(dst); {
 		case errors.Is(err, fs.ErrNotExist):
-			// main gained it later: the next session or account add links it.
-			out = append(out, bad(g, Warn, item+" is not linked to main yet", e.Command+" account add "+a.Label()))
+			// main gained it later: the next session or account repair links it.
+			out = append(out, bad(g, Warn, item+" is not linked to main yet", e.Command+" account repair "+a.Label()))
 		case !account.LinksTo(dst, src):
-			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account add "+a.Label()+" --relink"))
+			out = append(out, bad(g, Fail, item+" is not linked to main", e.Command+" account repair "+a.Label()+" --relink"))
 		}
 	}
 	return out
@@ -704,7 +709,7 @@ func (e Env) accountSettings(a account.Account, g string) []Check {
 	if d, ok := provider.DriverOf(a.Spec.ID); !ok || d.Settings == nil {
 		return nil
 	}
-	fix := e.Command + " account add " + a.Label()
+	fix := e.Command + " account repair " + a.Label()
 	name := a.Spec.Settings
 	path := account.SettingsPath(a)
 	if account.LinksTo(path, filepath.Join(e.Store.MainDir(a.Spec), name)) {

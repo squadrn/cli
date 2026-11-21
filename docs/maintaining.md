@@ -65,6 +65,11 @@ standard (non-admin) user with Defender on:
   denied or asked each time
 - `srn self-update` while a session runs; `--rollback`; `self-uninstall` leaves nothing behind
 - colours and the account picker in Windows Terminal and the classic console
+- `srn account add` without a name (the wizard, ADR 0014) in Windows Terminal and the classic
+  console: arrows, j/k, Space, Esc back, Ctrl-C cancels with nothing created; the frame glyphs
+  with code page 65001 and the ASCII fallback (`+ | > *`) with the default code page; the
+  terminal is back to normal (echo, line editing) after a cancel and after the login
+- `srn setup` at a terminal: the questions drawn in place, "Add an account?" runs the wizard
 
 ## Branches and releases
 

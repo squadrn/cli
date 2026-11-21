@@ -75,7 +75,7 @@ exec squadrn hook notify
 ! grep '"group":"s7"' sent.jsonl
 exec squadrn notify status
 stdout '^notifications +off$'
-exec squadrn account add work
+exec squadrn account repair work
 ! grep preferredNotifChannel home/.claude-work/settings.json
 ! exec squadrn config set notify.sound loud
 stderr 'notify.sound "loud" is not one of input, all, none'

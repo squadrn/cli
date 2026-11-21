@@ -15,8 +15,10 @@ exec squadrn account login --help
 cmp stdout help-account-login.txt
 exec squadrn account logout --help
 cmp stdout help-account-logout.txt
-exec squadrn account adopt --help
-cmp stdout help-account-adopt.txt
+exec squadrn account repair --help
+cmp stdout help-account-repair.txt
+exec squadrn account default --help
+cmp stdout help-account-default.txt
 exec squadrn account rename --help
 cmp stdout help-account-rename.txt
 exec squadrn account rm --help
@@ -146,12 +148,13 @@ Usage:
   srn account [command]
 
 Available Commands:
-  add         Create or repair an account (settings, shared files, push guard, usage, login)
-  adopt       Make an existing config dir (e.g. ~/.claude-<name>) an account and set it up
+  add         Create an account (settings, shared files, push guard, usage, login)
+  default     Show or set the account a bare srn runs
   login       Sign an account in
   logout      Sign an account out (keeps its dir)
   ls          List accounts with login status
   rename      Rename an account (logs it out first; log in again afterwards)
+  repair      Bring existing accounts up to date (shared files, settings, push guard)
   rm          Log an account out and move its dir to the trash (--purge: delete it for good)
 
 Flags:
@@ -175,30 +178,36 @@ Flags:
 Global Flags:
       --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-add.txt --
-Create or repair an account (settings, shared files, push guard, usage, login)
+Create an account. Without a name, at a terminal, a guided setup asks for the provider, the name
+and the settings, shows a review, creates the account and offers the login; flags given answer
+their questions. Without a terminal the name is required.
 
 Usage:
-  srn account add [<provider>/]<name> [flags]
+  srn account add [[<provider>/]<name>] [flags]
 
 Examples:
+  srn account add                          guided: provider, name, settings, review, login
   srn account add work                     asks for the profile, usage tracking and login
-  srn account add claude/work --profile strict --usage --login
-  srn account add work --with privacy      also turn telemetry off
+  srn account add work -p codex --profile strict --usage --login
+  srn account add work --with privacy,no-attribution
+  srn account add work --default           a bare srn runs it
+  srn account add tool --adopt             take over an existing ~/.claude-tool
   srn account add work --dry-run           show what would be done, change nothing
-  srn account add work --relink            link files the account has its own copy of (keeps a backup)
 
 Flags:
-      --dry-run          print the plan and change nothing
-  -h, --help             help for add
-      --json             print the result as JSON (implies --yes)
-      --login            log in right away without asking
-      --no-login         do not log in and do not ask
-      --no-usage         do not track usage limits and do not ask
-      --profile string   settings profile for a new account: minimal, standard, strict (default standard)
-      --relink           move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)
-      --usage            track usage limits in the status line without asking
-      --with strings     opt-in settings, repeatable: privacy, no-attribution
-  -y, --yes              do not ask; use the defaults and the flags given
+      --adopt             take over an existing dir named like the account that squadrn did not make
+      --default           make it the default account (a bare srn runs it)
+      --dry-run           print the plan and change nothing
+  -h, --help              help for add
+      --json              print the result as JSON (implies --yes)
+      --login             log in right away without asking
+      --no-login          do not log in and do not ask
+      --no-usage          do not track usage limits and do not ask
+      --profile string    settings profile: minimal, standard, strict (default: default_profile, else standard)
+  -p, --provider string   agent CLI: claude, codex, gemini (or provider/ in the name)
+      --usage             track usage limits in the status line without asking
+      --with strings      opt-in settings, repeatable or comma separated: privacy, no-attribution
+  -y, --yes               do not ask; use the defaults and the flags given
 
 Global Flags:
       --no-color   disable colors (also: NO_COLOR=1)
@@ -1581,17 +1590,48 @@ squadrn link -> $WORK/home/.local/share/squadrn/bin/squadrn
 srn link -> $WORK/home/.local/share/squadrn/bin/squadrn
 -- layout-config.txt --
 config.toml file -rw-r--r--
--- help-account-adopt.txt --
-Make an existing config dir an account, then set it up like account add. Its own settings are
-kept: they become the account's copy, and keys that differ from main's stay as they are.
+-- help-account-repair.txt --
+Bring existing accounts up to date (shared files, settings, push guard)
 
 Usage:
-  srn account adopt [<provider>/]<name> [flags]
+  srn account repair [<account> | --all] [flags]
+
+Examples:
+  srn account repair work                   asks about usage tracking and the login when they are off
+  srn account repair --all                  every account, without asking
+  srn account repair work --profile strict  switch the settings profile
+  srn account repair work --relink          link files the account has its own copy of (keeps a backup)
 
 Flags:
-  -h, --help             help for adopt
-      --profile string   settings profile to apply (default: none, keep its settings)
-  -y, --yes              do not ask; use the defaults
+      --all              repair every account, without asking
+      --dry-run          print the plan and change nothing
+  -h, --help             help for repair
+      --json             print the result as JSON (implies --yes)
+      --login            log in right away without asking
+      --no-login         do not log in and do not ask
+      --no-usage         do not track usage limits and do not ask
+      --profile string   switch the settings profile: minimal, standard, strict (default: keep the account's)
+      --relink           move the account's own copies of shared files aside (.bak-<time>) and link them to main (asks)
+      --usage            track usage limits in the status line without asking
+      --with strings     opt-in settings, repeatable or comma separated: privacy, no-attribution
+  -y, --yes              do not ask; use the defaults and the flags given
+
+Global Flags:
+      --no-color   disable colors (also: NO_COLOR=1)
+-- help-account-default.txt --
+Show or set the account a bare srn runs
+
+Usage:
+  srn account default [<account> | --unset] [flags]
+
+Examples:
+  srn account default          show it
+  srn account default work     a bare srn runs claude/work
+  srn account default --unset  a bare srn runs the default provider's main account again
+
+Flags:
+  -h, --help    help for default
+      --unset   clear the default account
 
 Global Flags:
       --no-color   disable colors (also: NO_COLOR=1)

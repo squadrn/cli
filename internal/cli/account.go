@@ -47,9 +47,10 @@ func (a *app) accountCmd() *cobra.Command {
 			RunE:              func(_ *cobra.Command, args []string) error { return a.accountLogout(args[0]) },
 			ValidArgsFunction: a.completeAccounts,
 		},
+		a.accountRepairCmd(),
+		a.accountDefaultCmd(),
 		a.accountRenameCmd(),
 		a.accountRmCmd(),
-		a.accountAdoptCmd(),
 	)
 	return cmd
 }
@@ -66,51 +67,6 @@ func (a *app) accountRenameCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "rename even if a session seems to use the account")
 	return cmd
-}
-
-func (a *app) accountAdoptCmd() *cobra.Command {
-	var yes bool
-	var profile string
-	cmd := &cobra.Command{
-		Use:               "adopt [<provider>/]<name>",
-		Short:             "Make an existing config dir (e.g. ~/.claude-<name>) an account and set it up",
-		Long:              "Make an existing config dir an account, then set it up like account add. Its own settings are\nkept: they become the account's copy, and keys that differ from main's stay as they are.",
-		Args:              oneArg,
-		ValidArgsFunction: a.completeUnmanaged,
-		RunE: func(_ *cobra.Command, args []string) error {
-			acct, err := a.store.Define(args[0])
-			if err != nil {
-				return err
-			}
-			if a.store.Managed(acct) {
-				a.out("%s is already an account; to repair it: %s account add %s\n", acct.Label(), a.cmd, acct.Label())
-				return nil
-			}
-			if err := a.confirm(yes, "Manage %s as account %s (another tool may own it)", a.tilde(acct.Dir), acct.Label()); err != nil {
-				return err
-			}
-			if acct, err = a.store.Adopt(args[0]); err != nil {
-				return err
-			}
-			a.out("adopted %s (%s)\n", acct.Label(), a.tilde(acct.Dir))
-			return a.accountAdd(acct.Label(), addOptions{profile: profile, yes: yes})
-		},
-	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask; use the defaults")
-	cmd.Flags().StringVar(&profile, "profile", "", "settings profile to apply (default: none, keep its settings)")
-	return cmd
-}
-
-func (a *app) completeUnmanaged(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-	if len(args) > 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-	un, _ := a.store.Unmanaged()
-	names := make([]string, len(un))
-	for i, acct := range un {
-		names[i] = acct.Label()
-	}
-	return names, cobra.ShellCompDirectiveNoFileComp
 }
 
 type accountRow struct {
@@ -160,7 +116,7 @@ func (a *app) accountList(asJSON bool) error {
 	}
 	un, _ := a.store.Unmanaged()
 	for _, acct := range un {
-		a.out("unmanaged: %s (%s account adopt %s)\n", a.tilde(acct.Dir), a.cmd, acct.Label())
+		a.out("unmanaged: %s (%s account add %s --adopt)\n", a.tilde(acct.Dir), a.cmd, acct.Label())
 	}
 	return nil
 }
@@ -289,7 +245,7 @@ func (a *app) accountRename(input, newName string, force, yes bool) error {
 	}
 	if r, ok := ag.(provider.Relocator); ok {
 		if err := r.Relocate(acct.Dir, to.Dir); err != nil {
-			a.warnf("cannot update plugin paths: %v; run: %s account add %s", err, a.cmd, to.Label())
+			a.warnf("cannot update plugin paths: %v; run: %s account repair %s", err, a.cmd, to.Label())
 		}
 	}
 	if keepsLogin {
@@ -381,4 +337,58 @@ func exactArgs(n int) cobra.PositionalArgs {
 		}
 		return nil
 	}
+}
+
+func (a *app) accountDefaultCmd() *cobra.Command {
+	var unset bool
+	cmd := &cobra.Command{
+		Use:   "default [<account> | --unset]",
+		Short: "Show or set the account a bare " + a.cmd + " runs",
+		Example: examples(a.cmd,
+			"account default", "show it",
+			"account default work", "a bare "+a.cmd+" runs claude/work",
+			"account default --unset", "a bare "+a.cmd+" runs the default provider's main account again"),
+		Args:              optionalArg,
+		ValidArgsFunction: a.completeAccounts,
+		RunE: func(_ *cobra.Command, args []string) error {
+			if a.cfgErr != nil {
+				return a.cfgErr
+			}
+			main := a.defaultSpec().ID + "/" + account.Main
+			switch {
+			case unset && len(args) > 0:
+				return usagef("name an account or --unset, not both")
+			case unset:
+				if err := a.saveDefaultAccount(""); err != nil {
+					return err
+				}
+				a.out("no default account: a bare %s runs %s\n", a.cmd, main)
+				return nil
+			case len(args) == 0:
+				def := a.cfg.DefaultAccount
+				if def == "" {
+					a.out("%s (no default account set; set one: %s account default <account>)\n", main, a.cmd)
+					return nil
+				}
+				if _, err := a.store.Get(def); err != nil {
+					a.out("%s\n", def)
+					a.warnf("the default account %s does not exist (%v); run: %s account default --unset", def, err, a.cmd)
+					return nil
+				}
+				a.out("%s\n", def)
+				return nil
+			}
+			acct, err := a.store.Get(args[0])
+			if err != nil {
+				return err
+			}
+			if err := a.saveDefaultAccount(acct.Label()); err != nil {
+				return err
+			}
+			a.out("default account: a bare %s runs %s\n", a.cmd, acct.Label())
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&unset, "unset", false, "clear the default account")
+	return cmd
 }

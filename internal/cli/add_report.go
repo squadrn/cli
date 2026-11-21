@@ -80,7 +80,7 @@ func (r lineReporter) failed(acct account.Account, step addStep, err error) erro
 	} else {
 		a.out("  state: nothing was created\n")
 	}
-	a.out("  retry: %s account add %s\n", a.cmd, acct.Label())
+	a.out("  retry: %s\n", retryCommand(a, acct, step))
 	return errQuiet
 }
 
@@ -108,7 +108,7 @@ func (r jsonReporter) info(text string)      { r.a.errf("%s\n", text) }
 func (jsonReporter) loginStart()             {}
 
 func (r jsonReporter) failed(acct account.Account, step addStep, err error) error {
-	return fixError{msg: fmt.Sprintf("%s failed: %v", step.name, err), how: "retry", fix: r.a.cmd + " account add " + acct.Label()}
+	return fixError{msg: fmt.Sprintf("%s failed: %v", step.name, err), how: "retry", fix: retryCommand(r.a, acct, step)}
 }
 
 func (r jsonReporter) done(p *addPlan, res addResult) error {
@@ -118,10 +118,17 @@ func (r jsonReporter) done(p *addPlan, res addResult) error {
 // fixError is an error with the command that fixes it; --json prints the two apart.
 type fixError struct {
 	msg, how, fix string
-	err           error
+	// paren puts the fix in parentheses: "x already exists (repair: …)".
+	paren bool
+	err   error
 }
 
-func (e fixError) Error() string { return e.msg + "; " + e.how + ": " + e.fix }
+func (e fixError) Error() string {
+	if e.paren {
+		return e.msg + " (" + e.how + ": " + e.fix + ")"
+	}
+	return e.msg + "; " + e.how + ": " + e.fix
+}
 func (e fixError) Unwrap() error { return e.err }
 
 // reported is an error already printed (as JSON); it keeps the exit code of the error it wraps.
@@ -155,4 +162,12 @@ func (a *app) jsonErrors(asJSON bool, err error) error {
 // printJSONLine prints v as one line of JSON.
 func (a *app) printJSONLine(v any) error {
 	return json.NewEncoder(a.stdout).Encode(v)
+}
+
+// retryCommand is what finishes a failed add: add again when nothing was created, else repair.
+func retryCommand(a *app, acct account.Account, step addStep) string {
+	if step.created {
+		return a.cmd + " account repair " + acct.Label()
+	}
+	return a.cmd + " account add " + acct.Label()
 }

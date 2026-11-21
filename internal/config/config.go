@@ -43,6 +43,9 @@ type Config struct {
 	DefaultProvider string `toml:"default_provider,omitempty"`
 	// DefaultProfile is the settings profile new accounts get unless --profile names one.
 	DefaultProfile string `toml:"default_profile,omitempty"`
+	// DefaultAccount is the account a bare command runs instead of the default provider's main
+	// account (account default).
+	DefaultAccount string `toml:"default_account,omitempty"`
 	// SharedMCP lists user-scope MCP servers copied from a provider's main account into new accounts.
 	SharedMCP []string `toml:"shared_mcp,omitempty"`
 	// ProtectedBranches are branch globs agents must never push to directly. Repositories can only
@@ -314,7 +317,7 @@ func Save(path string, c Config) error {
 
 // Keys lists the settings `config get|set` accepts.
 var Keys = []string{
-	"command", "aliases", "default_provider", "default_profile", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel",
+	"command", "aliases", "default_provider", "default_profile", "default_account", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel",
 	"completion", "notify.enabled", "notify.events", "notify.sound", "notify.when", "notify.quiet_hours", "notify.preview", "notify.method",
 }
 
@@ -368,6 +371,8 @@ func (c Config) Get(key string) (string, error) {
 		return c.DefaultProvider, nil
 	case "default_profile":
 		return c.ProfileName(), nil
+	case "default_account":
+		return c.DefaultAccount, nil
 	case "shared_mcp":
 		return strings.Join(c.SharedMCP, ","), nil
 	case "protected_branches":
@@ -415,6 +420,8 @@ func (c *Config) Set(key, value string) error {
 		c.DefaultProvider = value
 	case "default_profile":
 		c.DefaultProfile = value
+	case "default_account":
+		c.DefaultAccount = value
 	case "shared_mcp":
 		c.SharedMCP = list()
 	case "protected_branches":
