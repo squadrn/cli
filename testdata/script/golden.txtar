@@ -636,7 +636,9 @@ Usage:
 Available Commands:
   bash        Generate the autocompletion script for bash
   fish        Generate the autocompletion script for fish
+  install     Set up tab completion for your shell (asks before editing its startup file)
   powershell  Generate the autocompletion script for powershell
+  uninstall   Remove tab completion and stop updates from writing it again
   zsh         Generate the autocompletion script for zsh
 
 Flags:

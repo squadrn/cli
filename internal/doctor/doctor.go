@@ -93,6 +93,8 @@ type Env struct {
 	// Notifier finds the desktop notifier: its name, what to know about it (or what to install
 	// when ok is false); nil skips the check.
 	Notifier func() (tool, note string, ok bool)
+	// Completion reports the login shell's tab completion; false (or nil) for no line.
+	Completion func() (Check, bool)
 }
 
 // Run performs every check. Account checks run concurrently.
@@ -213,6 +215,11 @@ func (e Env) install(ctx context.Context) []Check {
 		out = append(out, bad(g, Warn, "this build cannot verify release signatures (no signing key built in)", "install an official release"))
 	} else {
 		out = append(out, ok(g, "release signatures verified on update"))
+	}
+	if e.Completion != nil {
+		if c, ok := e.Completion(); ok {
+			out = append(out, c)
+		}
 	}
 	if e.Layout.Marketplace() == "" {
 		out = append(out, bad(g, Warn, "squadrn plugin files not installed in "+e.tilde(e.Layout.DataDir), reinstallHint))

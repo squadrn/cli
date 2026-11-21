@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Tab completion through the router:** `srn <Tab>` offers accounts by their short names first
+  (`personal`, `main`; `provider/name` when ambiguous), described with the login last cached, then
+  commands. After an account it offers `wt`, `grid` and the agent CLI's own subcommands
+  (`srn personal <Tab>`, `srn personal wt <Tab>` completed nothing before). `-a` completes
+  accounts and `-C` directories; `config set` values, `grid` arguments, worktree names of the
+  account's provider. Completion never runs an agent CLI.
+- **`srn completion install|uninstall`:** writes the scripts where the shell loads them (a zsh dir
+  already on `fpath`, bash-completion's dir, fish's), adding a marked block above `compinit` in
+  `~/.zshrc` (or to `~/.bashrc`) only when needed and after asking. New setting
+  `completion = auto|off`: updates refresh the scripts unless off; they never edit startup files
+  and say `completion install` when the shell does not load the dir. `doctor` warns when the login
+  shell's completion is missing, out of date or not loaded; `self-uninstall` removes the block.
 - **Guided account creation** ([ADR 0014](docs/adr/0014-account-creation.md)): `srn account add`
   without a name, at a terminal, asks the provider (installed CLIs with their version and account
   count; missing ones dimmed with their install command), the name (checked as you type, with the
