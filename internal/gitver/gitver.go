@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // Min is the oldest Git squadrn supports: worktree.Open relies on

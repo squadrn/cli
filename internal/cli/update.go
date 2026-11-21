@@ -13,18 +13,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/release"
-	"github.com/squadrn/squadrn/internal/update"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/update"
 )
 
 // DefaultRepo is the public repository releases are published in (ADR 0007).
-const DefaultRepo = "squadrn/squadrn"
+const DefaultRepo = "squadrn/squadrn-cli"
 
 // Repo is the GitHub repository releases come from: DefaultRepo, or what the build sets with
-// -ldflags "-X github.com/squadrn/squadrn/internal/cli.Repo=owner/name". Only the --repo flag
+// -ldflags "-X github.com/squadrn/squadrn-cli/internal/cli.Repo=owner/name". Only the --repo flag
 // overrides it: an environment variable could be planted to redirect updates.
 var Repo = DefaultRepo
 

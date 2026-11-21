@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/notify"
 )
 
 // The fixtures follow the hook input and the notify argument documented by Codex.

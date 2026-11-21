@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // findNotifier uses notify-send (libnotify), else gdbus talking to the notification server.

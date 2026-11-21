@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // bundleRel is the CLI's entry point inside the npm package dir.

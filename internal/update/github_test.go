@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/config"
 )
 
 func TestGitHub(t *testing.T) {

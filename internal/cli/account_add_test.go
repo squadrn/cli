@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 func TestAskProfileAndYes(t *testing.T) {

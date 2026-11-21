@@ -7,8 +7,8 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/githook"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/githook"
 )
 
 // policyKeys are the settings that weaken the guard; only the user changes them, in a terminal.

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // The push guard's layer 1 is a PreToolUse hook in $CODEX_HOME/hooks.json running the squadrn

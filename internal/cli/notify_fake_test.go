@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // fakeNotifications replaces the desktop notifier for the whole test binary: a notification is

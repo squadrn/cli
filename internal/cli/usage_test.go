@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 func TestCompactUsage(t *testing.T) {

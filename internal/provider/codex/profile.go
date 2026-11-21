@@ -3,7 +3,7 @@ package codex
 import (
 	"fmt"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // Profiles are config.toml keys checked against Codex CLI 0.171.0's config schema

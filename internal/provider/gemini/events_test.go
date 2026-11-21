@@ -3,8 +3,8 @@ package gemini
 import (
 	"testing"
 
-	"github.com/squadrn/squadrn/internal/notify"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // The payloads follow the hook input ADR 0013's probe recorded (BeforeAgent, AfterAgent) and

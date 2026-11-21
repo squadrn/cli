@@ -17,15 +17,15 @@ Platforms: macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in
 macOS and Linux (needs `curl` or `wget`, `git` 2.31+ and `ssh-keygen`; no GitHub account):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/squadrn/squadrn-cli/releases/latest/download/install.sh | sh
 ```
 
 `latest` points to the newest stable release; GitHub skips pre-releases there. Until a stable
 release exists, or for any other release, take that release's installer (it installs the release
-it was downloaded from; see [releases](https://github.com/squadrn/squadrn/releases)):
+it was downloaded from; see [releases](https://github.com/squadrn/squadrn-cli/releases)):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.sh | sh
+curl -fsSL https://github.com/squadrn/squadrn-cli/releases/download/v1.0.0-rc.1/install.sh | sh
 ```
 
 The default command is **`srn`** with the alias **`squadrn`**. If another program already
@@ -34,7 +34,7 @@ other names (Enter keeps the default); or pass them up front (`--alias ''` insta
 alias; `SQUADRN_COMMAND`, `SQUADRN_ALIASES` and `SQUADRN_VERSION` work too):
 
 ```sh
-curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh -s -- --command ai --alias ''
+curl -fsSL https://github.com/squadrn/squadrn-cli/releases/latest/download/install.sh | sh -s -- --command ai --alias ''
 ```
 
 The installer checks the release signature (`ssh-keygen`) and checksum, installs the binary to
@@ -44,27 +44,27 @@ the squadrn plugin into every Claude account. On the first install at a terminal
 existing `~/.claude-<name>` dirs and to track usage limits, and runs `srn doctor` (every step can be
 skipped; run it again any time). Without a terminal it prints what it found and the next steps.
 Releases also carry GitHub build provenance; verify
-an archive by hand with `gh attestation verify <archive> --repo squadrn/squadrn`.
+an archive by hand with `gh attestation verify <archive> --repo squadrn/squadrn-cli`.
 
 ### Windows (beta)
 
 Requires [Git for Windows](https://git-scm.com/download/win) 2.31+. In PowerShell:
 
 ```powershell
-irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex
+irm https://github.com/squadrn/squadrn-cli/releases/latest/download/install.ps1 | iex
 ```
 
 `latest` is the newest stable release; for a pre-release, or any other release, use its own installer:
 
 ```powershell
-irm https://github.com/squadrn/squadrn/releases/download/v1.0.0-rc.1/install.ps1 | iex
+irm https://github.com/squadrn/squadrn-cli/releases/download/v1.0.0-rc.1/install.ps1 | iex
 ```
 
 `| iex` cannot pass options: set `$env:SQUADRN_COMMAND`, `$env:SQUADRN_ALIASES` or
 `$env:SQUADRN_VERSION` first, or use the script block form:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Command ai -Alias '' -AddToProfile
+& ([scriptblock]::Create((irm https://github.com/squadrn/squadrn-cli/releases/latest/download/install.ps1))) -Command ai -Alias '' -AddToProfile
 ```
 
 A failed install prints the reason in red and leaves the window open. `-AddToProfile` loads tab

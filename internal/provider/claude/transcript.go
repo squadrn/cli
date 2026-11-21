@@ -13,8 +13,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // Claude Code stores each conversation at <config dir>/projects/<project folder>/<session>.jsonl,

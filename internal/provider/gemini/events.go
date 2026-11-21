@@ -3,7 +3,7 @@ package gemini
 import (
 	"encoding/json"
 
-	"github.com/squadrn/squadrn/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/notify"
 )
 
 // Events maps Gemini CLI's hook input to notification events (ADR 0013 §6, hooks reference of

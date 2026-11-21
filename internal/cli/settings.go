@@ -3,8 +3,8 @@ package cli
 import (
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // settingsFormat is the settings file format of spec's CLI; nil when accounts have no copy.

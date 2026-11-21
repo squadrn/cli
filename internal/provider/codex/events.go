@@ -3,7 +3,7 @@ package codex
 import (
 	"encoding/json"
 
-	"github.com/squadrn/squadrn/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/notify"
 )
 
 // Events maps Codex's hook input (PermissionRequest, UserPromptSubmit, PostToolUse, Stop) and

@@ -18,21 +18,21 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"github.com/squadrn/squadrn/internal/account"
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/githook"
-	"github.com/squadrn/squadrn/internal/provider"
-	_ "github.com/squadrn/squadrn/internal/provider/all"
-	"github.com/squadrn/squadrn/internal/release"
-	"github.com/squadrn/squadrn/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/account"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/githook"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	_ "github.com/squadrn/squadrn-cli/internal/provider/all"
+	"github.com/squadrn/squadrn-cli/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/ui"
 )
 
 // buildSigners returns the release signing keys built into this binary ("" when none). Only the
 // test binary replaces it, so script tests can sign their own fake releases.
 var buildSigners = release.Signers
 
-// Version is set at build time with -ldflags "-X github.com/squadrn/squadrn/internal/cli.Version=…".
+// Version is set at build time with -ldflags "-X github.com/squadrn/squadrn-cli/internal/cli.Version=…".
 var Version = "dev"
 
 const (

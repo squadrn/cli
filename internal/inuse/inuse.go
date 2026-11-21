@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/config"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // Dir is the registry directory inside a used directory. It is a fixed identifier.

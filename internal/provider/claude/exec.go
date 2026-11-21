@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/proc"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // CLI runs the installed claude binary.

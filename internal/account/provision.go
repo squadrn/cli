@@ -12,8 +12,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // Provisioner prepares an account dir. It is idempotent: re-running repairs missing pieces.

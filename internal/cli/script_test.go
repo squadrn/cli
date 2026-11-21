@@ -19,9 +19,9 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
-	"github.com/squadrn/squadrn/internal/fakeagent"
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/release"
+	"github.com/squadrn/squadrn-cli/internal/fakeagent"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/release"
 )
 
 func TestMain(m *testing.M) {

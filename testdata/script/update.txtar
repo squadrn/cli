@@ -73,7 +73,7 @@ exitcode 2 squadrn self-install rel --command dev2 --alias dev2
 # ignored).
 env SQUADRN_REPO=me/squadrn
 ! exec squadrn self-update --check
-stderr 'cannot list releases of squadrn/squadrn'
+stderr 'cannot list releases of squadrn/squadrn-cli'
 
 # A published release, served by a fake GitHub API ($SQUADRN_TEST_API): archive for this
 # platform plus checksums. No gh needed; a fake one only answers auth queries.

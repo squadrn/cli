@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // names are the hooks shimmed. Hooks git runs on hot paths (reference-transaction on every ref

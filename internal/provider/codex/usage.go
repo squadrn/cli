@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 // RateLimits reads the account's usage limits from the app server (account/rateLimits/read).

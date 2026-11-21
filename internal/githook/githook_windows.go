@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // isRunnable mirrors Git for Windows: there are no execute bits, so a hook runs when it is a

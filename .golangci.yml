@@ -29,7 +29,7 @@ formatters:
     - goimports
   settings:
     gofumpt:
-      module-path: github.com/squadrn/squadrn
+      module-path: github.com/squadrn/squadrn-cli
     goimports:
       local-prefixes:
-        - github.com/squadrn/squadrn
+        - github.com/squadrn/squadrn-cli

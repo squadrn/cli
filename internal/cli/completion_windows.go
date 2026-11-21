@@ -5,7 +5,7 @@ package cli
 import (
 	"bytes"
 
-	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
 )
 
 // writeCompletions writes one PowerShell completion script for every name, which install.ps1

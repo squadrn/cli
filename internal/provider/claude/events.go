@@ -3,7 +3,7 @@ package claude
 import (
 	"encoding/json"
 
-	"github.com/squadrn/squadrn/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/notify"
 )
 
 // Events maps Claude Code's Notification, Stop and StopFailure hook input to notification

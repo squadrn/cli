@@ -9,7 +9,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn-cli/internal/proc"
 )
 
 // request is one JSON-RPC call to `codex app-server` (stdio, one JSON message per line).

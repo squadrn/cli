@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/config"
+	"github.com/squadrn/squadrn-cli/internal/config"
 )
 
 type repos struct {

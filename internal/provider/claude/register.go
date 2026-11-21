@@ -3,8 +3,8 @@ package claude
 import (
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 var (

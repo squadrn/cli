@@ -1,6 +1,6 @@
 BIN     := bin/squadrn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/squadrn/squadrn/internal/cli.Version=$(VERSION)
+LDFLAGS := -s -w -X github.com/squadrn/squadrn-cli/internal/cli.Version=$(VERSION)
 
 .PHONY: build race e2e cover-gates cover-gates-windows vuln lint fmt check validate hooks clean
 

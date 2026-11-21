@@ -1,7 +1,7 @@
 package gemini
 
 import (
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 var (

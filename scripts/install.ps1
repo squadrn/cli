@@ -1,8 +1,8 @@
 # Installs squadrn on Windows from its GitHub releases. Needs Git for Windows 2.31 or newer; no
 # GitHub account or gh.
 #
-#   irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex
-#   & ([scriptblock]::Create((irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1))) -Command ai -Alias sx
+#   irm https://github.com/squadrn/squadrn-cli/releases/latest/download/install.ps1 | iex
+#   & ([scriptblock]::Create((irm https://github.com/squadrn/squadrn-cli/releases/latest/download/install.ps1))) -Command ai -Alias sx
 #
 # It installs the release it was downloaded from (latest/download is the newest stable release).
 # Parameters, for the script block form, mirror install.sh: -Command (command name), -Alias (comma
@@ -81,7 +81,7 @@ __SQUADRN_SIGNERS__
     # The release this script was published with; a placeholder in a source checkout.
     $releaseTag = "__SQUADRN_VERSION__"
 
-    if ($Repo -notmatch '/') { $Repo = "squadrn/squadrn" }
+    if ($Repo -notmatch '/') { $Repo = "squadrn/squadrn-cli" }
     # Windows PowerShell 5.1 may default to TLS 1.0, which GitHub refuses.
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $git = Get-Command git -ErrorAction SilentlyContinue

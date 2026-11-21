@@ -154,7 +154,7 @@ jobs:
           fixture="$RUNNER_TEMP/ps1-fixture"
           mkdir -p "$fixture"
           ssh-keygen -q -t ed25519 -N '' -C test -f "$fixture/key"
-          sh scripts/render-install.sh squadrn/squadrn v1.2.0-rc.99 "$fixture/key.pub"
+          sh scripts/render-install.sh squadrn/squadrn-cli v1.2.0-rc.99 "$fixture/key.pub"
           pwsh -NoProfile -File scripts/windows-install-e2e.ps1 -Fixture "$(cygpath -w "$fixture")" -Tag v1.2.0-rc.99
       - name: install.ps1 parses in Windows PowerShell 5.1 and PowerShell 7
         run: |

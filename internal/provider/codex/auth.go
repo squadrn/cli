@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // accountReadTimeout bounds the app-server call that adds the email and plan to a login.

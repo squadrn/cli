@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The repository and Go module are now `github.com/squadrn/squadrn-cli`. Installed releases keep
+  updating through GitHub's redirect from `squadrn/squadrn`; installer URLs change to
+  `https://github.com/squadrn/squadrn-cli/releases/…` (the old ones redirect).
+
 ## 1.0.0-rc.5
 
 - **Gemini CLI accounts** (`gemini/<name>`, [ADR 0013](docs/adr/0013-gemini-provider.md), core):

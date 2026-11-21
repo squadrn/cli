@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/squadrn/squadrn/internal/notify"
-	"github.com/squadrn/squadrn/internal/usage"
+	"github.com/squadrn/squadrn-cli/internal/notify"
+	"github.com/squadrn/squadrn-cli/internal/usage"
 )
 
 type Caps struct {

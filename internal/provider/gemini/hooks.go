@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/squadrn/squadrn/internal/fsx"
-	"github.com/squadrn/squadrn/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/fsx"
+	"github.com/squadrn/squadrn-cli/internal/provider"
 )
 
 // Layer 1 of the push guard is a BeforeTool hook in the account's own settings.json (user
