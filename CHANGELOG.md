@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Gemini CLI accounts** (`gemini/<name>`, [ADR 0013](docs/adr/0013-gemini-provider.md), core):
+  `~/.gemini-<name>` is the account's `GEMINI_CLI_HOME`, with Gemini's files in its `.gemini/`;
+  `settings.json` is the account's own copy of main's (comments are read, never written back to
+  main's file), `GEMINI.md`, `commands`, `agents` and skills are shared from `~/.gemini`. The
+  login is read from the account's files (`oauth_creds.json`, or an API key in the environment);
+  `account login` runs `gemini` with a hint to finish the Google login and type `/quit`, and
+  `account logout` moves the login files to the trash. Sessions never use Gemini's shared
+  keychain store. `doctor` checks Gemini 0.70.0+, Node.js 20+, the keychain and Google Cloud
+  credential variables, and says that Gemini sessions have no git pre-push guard (Gemini turns
+  git hooks off). The pre-tool push guard, notifications and profiles for Gemini come next.
+- Every profile denies reading all of another account's credential files, Gemini's included, and
+  squadrn's own hook entries in main's Claude Code `hooks` are no longer copied into accounts.
 - `srn account add codex/main` (or `claude/main`) sets up the default account instead of refusing
   it as a reserved name: it installs the push guard, asks about usage tracking and the login, and
   leaves its settings alone. `doctor` suggests it when the default account has no guard, instead of

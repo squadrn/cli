@@ -23,6 +23,7 @@
 | `provider` | `Spec` (data: dirs, env var, shared items, worktree dir, subcommands, capabilities), the `Agent` and capability interfaces, the driver registry, the auth cache ([ADR 0011](adr/0011-provider-model-v2.md)) | provider internals |
 | `provider/claude` | everything about Claude Code: `CLAUDE_CONFIG_DIR`, auth status, transcripts, plugin registry paths, the status line; registers its driver | — |
 | `provider/codex` | everything about the Codex CLI: `CODEX_HOME`, the file credential store in `config.toml`, `login status`, the guard hook in `hooks.json` and its trust, `mcp`, the app server (account, rate limits); registers its driver | — |
+| `provider/gemini` | everything about Gemini CLI: `GEMINI_CLI_HOME` homes with the state in `.gemini/`, `settings.json` with comments, file-based auth (`oauth_creds.json`), the encrypted-storage switch, launching through node on Windows ([ADR 0013](adr/0013-gemini-provider.md)); registers its driver | — |
 | `provider/all` | imports every provider package so its driver is registered (`cli` imports this, never a provider package) | — |
 | `grid` | agent assignment (`--spread`), tmux sessions and pane tags (batched, race-safe) | git |
 | `worktree` | repo root, agent worktrees, gc classification, removal, lockfile detection | tmux |
