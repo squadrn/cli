@@ -27,9 +27,21 @@ type hookDef struct {
 	timeout                    int // milliseconds
 }
 
+// notifyName names squadrn's notification hooks. Gemini runs hooks synchronously, so they have a
+// short timeout, always exit 0 with nothing on stdout (a decision or exit 2 on AfterAgent would
+// make Gemini retry the turn) and leave desktop delivery to a background `hook deliver`. There is
+// no AfterTool hook: it would delay every tool call.
+const (
+	notifyName = "squadrn-notify"
+	notifyArgs = "notify --agent gemini"
+)
+
 // hookDefs are squadrn's hooks, the guard first.
 var hookDefs = []hookDef{
 	{"BeforeTool", "run_shell_command", guardName, "guard-git --no-ask --agent gemini", 5000},
+	{"BeforeAgent", "", notifyName, notifyArgs, 2000},
+	{"AfterAgent", "", notifyName, notifyArgs, 2000},
+	{"Notification", "", notifyName, notifyArgs, 2000},
 }
 
 // guardEntry is a guard hook entry: squadrn's entry point running guard-git.

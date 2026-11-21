@@ -70,6 +70,9 @@ type Spec struct {
 	// NoGitHooks: the CLI turns git hooks off in the shell commands it runs (Gemini sets
 	// core.hooksPath=""), so its sessions have no git pre-push layer.
 	NoGitHooks bool
+	// PaneTitleStates map the start of the terminal title the CLI sets to the agent's state, for
+	// `ps` when no hook reported one (Gemini: ui.dynamicWindowTitle).
+	PaneTitleStates map[string]string
 	// Credentials are an account's credential files relative to its state dir (none when the CLI
 	// keeps them elsewhere only); other accounts' profiles deny reading them.
 	Credentials []string
@@ -526,7 +529,9 @@ var Gemini = Spec{
 	// The guard is a BeforeTool hook squadrn writes into each account's settings.json.
 	GuardOff:   "turned off or changed (hooksConfig, matcher or command)",
 	NoGitHooks: true,
-	Caps:       Caps{Plugins: true, SharedMCP: true},
+	// Gemini titles its terminal "✋ Action Required", "⏲ Working…" or "◇ Ready".
+	PaneTitleStates: map[string]string{"✋": "input", "⏲": "working", "◇": "ready"},
+	Caps:            Caps{Plugins: true, SharedMCP: true},
 }
 
 var registry = []Spec{Claude, Codex, Gemini}

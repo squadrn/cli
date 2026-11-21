@@ -35,6 +35,7 @@ stdout '^✓ push guard: pre-tool hook$'
 grep '"matcher": "run_shell_command"' home/.gemini-work/.gemini/settings.json
 grep '"name": "squadrn-guard"' home/.gemini-work/.gemini/settings.json
 grep '"timeout": 5000' home/.gemini-work/.gemini/settings.json
+grep '"enableNotifications": false' home/.gemini-work/.gemini/settings.json
 grep '"command": "\\".*/plugin/bin/squadrn-hook\\" guard-git --no-ask --agent gemini"' home/.gemini-work/.gemini/settings.json
 exec squadrn account add gemini/work --no-login -y
 stdout '^✓ gemini/work is up to date$'
@@ -58,7 +59,7 @@ stdout '^0$'
 # The account's copy is plain JSON merged from main's: comments, MCP servers and squadrn's own
 # hook entries from main stay out; the user's other hooks, the auth type and the theme come along.
 ! grep '^ *//|/\*|mcpServers|/old/plugin' home/.gemini-work/.gemini/settings.json
-grep -count=1 'squadrn-hook' home/.gemini-work/.gemini/settings.json
+grep -count=4 'squadrn-hook' home/.gemini-work/.gemini/settings.json
 grep '"selectedType": "oauth-personal"' home/.gemini-work/.gemini/settings.json
 grep '"theme": "GitHub"' home/.gemini-work/.gemini/settings.json
 grep '"command": "my-linter"' home/.gemini-work/.gemini/settings.json
@@ -150,12 +151,45 @@ stdout '^✓ push guard: pre-tool hook$'
 ! exec squadrn doctor gemini/work
 stdout '✓ push guard hook installed$'
 
+# Notifications: BeforeAgent, AfterAgent and Notification hooks (2 s, no AfterTool), Gemini's own
+# notifications off while squadrn's are on. The hook prints nothing and exits 0: output or exit 2
+# on AfterAgent would make Gemini retry the turn.
+grep -count=3 '"name": "squadrn-notify"' home/.gemini-work/.gemini/settings.json
+grep -count=3 '"timeout": 2000' home/.gemini-work/.gemini/settings.json
+! grep 'AfterTool' home/.gemini-work/.gemini/settings.json
+env SQUADRN_TEST_NOTIFY=$WORK/sent.jsonl GEMINI_CLI_HOME=$WORK/home/.gemini-work
+stdin gemini-permission.json
+exec squadrn hook notify --agent gemini
+! stdout .
+grep '"title":"Gemini CLI · work · api","body":"Needs approval: run_shell_command","kind":"input","sound":true,"group":"g1"' sent.jsonl
+stdin gemini-before.json
+exec squadrn hook notify --agent gemini
+! stdout .
+stdin gemini-after.json
+exec squadrn hook notify --agent gemini
+! stdout .
+grep '"body":"Done","kind":"done","group":"g2"' sent.jsonl
+! grep 'secret plan' sent.jsonl
+env SQUADRN_TEST_NOTIFY= GEMINI_CLI_HOME=
+
+# ps falls back on the title Gemini gives its terminal when no hook reported a state.
+exec tmux new-session -d -s g -x 80 -y 24 sleep 60
+exec tmux set -p -t g @squadrn_acct gemini/work
+exec tmux set -p -t g @squadrn_name feat-g
+exec tmux select-pane -t g -T '✋ Action Required (api)'
+exec squadrn ps
+stdout '^gemini/work +feat-g +input +g %[0-9]+ '
+exec tmux select-pane -t g -T '◇  Ready (api)'
+exec squadrn ps
+stdout '^gemini/work +feat-g +ready '
+exec tmux kill-server
+
 # A session keeps the account's guard hook while settings follow main.
 exec squadrn gemini/work -p hi
-grep -count=1 'squadrn-hook' home/.gemini-work/.gemini/settings.json
+grep -count=4 'squadrn-hook' home/.gemini-work/.gemini/settings.json
 
 # The installed hook blocks a push with exit 2, Gemini's form.
-exec sh -c 'grep -o "[^\"]*/plugin/bin/squadrn-hook" home/.gemini-work/.gemini/settings.json > hookpath.txt'
+exec sh -c 'grep -o "[^\"]*/plugin/bin/squadrn-hook" home/.gemini-work/.gemini/settings.json | head -1 > hookpath.txt'
 stdin push-force.json
 ! exec sh -c '"$(cat hookpath.txt)" guard-git --no-ask --agent gemini'
 ! stdout .
@@ -163,7 +197,7 @@ stderr 'force push is not allowed'
 
 # Main's settings.json has comments: squadrn does not rewrite it and says what to add.
 ! exec squadrn account add gemini/main --no-login --no-usage -y
-stderr 'has comments squadrn does not rewrite: add these entries to its "hooks" yourself: \{"BeforeTool":'
+stderr 'has comments squadrn does not rewrite: add these entries to its "hooks" yourself: \{"AfterAgent":.*"BeforeTool":'
 cmp home/.gemini/settings.json main-settings.jsonc
 
 # Logout moves the login files to the trash.
@@ -249,3 +283,9 @@ echo v18.19.0
 {"security": {"auth": {"selectedType": "oauth-personal"}}}
 -- push-force.json --
 {"cwd":".","hook_event_name":"BeforeTool","tool_name":"run_shell_command","tool_input":{"command":"git push -f origin main","dir_path":"."}}
+-- gemini-permission.json --
+{"session_id":"g1","transcript_path":"/t","cwd":"/src/api","hook_event_name":"Notification","timestamp":"2026-11-21T10:00:00.000Z","notification_type":"ToolPermission","message":"Allow run_shell_command?","details":{"toolName":"run_shell_command"}}
+-- gemini-before.json --
+{"session_id":"g2","transcript_path":"/t","cwd":"/src/api","hook_event_name":"BeforeAgent","timestamp":"2026-11-21T10:00:00.000Z","prompt":"fix it"}
+-- gemini-after.json --
+{"session_id":"g2","transcript_path":"/t","cwd":"/src/api","hook_event_name":"AfterAgent","timestamp":"2026-11-21T10:00:05.000Z","prompt":"fix it","prompt_response":"secret plan","stop_hook_active":false}
