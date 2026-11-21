@@ -50,6 +50,11 @@ func (s style) collapsed(title, answer string) string {
 	}
 	n := width - 3 - visibleLen(title) - visibleLen(answer) - 2
 	if answer == "" || n < 2 {
+		if s.width > 0 && answer != "" {
+			// Too long for the screen: the title gives way, the answer stays visible.
+			short := style{g: s.g, width: max(s.width-3-visibleLen(answer)-1, 1)}
+			title = short.cut(title)
+		}
 		return s.line(s.paint(cGreen, s.g.Done), strings.TrimSpace(title+" "+s.paint(cDim, answer)))
 	}
 	return s.line(s.paint(cGreen, s.g.Done), title+" "+s.paint(cDim, strings.Repeat(s.g.Leader, n))+" "+s.paint(cDim, answer))

@@ -19,6 +19,7 @@ import (
 	"github.com/squadrn/squadrn-cli/internal/config"
 	"github.com/squadrn/squadrn-cli/internal/fsx"
 	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 )
 
 // addOptions are account add's flags; nil pointers mean "ask at a terminal, else no".
@@ -976,6 +977,21 @@ func (a *app) startCommand(acct account.Account) string {
 
 // askProfile lists spec's profiles with what each one does, then asks for one; Enter takes def.
 func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (string, error) {
+	if a.framed() {
+		var opts []prompt.Option
+		choice := 0
+		for i, p := range provider.ProfileNames {
+			opts = append(opts, prompt.Option{Label: p.Name, Detail: spec.ProfileSummary(p.Name)})
+			if p.Name == def {
+				choice = i
+			}
+		}
+		i, err := a.prompter().Select(prompt.Select{Title: "Profile", Options: opts, Default: choice})
+		if err != nil {
+			return "", standalone(err)
+		}
+		return provider.ProfileNames[i].Name, nil
+	}
 	for i, p := range provider.ProfileNames {
 		label := ""
 		if i == 0 {
@@ -1005,8 +1021,12 @@ func (a *app) askProfile(in *bufio.Reader, spec provider.Spec, def string) (stri
 	}
 }
 
-// askYes asks a [Y/n] question on one plan line; Enter is yes.
+// askYes asks a [Y/n] question on one plan line; Enter is yes. At a terminal that understands
+// ANSI it is a Confirm of the Prompter.
 func (a *app) askYes(in *bufio.Reader, label, question string) (bool, error) {
+	if a.framed() {
+		return a.confirmQ(label, question, true)
+	}
 	if question != "" {
 		question += " "
 	}
@@ -1028,6 +1048,9 @@ func (a *app) padding() string {
 
 // askNo is askYes for a question whose default is no.
 func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
+	if a.framed() {
+		return a.confirmQ(label, question, false)
+	}
 	a.errf("%s%-14s %s [y/N] ", a.padding(), label, question)
 	line, err := in.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -1035,6 +1058,31 @@ func (a *app) askNo(in *bufio.Reader, label, question string) (bool, error) {
 	}
 	s := strings.ToLower(strings.TrimSpace(line))
 	return s == "y" || s == "yes", nil
+}
+
+// framed reports whether questions are asked with the Prompter in place (a terminal that
+// understands ANSI) rather than as line prompts.
+func (a *app) framed() bool {
+	return a.prompt != nil || (a.interactive && a.ttyErr && os.Getenv("TERM") != "dumb")
+}
+
+// confirmQ asks label and question as one Confirm.
+func (a *app) confirmQ(label, question string, def bool) (bool, error) {
+	title := label
+	if question != "" {
+		title += ": " + question
+	}
+	yes, err := a.prompter().Confirm(prompt.Confirm{Title: strings.ToUpper(title[:1]) + title[1:], Default: def})
+	return yes, standalone(err)
+}
+
+// standalone is the error of a question asked on its own: going back has nowhere to go, so it
+// cancels.
+func standalone(err error) error {
+	if errors.Is(err, prompt.ErrBack) {
+		return prompt.ErrCancelled
+	}
+	return err
 }
 
 func profileList() string {

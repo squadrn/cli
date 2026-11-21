@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 	"github.com/squadrn/squadrn-cli/internal/account"
 	"github.com/squadrn/squadrn-cli/internal/config"
 	"github.com/squadrn/squadrn-cli/internal/provider"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 )
 
 func (a *app) setupCmd() *cobra.Command {
@@ -93,6 +95,12 @@ func (a *app) setup(yes bool) error {
 		return nil
 	}
 	in := bufio.NewReader(a.stdin)
+	if !a.framed() {
+		// The wizard's line prompts read the same input as setup's questions.
+		stdin := a.stdin
+		a.stdin = in
+		defer func() { a.stdin = stdin }()
+	}
 	ok, mark := a.paint(a.colorOut, "32", "✓"), a.paint(a.colorOut, "2", "–")
 	// Questions and the output of the commands setup runs are indented like its steps' lines.
 	a.pad = setupIndent
@@ -121,7 +129,7 @@ func (a *app) setup(yes bool) error {
 		for i, d := range found {
 			ids[i] = d.spec.ID
 		}
-		answer, err := a.askLine(in, "default provider", strings.Join(ids, " / "), a.store.DefaultProvider)
+		answer, err := a.askChoice(in, "default provider", ids, a.store.DefaultProvider)
 		if err != nil {
 			return err
 		}
@@ -178,7 +186,11 @@ func (a *app) setup(yes bool) error {
 	}
 	for _, acct := range un {
 		adopt := false
-		if ask {
+		if ask && a.framed() {
+			if adopt, err = a.confirmQ("adopt", a.tilde(acct.Dir)+" as "+acct.Label()+"? (another tool may own it)", false); err != nil {
+				return err
+			}
+		} else if ask {
 			a.errf("   adopt %s as %s? (another tool may own it) [y/N] ", a.tilde(acct.Dir), acct.Label())
 			line, err := in.ReadString('\n')
 			if err != nil && !errors.Is(err, io.EOF) {
@@ -197,7 +209,12 @@ func (a *app) setup(yes bool) error {
 		}
 	}
 
-	a.out("4. usage tracking\n")
+	a.out("4. new accounts\n")
+	if err := a.setupAccounts(in, ask, mark); err != nil {
+		return err
+	}
+
+	a.out("5. usage tracking\n")
 	accts, _ = a.store.List()
 	var untracked []account.Account
 	for _, acct := range accts {
@@ -233,12 +250,66 @@ func (a *app) setup(yes bool) error {
 		}
 	}
 
-	a.out("5. doctor\n")
+	a.out("6. doctor\n")
 	if err := a.indented(func() error { return a.runDoctor("") }); err != nil && !errors.Is(err, errQuiet) {
 		return err
 	}
 	a.nextSteps()
 	return nil
+}
+
+// setupAccounts offers the account wizard, then "Add another account?" until the answer is no.
+// A cancelled wizard adds nothing and setup goes on.
+func (a *app) setupAccounts(in *bufio.Reader, ask bool, mark string) error {
+	if !ask {
+		a.out("   %s skipped (later: %s account add)\n", mark, a.cmd)
+		return nil
+	}
+	accts, _ := a.store.List()
+	first := !slices.ContainsFunc(accts, func(x account.Account) bool { return !x.IsMain() })
+	question, def := "Add an account?", first
+	for {
+		var add bool
+		var err error
+		if def {
+			add, err = a.askYes(in, "accounts", question)
+		} else {
+			add, err = a.askNo(in, "accounts", question)
+		}
+		if err != nil {
+			return err
+		}
+		if !add {
+			if question == "Add an account?" {
+				a.out("   %s skipped (later: %s account add)\n", mark, a.cmd)
+			}
+			return nil
+		}
+		if _, err := a.runWizard(addOptions{}); err != nil && !errors.Is(err, prompt.ErrCancelled) && !errors.Is(err, errQuiet) {
+			a.warnf("%v", err)
+		}
+		question, def = "Add another account?", false
+	}
+}
+
+// askChoice asks for one of choices: a Select at a terminal that understands ANSI, else a line.
+func (a *app) askChoice(in *bufio.Reader, label string, choices []string, def string) (string, error) {
+	if !a.framed() {
+		return a.askLine(in, label, strings.Join(choices, " / "), def)
+	}
+	opts := make([]prompt.Option, len(choices))
+	choice := 0
+	for i, c := range choices {
+		opts[i] = prompt.Option{Label: c}
+		if c == def {
+			choice = i
+		}
+	}
+	i, err := a.prompter().Select(prompt.Select{Title: strings.ToUpper(label[:1]) + label[1:], Options: opts, Default: choice})
+	if err != nil {
+		return "", standalone(err)
+	}
+	return choices[i], nil
 }
 
 // askLine asks a free-form question with a default on one plan line.

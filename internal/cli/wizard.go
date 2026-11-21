@@ -75,8 +75,15 @@ func (a *app) addWizard(o addOptions) error {
 	if !a.interactive || o.yes || o.json {
 		return usagef("name the account: %s account add [<provider>/]<name> (the guided setup needs a terminal)", a.cmd)
 	}
+	_, err := a.runWizard(o)
+	return err
+}
+
+// runWizard runs the wizard at this terminal and returns the plan it applied.
+func (a *app) runWizard(o addOptions) (*addPlan, error) {
 	w := &wizard{a: a, p: a.prompter(), o: o, start: time.Now()}
-	return w.run()
+	err := w.run()
+	return w.plan, err
 }
 
 func (w *wizard) run() error {

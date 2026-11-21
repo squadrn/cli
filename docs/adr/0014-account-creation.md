@@ -1,6 +1,6 @@
 # 0014 — Account creation: guided `account add`, `repair`, `default`
 
-Status: proposed
+Status: accepted (implemented in #55, #56, #59, #60 and the setup PR; see Implementation notes)
 
 ## Context
 
@@ -260,3 +260,18 @@ Where the implementation differs from the decision above, and why:
   account picker; without one the picker stays. `wt`, `grid` and `usage` without an account keep
   using the default provider's main account.
 - `--relink` moved from `add` to `repair` (only an existing account has copies to relink).
+- The terminal code uses `github.com/charmbracelet/x/term` (already a dependency, which the picker
+  used) rather than `golang.org/x/term`; still no new dependency.
+- "Ready in Ns" counts from the review's Yes: the time squadrn spent applying and verifying,
+  without the questions and the login.
+- In the wizard, Recommended applies every default of the Customize questions, including "Make it
+  the default account" for the provider's first account.
+- Adopting (2b), repairing (2a) and setting up main (2c) skip the Setup questions: an adopted dir
+  keeps its own settings (no profile unless `--profile`), a repair keeps the account's.
+- A question asked on its own (outside the wizard) has nowhere to go back to, so Esc cancels it.
+- `--dry-run` in the wizard stops after the review and prints the command without questions.
+- The `--json` result also has `dryRun: true` for a dry run; errors carry `fix` only when there is a
+  command that fixes them.
+- `setup` asks "Add an account?" (default yes when there is no account besides main), runs the
+  wizard, then asks "Add another account?" (default no). A cancelled wizard adds nothing and setup
+  goes on. The account picker's "+ add a new account" runs the wizard and starts the new account.
