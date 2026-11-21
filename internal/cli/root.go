@@ -141,6 +141,9 @@ func run(args []string, cfg config.Config, cfgErr error) error {
 	}
 	a.signers = buildSigners()
 	root := a.rootCmd()
+	if len(args) > 0 && (args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd) {
+		return a.complete(args[0], args[1:])
+	}
 	r, err := parseRoute(args, a.routeTable())
 	if err != nil {
 		return err

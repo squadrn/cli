@@ -1,0 +1,94 @@
+[windows] skip 'Unix script: sh stub agents'
+# Tab completion goes through squadrn's router: accounts by their shortest name first, then
+# subcommands; after an account, what can follow it. It never runs an agent CLI: stub agents
+# that leave a mark and fail stand first on PATH.
+cp stub bin/claude
+cp stub bin/codex
+chmod 755 bin/claude
+chmod 755 bin/codex
+mkdir home/.claude-personal home/.claude-work home/.codex-work home/.codex
+cp empty home/.claude-personal/.squadrn-account
+cp empty home/.claude-work/.squadrn-account
+cp empty home/.codex-work/.squadrn-account
+
+# First word: accounts (bare name when it names only that account), then
+# subcommands, in that order (KeepOrder + NoFileComp = 36).
+exec squadrn __complete ''
+stdout '\Amain\tclaude/main\npersonal\tclaude/personal\nclaude/work\tClaude Code\ncodex/main\tCodex CLI\ncodex/work\tCodex CLI\naccount\t'
+stdout '^wt\tRun the agent'
+stdout '^help\t'
+stdout '^:36$'
+! stdout '^__complete'
+
+# A prefix filters; one no bare name matches is matched against provider/name.
+exec squadrn __complete per
+cmp stdout per.out
+exec squadrn __complete wo
+stdout '\A:36\n\z'
+exec squadrn __complete co
+stdout '\Acodex/main\tCodex CLI\ncodex/work\tCodex CLI\ncompletion\t'
+exec squadrn __completeNoDesc cl
+cmp stdout cl.out
+
+# After an account: the subcommands that run as one, then the agent's own subcommands.
+exec squadrn __complete personal ''
+stdout '\Agrid\t.*\nwt\t.*\nagents\tClaude Code subcommand\n'
+stdout '^mcp\tClaude Code subcommand$'
+! stdout '^(account|doctor\t[^C]|help|personal)'
+exec squadrn __complete codex/work ''
+stdout '^exec\tCodex CLI subcommand$'
+! stdout '^setup-token\t'
+exec squadrn __complete -C . --no-color claude/personal --no-color m
+cmp stdout m.out
+
+# Then cobra completes the subcommand as usual.
+exec squadrn __complete personal wt ''
+stdout '^ls\t'
+stdout '^:4$'
+exec squadrn __complete -a personal wt ''
+stdout '^ls\t'
+
+# Values of the global flags: accounts for -a, directories for -C.
+exec squadrn __complete -a ''
+stdout '\Amain\tclaude/main\npersonal\t'
+stdout '^:36$'
+exec squadrn __complete --account per
+stdout '\Apersonal\tclaude/personal\n:36\n'
+exec squadrn __complete -C ''
+stdout '\A:16\n'
+exec squadrn __complete personal --dir ''
+stdout '\A:16\n'
+
+# Flags, prompts and the agent's own words.
+exec squadrn __complete --
+stdout '^--account\t'
+exec squadrn __complete personal -- ''
+stdout '\A:4\n'
+exec squadrn __complete personal mcp ''
+stdout '\A:0\n'
+exec squadrn __complete -p ''
+stdout '\A:0\n'
+exec squadrn __complete typo ''
+stdout '\A:4\n'
+exec squadrn __complete personal -a work ''
+stdout '\A:4\n'
+
+! exists agent-called
+
+-- stub --
+#!/bin/sh
+touch "$HOME/../agent-called"
+exit 1
+-- empty --
+-- per.out --
+personal	claude/personal
+:36
+-- cl.out --
+claude/main
+claude/personal
+claude/work
+:36
+-- m.out --
+mcp	Claude Code subcommand
+migrate-installer	Claude Code subcommand
+:36
