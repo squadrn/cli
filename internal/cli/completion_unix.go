@@ -299,3 +299,8 @@ func (a *app) completionCheck() (doctor.Check, bool) {
 
 // completionShells are the shells completion install and uninstall take.
 var completionShells = completion.Shells
+
+// generatedCompletion recognises a cobra completion script for name (ours, not the user's).
+func generatedCompletion(b []byte, name string) bool {
+	return bytes.Contains(b, []byte(name)) && bytes.Contains(b, []byte("__complete"))
+}

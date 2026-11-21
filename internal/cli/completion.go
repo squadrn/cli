@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -66,11 +65,6 @@ func (a *app) names() []string {
 // powerShellCompletionPath holds the PowerShell completion script for every command name.
 func (a *app) powerShellCompletionPath() string {
 	return filepath.Join(a.layout.DataDir, "completion.ps1")
-}
-
-// generatedCompletion recognises a cobra completion script for name (ours, not the user's).
-func generatedCompletion(b []byte, name string) bool {
-	return bytes.Contains(b, []byte(name)) && bytes.Contains(b, []byte("__complete"))
 }
 
 func (a *app) completionInstallCmd() *cobra.Command {
