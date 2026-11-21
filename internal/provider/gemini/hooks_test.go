@@ -73,7 +73,7 @@ func TestGuardInstaller(t *testing.T) {
 		t.Fatalf("install: %v %v", changed, err)
 	}
 	b, _ := os.ReadFile(path)
-	if strings.Count(string(b), "squadrn-hook") != 1 || strings.Contains(string(b), "/old/") || !strings.Contains(string(b), `"lint"`) || !strings.Contains(string(b), `"theme": "x"`) {
+	if strings.Count(string(b), hookDefs[0].args) != 1 || strings.Contains(string(b), "/old/") || !strings.Contains(string(b), `"lint"`) || !strings.Contains(string(b), `"theme": "x"`) {
 		t.Fatalf("settings = %s", b)
 	}
 	if inst, en, err := c.PluginState(ctx, acct); !inst || !en || err != nil {
