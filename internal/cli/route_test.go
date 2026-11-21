@@ -8,7 +8,7 @@ import (
 
 	"github.com/squadrn/squadrn-cli/internal/account"
 	"github.com/squadrn/squadrn-cli/internal/install"
-	"github.com/squadrn/squadrn-cli/internal/ui"
+	"github.com/squadrn/squadrn-cli/internal/ui/prompt"
 )
 
 func table(interactive bool) routeTable {
@@ -109,7 +109,7 @@ func TestExitCodes(t *testing.T) {
 	for err, want := range map[error]int{
 		nil:                  exitOK,
 		usagef("x"):          exitUsage,
-		ui.ErrCancelled:      exitCancelled,
+		prompt.ErrCancelled:  exitCancelled,
 		errAborted:           exitError,
 		childExit{code: 3}:   3,
 		account.ErrReserved:  exitUsage,
