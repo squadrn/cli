@@ -1,4 +1,4 @@
-package ui
+package prompt
 
 import "unicode/utf8"
 
@@ -8,14 +8,18 @@ const (
 	keyNone keyKind = iota
 	keyRune
 	keyEnter
+	keyEsc
 	keyCancel
 	keyUp
 	keyDown
+	keyLeft
+	keyRight
 	keyHome
 	keyEnd
 	keyPgUp
 	keyPgDown
 	keyBackspace
+	keyClear
 )
 
 type key struct {
@@ -24,7 +28,7 @@ type key struct {
 }
 
 // decodeKeys turns raw-mode terminal input into keys. In raw mode Enter is CR, so LF is ctrl-j.
-// Escape sequences arrive in one read; a lone ESC is a cancel.
+// Escape sequences arrive in one read; a lone ESC is keyEsc, ctrl-c and ctrl-d are keyCancel.
 func decodeKeys(b []byte) []key {
 	var keys []key
 	for i := 0; i < len(b); {
@@ -43,7 +47,9 @@ func decodeKeys(b []byte) []key {
 			}
 			i = j + 1
 			continue
-		case c == 0x1b, c == 0x03: // esc, ctrl-c
+		case c == 0x1b:
+			keys = append(keys, key{kind: keyEsc})
+		case c == 0x03, c == 0x04: // ctrl-c, ctrl-d
 			keys = append(keys, key{kind: keyCancel})
 		case c == '\r':
 			keys = append(keys, key{kind: keyEnter})
@@ -51,6 +57,8 @@ func decodeKeys(b []byte) []key {
 			keys = append(keys, key{kind: keyDown})
 		case c == 0x0b, c == 0x10: // ctrl-k, ctrl-p
 			keys = append(keys, key{kind: keyUp})
+		case c == 0x15: // ctrl-u
+			keys = append(keys, key{kind: keyClear})
 		case c == 0x7f, c == 0x08:
 			keys = append(keys, key{kind: keyBackspace})
 		case c < 0x20:
@@ -73,6 +81,10 @@ func csiKey(params string, final byte) keyKind {
 		return keyUp
 	case 'B':
 		return keyDown
+	case 'C':
+		return keyRight
+	case 'D':
+		return keyLeft
 	case 'H':
 		return keyHome
 	case 'F':

@@ -1,4 +1,4 @@
-package ui
+package prompt
 
 import (
 	"bytes"
@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 )
 
 func items() []Item {
@@ -21,16 +19,18 @@ func items() []Item {
 }
 
 // press feeds raw terminal input to the picker.
-func press(m picker, input ...string) picker {
+func press(m pickModel, input ...string) pickModel {
 	for _, in := range input {
 		for _, k := range decodeKeys([]byte(in)) {
-			if m.update(k) {
+			if m.update(k) != running {
 				return m
 			}
 		}
 	}
 	return m
 }
+
+var plain = style{g: Unicode}
 
 const (
 	down  = "\x1b[B"
@@ -69,7 +69,7 @@ func TestPickerFiltersAndMapsBackToItemIndex(t *testing.T) {
 
 func TestPickerBackspaceAndNoMatch(t *testing.T) {
 	m := press(newPicker("›", items()), "zz")
-	if len(m.visible()) != 0 || !strings.Contains(m.view(), "no match") {
+	if len(m.visible()) != 0 || !strings.Contains(m.view(plain), "no match") {
 		t.Fatal("expected no match")
 	}
 	m = press(m, enter)
@@ -91,7 +91,7 @@ func TestPickerCancels(t *testing.T) {
 }
 
 func TestPickerView(t *testing.T) {
-	v := newPicker("›", items()).view()
+	v := newPicker("›", items()).view(plain)
 	for _, want := range []string{"claude/main", "a@example.com", "not logged in", "+ add a new account"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q:\n%s", want, v)
@@ -100,10 +100,9 @@ func TestPickerView(t *testing.T) {
 	if strings.Contains(v, "\033[") {
 		t.Error("colors without color")
 	}
-	m := newPicker("›", items())
-	m.color = true
-	if !strings.Contains(m.view(), "\033[1;94m▌ ") {
-		t.Errorf("colored cursor missing:\n%q", m.view())
+	colored := style{g: Unicode, color: true}
+	if m := newPicker("›", items()); !strings.Contains(m.view(colored), "\033[1;94m▌ ") {
+		t.Errorf("colored cursor missing:\n%q", m.view(colored))
 	}
 }
 
@@ -113,13 +112,13 @@ func TestPickerScrollsInSmallTerminal(t *testing.T) {
 		many[i] = Item{Label: fmt.Sprintf("claude/a%02d", i), Active: true}
 	}
 	m := newPicker("›", many)
-	m.height = 8
-	if strings.Contains(m.view(), "claude/a10") || !strings.Contains(m.view(), "15 more") {
-		t.Fatalf("view does not fit:\n%s", m.view())
+	m.setHeight(8)
+	if strings.Contains(m.view(plain), "claude/a10") || !strings.Contains(m.view(plain), "15 more") {
+		t.Fatalf("view does not fit:\n%s", m.view(plain))
 	}
 	m = press(m, "\x1b[F")
-	if !strings.Contains(m.view(), "claude/a19") || m.offset != 15 {
-		t.Fatalf("end not scrolled into view (offset %d):\n%s", m.offset, m.view())
+	if !strings.Contains(m.view(plain), "claude/a19") || m.offset != 15 {
+		t.Fatalf("end not scrolled into view (offset %d):\n%s", m.offset, m.view(plain))
 	}
 	m = press(m, "\x1b[5~", "\x1b[H", "\n")
 	if m.cursor != 1 || m.offset != 0 {
@@ -181,21 +180,3 @@ func TestPick(t *testing.T) {
 type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, errors.New("broken tty") }
-
-func TestSpin(t *testing.T) {
-	var b strings.Builder
-	var mu sync.Mutex
-	stop := Spin(writerFunc(func(p []byte) (int, error) { mu.Lock(); defer mu.Unlock(); return b.Write(p) }), "checking")
-	time.Sleep(100 * time.Millisecond)
-	stop()
-	stop()
-	mu.Lock()
-	defer mu.Unlock()
-	if !strings.Contains(b.String(), "checking") || !strings.HasSuffix(b.String(), "\r\033[K") {
-		t.Fatalf("spinner output %q", b.String())
-	}
-}
-
-type writerFunc func([]byte) (int, error)
-
-func (f writerFunc) Write(p []byte) (int, error) { return f(p) }

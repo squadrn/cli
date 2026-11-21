@@ -1,0 +1,47 @@
+┌  New account
+│
+◆  Provider
+│  1) Claude Code  2.1.0    3 accounts
+│  2) Codex CLI    0.171.0  new
+│  3) Gemini CLI            not installed · npm install -g @google/gemini-cli
+│  1-3 [2]: │  Gemini CLI cannot be chosen: not installed · npm install -g @google/gemini-cli
+│  1-3 [2]: │  no choice "x"
+│  1-3 [2]: │
+◆  Options
+│  1) privacy
+│  2) no-attribution
+│  numbers or names, comma separated, - for none [none]: │
+◆  Account name
+│  (e.g. work): │  letters, digits and - only
+│  (e.g. work): │  "work" is also claude/work: start it with srn codex/work
+│
+◆  Review
+│  account   codex/work → ~/.codex-work (private)
+│  profile   standard
+│  Create codex/work? [Y/n] │  answer y or n
+│  Create codex/work? [Y/n] │
+◆  Log in now? [Y/n] │
+◆  Options
+│  1) privacy
+│  2) no-attribution
+│  numbers or names, comma separated, - for none [2]: │
+◆  Options
+│  1) privacy
+│  2) no-attribution
+│  numbers or names, comma separated, - for none [2]: │
+◆  Alias
+│  [sx]: │
+◆  Sure? [y/N] │
+◇  Created
+│  x
+│
+│  line
+▲  careful
+│
+└  done
+■  gone
+◆  again
+│  1) Claude Code  2.1.0    3 accounts
+│  2) Codex CLI    0.171.0  new
+│  3) Gemini CLI            not installed · npm install -g @google/gemini-cli
+│  1-3 [1]: 
