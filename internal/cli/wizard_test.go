@@ -333,3 +333,56 @@ func TestWizardWithoutATerminalOrCLI(t *testing.T) {
 		t.Fatal("a dry run wrote the config")
 	}
 }
+
+// At a terminal that understands ANSI the remaining line questions are Prompter questions.
+func TestFramedQuestions(t *testing.T) {
+	a, s := wizApp(t, "claude")
+	s.Answers = []any{false, true, "strict", "codex", prompt.ErrBack}
+	if yes, err := a.askYes(nil, "usage limits", "track for claude/work?"); err != nil || yes {
+		t.Fatalf("askYes %v %v", yes, err)
+	}
+	if yes, err := a.askNo(nil, "relink", "move x aside?"); err != nil || !yes {
+		t.Fatalf("askNo %v %v", yes, err)
+	}
+	if p, err := a.askProfile(nil, provider.Claude, "standard"); err != nil || p != "strict" {
+		t.Fatalf("askProfile %q %v", p, err)
+	}
+	if c, err := a.askChoice(nil, "default provider", []string{"claude", "codex"}, "claude"); err != nil || c != "codex" {
+		t.Fatalf("askChoice %q %v", c, err)
+	}
+	if _, err := a.askYes(nil, "log in now?", ""); !errors.Is(err, prompt.ErrCancelled) {
+		t.Fatalf("esc on a question asked on its own cancels: %v", err)
+	}
+	if _, err := a.askProfile(nil, provider.Claude, "standard"); !errors.Is(err, prompt.ErrCancelled) {
+		t.Fatalf("no answer: %v", err)
+	}
+	if _, err := a.askChoice(nil, "default provider", []string{"claude"}, "claude"); !errors.Is(err, prompt.ErrCancelled) {
+		t.Fatalf("no answer: %v", err)
+	}
+	if got := strings.Join(s.Asked, ","); got != "Usage limits: track for claude/work?,Relink: move x aside?,Profile,Default provider,Log in now?,Profile,Default provider" {
+		t.Fatalf("asked %s", got)
+	}
+}
+
+// setup offers the wizard, then another account, until the answer is no.
+func TestSetupAccounts(t *testing.T) {
+	a, s := wizApp(t, "claude")
+	s.Answers = []any{true, "one", "Recommended", true, false, true, "two", "Recommended", true, false, false}
+	if err := a.setupAccounts(nil, true, "-"); err != nil {
+		t.Fatal(err)
+	}
+	if !fsx.IsDir(a.dir(".claude-one")) || !fsx.IsDir(a.dir(".claude-two")) {
+		t.Fatal("setup did not add both accounts")
+	}
+	if !strings.Contains(strings.Join(s.Asked, ","), "Accounts: Add another account?") {
+		t.Fatalf("asked %v", s.Asked)
+	}
+	a, s = wizApp(t, "claude")
+	s.Answers = []any{true, prompt.ErrCancelled, false}
+	if err := a.setupAccounts(nil, true, "-"); err != nil {
+		t.Fatalf("a cancelled wizard does not stop setup: %v", err)
+	}
+	if err := a.setupAccounts(nil, false, "-"); err != nil {
+		t.Fatal(err)
+	}
+}

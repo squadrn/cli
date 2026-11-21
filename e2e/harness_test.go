@@ -448,21 +448,6 @@ func (s *sandbox) srn(t *testing.T, args ...string) *result {
 	return s.run(t, opt{}, "srn", args...)
 }
 
-// srnTTY runs srn at a pseudo terminal through script(1), typing stdin; stdout holds everything
-// the terminal showed (both streams and the echoed answers). Unix only.
-func (s *sandbox) srnTTY(t *testing.T, stdin string, args ...string) *result {
-	t.Helper()
-	srn := s.lookPath("srn")
-	if runtime.GOOS == "darwin" {
-		return s.run(t, opt{stdin: stdin, open: true}, "script", append([]string{"-q", "/dev/null", srn}, args...)...)
-	}
-	line := srn
-	for _, a := range args {
-		line += " '" + a + "'"
-	}
-	return s.run(t, opt{stdin: stdin, open: true, env: []string{"SHELL=/bin/sh"}}, "script", "-qec", line, "/dev/null")
-}
-
 // srnKeys runs srn at a pseudo terminal through script(1) in a UTF-8 locale, typing each key
 // step once the screen shows what it waits for. Unix only.
 func (s *sandbox) srnKeys(t *testing.T, keys []keystep, args ...string) *result {

@@ -74,9 +74,10 @@ func testInstall(t *testing.T, s *sandbox) {
 	testSetupTTY(t, s)
 }
 
-// testSetupTTY answers srn setup at a pseudo terminal: claude as the default provider (Codex is
-// on PATH too), strict as the default profile, the self-protection rules, the other tool's dir
-// and usage tracking skipped. The sandbox is put back for the later sections.
+// testSetupTTY answers srn setup at a pseudo terminal, where its questions are drawn in place
+// (ADR 0014): claude as the default provider (Codex is on PATH too), strict as the default profile,
+// the self-protection rules, the other tool's dir, a new account and usage tracking skipped. The
+// sandbox is put back for the later sections.
 func testSetupTTY(t *testing.T, s *sandbox) {
 	if runtime.GOOS == "windows" {
 		t.Log("srn setup at a terminal: skipped on Windows (no script(1))")
@@ -86,18 +87,24 @@ func testSetupTTY(t *testing.T, s *sandbox) {
 	if err := os.Mkdir(old, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	s.srnTTY(t, "\nstrict\nn\nn\nn\n", "setup").exit(0).out(
-		`^1\. agent CLIs$`,
-		`default provider claude / codex / gemini \[claude\]: `,
-		`strict +sandboxed, reads limited to the project`,
-		`profile +minimal / standard / strict \[standard\]: `,
-		`✓ new accounts get the strict profile$`,
-		`deny agents edits of squadrn's files in ~/\.claude/settings\.json\? \[Y/n\] `,
-		`adopt ~/\.claude-old as claude/old\? \(another tool may own it\) \[y/N\] `,
+	s.srnKeys(t, []keystep{
+		{`◆  Default provider`, "\r"},
+		{`◆  Profile`, "j\r"},
+		{`◆  Protect: deny agents edits`, "n"},
+		{`◆  Adopt: ~/\.claude-old as claude/old\?`, "n"},
+		{`◆  Accounts: Add an account\?`, "n"},
+		{`◆  Track: usage limits for claude/main\?`, "n"},
+	}, "setup").exit(0).out(
+		`^1\. agent CLIs`,
+		`◇  Default provider ·+ claude`,
+		`◇  Profile ·+ strict`,
+		`✓ new accounts get the strict profile`,
+		`– skipped \(later: srn doctor shows the rules to add\)`,
 		`– skipped ~/\.claude-old \(later: srn account add claude/old --adopt\)`,
-		`usage limits for claude/main\? \[Y/n\] `,
+		`^4\. new accounts`,
+		`– skipped \(later: srn account add\)`,
 		`– skipped \(later: srn usage setup --all\)`,
-		`^5\. doctor$`,
+		`^6\. doctor`,
 		`^next: srn account add <name>`)
 	s.srn(t, "config", "get", "default_profile").exit(0).out(`^strict$`)
 	s.check(t, !s.exists(filepath.Join(old, ".squadrn-account")), "setup adopted ~/.claude-old although the answer was no")
@@ -530,7 +537,7 @@ func testDoctor(t *testing.T, s *sandbox) {
 	s.srn(t, "doctor", "codex/work").exit(0).out(`^account codex/work$`, `✓ push guard hook installed and trusted`).noOut(`^account claude/`)
 	s.srn(t, "doctor", "ghost").exit(1)
 	s.srn(t, "doctor", "work", "extra").exit(2)
-	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ Codex CLI 0\.171\.0 `, `^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^5\. doctor$`, `^next: srn account add <name>`)
+	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ Codex CLI 0\.171\.0 `, `^   profile +standard`, `^   ✓ nothing to adopt$`, `^   ✓ usage tracking on: claude/main$`, `^6\. doctor$`, `^next: srn account add <name>`)
 	s.srn(t, "setup", "-y").exit(0).out(`^   ✓ on for every account that reports usage$`).noOut(`new accounts get`)
 }
 

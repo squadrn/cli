@@ -756,6 +756,13 @@ func (a *app) pick() error {
 }
 
 func (a *app) addInteractively() error {
+	if a.framed() {
+		p, err := a.runWizard(addOptions{})
+		if err != nil {
+			return err
+		}
+		return a.session(p.ag, p.acct, nil, "")
+	}
 	a.errf("New account (name or provider/name, e.g. work): ")
 	line, err := bufio.NewReader(a.stdin).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
