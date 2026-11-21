@@ -256,6 +256,44 @@ func TestDiagnose(t *testing.T) {
 	}
 }
 
+func TestConsumerLogin(t *testing.T) {
+	state := t.TempDir()
+	settings := filepath.Join(state, "settings.json")
+	env := func(kv ...string) func(string) string {
+		return func(k string) string {
+			for i := 0; i+1 < len(kv); i += 2 {
+				if kv[i] == k {
+					return kv[i+1]
+				}
+			}
+			return ""
+		}
+	}
+	if _, ok := consumerLogin(state, env()); ok {
+		t.Error("no settings: warned")
+	}
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(settings, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"security": {"auth": {"selectedType": "gemini-api-key"}}}`)
+	if _, ok := consumerLogin(state, env()); ok {
+		t.Error("API key: warned")
+	}
+	write("{\n  // Google login\n  \"security\": {\"auth\": {\"selectedType\": \"oauth-personal\"}}\n}")
+	n, ok := consumerLogin(state, env())
+	if !ok || !n.Warn || !strings.Contains(n.Text, "2026-06-18") || !strings.Contains(n.Fix, "agy") {
+		t.Errorf("Google login without a project = %+v, %v", n, ok)
+	}
+	for _, k := range []string{"GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT_ID"} {
+		if _, ok := consumerLogin(state, env(k, "acme")); ok {
+			t.Errorf("%s set: warned", k)
+		}
+	}
+}
+
 func TestCheckCredentials(t *testing.T) {
 	dir := t.TempDir()
 	c := CLI{Home: t.TempDir()}

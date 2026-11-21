@@ -7,8 +7,9 @@ Squadrn — command `srn` (also `squadrn`).
 Run many coding agents in parallel on one machine — across several accounts and isolated git
 worktrees — with a guard that stops agents from force-pushing or pushing to protected branches.
 
-Providers: Claude Code and OpenAI Codex CLI (`claude/…`, `codex/…` accounts); the account model
-is ready for more.
+Providers: Claude Code, OpenAI Codex CLI and Gemini CLI (`claude/…`, `codex/…`, `gemini/…`
+accounts). Gemini CLI serves Code Assist Standard/Enterprise licenses and paid API or Vertex AI
+keys only: Google refuses it for personal accounts, Google AI Pro and Ultra since 2026-06-18.
 Platforms: macOS and Linux (amd64, arm64); Windows 10 21H2+/11 (amd64, arm64) in beta, without
 `grid` (ADR 0008).
 
@@ -236,6 +237,16 @@ Codex profiles map to `config.toml`: `minimal` keeps credentials per account and
 environment variables out of commands; `standard` (default) adds a workspace-write sandbox without
 network that asks before leaving it; `strict` makes the workspace **read-only** — use it for
 review-only accounts, and `standard` for daily work.
+
+Gemini CLI accounts (`gemini/<name>`, [ADR 0013](docs/adr/0013-gemini-provider.md)) are
+`GEMINI_CLI_HOME` dirs: `gemini/work` is `~/.gemini-work`, with Gemini's files in its `.gemini/`.
+**Since 2026-06-18 Google refuses Gemini CLI for personal Google accounts, Google AI Pro and
+Ultra** ("This client is no longer supported for Gemini Code Assist for individuals"; upgrading
+the CLI does not help). It still works with a Gemini Code Assist Standard or Enterprise license
+(Login with Google and `GOOGLE_CLOUD_PROJECT`), a paid Gemini API key or Vertex AI. Personal
+accounts belong in Google's Antigravity CLI (`agy`), which squadrn does not drive yet. `doctor`
+warns about a Gemini account that signs in with Google without `GOOGLE_CLOUD_PROJECT`, and about
+the missing layer-2 guard: Gemini turns git hooks off in the commands it runs.
 
 ## Usage limits
 

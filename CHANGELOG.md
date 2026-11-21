@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Gemini CLI and personal accounts:** since 2026-06-18 Google refuses Gemini CLI for personal
+  Google accounts, Google AI Pro and Ultra (*"This client is no longer supported for Gemini Code
+  Assist for individuals"*); it serves Code Assist Standard and Enterprise licenses, paid API keys
+  and Vertex AI. `account login`/`add` for a Gemini account say so before the login, and `doctor`
+  warns about an account that signs in with Google without `GOOGLE_CLOUD_PROJECT`, pointing
+  personal accounts to Antigravity CLI (`agy`). README and ADR 0013 record the scope.
 - **Tab completion through the router:** `srn <Tab>` offers accounts by their short names first
   (`personal`, `main`; `provider/name` when ambiguous), described with the login last cached, then
   commands. After an account it offers `wt`, `grid` and the agent CLI's own subcommands

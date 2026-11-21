@@ -190,6 +190,31 @@ hand). `srn wt ls` lists the default provider's worktree dir only.
 - Windows launch uses `node <package>/bundle/gemini.js`, not `gemini.cmd`, which `cmd.exe`
   would re-parse (quotes in prompts), as for Codex's `.cmd`.
 
+### 10. Addendum (2026-11-21): consumer accounts are refused
+
+This ADR missed that Google stopped serving Gemini CLI to consumer accounts on **2026-06-18**
+(announced 2026-05-19, "Transitioning Gemini CLI to Antigravity CLI", Google Developers Blog;
+deprecation page developers.google.com/gemini-code-assist/docs/deprecations/code-assist-individuals).
+The 0.70.0 bundled docs, which the facts above relied on, still describe the free tier.
+
+- Login with Google for a personal account, Google AI Pro or Ultra fails with *"This client is no
+  longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate
+  to the Antigravity suite of products"*. The server returns it (`UNSUPPORTED_CLIENT`); the CLI
+  only wraps it (`Failed to sign in. Message: …`), so no CLI version helps.
+- Gemini CLI still serves Code Assist Standard and Enterprise licenses (Login with Google plus
+  `GOOGLE_CLOUD_PROJECT`), paid Gemini API keys and Vertex AI. Its README now reads "Enterprise
+  Code Assist only". Code Assist Standard/Enterprise has its own sunset (no new purchases from
+  2026-10-09, through 2027), with Antigravity as the replacement.
+- The quota table of the Context (1,000/1,500/2,000 requests a day for Google login) no longer
+  applies to consumer accounts.
+
+Squadrn keeps the provider for those users and says the rest plainly: the login hint names the
+supported licenses and Antigravity CLI (`agy`); `doctor` warns when an account selects
+`oauth-personal` and neither `GOOGLE_CLOUD_PROJECT` nor `GOOGLE_CLOUD_PROJECT_ID` is set (Gemini
+also reads them from `.env` files, which squadrn does not; the warning says what to set). squadrn
+cannot see the refusal itself: it happens inside the interactive login. Antigravity CLI as a
+provider needs its own decision (no config-dir variable yet, logins in the OS keyring).
+
 ## Probe (P0)
 
 Gemini CLI 0.70.0 in a sandbox: `HOME` and `GEMINI_CLI_HOME` in a temp dir, a fake API key in
