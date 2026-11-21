@@ -73,6 +73,67 @@ stdout '\A:4\n'
 exec squadrn __complete personal -a work ''
 stdout '\A:4\n'
 
+# Descriptions add the login last cached, however old; no cache entry, no login shown.
+mkdir home/.cache/squadrn
+cp auth.json home/.cache/squadrn/auth.json
+exec squadrn __complete ''
+stdout '\Amain\tclaude/main · me@example.com\npersonal\tclaude/personal · logged out\nclaude/work\tClaude Code\n'
+exec squadrn __complete -a co
+stdout '^codex/main\tCodex CLI · logged in$'
+
+# Accounts as arguments and flag values, other arguments: nothing rather than file names.
+exec squadrn __complete doctor per
+stdout '\Apersonal\tclaude/personal · logged out\n:36\n'
+exec squadrn __complete usage setup per
+stdout '\Apersonal\t'
+exec squadrn __complete swap --to per
+stdout '\Apersonal\t'
+exec squadrn __complete swap ''
+stdout '\A:4\n\z'
+exec squadrn __complete gc ''
+stdout '\A:4\n\z'
+
+# config set: keys, then the values each accepts; list values comma separated.
+exec squadrn __complete config set ''
+stdout '^notify.events$'
+exec squadrn __complete config set update_channel ''
+cmp stdout channel.out
+exec squadrn __complete config set git_hooks ''
+stdout '\Atrue\nfalse\n:4\n'
+exec squadrn __complete config set default_profile ''
+stdout '\Aminimal\nstandard\nstrict\n'
+exec squadrn __complete config set notify.events input,
+cmp stdout events.out
+exec squadrn __complete config set aliases ''
+stdout '\A:6\n'
+
+# Worktree names: those of the account's provider; grid takes a repository, then
+# [<account>:]<name>.
+exec git init -q -b main repo
+exec git -C repo commit -q --allow-empty -m init
+exec git -C repo worktree add -q .claude/worktrees/feat-a
+exec git -C repo worktree add -q .gemini/worktrees/gem-a
+cd repo
+exec squadrn __complete wt rm ''
+stdout '\Afeat-a\n:4\n'
+exec squadrn __complete personal wt ''
+stdout '^feat-a$'
+cd $WORK
+exec squadrn __complete -C repo wt ''
+stdout '^feat-a$'
+exec squadrn __complete grid ''
+stdout '^attach\t'
+stdout '^:16$'
+exec squadrn __complete grid repo ''
+stdout '\Afeat-a\nmain:\trun as claude/main · me@example.com\npersonal:\trun as claude/personal · logged out\n'
+stdout '^:38$'
+exec squadrn __complete grid repo personal:
+stdout '\Apersonal:feat-a\n:36\n'
+exec squadrn __complete grid attach ''
+stdout '\A:16\n'
+exec squadrn __complete grid stop repo ''
+stdout '\A:4\n'
+
 ! exists agent-called
 
 -- stub --
@@ -80,6 +141,20 @@ stdout '\A:4\n'
 touch "$HOME/../agent-called"
 exit 1
 -- empty --
+-- auth.json --
+{"claude/main":{"status":{"loggedIn":true,"email":"me@example.com"},"at":"2020-01-01T00:00:00Z"},
+ "claude/personal":{"status":{"loggedIn":false},"at":"2020-01-01T00:00:00Z"},
+ "codex/main":{"status":{"loggedIn":true},"at":"2020-01-01T00:00:00Z"},
+ "claude/work":{"err":"down","at":"2020-01-01T00:00:00Z"}}
+-- channel.out --
+stable
+beta
+:4
+-- events.out --
+input,failed
+input,done
+input,info
+:6
 -- per.out --
 personal	claude/personal
 :36
