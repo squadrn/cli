@@ -178,12 +178,15 @@ Flags:
 Global Flags:
       --no-color   disable colors (also: NO_COLOR=1)
 -- help-account-add.txt --
-Create an account (settings, shared files, push guard, usage, login)
+Create an account. Without a name, at a terminal, a guided setup asks for the provider, the name
+and the settings, shows a review, creates the account and offers the login; flags given answer
+their questions. Without a terminal the name is required.
 
 Usage:
-  srn account add [<provider>/]<name> [flags]
+  srn account add [[<provider>/]<name>] [flags]
 
 Examples:
+  srn account add                          guided: provider, name, settings, review, login
   srn account add work                     asks for the profile, usage tracking and login
   srn account add work -p codex --profile strict --usage --login
   srn account add work --with privacy,no-attribution

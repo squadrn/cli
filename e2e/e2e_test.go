@@ -211,6 +211,40 @@ func testAccounts(t *testing.T, s *sandbox) {
 	s.check(t, len(trashed) == 0, "account rm --purge moved the dir instead of deleting it: %v", trashed)
 	s.srn(t, "account", "add", "Bad").exit(2)
 	s.srn(t, "-a", "ghost").exit(1).err(`account not found: claude/ghost`)
+	testWizardTTY(t, s)
+}
+
+// testWizardTTY drives account add without a name at a pseudo terminal (ADR 0014 §3): each key
+// is typed once its question is drawn. Without a terminal the name is required.
+func testWizardTTY(t *testing.T, s *sandbox) {
+	s.srn(t, "account", "add").exit(2).err(`name the account: srn account add \[<provider>/\]<name>`)
+	if runtime.GOOS == "windows" {
+		t.Log("account add at a terminal: skipped on Windows (no script(1))")
+		return
+	}
+	dir := filepath.Join(s.home, ".claude-wiz")
+	s.srnKeys(t, []keystep{
+		{`Provider`, "\r"},
+		{`Account name`, "wiz"},
+		{`→ ~/\.claude-wiz · start with: srn wiz`, "\r"},
+		{`Setup`, "\r"},
+		{`Create claude/wiz\?`, "y"},
+		{`Log in now\?`, "n"},
+	}, "account", "add").exit(0).out(
+		`┌  New account`,
+		`◇  Provider ·+ Claude Code`,
+		`◇  Account name ·+ wiz`,
+		`◇  Created claude/wiz`,
+		`✓ created ~/\.claude-wiz \(private\)`,
+		`▲  not logged in · srn account login claude/wiz`,
+		`└  Ready in [0-9.]+s · start: srn wiz`,
+		`Same without questions: srn account add claude/wiz .*--no-login`)
+	s.check(t, s.exists(filepath.Join(dir, ".squadrn-account")), "the wizard did not create ~/.claude-wiz")
+
+	// Ctrl-C at a question cancels: nothing is created, exit 130.
+	s.srnKeys(t, []keystep{{`Provider`, "\r"}, {`Account name`, "gone"}, {`gone`, "\x03"}}, "account", "add").exit(130).out(`■  Cancelled · nothing changed`)
+	s.check(t, !s.exists(filepath.Join(s.home, ".claude-gone")), "a cancelled wizard created ~/.claude-gone")
+	s.srn(t, "account", "rm", "wiz", "--yes").exit(0)
 }
 
 func testRun(t *testing.T, s *sandbox) {

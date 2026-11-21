@@ -79,6 +79,8 @@ type app struct {
 	backgroundCheck func()
 	// gitChecked: the Git version was checked in this run (openRepo).
 	gitChecked bool
+	// prompt overrides how questions are asked (tests); nil asks at the terminal (prompter).
+	prompt prompt.Prompter
 	// self overrides the program doctor compares the command names with: the installed binary
 	// when the installers run setup from the unpacked release.
 	self string
