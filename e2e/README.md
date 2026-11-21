@@ -76,7 +76,8 @@ squadrn uses (`account/read`, `account/rateLimits/read` from `.limits`, `hooks/l
 `gemini` (`fakeagent.Gemini`) uses `GEMINI_CLI_HOME` as a home (default `$HOME`) with its state in
 `.gemini/`. Gemini has no auth commands: `--version` prints the bare version, `--skip-trust` is the
 login (writes `oauth_creds.json` and `google_accounts.json`), and status is read by squadrn from
-those files. A session still carrying `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE` logs it.
+those files. A leading `--policy <file>` (a profile's policy) is shown in a session's args and skipped
+otherwise. A session still carrying `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE` logs it.
 
 ### Adding the fake of a new provider
 

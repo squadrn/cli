@@ -568,8 +568,42 @@ func (a *app) session(ag provider.Agent, acct account.Account, args []string, wt
 		a.warnf("%v; the git push guard stays on, but fix the config (%s doctor)", a.cfgErr, a.cmd)
 	}
 	a.layout.CleanOld(append([]string{a.cmd}, a.cfg.Aliases...))
+	a.askTrust(ag, acct)
 	defer a.markInUse(acct, wt)()
 	return ag.Exec(acct.ConfigDir(), args)
+}
+
+// askTrust offers, once per repository and account, to trust the repository the session starts
+// in, for a CLI that trusts folders per account (Gemini): the repository root and every worktree
+// below it. A no leaves it to the CLI, which asks itself and records the answer, so squadrn does
+// not ask again. Without a terminal nothing is asked.
+func (a *app) askTrust(ag provider.Agent, acct account.Account) {
+	t, ok := ag.(provider.Truster)
+	if !ok {
+		return
+	}
+	repo, err := a.repoHere(context.Background(), acct.Spec)
+	if err != nil || repo.Root == "" {
+		return
+	}
+	if decided, err := t.Trusted(acct.ConfigDir(), repo.Root); err != nil || decided {
+		return
+	}
+	in, out, done, ok := a.terminalIO()
+	if !ok {
+		return
+	}
+	defer done()
+	_, _ = fmt.Fprintf(out, "%s: trust %s in %s? Its settings, hooks and MCP servers apply, in every worktree below it [y/N] ", a.cmd, a.tilde(repo.Root), acct.Label())
+	line, _ := bufio.NewReader(in).ReadString('\n')
+	if s := strings.ToLower(strings.TrimSpace(line)); s != "y" && s != "yes" {
+		return
+	}
+	if err := t.Trust(acct.ConfigDir(), repo.Root); err != nil {
+		a.warnf("cannot record the trust in %s: %v", acct.Label(), err)
+		return
+	}
+	_, _ = fmt.Fprintf(out, "%s: %s trusts %s\n", a.cmd, acct.Label(), a.tilde(repo.Root))
 }
 
 // relinkHint is the command that links an account's own copies of shared files to main again.

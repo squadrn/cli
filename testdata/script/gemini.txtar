@@ -36,6 +36,19 @@ grep '"matcher": "run_shell_command"' home/.gemini-work/.gemini/settings.json
 grep '"name": "squadrn-guard"' home/.gemini-work/.gemini/settings.json
 grep '"timeout": 5000' home/.gemini-work/.gemini/settings.json
 grep '"enableNotifications": false' home/.gemini-work/.gemini/settings.json
+# The standard profile: no yolo, no auto-update in parallel panes, 30-day history, git and tmux
+# variables never redacted, worktrees on, and a policy file every session loads.
+grep '"disableYoloMode": true' home/.gemini-work/.gemini/settings.json
+grep '"enableAutoUpdate": false' home/.gemini-work/.gemini/settings.json
+grep '"maxAge": "30d"' home/.gemini-work/.gemini/settings.json
+grep '"GIT_CONFIG_VALUE_0"' home/.gemini-work/.gemini/settings.json
+grep '"worktrees": true' home/.gemini-work/.gemini/settings.json
+grep 'commandPrefix = "git push"' home/.gemini-work/.gemini/squadrn-policy.toml
+grep 'decision = "ask_user"' home/.gemini-work/.gemini/squadrn-policy.toml
+grep 'toolName = \["read_file", "read_many_files", "grep_search", "glob"\]' home/.gemini-work/.gemini/squadrn-policy.toml
+grep 'reading ./.env is denied' home/.gemini-work/.gemini/squadrn-policy.toml
+! exists home/.gemini/squadrn-policy.toml
+! exists home/.gemini-work/.gemini/policies
 grep '"command": "\\".*/plugin/bin/squadrn-hook\\" guard-git --no-ask --agent gemini"' home/.gemini-work/.gemini/settings.json
 exec squadrn account add gemini/work --no-login -y
 stdout '^✓ gemini/work is up to date$'
@@ -89,7 +102,7 @@ stdout '^gemini/work +yes +me@.gemini-work'
 # with GEMINI_CLI_HOME unset.
 env GEMINI_FORCE_ENCRYPTED_FILE_STORAGE=true
 exec squadrn gemini/work -p hi
-stdout '^cfg=.*/home/.gemini-work args=-p hi$'
+stdout '^cfg=.*/home/.gemini-work args=--policy .*/home/.gemini-work/.gemini/squadrn-policy.toml -p hi$'
 exec squadrn gemini/main -p hi
 stdout '^cfg=<unset> args=-p hi$'
 ! grep 'encrypted-storage' home/calls.log
@@ -200,6 +213,54 @@ stderr 'force push is not allowed'
 stderr 'has comments squadrn does not rewrite: add these entries to its "hooks" yourself: \{"AfterAgent":.*"BeforeTool":'
 cmp home/.gemini/settings.json main-settings.jsonc
 
+# Other accounts' credential files are denied to the file tools too.
+exec squadrn account add gemini/strict --profile strict --no-login -y
+grep '"maxAge": "14d"' home/.gemini-strict/.gemini/settings.json
+grep '"defaultApprovalMode": "default"' home/.gemini-strict/.gemini/settings.json
+grep 'reading ~/.gemini-work/.gemini/oauth_creds.json is denied' home/.gemini-strict/.gemini/squadrn-policy.toml
+exec squadrn account rm gemini/strict --purge --yes
+
+# shared_mcp copies main's allowlisted servers into the account's settings.json, never one with
+# env or headers.
+env SQUADRN_SHARED_MCP='docs main-only absent'
+exec squadrn account add gemini/mcp --no-login -y
+stdout '^✓ mcp docs from gemini/main$'
+stdout '^! mcp main-only not copied'
+stdout '^! mcp absent is not configured in gemini/main$'
+grep '"docs": \{' home/.gemini-mcp/.gemini/settings.json
+! grep 'main-only' home/.gemini-mcp/.gemini/settings.json
+exec squadrn account add gemini/mcp --no-login -y
+! stdout 'mcp docs'
+env SQUADRN_SHARED_MCP=
+exec squadrn account rm gemini/mcp --purge --yes
+
+# Folder trust is asked once per repository: yes trusts the repository root, and so every
+# worktree below it, in that account's trustedFolders.json.
+exec git init -q -b main repo
+exec git -C repo commit -q --allow-empty -m init
+cp yes.txt tty.txt
+env SQUADRN_TEST_TTY=$WORK/tty.txt
+cd repo
+exec squadrn gemini/work -p hi
+stderr 'trust .*/repo in gemini/work\? Its settings, hooks and MCP servers apply'
+stderr 'gemini/work trusts'
+grep '"TRUST_FOLDER"' $WORK/home/.gemini-work/.gemini/trustedFolders.json
+exec squadrn gemini/work -p hi
+! stderr 'trust'
+! grep 'GEMINI_CLI_TRUST_WORKSPACE' $WORK/home/calls.log
+
+# srn wt runs gemini --worktree <name>, which creates .gemini/worktrees/<name>.
+exec squadrn gemini/work wt feat-g
+stdout '^cfg=.*/home/.gemini-work args=--policy .*squadrn-policy.toml --worktree feat-g$'
+cd $WORK
+env SQUADRN_TEST_TTY=
+
+# A grid pane runs it too.
+exec squadrn grid repo gemini/work:feat-h
+stdout 'gemini/work +→ feat-h'
+waitfor home/calls.log 'cfg=.*/home/.gemini-work pwd=.*/repo args=--policy .* --worktree feat-h'
+exec tmux kill-server
+
 # Logout moves the login files to the trash.
 exec squadrn account logout gemini/work
 [darwin] stdout '^moved the login files of gemini/work to the trash \(~/.Trash\)$'
@@ -269,7 +330,7 @@ echo v18.19.0
   /* the theme */
   "ui": { "theme": "GitHub" },
   "general": { "url": "https://example.com/a//b" },
-  "mcpServers": { "main-only": { "command": "srv", "env": { "TOKEN": "x" } } },
+  "mcpServers": { "main-only": { "command": "srv", "env": { "TOKEN": "x" } }, "docs": { "command": "npx", "args": ["-y", "@acme/docs"] } },
   "hooks": {
     "BeforeTool": [
       { "matcher": "run_shell_command", "hooks": [{ "type": "command", "name": "squadrn-guard", "command": "\"/old/plugin/bin/squadrn-hook\" guard-git --no-ask --agent gemini" }] },
@@ -289,3 +350,5 @@ echo v18.19.0
 {"session_id":"g2","transcript_path":"/t","cwd":"/src/api","hook_event_name":"BeforeAgent","timestamp":"2026-11-21T10:00:00.000Z","prompt":"fix it"}
 -- gemini-after.json --
 {"session_id":"g2","transcript_path":"/t","cwd":"/src/api","hook_event_name":"AfterAgent","timestamp":"2026-11-21T10:00:05.000Z","prompt":"fix it","prompt_response":"secret plan","stop_hook_active":false}
+-- yes.txt --
+y

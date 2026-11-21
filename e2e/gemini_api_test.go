@@ -43,7 +43,8 @@ func TestGeminiGuardAgainstMockAPI(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
-	// Nothing may reach the login Keychain.
+	// Nothing may reach the login Keychain. The minimal profile allows yolo mode; its policy file
+	// is loaded all the same.
 	writeMode(t, filepath.Join(bin, "security"), "#!/bin/sh\nexit 1\n", 0o755)
 	repoRoot, _ := filepath.Abs("..")
 
@@ -68,7 +69,7 @@ func TestGeminiGuardAgainstMockAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(home, ".gemini", "settings.json"), `{"security":{"auth":{"selectedType":"gemini-api-key"}}}`)
-	run(home, filepath.Join(bin, "squadrn"), "account", "add", "gemini/probe", "--no-login", "-y")
+	run(home, filepath.Join(bin, "squadrn"), "account", "add", "gemini/probe", "--profile", "minimal", "--no-login", "-y")
 	settings := read(t, filepath.Join(home, ".gemini-probe", ".gemini", "settings.json"))
 	if !strings.Contains(settings, "squadrn-guard") {
 		t.Fatalf("no guard hook in the account:\n%s", settings)

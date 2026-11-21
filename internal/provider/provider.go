@@ -378,6 +378,21 @@ type Profiler interface {
 	Profile(name string, options []string, ctx ProfileContext) (map[string]any, error)
 }
 
+// ProfileFiler is a Profiler whose profiles also keep files next to the settings, relative to
+// the account's state dir (Gemini: its policy file, passed with --policy on each launch).
+type ProfileFiler interface {
+	ProfileFiles(name string, options []string, ctx ProfileContext) (map[string][]byte, error)
+}
+
+// Truster is an Agent whose CLI trusts folders per account (Gemini: trustedFolders.json): a
+// folder it does not trust ignores the project's settings, hooks and MCP servers.
+type Truster interface {
+	// Trusted reports whether the CLI has a trust decision for dir (trusted or not).
+	Trusted(configDir, dir string) (bool, error)
+	// Trust records dir and everything below it as trusted.
+	Trust(configDir, dir string) error
+}
+
 // Seeder copies the allowlisted onboarding state from main into a new account dir, so the CLI
 // does not run its first-time setup again; home is the user's home.
 type Seeder interface {
@@ -495,10 +510,6 @@ var Codex = Spec{
 	Caps:        Caps{Plugins: true, SharedMCP: true, UsageQuery: true},
 }
 
-// geminiProfiles: the Gemini profiles (policy files, the guard hook) come in a later phase of
-// ADR 0013; until then every profile only keeps credentials per account.
-const geminiProfiles = "credentials per account, push guard hook; other Gemini profile settings are not available yet"
-
 // Gemini is Google's Gemini CLI (ADR 0013). GEMINI_CLI_HOME names a home: an account is
 // ~/.gemini-<name>, holding the CLI's state in its .gemini/ (StateDir); main is ~/.gemini, run
 // with the variable unset. Gemini has no login or logout command: auth is file-based.
@@ -515,14 +526,16 @@ var Gemini = Spec{
 	// (the CLI rewrites them), policies/ (would apply to every account) and extensions/.
 	Shared:         []string{"GEMINI.md", "commands", "agents"},
 	SharedPerEntry: map[string][]string{"skills": nil},
-	Subcommands:    []string{"mcp", "extensions", "extension", "skills", "skill", "hooks", "hook", "gemma", "models"},
+	// gemini -w <name> creates .gemini/worktrees/<name> (experimental.worktrees, set by profiles).
+	WorktreeDir: ".gemini/worktrees",
+	Subcommands: []string{"mcp", "extensions", "extension", "skills", "skill", "hooks", "hook", "gemma", "models"},
 	// gemini-credentials.json is the encrypted fallback store; its key derives from host and
 	// user, so any account could decrypt another's.
 	Credentials: []string{"oauth_creds.json", "google_accounts.json", "gemini-credentials.json"},
 	ProfileSummaries: map[string]string{
-		ProfileMinimal:  geminiProfiles,
-		ProfileStandard: geminiProfiles,
-		ProfileStrict:   geminiProfiles,
+		ProfileMinimal:  "secrets denied to file tools",
+		ProfileStandard: "secrets denied to file tools, push guard, asks before git push, 30-day history",
+		ProfileStrict:   "standard, approval for every tool, 14-day history",
 	},
 	MinVersion:  "0.70.0",
 	InstallHint: "npm install -g @google/gemini-cli",
@@ -531,7 +544,7 @@ var Gemini = Spec{
 	NoGitHooks: true,
 	// Gemini titles its terminal "✋ Action Required", "⏲ Working…" or "◇ Ready".
 	PaneTitleStates: map[string]string{"✋": "input", "⏲": "working", "◇": "ready"},
-	Caps:            Caps{Plugins: true, SharedMCP: true},
+	Caps:            Caps{Worktree: true, Plugins: true, SharedMCP: true},
 }
 
 var registry = []Spec{Claude, Codex, Gemini}

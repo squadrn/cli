@@ -21,7 +21,12 @@ func Gemini(args []string) int {
 		cfg, home = "<unset>", os.Getenv("HOME")
 	}
 	state := filepath.Join(home, ".gemini")
-	cmd := strings.Join(args, " ")
+	// --policy <file> (an account's profile) comes first; the rest decides what this run is.
+	rest := args
+	if len(rest) > 1 && rest[0] == "--policy" {
+		rest = rest[2:]
+	}
+	cmd := strings.Join(rest, " ")
 	extra := ""
 	if v, ok := os.LookupEnv("GEMINI_FORCE_ENCRYPTED_FILE_STORAGE"); ok {
 		extra = " encrypted-storage=" + v
@@ -44,8 +49,8 @@ func Gemini(args []string) int {
 		_ = os.WriteFile(filepath.Join(state, "google_accounts.json"), []byte(`{"active":"me@`+filepath.Base(home)+`","old":[]}`), 0o600)
 		selectOAuth(filepath.Join(state, "settings.json"))
 	default:
-		fmt.Printf("cfg=%s args=%s\n", cfg, cmd)
-		logCall("cfg=%s pwd=%s args=%s%s", cfg, workdir(), cmd, extra)
+		fmt.Printf("cfg=%s args=%s\n", cfg, strings.Join(args, " "))
+		logCall("cfg=%s pwd=%s args=%s%s", cfg, workdir(), strings.Join(args, " "), extra)
 		return session("")
 	}
 	return 0
