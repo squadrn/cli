@@ -145,6 +145,16 @@ func (c AuthCache) Cached(key string) (AuthStatus, bool) {
 	return e.Status, true
 }
 
+// Last returns the last status cached for key however old, without querying: for hints that
+// must not wait (shell completion). ok is false when there is none or it was a failure.
+func (c AuthCache) Last(key string) (AuthStatus, bool) {
+	e, ok := c.read()[key]
+	if !ok || e.Err != "" {
+		return AuthStatus{}, false
+	}
+	return e.Status, true
+}
+
 // Forget drops one account, e.g. after login, logout or removal; false when none was cached.
 func (c AuthCache) Forget(key string) bool {
 	entries := c.read()

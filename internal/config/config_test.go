@@ -307,3 +307,29 @@ func TestNotifyKeys(t *testing.T) {
 		t.Errorf("invalid [notify] read: %v", err)
 	}
 }
+
+// Every value offered for completion is one Set accepts.
+func TestValuesAreAccepted(t *testing.T) {
+	for _, key := range Keys {
+		values := Values(key)
+		switch key {
+		case "command", "aliases", "shared_mcp", "protected_branches", "notify.quiet_hours":
+			if values != nil {
+				t.Errorf("%s: free text, got %v", key, values)
+			}
+			continue
+		}
+		if len(values) == 0 {
+			t.Errorf("%s: no values", key)
+		}
+		for _, v := range values {
+			var c Config
+			if err := c.Set(key, v); err != nil {
+				t.Errorf("%s %s: %v", key, v, err)
+			}
+		}
+	}
+	if !ListKey("notify.events") || ListKey("notify.sound") {
+		t.Error("ListKey")
+	}
+}

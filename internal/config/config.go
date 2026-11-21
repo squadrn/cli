@@ -308,6 +308,38 @@ var (
 	ErrInvalidValue = errors.New("invalid config value")
 )
 
+// Values lists the values key accepts, for completion; nil for free text. List keys
+// (ListKey) take several of them, comma separated.
+func Values(key string) []string {
+	switch key {
+	case "git_hooks", "update_check", "notify.enabled", "notify.preview":
+		return []string{"true", "false"}
+	case "default_provider":
+		var out []string
+		for _, s := range provider.All() {
+			out = append(out, s.ID)
+		}
+		return out
+	case "default_profile":
+		var out []string
+		for _, p := range provider.ProfileNames {
+			out = append(out, p.Name)
+		}
+		return out
+	case "update_channel":
+		return []string{Stable, Beta}
+	}
+	if name, ok := strings.CutPrefix(key, "notify."); ok {
+		return notify.Choices(name)
+	}
+	return nil
+}
+
+// ListKey reports a key whose value is a comma separated list.
+func ListKey(key string) bool {
+	return slices.Contains([]string{"aliases", "shared_mcp", "protected_branches", "notify.events"}, key)
+}
+
 // Get renders one setting of c (with defaults applied) as text.
 func (c Config) Get(key string) (string, error) {
 	switch key {
