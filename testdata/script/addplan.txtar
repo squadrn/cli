@@ -1,0 +1,68 @@
+[windows] skip 'Unix script: sh and the tree command over links'
+# account add --dry-run prints the plan and changes nothing; --json prints one result object.
+mkdir home/.claude/agents home/.claude/skills/find-skills
+cp settings.json home/.claude/settings.json
+cp empty home/.claude/CLAUDE.md
+cp empty home/.claude/.loggedin
+env SQUADRN_MARKETPLACE=$WORK/market
+env FAKE_VERSION=2.1.329
+
+tree home
+cp stdout before.txt
+exec squadrn account add claude/work --dry-run --profile strict --with privacy --usage
+cmp stdout plan-new.txt
+! stderr .
+tree home
+cmp stdout before.txt
+
+# --json implies --yes: nothing is asked, the result is one line of JSON.
+exec squadrn account add work --json --no-usage
+stdout '^\{"account":"claude/work","provider":"claude","dir":".*\.claude-work","created":true,"adopted":false,"profile":"standard","options":\[\],"guard":"installed","usage":false,"loggedIn":false,"default":false,"start":"srn work"\}$'
+! stdout '✓'
+exists home/.claude-work/.squadrn-account
+
+# A dry run of an existing account and of main.
+exec squadrn account add work --dry-run
+stdout '^plan: claude/work → ~/.claude-work \(exists\)$'
+stdout '^  settings  kept, follows claude/main$'
+stdout '^  login     no \(--login to log in\)$'
+exec squadrn account add main --dry-run
+cmp stdout plan-main.txt
+exec squadrn account add work --dry-run --json
+stdout '^\{"account":"claude/work",.*"created":false,.*"dryRun":true\}$'
+
+# Errors keep their exit codes and print {"error", "fix"} on stdout.
+mkdir home/.claude-tool
+! exec squadrn account add tool --json
+stdout '^\{"error":"~/.claude-tool exists but is not a squadrn account \(another tool may use it\)","fix":"srn account adopt tool"\}$'
+! stderr .
+exitcode 2 squadrn account add xy --json --profile lax
+! exec squadrn account add xy --json --profile lax
+stdout '^\{"error":"unknown profile \\"lax\\" \(use minimal / standard / strict\)"\}$'
+chmod 0500 home
+! exec squadrn account add broken --json
+stdout '^\{"error":"create ~/.claude-broken failed: .*","fix":"srn account add claude/broken"\}$'
+chmod 0700 home
+
+-- empty --
+-- settings.json --
+{"model": "opus"}
+-- market/.claude-plugin/marketplace.json --
+{"name": "squadrn", "plugins": [{"name": "squadrn", "source": "./plugin"}]}
+-- market/plugin/.claude-plugin/plugin.json --
+{"name": "squadrn"}
+-- plan-new.txt --
+plan: claude/work → ~/.claude-work (new)
+  profile   strict + privacy   sandboxed, reads limited to the project, 14-day history
+  shared    skills, CLAUDE.md, agents ← claude/main
+  settings  copy of claude/main + strict (follows main)
+  guard     pre-tool hook + git pre-push
+  usage     on
+  login     no (--login to log in)
+nothing was changed
+-- plan-main.txt --
+plan: claude/main → ~/.claude (the default account)
+  guard     pre-tool hook + git pre-push
+  usage     unchanged
+  login     already logged in
+nothing was changed
