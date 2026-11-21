@@ -18,6 +18,11 @@ var (
 	_ provider.GuardHook         = Guard{}
 	_ provider.HookEvents        = Events{}
 	_ provider.Profiler          = Profiles{}
+	_ provider.ProfileFiler      = Profiles{}
+	_ provider.MCP               = CLI{}
+	_ provider.MCPLister         = CLI{}
+	_ provider.Worktrees         = CLI{}
+	_ provider.Truster           = CLI{}
 )
 
 func init() {

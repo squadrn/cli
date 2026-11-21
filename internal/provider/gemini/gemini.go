@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/squadrn/squadrn/internal/fsx"
 	"github.com/squadrn/squadrn/internal/proc"
 	"github.com/squadrn/squadrn/internal/provider"
 )
@@ -92,7 +94,7 @@ func (c CLI) Output(ctx context.Context, configDir string, args ...string) ([]by
 // Run runs an interactive gemini as a child and returns when it ends (platform: runChild); a
 // non-zero exit is an ExitStatus.
 func (c CLI) Run(configDir string, args []string) error {
-	if err := runChild(c.Bin, c.argv(args), c.env(configDir)); err != nil {
+	if err := runChild(c.Bin, c.argv(c.withPolicy(configDir, args)), c.env(configDir)); err != nil {
 		var es provider.ExitStatus
 		if errors.As(err, &es) {
 			return es
@@ -104,7 +106,7 @@ func (c CLI) Run(configDir string, args []string) error {
 
 // Exec runs an interactive gemini session in place of squadrn (platform: run).
 func (c CLI) Exec(configDir string, args []string) error {
-	if err := run(c.Bin, c.argv(args), c.env(configDir)); err != nil {
+	if err := run(c.Bin, c.argv(c.withPolicy(configDir, args)), c.env(configDir)); err != nil {
 		var es provider.ExitStatus
 		if errors.As(err, &es) {
 			return es
@@ -117,6 +119,23 @@ func (c CLI) Exec(configDir string, args []string) error {
 func (c CLI) argv(args []string) []string {
 	return append([]string{provider.Gemini.Binary}, c.args(args)...)
 }
+
+// withPolicy puts --policy <the profile's policy file> before args of a session (not of a
+// subcommand such as mcp), when the account has one.
+func (c CLI) withPolicy(configDir string, args []string) []string {
+	if configDir == "" || (len(args) > 0 && slices.Contains(provider.Gemini.Subcommands, args[0])) {
+		return args
+	}
+	p := filepath.Join(c.state(configDir), PolicyFile)
+	if !fsx.IsFile(p) {
+		return args
+	}
+	return append([]string{"--policy", p}, args...)
+}
+
+// WorktreeArgs: `gemini --worktree <name>` creates .gemini/worktrees/<name> on branch <name>
+// (experimental.worktrees, set by every profile).
+func (CLI) WorktreeArgs(name string) []string { return []string{"--worktree", name} }
 
 // LoginArgs: Gemini has no login command. The login is a session (the first run asks how to
 // sign in); --skip-trust keeps the folder-trust dialog out of it, for this run only.

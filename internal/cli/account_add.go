@@ -465,7 +465,42 @@ func (a *app) syncSettingsAs(work, acct account.Account) (account.SettingsReport
 	if err != nil {
 		return account.SettingsReport{}, err
 	}
-	return a.store.SyncSettings(work, f, layers, a.now())
+	rep, err := a.store.SyncSettings(work, f, layers, a.now())
+	if err != nil {
+		return rep, err
+	}
+	return rep, a.writeProfileFiles(work, acct)
+}
+
+// writeProfileFiles writes the files the profile recorded in work's dir keeps next to the
+// settings (Gemini: its policy file) into work's state dir, when they changed.
+func (a *app) writeProfileFiles(work, acct account.Account) error {
+	d, _ := provider.DriverOf(acct.Spec.ID)
+	pf, ok := d.Profiles.(provider.ProfileFiler)
+	if !ok || work.IsMain() {
+		return nil
+	}
+	m, _, err := account.ReadManaged(work.Dir)
+	if err != nil || m.Profile == "" {
+		return err
+	}
+	files, err := pf.ProfileFiles(m.Profile, m.Options, a.profileContext(acct))
+	if err != nil {
+		return err
+	}
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		p := filepath.Join(work.StateDir(), name)
+		if old, err := os.ReadFile(p); err == nil && string(old) == string(files[name]) {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			return err
+		}
+		if err := fsx.WriteBytes(p, files[name], 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // profileLayers is the settings layer of the profile recorded in work's dir, for account acct.

@@ -1,6 +1,7 @@
 # 0013 — Gemini CLI provider
 
-Status: proposed
+Status: accepted (implemented in four phases, #47–#50; corrections from the implementation are
+marked *Implementation note*)
 
 ## Context
 
@@ -20,7 +21,7 @@ the source of 0.70.0, **P** = observed in the probe. A key that could not be ver
 | `GEMINI_CLI_HOME` replaces the home dir for all CLI state: state lives in `$GEMINI_CLI_HOME/.gemini/` (`settings.json`, `oauth_creds.json`, `google_accounts.json`, `installation_id`, `trustedFolders.json`, `projects.json`, `history/`, `tmp/<project>/chats/`, `extensions/`, `policies/`); nothing is written to `HOME`. Since 0.25.0 | D, P |
 | `gemini --version` prints the bare version (`0.70.0`) | P |
 | Subcommands: `mcp`, `extensions`, `skills`, `hooks`, `gemma`, `models`; no `login`, `logout` or auth status | P |
-| `settings.json` may hold comments: it is read through `strip-json-comments` | S, P |
+| `settings.json` may hold comments: it is read through `strip-json-comments` (default options: trailing commas are **not** accepted) | S, P |
 | Precedence: system defaults < user `settings.json` < project `.gemini/settings.json` < system settings; env vars and flags on top | D |
 | Auth type is `security.auth.selectedType`: `oauth-personal`, `gemini-api-key`, `vertex-ai`, `cloud-shell`, `compute-default-credentials`, `gateway` | S |
 | Google login tokens are kept in `<state>/oauth_creds.json` by default. With `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE=true` they go to the OS keychain under a fixed entry (`gemini-cli-oauth` / `main-account`) shared by every home, falling back to `<state>/gemini-credentials.json`, encrypted with a key derived from host and user name. An API key typed in the UI goes to a fixed keychain entry (`gemini-cli-api-key`) | S |
@@ -28,7 +29,7 @@ the source of 0.70.0, **P** = observed in the probe. A key that could not be ver
 | Hooks: `hooks.<Event>[] = {matcher, hooks: [{type: "command", command, name, timeout (ms, default 60000), env}]}` in `settings.json`; events `BeforeTool`, `AfterTool`, `BeforeAgent`, `AfterAgent`, `BeforeModel`, `AfterModel`, `BeforeToolSelection`, `SessionStart`, `SessionEnd`, `PreCompress`, `Notification`; no `async` | D |
 | `BeforeTool` stdin: `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `timestamp`, `tool_name: "run_shell_command"`, `tool_input: {command, description, dir_path}`; `dir_path` is passed as the model wrote it (relative to `cwd`) | P |
 | A `BeforeTool` hook blocks with exit 2 (stderr is the reason) or exit 0 with `{"decision":"deny","reason":…}`, also in `--approval-mode yolo`. Any other exit code lets the call through with a warning. Claude Code's `hookSpecificOutput.permissionDecision: "deny"` is **ignored**: the call runs | D, P |
-| `ask` is not a documented decision; the policy engine has `decision = "ask_user"` (`commandPrefix`, `argsPattern` regex over the tool's JSON arguments), in `<state>/policies/*.toml` or `--policy <file>` | D |
+| `ask` is not a documented decision; the policy engine has `decision = "ask_user"` (`commandPrefix`, `argsPattern` regex over the tool's JSON arguments), in `<state>/policies/*.toml` or `--policy <file>` (the flag is in the source, not the CLI reference) | D, S |
 | `AfterAgent` fires once per turn (`prompt`, `prompt_response`, `stop_hook_active`); a `deny` or exit 2 there **rejects the response and retries the turn** | D |
 | `Notification` (`notification_type: "ToolPermission"`, `message`, `details`) fires on permission prompts and is observe-only; no event fires when a turn waits for input otherwise, nor on the usage-limit dialog | D |
 | Hooks get the CLI's environment (sanitized only when redaction is on) plus `GEMINI_PROJECT_DIR`, `GEMINI_CWD`, `GEMINI_SESSION_ID`, `GEMINI_PLANS_DIR`, `CLAUDE_PROJECT_DIR`, and the hook's own `env`; they run through the platform shell (PowerShell on Windows, with `; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }` appended) | S, P |
@@ -47,7 +48,8 @@ the source of 0.70.0, **P** = observed in the probe. A key that could not be ver
 
 `provider.Gemini`: ID `gemini`, binary `gemini`, `MainDir` `.gemini`, `DirPrefix` `.gemini-`,
 `ConfigEnv` `GEMINI_CLI_HOME`, settings `settings.json`, subcommands as probed, install hint
-`npm install -g @google/gemini-cli`, `Caps{Plugins: true, SharedMCP: true}`. Floor: 0.70.0,
+`npm install -g @google/gemini-cli`, `Caps{Worktree: true, Plugins: true, SharedMCP: true}` (each
+turned on by the phase that implements it). Floor: 0.70.0,
 the probed version (`doctor` warns below it).
 
 A secondary account's dir is the `GEMINI_CLI_HOME` value (`~/.gemini-work`, holding the
@@ -100,7 +102,9 @@ No CLI command exists, so auth is file-based behind the `Authenticator` interfac
   `selectedType` is `oauth-personal`, or when `selectedType` is `gemini-api-key` / `vertex-ai`
   and the environment provides the key (metered). Email from `google_accounts.json` (`active`),
   best effort. Token values are never read into output or logs.
-- **Login**: runs `gemini --skip-trust` interactively with `selectedType` seeded, after printing
+- **Login**: runs `gemini --skip-trust` interactively with `selectedType` from main's settings
+  (*Implementation note*: the settings merge already carries it; there is no separate seeder),
+  after printing
   "finish the Google login, then type /quit". `NO_BROWSER` is passed through for SSH sessions.
   squadrn does not kill the CLI when the token file appears.
 - **Logout**: moves the credential files to the trash. A new optional interface, `FileLogout`,
@@ -136,9 +140,10 @@ call and must be exact on every platform).
 
 ### 6. Notifications
 
-`HookEvents` for Gemini: `BeforeAgent` → working, `AfterAgent` → done (or input when the
-response ends in a question, as for the other CLIs), `Notification` (`ToolPermission`) → needs
-input. Hooks are synchronous, so the notify hook for Gemini always exits 0 with empty stdout
+`HookEvents` for Gemini: `BeforeAgent` → working, `AfterAgent` → done, `Notification`
+(`ToolPermission`) → needs input. (*Implementation note*: an earlier draft said "or input when the
+response ends in a question, as for the other CLIs"; the other CLIs do not do that, so neither
+does Gemini.) Hooks are synchronous, so the notify hook for Gemini always exits 0 with empty stdout
 (never exit 2 or a `decision`, which would retry the turn), has `timeout: 2000`, and hands the
 delivery to `hook deliver` in the background. No `AfterTool` hook: it would add latency to every
 tool call.
@@ -166,12 +171,15 @@ covered, as with Claude's read rules outside the sandbox.
 ### 8. Trust and worktrees
 
 Folder trust is per account. On first use of a repository in a Gemini account, squadrn asks
-once and writes `TRUST_PARENT` for the worktree root (so every worktree squadrn creates there is
-trusted) to that account's `trustedFolders.json`. It never sets `GEMINI_CLI_TRUST_WORKSPACE`,
+once and writes `TRUST_FOLDER` for the repository root (so every worktree squadrn creates below it
+is trusted) to that account's `trustedFolders.json`. (*Implementation note*: the draft said
+`TRUST_PARENT`, which trusts the folder's *parent*, i.e. every sibling repository too.) A no leaves
+the decision to Gemini's own dialog, which records it, so squadrn does not ask again. It never sets `GEMINI_CLI_TRUST_WORKSPACE`,
 which would also trust hooks and MCP servers a repository brings.
 
 `srn wt` for Gemini (`WorktreeDir` `.gemini/worktrees`, `-w <name>`) needs
-`experimental.worktrees`; it comes after the core, with `Caps.Worktree` off until then.
+`experimental.worktrees`, which every profile sets (main, which has no profile, needs it set by
+hand). `srn wt ls` lists the default provider's worktree dir only.
 
 ### 9. Not supported
 
@@ -212,6 +220,10 @@ One PR each, in order:
    writer (`GuardInstaller`), PowerShell command, e2e against the mock API.
 3. **Notifications**: `HookEvents`, background delivery, pane-title fallback in `srn ps`.
 4. **Profiles, MCP, trust, worktrees**.
+
+All four are implemented. The policy file is `<state>/squadrn-policy.toml` (not in `policies/`),
+written from the profile and passed with `--policy` to sessions and logins, not to subcommands.
+`srn ps` maps the ◇ title to `ready`.
 
 ## Consequences
 
