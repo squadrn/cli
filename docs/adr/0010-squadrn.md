@@ -28,7 +28,7 @@ Fixed identifiers (they never follow the user's command name, ADR 0004):
 
 | Thing | Value |
 |---|---|
-| Repository, Go module | `github.com/squadrn/squadrn` |
+| Repository, Go module | `github.com/squadrn/squadrn-cli` |
 | Binary, `cmd/` dir | `squadrn` (`squadrn.exe`) |
 | Default command, alias | `srn`, `squadrn` (installs keep the names they were given) |
 | Config/data/state/cache dirs | `~/.config/squadrn`, `~/.local/share/squadrn`, `~/.local/state/squadrn`, `~/.cache/squadrn` |
@@ -43,15 +43,10 @@ Fixed identifiers (they never follow the user's command name, ADR 0004):
 
 ## Module path
 
-The module path is `github.com/squadrn/squadrn`, matching the repository. The repository was
+The module path is `github.com/squadrn/squadrn-cli`, matching the repository. The repository was
 first published as `github.com/squadrn/cli`, and versions of that module path are recorded for
 good in the Go checksum database (sum.golang.org). Reusing it would tie new code to tags that no
 longer exist, so the repository and the module were renamed together and those tags removed.
-
-Update (v1.0.0-rc.5): the repository and the module path became `github.com/squadrn/squadrn-cli`,
-naming the repository for what it holds. v1.0.0-rc.1 to rc.5 have `squadrn/squadrn` built in
-(`-X …/cli.Repo`) and update through GitHub's redirect from the old name, so no repository may be
-created under `squadrn/squadrn` again.
 
 ## Consequences
 

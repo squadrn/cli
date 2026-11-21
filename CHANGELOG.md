@@ -1,11 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- The repository and Go module are now `github.com/squadrn/squadrn-cli`. Installed releases keep
-  updating through GitHub's redirect from `squadrn/squadrn`; installer URLs change to
-  `https://github.com/squadrn/squadrn-cli/releases/…` (the old ones redirect).
-
 ## 1.0.0-rc.5
 
 - **Gemini CLI accounts** (`gemini/<name>`, [ADR 0013](docs/adr/0013-gemini-provider.md), core):
@@ -157,7 +151,7 @@
 - `completion <shell>` covers the command and every alias, and an unknown shell is a usage error;
   `grid attach` explains a missing terminal and keeps tmux's own connection errors.
 - `self-uninstall` checks that the marketplace registration is gone; `--purge` also removes the
-  session registries it knows of. Development builds check `squadrn/squadrn` for updates, report
+  session registries it knows of. Development builds check `squadrn/squadrn-cli` for updates, report
   "no release yet" instead of failing, and call themselves `dev`.
 
 ## 1.0.0-rc.1

@@ -4,7 +4,7 @@ Status: accepted (v1.0.0)
 
 ## Context
 
-The source is public under the Apache License 2.0 in `squadrn/squadrn`. Anyone should be able to
+The source is public under the Apache License 2.0 in `squadrn/squadrn-cli`. Anyone should be able to
 install and update with one command, without a GitHub account or `gh`, and still get only
 releases signed by the project. Updates should be announced, never forced, the way Claude Code
 does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signatures there.
@@ -12,15 +12,15 @@ does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signat
 ## Decision
 
 1. **One public repository.** Source and releases (archives, `checksums.txt`, its signature,
-   `install.sh`, `install.ps1`, notes from the CHANGELOG) live in `squadrn/squadrn`. The `release`
+   `install.sh`, `install.ps1`, notes from the CHANGELOG) live in `squadrn/squadrn-cli`. The `release`
    workflow publishes with the workflow's own `GITHUB_TOKEN` (`contents: write` on that job only);
    no personal access token exists.
 2. **One-line installers over HTTPS.**
-   `curl -fsSL https://github.com/squadrn/squadrn/releases/latest/download/install.sh | sh` and
-   `irm https://github.com/squadrn/squadrn/releases/latest/download/install.ps1 | iex`. Each installer
+   `curl -fsSL https://github.com/squadrn/squadrn-cli/releases/latest/download/install.sh | sh` and
+   `irm https://github.com/squadrn/squadrn-cli/releases/latest/download/install.ps1 | iex`. Each installer
    is rendered with its release's tag and the trusted public keys, installs that release by
    default (`--version`/`-Version` or `SQUADRN_VERSION` for another), and downloads from
-   `github.com/squadrn/squadrn/releases/download` with curl, wget or `Invoke-WebRequest`.
+   `github.com/squadrn/squadrn-cli/releases/download` with curl, wget or `Invoke-WebRequest`.
 3. **Signed releases.** CI signs `checksums.txt` with an ed25519 key in the SSH signature format
    (`ssh-keygen -Y sign -n squadrn-release`). Public keys are committed in
    `internal/release/signers.pub` and embedded in every build and installer. `self-update`
@@ -30,10 +30,10 @@ does it. macOS ships LibreSSL without ed25519, so `openssl` cannot verify signat
    `gh attestation verify`), `self-update` checks them as an extra when `gh` is installed and
    logged in.
 4. **Updates from the REST API.** `self-update` and the background check read
-   `api.github.com/repos/squadrn/squadrn/releases` and download asset URLs with Go's `net/http`
+   `api.github.com/repos/squadrn/squadrn-cli/releases` and download asset URLs with Go's `net/http`
    (environment proxy settings, timeouts). No token is needed; `GH_TOKEN`, `GITHUB_TOKEN` or gh's
    login only raise the rate limit (and let the release workflow test its own drafts). The
-   repository is fixed at build time (`-X …/cli.Repo=squadrn/squadrn`); only `--repo` overrides it.
+   repository is fixed at build time (`-X …/cli.Repo=squadrn/squadrn-cli`); only `--repo` overrides it.
 5. **Notices, not forced updates.** A detached `self-update --background` refreshes
    `~/.cache/squadrn/update.json` at most once a day; at a terminal, commands show a one-line
    notice at most every 6 hours. Never in hooks, CI, `--json` or non-terminals; opt out with
