@@ -89,6 +89,7 @@ func (a *app) uninstall(purge bool) error {
 		a.removeCompletions(name)
 	}
 	a.removeProfileLines()
+	a.removeCompletionBlocks()
 	if err := unregisterToastApp(); err != nil {
 		a.warnf("cannot remove squadrn's notification registration: %v", err)
 	}
@@ -133,16 +134,6 @@ func (a *app) uninstall(purge bool) error {
 	}
 	a.out("squadrn is uninstalled; restart running agent sessions\n")
 	return nil
-}
-
-// removeCompletions deletes the completion scripts squadrn generated for name.
-func (a *app) removeCompletions(name string) {
-	for shell, dir := range a.completionDirs() {
-		file := completionFile(shell, dir, name)
-		if b, err := os.ReadFile(file); err == nil && generatedCompletion(b, name) {
-			_ = os.Remove(file)
-		}
-	}
 }
 
 // purgeInUse removes the session registries (.squadrn-inuse) squadrn can find without searching

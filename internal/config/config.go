@@ -54,6 +54,9 @@ type Config struct {
 	UpdateCheck *bool `toml:"update_check,omitempty"`
 	// UpdateChannel is "stable" (default) or "beta" (also pre-releases).
 	UpdateChannel string `toml:"update_channel,omitempty"`
+	// Completion is "auto" (default): install and update the shell completion scripts; "off":
+	// leave them alone (`completion uninstall` sets it).
+	Completion string `toml:"completion,omitempty"`
 	// Notify is the [notify] table: desktop, terminal and tmux notifications (ADR 0012).
 	Notify notify.Settings `toml:"notify,omitempty"`
 }
@@ -102,6 +105,15 @@ func (c Config) Channel() string {
 	}
 	return c.UpdateChannel
 }
+
+// Completion settings.
+const (
+	CompletionAuto = "auto"
+	CompletionOff  = "off"
+)
+
+// CompletionEnabled reports whether squadrn installs and updates the shell completion scripts.
+func (c Config) CompletionEnabled() bool { return c.Completion != CompletionOff }
 
 // Dirs are the XDG base directories of one product name, resolved the same way on Linux and
 // macOS (macOS conventions such as ~/Library/Caches are deliberately not used).
@@ -273,6 +285,9 @@ func (c Config) validate() error {
 	if c.DefaultProfile != "" && provider.ProfileSummary(c.DefaultProfile) == "" {
 		return fmt.Errorf("%w: unknown default_profile %q", ErrInvalidValue, c.DefaultProfile)
 	}
+	if c.Completion != "" && c.Completion != CompletionAuto && c.Completion != CompletionOff {
+		return fmt.Errorf("%w: completion %q is not auto or off", ErrInvalidValue, c.Completion)
+	}
 	if c.UpdateChannel != "" && c.UpdateChannel != Stable && c.UpdateChannel != Beta {
 		return fmt.Errorf("%w: update_channel %q is not stable or beta", ErrInvalidValue, c.UpdateChannel)
 	}
@@ -300,7 +315,7 @@ func Save(path string, c Config) error {
 // Keys lists the settings `config get|set` accepts.
 var Keys = []string{
 	"command", "aliases", "default_provider", "default_profile", "shared_mcp", "protected_branches", "git_hooks", "update_check", "update_channel",
-	"notify.enabled", "notify.events", "notify.sound", "notify.when", "notify.quiet_hours", "notify.preview", "notify.method",
+	"completion", "notify.enabled", "notify.events", "notify.sound", "notify.when", "notify.quiet_hours", "notify.preview", "notify.method",
 }
 
 var (
@@ -328,6 +343,8 @@ func Values(key string) []string {
 		return out
 	case "update_channel":
 		return []string{Stable, Beta}
+	case "completion":
+		return []string{CompletionAuto, CompletionOff}
 	}
 	if name, ok := strings.CutPrefix(key, "notify."); ok {
 		return notify.Choices(name)
@@ -361,6 +378,11 @@ func (c Config) Get(key string) (string, error) {
 		return strconv.FormatBool(c.UpdateCheckEnabled()), nil
 	case "update_channel":
 		return c.Channel(), nil
+	case "completion":
+		if c.CompletionEnabled() {
+			return CompletionAuto, nil
+		}
+		return CompletionOff, nil
 	case "notify.enabled":
 		return strconv.FormatBool(c.Notify.Enabled == nil || *c.Notify.Enabled), nil
 	case "notify.events":
@@ -424,6 +446,8 @@ func (c *Config) Set(key, value string) error {
 		c.Notify.Method = value
 	case "update_channel":
 		c.UpdateChannel = value
+	case "completion":
+		c.Completion = value
 	default:
 		return fmt.Errorf("%w %q (known: %s)", ErrUnknownKey, key, strings.Join(Keys, ", "))
 	}

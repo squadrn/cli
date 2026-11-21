@@ -42,6 +42,7 @@ func (a *app) completionForEveryName() {
 			return nil
 		}
 	}
+	comp.AddCommand(a.completionInstallCmd(), a.completionUninstallCmd())
 	comp.Args = cobra.ArbitraryArgs
 	comp.RunE = func(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 {
@@ -62,27 +63,6 @@ func (a *app) names() []string {
 	return out
 }
 
-// completionDirs are the per-user completion dirs of each shell; existing ones are used, and the
-// login shell's.
-func (a *app) completionDirs() map[string]string {
-	dirs := config.DirsFor(a.store.Home, "")
-	return map[string]string{
-		"zsh":  filepath.Join(a.store.Home, ".zsh", "completions"),
-		"bash": filepath.Join(dirs.Data, "bash-completion", "completions"),
-		"fish": filepath.Join(dirs.Config, "fish", "completions"),
-	}
-}
-
-func completionFile(shell, dir, name string) string {
-	switch shell {
-	case "zsh":
-		return filepath.Join(dir, "_"+name)
-	case "fish":
-		return filepath.Join(dir, name+".fish")
-	}
-	return filepath.Join(dir, name)
-}
-
 // powerShellCompletionPath holds the PowerShell completion script for every command name.
 func (a *app) powerShellCompletionPath() string {
 	return filepath.Join(a.layout.DataDir, "completion.ps1")
@@ -91,4 +71,59 @@ func (a *app) powerShellCompletionPath() string {
 // generatedCompletion recognises a cobra completion script for name (ours, not the user's).
 func generatedCompletion(b []byte, name string) bool {
 	return bytes.Contains(b, []byte(name)) && bytes.Contains(b, []byte("__complete"))
+}
+
+func (a *app) completionInstallCmd() *cobra.Command {
+	var shell string
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "install",
+		Short: "Set up tab completion for your shell (asks before editing its startup file)",
+		Long: `Set up tab completion for your login shell, or --shell: write the completion scripts where
+the shell loads them. When it loads none of its completion dirs (zsh without one on its fpath,
+bash without bash-completion), squadrn's lines go into its startup file, after asking (--yes:
+without asking). Turns config completion back on, so updates keep the scripts current.`,
+		Args: noArgs,
+		RunE: func(*cobra.Command, []string) error { return a.installCompletion(shell, yes) },
+	}
+	cmd.Flags().StringVar(&shell, "shell", "", "the shell to set up (default: your login shell)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "edit the shell's startup file without asking")
+	_ = cmd.RegisterFlagCompletionFunc("shell", cobra.FixedCompletions(completionShells, cobra.ShellCompDirectiveNoFileComp))
+	return cmd
+}
+
+func (a *app) completionUninstallCmd() *cobra.Command {
+	var shell string
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Remove tab completion and stop updates from writing it again",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return a.uninstallCompletion(shell) },
+	}
+	cmd.Flags().StringVar(&shell, "shell", "", "only this shell (default: every shell)")
+	_ = cmd.RegisterFlagCompletionFunc("shell", cobra.FixedCompletions(completionShells, cobra.ShellCompDirectiveNoFileComp))
+	return cmd
+}
+
+// setCompletion saves config completion (auto or off) when it changes.
+func (a *app) setCompletion(value string) error {
+	if a.cfg.Completion == value || (value == config.CompletionAuto && a.cfg.CompletionEnabled()) {
+		return nil
+	}
+	path, err := config.Path()
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Read(path)
+	if err != nil {
+		return err
+	}
+	if err := cfg.Set("completion", value); err != nil {
+		return err
+	}
+	if err := config.Save(path, cfg); err != nil {
+		return err
+	}
+	a.cfg.Completion = value
+	return nil
 }

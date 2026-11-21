@@ -112,9 +112,25 @@ installed files; accounts are kept). `--purge` also removes the config, guard lo
 <command> config set aliases srn,sx
 ```
 
-Completions for zsh (`~/.zsh/completions`), bash (`~/.local/share/bash-completion/completions`)
-and fish (`~/.config/fish/completions`) are written when those directories exist; otherwise
-`srn completion zsh|bash|fish` prints them.
+Tab completes accounts by their short names first (`srn per<Tab>` → `personal`, with the login
+last seen), then commands; after an account, `wt`, `grid` and the agent's own subcommands
+(`srn personal mcp`); worktree names, `grid` arguments, `config set` values and `-a`/`-C`
+values. It never runs an agent CLI.
+
+```sh
+srn completion install            # your login shell; --shell zsh|bash|fish
+srn completion uninstall          # remove it; updates then leave completion alone
+```
+
+`completion install` writes the scripts where the shell loads them: a zsh dir already on `fpath`
+(`~/.zsh/completions`, `~/.zfunc`, Homebrew's `site-functions`), bash-completion's
+`~/.local/share/bash-completion/completions`, fish's `~/.config/fish/completions`. When zsh has
+none on `fpath` (or bash has no bash-completion), it adds a marked block to `~/.zshrc` (above
+`compinit`) or `~/.bashrc`, after asking (`--yes`: without asking); `completion uninstall` and
+`self-uninstall` remove it. Install and update refresh the scripts and never edit startup files;
+`config set completion off` stops them. Shells that are already open keep their old completions:
+`exec zsh`. `srn doctor` warns when the login shell's completion is missing, out of date or not
+loaded. `srn completion zsh|bash|fish|powershell` prints a script.
 
 Requirements: `claude` (native build), `git` 2.31 or newer; `tmux` for `grid`/`ps`.
 Optional: `gh` (PR detection in `gc`, the branch protection check in `doctor`, build provenance).
@@ -430,6 +446,7 @@ protected_branches = ["main", "release/*"]   # repositories can only add to this
 git_hooks = true                             # layer 2 of the push guard
 update_check = true                          # daily background check, notice only
 update_channel = "stable"                    # or "beta" for pre-releases
+completion = "auto"                          # "off": updates leave tab completion alone
 
 [notify]
 enabled = true

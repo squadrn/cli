@@ -1,0 +1,102 @@
+[windows] skip 'Unix script: sh stub zsh'
+# completion install puts the scripts where the shell loads them and edits its startup file only
+# when it must, after asking; completion uninstall undoes both and turns completion off. A stub
+# zsh reports its fpath from the file fpath, so the real one (and its system dirs) stay out.
+cp zsh bin/zsh
+chmod 755 bin/zsh
+cp empty fpath
+cp empty home/.claude/.loggedin
+
+# zsh loads none of its dirs: the scripts go to ~/.zsh/completions, and ~/.zshrc needs lines.
+cp zshrc home/.zshrc
+! exec squadrn completion install --shell zsh
+stdout '^zsh completion → ~/.zsh/completions$'
+stdout '^zsh loads it once ~/.zshrc has these lines:$'
+stdout '^  fpath=\(\$HOME/.zsh/completions \$fpath\)$'
+stderr 're-run with --yes'
+exists home/.zsh/completions/_srn
+cmp home/.zshrc zshrc
+
+# --yes adds them above compinit, once.
+exec squadrn completion install --shell zsh --yes
+stdout '^added them to ~/.zshrc$'
+stdout '^tab completion is on in new zsh sessions; in one already open, run: exec zsh$'
+cmp home/.zshrc zshrc.want
+exec squadrn completion install --shell zsh --yes
+! stdout 'added them'
+cmp home/.zshrc zshrc.want
+
+# doctor reports the login shell's completion: active, out of date, not loaded.
+env SHELL=/bin/zsh
+! exec squadrn doctor
+stdout '✓ zsh tab completion \(~/.zsh/completions\)$'
+cp empty home/.zsh/completions/_srn
+! exec squadrn doctor
+stdout '! zsh tab completion for srn is out of date  → srn completion install$'
+cp zshrc home/.zshrc
+exec squadrn completion install --shell zsh -y
+! exec squadrn doctor
+stdout '✓ zsh tab completion'
+
+# A dir already on fpath is used as it is: no startup file edit, and the old copies go.
+mkdir home/.zfunc
+exec sh -c 'echo "$HOME/.zfunc" > fpath'
+cp zshrc home/.zshrc
+exec squadrn completion install
+stdout '^zsh completion → ~/.zfunc$'
+! stdout 'these lines'
+exists home/.zfunc/_srn
+! exists home/.zsh/completions/_srn
+cmp home/.zshrc zshrc
+! exec squadrn doctor
+stdout '✓ zsh tab completion \(~/.zfunc\)$'
+
+# fish loads its completions dir as it is.
+exec squadrn completion install --shell fish
+stdout '^fish completion → ~/.config/fish/completions$'
+exists home/.config/fish/completions/srn.fish
+
+# Unknown shells are usage errors.
+exitcode 2 squadrn completion install --shell tcsh
+! exec squadrn completion install --shell tcsh
+stderr 'tab completion for "tcsh" is not supported; name one with --shell \(zsh, bash, fish\)'
+
+# uninstall removes the scripts and squadrn's lines, and turns completion off for updates.
+cp zshrc.want home/.zshrc
+exec squadrn completion uninstall
+stdout 'removed ~/.zfunc/_srn'
+stdout 'removed ~/.config/fish/completions/srn.fish'
+stdout 'removed completion from ~/.zshrc'
+stdout 'tab completion is off'
+! exists home/.zfunc/_srn
+cmp home/.zshrc zshrc
+exec squadrn config get completion
+stdout '^off$'
+! exec squadrn doctor
+stdout '– zsh tab completion off \(completion = off\)$'
+exec squadrn completion install -y
+exec squadrn config get completion
+stdout '^auto$'
+
+# self-uninstall takes squadrn's lines out of the startup files too.
+cp zshrc.want home/.zshrc
+exec squadrn self-uninstall --yes
+stdout '^  removed completion from ~/.zshrc$'
+cmp home/.zshrc zshrc
+
+-- zsh --
+#!/bin/sh
+echo __squadrn_fpath__
+cat "$HOME/../fpath"
+-- empty --
+-- zshrc --
+export EDITOR=vi
+autoload -Uz compinit
+compinit
+-- zshrc.want --
+export EDITOR=vi
+# >>> squadrn completion >>>
+fpath=($HOME/.zsh/completions $fpath)
+# <<< squadrn completion <<<
+autoload -Uz compinit
+compinit

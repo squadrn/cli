@@ -34,17 +34,28 @@ exec squadrn self-install rel --interactive --command ai
 exec squadrn self-update --rollback
 ! stderr 'Command name'
 
-# A fresh home gets completions for the login shell in a dir made for them; zsh is told how to
-# load it.
+# A fresh home gets completions for the login shell in a dir made for them; install and update
+# never edit ~/.zshrc, they say how zsh loads the dir.
 env SHELL=/bin/zsh
 exec squadrn self-install rel --interactive --command ai
-stdout '^  zsh completion → ~/.zsh/completions \(new: add to ~/.zshrc: fpath=\(~/.zsh/completions \$fpath\); autoload -Uz compinit && compinit\)$'
+stdout '^  zsh completion → ~/.zsh/completions \(zsh does not load it yet; run: ai completion install\)$'
 exists home/.zsh/completions/_ai
+! exists home/.zshrc
 ! stdout 'bash completion|fish completion'
+# Once ~/.zshrc puts the dir on fpath before compinit, the hint is gone.
+cp zshrc home/.zshrc
 exec squadrn self-install rel --interactive --command ai
 stdout '^  zsh completion → ~/.zsh/completions$'
+# completion = off: updates leave completion alone.
+exec squadrn config set completion off
+exec squadrn self-install rel --interactive --command ai
+! stdout 'zsh completion'
+exec squadrn config set completion auto
 env SHELL=
 
+-- zshrc --
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
 -- answers --
 con
 ai
