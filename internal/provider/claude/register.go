@@ -16,6 +16,7 @@ var (
 	_ provider.Relocator      = CLI{}
 	_ provider.StatusLine     = StatusLine{}
 	_ provider.SettingsFormat = Settings{}
+	_ provider.MainFilter     = Settings{}
 	_ provider.Profiler       = Profiles{}
 	_ provider.Seeder         = Profiles{}
 	_ provider.HookEvents     = Events{}

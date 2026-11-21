@@ -568,7 +568,7 @@ func (e Env) account(ctx context.Context, a account.Account) []Check {
 		if err := cs.CheckCredentials(a.ConfigDir()); err != nil {
 			out = append(out, bad(g, Fail, "credentials may be shared with other accounts: "+err.Error(), e.Command+" account add "+a.Label()))
 		} else {
-			out = append(out, ok(g, "credentials kept in "+e.tilde(a.Dir)))
+			out = append(out, ok(g, "credentials kept in "+e.tilde(a.StateDir())))
 		}
 	}
 	if e.Usage != nil && a.Spec.Caps.UsageReport {
@@ -618,9 +618,9 @@ func (e Env) plugin(ctx context.Context, ag provider.Agent, a account.Account, g
 
 func (e Env) links(a account.Account, g string) []Check {
 	var out []Check
-	entries, _ := os.ReadDir(a.Dir)
+	entries, _ := os.ReadDir(a.StateDir())
 	for _, ent := range entries {
-		p := filepath.Join(a.Dir, ent.Name())
+		p := filepath.Join(a.StateDir(), ent.Name())
 		if ent.Type()&fs.ModeSymlink != 0 {
 			if _, err := os.Stat(p); err != nil {
 				out = append(out, bad(g, Warn, "dangling link "+ent.Name(), e.Command+" account add "+a.Label()))
@@ -633,7 +633,7 @@ func (e Env) links(a account.Account, g string) []Check {
 		if _, err := os.Stat(src); err != nil {
 			continue
 		}
-		dst := filepath.Join(a.Dir, item)
+		dst := filepath.Join(a.StateDir(), item)
 		switch _, err := os.Lstat(dst); {
 		case errors.Is(err, fs.ErrNotExist):
 			// main gained it later: the next session or account add links it.

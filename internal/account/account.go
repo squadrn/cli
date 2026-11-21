@@ -49,6 +49,9 @@ type Ref struct {
 
 func (r Ref) String() string { return r.Provider + "/" + r.Name }
 
+// Account is one account. Dir is the account's own dir: the one squadrn marks, records, trashes
+// and renames, and the value of Spec.ConfigEnv. The CLI's files (settings, credentials, shared
+// links) are in StateDir.
 type Account struct {
 	Ref
 	Spec provider.Spec
@@ -56,6 +59,24 @@ type Account struct {
 }
 
 func (a Account) IsMain() bool { return a.Name == Main }
+
+// StateDir is where the CLI keeps the account's state: Dir, or Dir/Spec.StateDir for a
+// secondary account of a CLI whose ConfigEnv names a home (Gemini: ~/.gemini-work/.gemini).
+func (a Account) StateDir() string {
+	if a.IsMain() || a.Spec.StateDir == "" {
+		return a.Dir
+	}
+	return filepath.Join(a.Dir, a.Spec.StateDir)
+}
+
+// CredentialFiles are the account's credential files (Spec.Credentials in StateDir).
+func (a Account) CredentialFiles() []string {
+	out := make([]string, len(a.Spec.Credentials))
+	for i, c := range a.Spec.Credentials {
+		out[i] = filepath.Join(a.StateDir(), c)
+	}
+	return out
+}
 
 // Label is how the account is shown and can be typed: claude/personal.
 func (a Account) Label() string { return a.String() }
@@ -359,29 +380,55 @@ func (s Store) MoveToTrash(a Account, now time.Time) (string, error) {
 	if a.IsMain() {
 		return "", MainError{a}
 	}
+	return s.trash(a.Dir, filepath.Base(a.Dir), now)
+}
+
+// TrashFiles moves those of paths that exist into the user's trash (a logout without a CLI
+// command, provider.FileLogout); each is named after a's dir and the file. It returns where they
+// went.
+func (s Store) TrashFiles(a Account, paths []string, now time.Time) ([]string, error) {
+	var out []string
+	for _, p := range paths {
+		if _, err := os.Lstat(p); err != nil {
+			continue
+		}
+		dst, err := s.trash(p, filepath.Base(a.Dir)+"-"+strings.TrimPrefix(filepath.Base(p), "."), now)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, dst)
+	}
+	return out, nil
+}
+
+// trash moves src into the user's trash as <base>-<time>.
+func (s Store) trash(src, base string, now time.Time) (string, error) {
 	files, info := trashDirs(s.Home)
 	if err := os.MkdirAll(files, 0o700); err != nil {
 		return "", err
 	}
-	name := filepath.Base(a.Dir) + "-" + now.Format("20060102-150405")
+	name := base + "-" + now.Format("20060102-150405")
 	dst := filepath.Join(files, name)
+	if _, err := os.Lstat(dst); err == nil {
+		return "", fmt.Errorf("move %s to trash: %s already exists", src, dst)
+	}
 	infoFile := ""
 	if info != "" {
 		if err := os.MkdirAll(info, 0o700); err != nil {
 			return "", err
 		}
 		infoFile = filepath.Join(info, name+".trashinfo")
-		u := url.URL{Path: filepath.ToSlash(a.Dir)}
+		u := url.URL{Path: filepath.ToSlash(src)}
 		body := "[Trash Info]\nPath=" + u.EscapedPath() + "\nDeletionDate=" + now.Format("2006-01-02T15:04:05") + "\n"
 		if err := fsx.WriteBytes(infoFile, []byte(body), 0o600); err != nil {
 			return "", err
 		}
 	}
-	if err := os.Rename(a.Dir, dst); err != nil {
+	if err := os.Rename(src, dst); err != nil {
 		if infoFile != "" {
 			_ = os.Remove(infoFile)
 		}
-		return "", fmt.Errorf("move %s to trash: %w", a.Dir, err)
+		return "", fmt.Errorf("move %s to trash: %w", src, err)
 	}
 	return dst, nil
 }

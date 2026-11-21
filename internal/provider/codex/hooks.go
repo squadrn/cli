@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/squadrn/squadrn/internal/fsx"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // The push guard's layer 1 is a PreToolUse hook in $CODEX_HOME/hooks.json running the squadrn
@@ -48,7 +49,7 @@ var hookDefs = []hookDef{
 // squadrnCommand reports whether a hooks.json command runs squadrn's hook entry point, from any
 // install location and in either platform's form.
 func squadrnCommand(cmd string) bool {
-	return strings.Contains(cmd, "squadrn-hook") || strings.Contains(cmd, "squadrn.exe")
+	return provider.SquadrnCommand(cmd)
 }
 
 // ours reports whether a hooks.json command is squadrn's guard.

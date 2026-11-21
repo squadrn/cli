@@ -3,6 +3,8 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // Settings is Claude Code's settings.json.
@@ -36,3 +38,7 @@ func (Settings) Encode(doc map[string]any) ([]byte, error) {
 func (Settings) Deep() []string {
 	return []string{"permissions", "sandbox", "env", "hooks", "attribution"}
 }
+
+// FromMain drops squadrn's own hook entries from main's hooks: an account's guard and
+// notification hooks come from its own setup, never from main (ADR 0013).
+func (Settings) FromMain(doc map[string]any) { provider.DropSquadrnHooks(doc) }

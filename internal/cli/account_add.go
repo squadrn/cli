@@ -238,7 +238,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 		}
 	}
 	if d, _ := provider.DriverOf(acct.Spec.ID); isNew && d.Seed != nil {
-		if err := d.Seed.Seed(a.store.Home, work.Dir); err != nil {
+		if err := d.Seed.Seed(a.store.Home, work.StateDir()); err != nil {
 			return fail(err)
 		}
 	}
@@ -263,7 +263,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	switch {
 	case isNew || srep.Created || srep.Backup != "":
 		what := "settings from " + acct.Provider + "/" + account.Main
-		if !fsx.IsFile(filepath.Join(a.store.MainDir(acct.Spec), acct.Spec.Settings)) {
+		if mainAcct, _ := a.store.MainOf(acct.Provider + "/" + account.Main); !fsx.IsFile(account.SettingsPath(mainAcct)) {
 			// No main account (or no settings in it) to start from.
 			what = "settings created"
 			if profile != "" {
@@ -483,15 +483,17 @@ func (a *app) profileLayers(work, acct account.Account) ([]account.Layer, error)
 }
 
 // profileContext describes this machine for acct's profile: every other account's credential
-// file and squadrn's own dirs, as ~/ paths with / separators.
+// files and squadrn's own dirs, as ~/ paths with / separators.
 func (a *app) profileContext(acct account.Account) provider.ProfileContext {
 	ctx := provider.ProfileContext{Hook: a.statusLineBinary(), Home: a.store.Home, Notify: a.cfgErr == nil && a.cfg.Notify.On()}
 	accts, _ := a.store.List()
 	for _, x := range accts {
-		if x.Label() == acct.Label() || x.Spec.Credentials == "" {
+		if x.Label() == acct.Label() {
 			continue
 		}
-		ctx.OtherCredentials = append(ctx.OtherCredentials, a.rulePath(filepath.Join(x.Dir, x.Spec.Credentials)))
+		for _, p := range x.CredentialFiles() {
+			ctx.OtherCredentials = append(ctx.OtherCredentials, a.rulePath(p))
+		}
 	}
 	for _, dir := range []string{a.layout.DataDir, config.DirsFor(a.store.Home, config.Slug).Config} {
 		ctx.OwnDirs = append(ctx.OwnDirs, a.rulePath(dir))
