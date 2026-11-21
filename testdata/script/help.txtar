@@ -25,7 +25,8 @@ exec squadrn completion fish
 stdout 'complete -c srn'
 exec squadrn __complete ''
 stdout '^account'
-stdout '^claude/main'
+stdout '^main\tclaude/main$'
+
 
 # Printed scripts register the command and every alias; an unknown shell is a usage error.
 cp home/.config/squadrn/config.toml bad.toml
