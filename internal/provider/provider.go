@@ -290,15 +290,13 @@ type LoginHinter interface {
 type Notice struct {
 	Warn      bool
 	Text, Fix string
-	// Group is the doctor group it belongs to ("" for the install group).
-	Group string
 }
 
 // Diagnoser adds provider-specific checks to doctor.
 type Diagnoser interface {
-	// Diagnose reports on the installed CLI (version as ParseVersion read it; "" when unknown)
-	// and the user's environment, once.
-	Diagnose(ctx context.Context, version string) []Notice
+	// Diagnose reports on what the installed CLI needs (a runtime) and the user's environment,
+	// once, with the install checks.
+	Diagnose(ctx context.Context) []Notice
 	// AccountNotices reports what to know about one account (configDir "" is main).
 	AccountNotices(configDir string) []Notice
 }
@@ -463,7 +461,43 @@ var Codex = Spec{
 	Caps:        Caps{Plugins: true, SharedMCP: true, UsageQuery: true},
 }
 
-var registry = []Spec{Claude, Codex}
+// geminiProfiles: the Gemini profiles (policy files, the guard hook) come in a later phase of
+// ADR 0013; until then every profile only keeps credentials per account.
+const geminiProfiles = "credentials per account; Gemini profile settings are not available yet"
+
+// Gemini is Google's Gemini CLI (ADR 0013). GEMINI_CLI_HOME names a home: an account is
+// ~/.gemini-<name>, holding the CLI's state in its .gemini/ (StateDir); main is ~/.gemini, run
+// with the variable unset. Gemini has no login or logout command: auth is file-based.
+var Gemini = Spec{
+	ID:        "gemini",
+	Name:      "Gemini CLI",
+	Binary:    "gemini",
+	MainDir:   ".gemini",
+	DirPrefix: ".gemini-",
+	ConfigEnv: "GEMINI_CLI_HOME",
+	StateDir:  ".gemini",
+	Settings:  "settings.json",
+	// Never shared: credentials, installation_id, projects.json, tmp/, history/, the trust files
+	// (the CLI rewrites them), policies/ (would apply to every account) and extensions/.
+	Shared:         []string{"GEMINI.md", "commands", "agents"},
+	SharedPerEntry: map[string][]string{"skills": nil},
+	Subcommands:    []string{"mcp", "extensions", "extension", "skills", "skill", "hooks", "hook", "gemma", "models"},
+	// gemini-credentials.json is the encrypted fallback store; its key derives from host and
+	// user, so any account could decrypt another's.
+	Credentials: []string{"oauth_creds.json", "google_accounts.json", "gemini-credentials.json"},
+	ProfileSummaries: map[string]string{
+		ProfileMinimal:  geminiProfiles,
+		ProfileStandard: geminiProfiles,
+		ProfileStrict:   geminiProfiles,
+	},
+	MinVersion:  "0.70.0",
+	InstallHint: "npm install -g @google/gemini-cli",
+	// Plugins stays off until the guard hook installer lands (ADR 0013, plan step 2): without it
+	// doctor and account add would report a guard that is not there.
+	Caps: Caps{SharedMCP: true},
+}
+
+var registry = []Spec{Claude, Codex, Gemini}
 
 // Default is used when an account ref names no provider and for the "main" shorthand.
 const Default = "claude"

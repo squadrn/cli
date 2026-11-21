@@ -73,6 +73,11 @@ registered fake into the sandbox's `fakebin/`: a wrapper script on Unix
 squadrn uses (`account/read`, `account/rateLimits/read` from `.limits`, `hooks/list` and
 `config/batchWrite` for the guard hook's trust).
 
+`gemini` (`fakeagent.Gemini`) uses `GEMINI_CLI_HOME` as a home (default `$HOME`) with its state in
+`.gemini/`. Gemini has no auth commands: `--version` prints the bare version, `--skip-trust` is the
+login (writes `oauth_creds.json` and `google_accounts.json`), and status is read by squadrn from
+those files. A session still carrying `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE` logs it.
+
 ### Adding the fake of a new provider
 
 1. Add `internal/fakeagent/codex.go` with `func Codex(args []string) int` implementing the

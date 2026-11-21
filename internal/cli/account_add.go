@@ -312,7 +312,7 @@ func (a *app) accountAdd(input string, o addOptions) error {
 	if doLogin {
 		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
 		loginAt := time.Now()
-		err := ag.Run(acct.ConfigDir(), ag.LoginArgs())
+		err := a.runLogin(ag, acct)
 		waited += time.Since(loginAt)
 		a.cache.Forget(acct.Label())
 		if err != nil {
@@ -422,7 +422,7 @@ func (a *app) accountAddMain(acct account.Account, o addOptions, start time.Time
 	if doLogin {
 		a.out("%s opening login…\n", a.paint(a.colorOut, "36", "↗"))
 		loginAt := time.Now()
-		err := ag.Run(acct.ConfigDir(), ag.LoginArgs())
+		err := a.runLogin(ag, acct)
 		waited += time.Since(loginAt)
 		a.cache.Forget(acct.Label())
 		if err != nil {

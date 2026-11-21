@@ -87,11 +87,11 @@ tree home/.config/squadrn
 cmp stdout layout-config.txt
 
 -- help-root.txt --
-Squadrn runs coding agents (today: Claude Code and Codex CLI) as one of several accounts on this
-machine.
+Squadrn runs coding agents (today: Claude Code, Codex CLI and Gemini CLI) as one of several accounts
+on this machine.
 
 Accounts are provider/name: claude/main is ~/.claude, claude/personal is ~/.claude-personal,
-codex/work is ~/.codex-work.
+codex/work is ~/.codex-work, gemini/work is ~/.gemini-work.
 
 Usage:
   srn [<account>] [<command> | agent args... | -- prompt] [flags]

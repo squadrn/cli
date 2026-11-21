@@ -93,7 +93,7 @@ func TestGet(t *testing.T) {
 	if _, err := s.Get("ghost"); !errors.As(err, &nf) || nf.Ref.String() != "claude/ghost" || !errors.Is(err, ErrNotFound) {
 		t.Errorf("Get(ghost) err = %v", err)
 	}
-	if _, err := s.Get("gemini/x1"); !errors.Is(err, ErrUnknownProvider) {
+	if _, err := s.Get("nope/x1"); !errors.Is(err, ErrUnknownProvider) {
 		t.Errorf("unknown provider err = %v", err)
 	}
 }

@@ -507,6 +507,56 @@ func TestHookGuardAccountChecks(t *testing.T) {
 	}
 }
 
+// diagAgent is a CLI with a version floor and its own checks (Gemini).
+type diagAgent struct {
+	fakeAgent
+	version string
+}
+
+func (d diagAgent) Output(context.Context, string, ...string) ([]byte, error) {
+	return []byte(d.version + "\n"), nil
+}
+
+func (diagAgent) Diagnose(context.Context) []provider.Notice {
+	return []provider.Notice{{Text: "node v22.0.0"}, {Warn: true, Text: "node is odd", Fix: "fix node"}}
+}
+
+func (diagAgent) AccountNotices(string) []provider.Notice {
+	return []provider.Notice{{Warn: true, Text: "no layer 2"}}
+}
+
+func TestVersionFloorAndProviderNotices(t *testing.T) {
+	e := env(t, diagAgent{fakeAgent: fakeAgent{loggedIn: true}, version: "0.69.1"}, nil)
+	name, notes := e.version(context.Background(), provider.Gemini)
+	if name != "gemini 0.69.1" {
+		t.Errorf("name = %q", name)
+	}
+	if c, _ := find(notes, "older than 0.70.0"); c.Status != Warn || c.Group != "install" || c.Fix != provider.Gemini.InstallHint {
+		t.Errorf("floor: %+v", c)
+	}
+	if c, ok := find(notes, "node v22.0.0"); !ok || c.Status != OK {
+		t.Errorf("info notice: %+v", c)
+	}
+	if c, _ := find(notes, "node is odd"); c.Status != Warn || c.Fix != "fix node" {
+		t.Errorf("warn notice: %+v", c)
+	}
+	e.Agent = func(provider.Spec) (provider.Agent, error) { return diagAgent{version: "0.71.0-preview.0"}, nil }
+	if _, notes := e.version(context.Background(), provider.Gemini); len(notes) != 2 {
+		t.Errorf("a newer preview: %+v", notes)
+	}
+	e.Agent = func(provider.Spec) (provider.Agent, error) { return diagAgent{}, nil }
+	if name, notes := e.version(context.Background(), provider.Gemini); name != "gemini" || len(notes) != 3 {
+		t.Errorf("no version: %q %+v", name, notes)
+	}
+	e.Agent = func(provider.Spec) (provider.Agent, error) {
+		return diagAgent{fakeAgent: fakeAgent{loggedIn: true}}, nil
+	}
+	a := account.Account{Ref: account.Ref{Provider: "gemini", Name: "work"}, Spec: provider.Gemini, Dir: filepath.Join(e.Store.Home, ".gemini-work")}
+	if c, ok := find(e.account(context.Background(), a), "no layer 2"); !ok || c.Status != Warn || c.Group != "account gemini/work" {
+		t.Errorf("account notice: %+v", c)
+	}
+}
+
 func TestOnlyChecksOneAccount(t *testing.T) {
 	e := env(t, fakeAgent{loggedIn: true}, nil)
 	if err := os.MkdirAll(filepath.Join(e.Store.Home, ".claude-work"), 0o700); err != nil {
