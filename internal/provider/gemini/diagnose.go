@@ -59,12 +59,35 @@ func diagnose(ctx context.Context, getenv func(string) string, node func(context
 	return out
 }
 
-// AccountNotices: layer 2 of the push guard cannot run in Gemini sessions (ADR 0013).
-func (CLI) AccountNotices(string) []provider.Notice {
-	return []provider.Notice{{
+// AccountNotices: layer 2 of the push guard cannot run in Gemini sessions, and Login with Google
+// works only for a Code Assist Standard or Enterprise license (ADR 0013).
+func (c CLI) AccountNotices(configDir string) []provider.Notice {
+	out := []provider.Notice{{
 		Warn: true,
 		Text: "no layer-2 push guard: Gemini CLI turns git hooks off (core.hooksPath=\"\") in the shell commands it runs; the pre-tool hook (layer 1) and the server's branch protection remain",
 	}}
+	if n, ok := consumerLogin(c.state(configDir), os.Getenv); ok {
+		out = append(out, n)
+	}
+	return out
+}
+
+// consumerLogin warns about an account that signs in with Google without a Google Cloud project:
+// since 2026-06-18 Google refuses Gemini CLI for personal accounts, Google AI Pro and Ultra
+// ("This client is no longer supported for Gemini Code Assist for individuals"); only Code Assist
+// Standard and Enterprise licenses, which name their project, still sign in.
+func consumerLogin(state string, getenv func(string) string) (provider.Notice, bool) {
+	if sel, err := selectedType(filepath.Join(state, provider.Gemini.Settings)); err != nil || sel != authOAuth {
+		return provider.Notice{}, false
+	}
+	if getenv("GOOGLE_CLOUD_PROJECT") != "" || getenv("GOOGLE_CLOUD_PROJECT_ID") != "" {
+		return provider.Notice{}, false
+	}
+	return provider.Notice{
+		Warn: true,
+		Text: "Login with Google without GOOGLE_CLOUD_PROJECT: since 2026-06-18 Google refuses personal accounts, Google AI Pro and Ultra in Gemini CLI; it serves Code Assist Standard and Enterprise licenses",
+		Fix:  "set GOOGLE_CLOUD_PROJECT to the license's project, or use a paid Gemini API key or Vertex AI; personal accounts: Antigravity CLI (agy)",
+	}, true
 }
 
 var nodeVersionPattern = regexp.MustCompile(`^v?(\d+)\.`)

@@ -85,6 +85,7 @@ exec squadrn account ls
 stdout '^gemini/work +no +- +~/.gemini-work$'
 exec squadrn account login gemini/work
 stdout 'finish the Google login in Gemini CLI, then type /quit'
+stdout 'Login with Google needs a Code Assist Standard or Enterprise license'
 stdout '^logged in to gemini/work as me@.gemini-work$'
 grep 'cfg=.*/home/.gemini-work args=--skip-trust$' home/calls.log
 exists home/.gemini-work/.gemini/oauth_creds.json
@@ -129,9 +130,16 @@ stdout '^account gemini/work$'
 stdout '✓ logged in as me@.gemini-work'
 stdout '✓ credentials kept in ~/.gemini-work/.gemini'
 stdout '! no layer-2 push guard: Gemini CLI turns git hooks off'
+stdout '! Login with Google without GOOGLE_CLOUD_PROJECT: since 2026-06-18 Google refuses personal accounts'
+stdout 'Antigravity CLI \(agy\)'
 stdout '✓ settings.json follows main \+ standard profile'
 stdout '✓ push guard hook installed$'
 env GEMINI_FORCE_ENCRYPTED_FILE_STORAGE= GOOGLE_APPLICATION_CREDENTIALS=
+# A Code Assist license names its project: no consumer-login warning.
+env GOOGLE_CLOUD_PROJECT=acme
+! exec squadrn doctor gemini/work
+! stdout 'Login with Google without GOOGLE_CLOUD_PROJECT'
+env GOOGLE_CLOUD_PROJECT=
 env FAKE_VERSION=0.69.2
 ! exec squadrn doctor gemini/work
 stdout '! gemini 0.69.2 is older than 0.70.0, the oldest version squadrn supports  → npm install -g @google/gemini-cli'

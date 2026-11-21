@@ -144,9 +144,11 @@ func (CLI) LoginArgs() []string { return []string{"--skip-trust"} }
 // LogoutArgs: none; logging out moves the credential files to the trash (LogoutFiles).
 func (CLI) LogoutArgs() []string { return nil }
 
-// LoginHint is printed before the login session, which does not end by itself.
+// LoginHint is printed before the login session, which does not end by itself. Google refuses
+// Gemini CLI for personal accounts, Google AI Pro and Ultra since 2026-06-18 (ADR 0013).
 func (CLI) LoginHint() string {
-	return "finish the Google login in Gemini CLI, then type /quit (over SSH: NO_BROWSER=true prints a URL instead)"
+	return "finish the Google login in Gemini CLI, then type /quit (over SSH: NO_BROWSER=true prints a URL instead)\n" +
+		"Login with Google needs a Code Assist Standard or Enterprise license (GOOGLE_CLOUD_PROJECT); Google refuses personal accounts, Google AI Pro and Ultra (\"no longer supported\"): use a paid API key, Vertex AI or Antigravity CLI (agy)"
 }
 
 // LogoutFiles are the account's credential files.
