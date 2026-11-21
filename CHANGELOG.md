@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `account add` only creates an account; on an existing one it fails with
+  `<account> already exists (repair: srn account repair <account>)`. The new `account repair
+  [<account>|--all]` brings accounts up to date (what re-running `add` did, including `--relink`
+  and switching `--profile`); scripts that re-ran `add` must call `repair`. The installer,
+  `self-update` and `doctor` hints name `repair` (ADR 0014).
+- **Breaking:** `account adopt` is removed, with no alias: `account add <name> --adopt` takes over
+  an existing `~/.<provider>-<name>` dir (ADR 0014).
+- `account default [<account>|--unset]` and the config key `default_account`: a bare `srn` (and an
+  agent subcommand without an account) runs that account instead of the default provider's main
+  account; `doctor` warns when it names an account that no longer exists. `account add --default`
+  sets it.
+- `account add -p/--provider <id>` names the provider (it must agree with one in the name);
+  `--with` takes comma-separated values.
+
 ## 1.0.0-rc.5
 
 - **Gemini CLI accounts** (`gemini/<name>`, [ADR 0013](docs/adr/0013-gemini-provider.md), core):

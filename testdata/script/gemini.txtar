@@ -30,7 +30,7 @@ stdout 'log in: srn account login gemini/work'
 # With the plugin files, the guard is a BeforeTool hook on the shell tool. Gemini sessions run no
 # git hooks, so there is no git pre-push layer.
 env SQUADRN_MARKETPLACE=$REPO_ROOT
-exec squadrn account add gemini/work --no-login -y
+exec squadrn account repair gemini/work --no-login -y
 stdout '^✓ push guard: pre-tool hook$'
 grep '"matcher": "run_shell_command"' home/.gemini-work/.gemini/settings.json
 grep '"name": "squadrn-guard"' home/.gemini-work/.gemini/settings.json
@@ -50,7 +50,7 @@ grep 'reading ./.env is denied' home/.gemini-work/.gemini/squadrn-policy.toml
 ! exists home/.gemini/squadrn-policy.toml
 ! exists home/.gemini-work/.gemini/policies
 grep '"command": "\\".*/plugin/bin/squadrn-hook\\" guard-git --no-ask --agent gemini"' home/.gemini-work/.gemini/settings.json
-exec squadrn account add gemini/work --no-login -y
+exec squadrn account repair gemini/work --no-login -y
 stdout '^✓ gemini/work is up to date$'
 
 # The account dir is the GEMINI_CLI_HOME: squadrn's files there, the CLI's in .gemini/.
@@ -147,19 +147,19 @@ rm home/.gemini-work/.gemini/gemini-credentials.json
 
 # doctor reports a guard hook that is turned off, changed or missing; account add restores it.
 cp settings-hooks-off.json home/.gemini-work/.gemini/settings.json
-exec squadrn account add gemini/work --no-login -y
+exec squadrn account repair gemini/work --no-login -y
 ! exec squadrn doctor gemini/work
-stdout '✗ push guard hook turned off or changed \(hooksConfig, matcher or command\) \(no git push guard\)  → srn account add gemini/work'
+stdout '✗ push guard hook turned off or changed \(hooksConfig, matcher or command\) \(no git push guard\)  → srn account repair gemini/work'
 cp empty-object.json home/.gemini-work/.gemini/settings.json
-exec squadrn account add gemini/work --no-login -y
+exec squadrn account repair gemini/work --no-login -y
 exec sh -c 'sed "s/run_shell_command/write_file/" home/.gemini-work/.gemini/settings.json > s.json'
 cp s.json home/.gemini-work/.gemini/settings.json
 ! exec squadrn doctor gemini/work
 stdout '✗ push guard hook turned off or changed'
 cp empty-object.json home/.gemini-work/.gemini/settings.json
 ! exec squadrn doctor gemini/work
-stdout '✗ push guard hook not installed \(no git push guard\)  → srn account add gemini/work'
-exec squadrn account add gemini/work --no-login -y
+stdout '✗ push guard hook not installed \(no git push guard\)  → srn account repair gemini/work'
+exec squadrn account repair gemini/work --no-login -y
 stdout '^✓ push guard: pre-tool hook$'
 ! exec squadrn doctor gemini/work
 stdout '✓ push guard hook installed$'
@@ -229,7 +229,7 @@ stdout '^! mcp main-only not copied'
 stdout '^! mcp absent is not configured in gemini/main$'
 grep '"docs": \{' home/.gemini-mcp/.gemini/settings.json
 ! grep 'main-only' home/.gemini-mcp/.gemini/settings.json
-exec squadrn account add gemini/mcp --no-login -y
+exec squadrn account repair gemini/mcp --no-login -y
 ! stdout 'mcp docs'
 env SQUADRN_SHARED_MCP=
 exec squadrn account rm gemini/mcp --purge --yes
