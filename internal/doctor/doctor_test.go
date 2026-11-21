@@ -525,6 +525,16 @@ func (diagAgent) AccountNotices(string) []provider.Notice {
 	return []provider.Notice{{Warn: true, Text: "no layer 2"}}
 }
 
+func inGroup(checks []Check, g string) []Check {
+	var out []Check
+	for _, c := range checks {
+		if c.Group == g {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func TestVersionFloorAndProviderNotices(t *testing.T) {
 	e := env(t, diagAgent{fakeAgent: fakeAgent{loggedIn: true}, version: "0.69.1"}, nil)
 	name, notes := e.version(context.Background(), provider.Gemini)
@@ -541,7 +551,8 @@ func TestVersionFloorAndProviderNotices(t *testing.T) {
 		t.Errorf("warn notice: %+v", c)
 	}
 	e.Agent = func(provider.Spec) (provider.Agent, error) { return diagAgent{version: "0.71.0-preview.0"}, nil }
-	if _, notes := e.version(context.Background(), provider.Gemini); len(notes) != 2 {
+	// Only the install group: on Windows the platform adds a push guard note.
+	if _, notes := e.version(context.Background(), provider.Gemini); len(inGroup(notes, "install")) != 2 {
 		t.Errorf("a newer preview: %+v", notes)
 	}
 	e.Agent = func(provider.Spec) (provider.Agent, error) { return diagAgent{}, nil }
