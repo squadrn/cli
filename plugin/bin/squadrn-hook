@@ -9,12 +9,21 @@ if [ "$1" != guard-git ]; then
   cat >/dev/null
   exit 0
 fi
-# --no-ask: the agent CLI cannot ask (Codex lets the call through), so asking becomes denying.
+# --no-ask: the agent CLI cannot ask (Codex and Gemini let the call through), so asking becomes
+# denying. A denial is exit 2 with the reason on stderr, which blocks the call in Claude Code, Codex
+# and Gemini CLI alike (Gemini ignores Claude Code's JSON reply).
 noask=
-[ "$2" = --no-ask ] && noask=1
+for a in "$@"; do
+  [ "$a" = --no-ask ] && noask=1
+done
 decide() {
   if [ -n "$noask" ] && [ "$1" = ask ]; then set -- deny "$2"; fi
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"squadrn guard: squadrn is not installed, so %s. Install squadrn or remove the squadrn plugin."}}\n' "$1" "$2"
+  reason="squadrn guard: squadrn is not installed, so $2. Install squadrn or remove the squadrn plugin."
+  if [ "$1" = deny ]; then
+    printf '%s\n' "$reason" >&2
+    exit 2
+  fi
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$reason"
 }
 # Lower-cased, with quotes and backslashes removed, so pu''sh and P\USH still match.
 input=$(tr '[:upper:]' '[:lower:]' | tr -d "\"'\\\\")

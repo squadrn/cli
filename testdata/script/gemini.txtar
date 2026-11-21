@@ -1,6 +1,7 @@
 [windows] skip 'Unix script: sh, symlinks or mode bits'
 # Gemini CLI accounts: GEMINI_CLI_HOME homes holding the CLI's state in .gemini/, settings.json
-# with comments, file-based auth and no layer-2 push guard (ADR 0013).
+# with comments, file-based auth, the push guard as a BeforeTool hook in each account's settings
+# and no layer-2 push guard (ADR 0013).
 
 # Without gemini on PATH and without gemini accounts, gemini stays out of the way.
 cp empty home/.claude/.loggedin
@@ -23,8 +24,20 @@ stdout '^Gemini CLI 0.70.0 · new account gemini/work → ~/.gemini-work$'
 stdout '^  shared         skills, GEMINI.md, commands from gemini/main$'
 stdout '^✓ created ~/.gemini-work \(private\)$'
 stdout '^✓ settings from gemini/main \+ standard profile$'
-! stdout 'push guard'
+stdout '^! push guard: the squadrn plugin is not available here'
 stdout 'log in: srn account login gemini/work'
+! grep 'squadrn-hook' home/.gemini-work/.gemini/settings.json
+# With the plugin files, the guard is a BeforeTool hook on the shell tool. Gemini sessions run no
+# git hooks, so there is no git pre-push layer.
+env SQUADRN_MARKETPLACE=$REPO_ROOT
+exec squadrn account add gemini/work --no-login -y
+stdout '^✓ push guard: pre-tool hook$'
+grep '"matcher": "run_shell_command"' home/.gemini-work/.gemini/settings.json
+grep '"name": "squadrn-guard"' home/.gemini-work/.gemini/settings.json
+grep '"timeout": 5000' home/.gemini-work/.gemini/settings.json
+grep '"command": "\\".*/plugin/bin/squadrn-hook\\" guard-git --no-ask --agent gemini"' home/.gemini-work/.gemini/settings.json
+exec squadrn account add gemini/work --no-login -y
+stdout '^✓ gemini/work is up to date$'
 
 # The account dir is the GEMINI_CLI_HOME: squadrn's files there, the CLI's in .gemini/.
 exists home/.gemini-work/.squadrn-account
@@ -43,8 +56,9 @@ exec sh -c 'ls -a home | grep -c tmp- || true'
 stdout '^0$'
 
 # The account's copy is plain JSON merged from main's: comments, MCP servers and squadrn's own
-# hook entries stay out; the user's other hooks, the auth type and the theme come along.
-! grep '^ *//|/\*|mcpServers|squadrn-hook' home/.gemini-work/.gemini/settings.json
+# hook entries from main stay out; the user's other hooks, the auth type and the theme come along.
+! grep '^ *//|/\*|mcpServers|/old/plugin' home/.gemini-work/.gemini/settings.json
+grep -count=1 'squadrn-hook' home/.gemini-work/.gemini/settings.json
 grep '"selectedType": "oauth-personal"' home/.gemini-work/.gemini/settings.json
 grep '"theme": "GitHub"' home/.gemini-work/.gemini/settings.json
 grep '"command": "my-linter"' home/.gemini-work/.gemini/settings.json
@@ -102,7 +116,7 @@ stdout '✓ logged in as me@.gemini-work'
 stdout '✓ credentials kept in ~/.gemini-work/.gemini'
 stdout '! no layer-2 push guard: Gemini CLI turns git hooks off'
 stdout '✓ settings.json follows main \+ standard profile'
-! stdout 'plugin (enabled|disabled|not installed \(no)|push guard hook'
+stdout '✓ push guard hook installed$'
 env GEMINI_FORCE_ENCRYPTED_FILE_STORAGE= GOOGLE_APPLICATION_CREDENTIALS=
 env FAKE_VERSION=0.69.2
 ! exec squadrn doctor gemini/work
@@ -116,6 +130,41 @@ cp empty home/.gemini-work/.gemini/gemini-credentials.json
 ! exec squadrn doctor gemini/work
 stdout '✗ credentials may be shared with other accounts: gemini-credentials.json found'
 rm home/.gemini-work/.gemini/gemini-credentials.json
+
+# doctor reports a guard hook that is turned off, changed or missing; account add restores it.
+cp settings-hooks-off.json home/.gemini-work/.gemini/settings.json
+exec squadrn account add gemini/work --no-login -y
+! exec squadrn doctor gemini/work
+stdout '✗ push guard hook turned off or changed \(hooksConfig, matcher or command\) \(no git push guard\)  → srn account add gemini/work'
+cp empty-object.json home/.gemini-work/.gemini/settings.json
+exec squadrn account add gemini/work --no-login -y
+exec sh -c 'sed "s/run_shell_command/write_file/" home/.gemini-work/.gemini/settings.json > s.json'
+cp s.json home/.gemini-work/.gemini/settings.json
+! exec squadrn doctor gemini/work
+stdout '✗ push guard hook turned off or changed'
+cp empty-object.json home/.gemini-work/.gemini/settings.json
+! exec squadrn doctor gemini/work
+stdout '✗ push guard hook not installed \(no git push guard\)  → srn account add gemini/work'
+exec squadrn account add gemini/work --no-login -y
+stdout '^✓ push guard: pre-tool hook$'
+! exec squadrn doctor gemini/work
+stdout '✓ push guard hook installed$'
+
+# A session keeps the account's guard hook while settings follow main.
+exec squadrn gemini/work -p hi
+grep -count=1 'squadrn-hook' home/.gemini-work/.gemini/settings.json
+
+# The installed hook blocks a push with exit 2, Gemini's form.
+exec sh -c 'grep -o "[^\"]*/plugin/bin/squadrn-hook" home/.gemini-work/.gemini/settings.json > hookpath.txt'
+stdin push-force.json
+! exec sh -c '"$(cat hookpath.txt)" guard-git --no-ask --agent gemini'
+! stdout .
+stderr 'force push is not allowed'
+
+# Main's settings.json has comments: squadrn does not rewrite it and says what to add.
+! exec squadrn account add gemini/main --no-login --no-usage -y
+stderr 'has comments squadrn does not rewrite: add these entries to its "hooks" yourself: \{"BeforeTool":'
+cmp home/.gemini/settings.json main-settings.jsonc
 
 # Logout moves the login files to the trash.
 exec squadrn account logout gemini/work
@@ -153,6 +202,17 @@ exec squadrn account rm gemini/tmp --purge --yes
 stdout '^deleted ~/.gemini-tmp$'
 ! exists home/.gemini-tmp
 
+# self-uninstall takes the guard hook out of Gemini accounts, keeping their other settings; main's
+# commented file is left for the user.
+exec squadrn account add gemini/un --no-login -y
+grep 'squadrn-hook' home/.gemini-un/.gemini/settings.json
+exec squadrn self-uninstall --yes
+stdout '^  gemini/un: push guard hook removed$'
+stderr 'gemini/main: push guard hook uninstall: .*has comments squadrn does not rewrite: remove squadrn'
+! grep 'squadrn' home/.gemini-un/.gemini/settings.json
+grep '"theme": "GitHub"' home/.gemini-un/.gemini/settings.json
+cmp home/.gemini/settings.json main-settings.jsonc
+
 -- empty --
 -- gemini.md --
 # shared instructions
@@ -183,3 +243,9 @@ echo v18.19.0
     ]
   }
 }
+-- settings-hooks-off.json --
+{"security": {"auth": {"selectedType": "oauth-personal"}}, "hooksConfig": {"enabled": false}}
+-- empty-object.json --
+{"security": {"auth": {"selectedType": "oauth-personal"}}}
+-- push-force.json --
+{"cwd":".","hook_event_name":"BeforeTool","tool_name":"run_shell_command","tool_input":{"command":"git push -f origin main","dir_path":"."}}

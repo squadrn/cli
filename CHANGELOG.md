@@ -11,7 +11,15 @@
   `account logout` moves the login files to the trash. Sessions never use Gemini's shared
   keychain store. `doctor` checks Gemini 0.70.0+, Node.js 20+, the keychain and Google Cloud
   credential variables, and says that Gemini sessions have no git pre-push guard (Gemini turns
-  git hooks off). The pre-tool push guard, notifications and profiles for Gemini come next.
+  git hooks off). Notifications and profiles for Gemini come next.
+- **Push guard for Gemini CLI** (ADR 0013 §5): `account add`, the installer and `self-update`
+  write a `BeforeTool` hook (`squadrn-guard`, shell tool only, 5 s) into each Gemini account's own
+  `settings.json`; it blocks with exit 2, which Gemini honours even in yolo mode. A main
+  `settings.json` with comments is left alone and the hook to add is printed. `doctor` reports a
+  hook that is missing, turned off or changed. `self-uninstall` removes it.
+- When squadrn itself is missing, the plugin's fail-closed reply is now exit 2 with the reason on
+  stderr, for every agent CLI, instead of Claude Code's JSON (which Gemini ignores). What is
+  blocked does not change.
 - Every profile denies reading all of another account's credential files, Gemini's included, and
   squadrn's own hook entries in main's Claude Code `hooks` are no longer copied into accounts.
 - `srn account add codex/main` (or `claude/main`) sets up the default account instead of refusing

@@ -552,7 +552,7 @@ func (a *app) guardLine(acct account.Account, ag provider.Agent, justInstalled b
 	if len(layers) == 0 {
 		return ""
 	}
-	if a.cfgErr != nil || a.cfg.GitHooksEnabled() {
+	if (a.cfgErr != nil || a.cfg.GitHooksEnabled()) && !acct.Spec.NoGitHooks {
 		layers = append(layers, "git pre-push")
 	}
 	return strings.Join(layers, " + ")

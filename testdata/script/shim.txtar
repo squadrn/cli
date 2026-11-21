@@ -16,25 +16,34 @@ stdout 'force push is not allowed'
 
 # Without squadrn anywhere the shim denies pushes, asks about other git commands and stays out of
 # the way otherwise.
+# A denial is exit 2 with the reason on stderr, which blocks the call in every agent CLI.
 rm home/.local/share/squadrn/bin/squadrn
 stdin force.json
-exec $SHIM guard-git
-stdout '"permissionDecision":"deny"'
-stdout 'squadrn is not installed, so git push is blocked'
+! exec $SHIM guard-git
+! stdout .
+stderr 'squadrn is not installed, so git push is blocked'
+exec sh -c '"$SHIM" guard-git < force.json 2>/dev/null; echo $?'
+stdout '^2$'
 stdin obfuscated.json
-exec $SHIM guard-git
-stdout '"permissionDecision":"deny"'
+! exec $SHIM guard-git
+stderr 'git push is blocked'
 stdin status.json
 exec $SHIM guard-git
 stdout '"permissionDecision":"ask"'
 stdin ls.json
 exec $SHIM guard-git
 ! stdout .
-# Codex hooks cannot ask (--no-ask): what would be asked about is denied.
+# Codex and Gemini hooks cannot ask (--no-ask): what would be asked about is denied.
 stdin status.json
-exec $SHIM guard-git --no-ask
-stdout '"permissionDecision":"deny"'
-stdout 'git commands cannot be checked'
+! exec $SHIM guard-git --no-ask
+stderr 'git commands cannot be checked'
+stdin gemini-status.json
+! exec $SHIM guard-git --no-ask --agent gemini
+! stdout .
+stderr 'git commands cannot be checked'
+stdin gemini-ls.json
+exec $SHIM guard-git --no-ask --agent gemini
+! stdout .
 stdin force.json
 exec $SHIM notify Test
 ! stdout .
@@ -47,3 +56,7 @@ exec $SHIM notify Test
 {"cwd":".","tool_input":{"command":"ls -la"}}
 -- status.json --
 {"cwd":".","tool_input":{"command":"git status"}}
+-- gemini-status.json --
+{"cwd":".","hook_event_name":"BeforeTool","tool_name":"run_shell_command","tool_input":{"command":"git status","dir_path":"."}}
+-- gemini-ls.json --
+{"cwd":".","hook_event_name":"BeforeTool","tool_name":"run_shell_command","tool_input":{"command":"ls","dir_path":"."}}

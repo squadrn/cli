@@ -1,7 +1,7 @@
 [windows] skip 'Unix script: sh, tmux, symlinks or mode bits'
 # Hook usage uses the command name and says the hooks run through the installed binary.
 exec squadrn hook --help
-stdout '^usage: srn hook guard-git \[--no-ask\] \| '
+stdout '^usage: srn hook guard-git \[--no-ask\] \[--agent <provider>\] \| '
 stdout '^internal: the squadrn plugin \(squadrn-hook\) and git hooks run this through the installed binary$'
 exitcode 2 squadrn hook bogus
 exec squadrn hook guard-git --help
@@ -56,6 +56,34 @@ stdin allow.json
 exec squadrn hook guard-git --no-ask
 ! stdout .
 exitcode 2 squadrn hook guard-git --ask
+exitcode 2 squadrn hook guard-git --agent
+exitcode 2 squadrn hook guard-git --agent nope
+
+# Gemini CLI reads only exit 2 (reason on stderr) as a block; its BeforeTool input names the shell
+# tool run_shell_command, and dir_path is relative to cwd.
+stdin gemini-force.json
+! exec squadrn hook guard-git --no-ask --agent gemini
+! stdout .
+stderr '^squadrn guard: .*force push is not allowed'
+exec sh -c 'squadrn hook guard-git --no-ask --agent gemini < gemini-force.json 2>/dev/null; echo $?'
+stdout '^2$'
+stdin gemini-dynamic.json
+! exec squadrn hook guard-git --no-ask --agent gemini
+stderr 'cannot ask for confirmation'
+stdin gemini-allow.json
+exec squadrn hook guard-git --no-ask --agent gemini
+! stdout .
+! stderr .
+stdin gemini-other-tool.json
+! exec squadrn hook guard-git --no-ask --agent gemini
+stderr 'does not know the read_file tool'
+stdin gemini-bad.json
+! exec squadrn hook guard-git --no-ask --agent gemini
+stderr 'invalid hook input'
+# Claude Code and Codex keep their JSON reply with --agent.
+stdin codex-force.json
+exec squadrn hook guard-git --no-ask --agent codex
+stdout '"permissionDecision":"deny"'
 
 # A repo's own list only adds to the user's: main stays protected, production is too.
 stdin prod-main.json
@@ -225,3 +253,13 @@ protected_branches = [
 not json
 -- configchange.json --
 {"hook_event_name":"ConfigChange","source":"user_settings","file_path":"/x/settings.json"}
+-- gemini-force.json --
+{"session_id":"s","transcript_path":"/t","cwd":".","hook_event_name":"BeforeTool","timestamp":"2026-11-21T00:00:00Z","tool_name":"run_shell_command","tool_input":{"command":"git push -f origin feat-x","description":"push","dir_path":"."}}
+-- gemini-dynamic.json --
+{"cwd":".","hook_event_name":"BeforeTool","tool_name":"run_shell_command","tool_input":{"command":"git push origin \"$BRANCH\"","dir_path":"."}}
+-- gemini-allow.json --
+{"cwd":".","hook_event_name":"BeforeTool","tool_name":"run_shell_command","tool_input":{"command":"ls -la","dir_path":"sub"}}
+-- gemini-other-tool.json --
+{"cwd":".","hook_event_name":"BeforeTool","tool_name":"read_file","tool_input":{"file_path":"x"}}
+-- gemini-bad.json --
+{"cwd":

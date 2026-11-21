@@ -16,6 +16,7 @@ import (
 	"github.com/squadrn/squadrn/internal/githook"
 	"github.com/squadrn/squadrn/internal/guard"
 	"github.com/squadrn/squadrn/internal/proc"
+	"github.com/squadrn/squadrn/internal/provider"
 	"github.com/squadrn/squadrn/internal/release"
 )
 
@@ -60,7 +61,7 @@ func (h hookEnv) readInput() ([]byte, error) {
 // squadrn-hook) and the git hook shims run them through the installed binary whatever it is called.
 func hookUsage() string {
 	cfg, _ := config.Load()
-	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] | notify [--terminal] [--agent <provider>] [<payload>] | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
+	return "usage: " + cfg.CommandName() + " hook guard-git [--no-ask] [--agent <provider>] | notify [--terminal] [--agent <provider>] [<payload>] | git [--config <file>] <hook-name> [args...] | statusline [--then <command>] | limit | config-change | deliver <payload>\n" +
 		"internal: the " + config.Slug + " plugin (squadrn-hook) and git hooks run this through the installed binary"
 }
 
@@ -76,15 +77,14 @@ func runHook(args []string, h hookEnv) int {
 	}
 	switch args[0] {
 	case "guard-git":
-		noAsk := len(args) == 2 && args[1] == "--no-ask"
-		if len(args) != 1 && !noAsk {
-			// Exit 2 blocks the tool call in Claude Code and Codex, so a bad invocation still
-			// fails closed.
+		noAsk, gh, ok := parseGuardArgs(args[1:])
+		if !ok {
+			// Exit 2 blocks the tool call in Claude Code, Codex and Gemini CLI, so a bad
+			// invocation still fails closed.
 			_, _ = fmt.Fprintln(h.stderr, hookUsage())
 			return exitUsage
 		}
-		h.guardGit(noAsk)
-		return exitOK
+		return h.guardGit(noAsk, gh)
 	case "notify":
 		n, ok := parseNotifyArgs(args[1:])
 		if !ok {
@@ -169,10 +169,33 @@ func hookGuard(cfgFile string) (guard.Guard, error) {
 	return g, cfgErr
 }
 
-// guardGit is the pre-tool layer. Any failure becomes "ask": a hook that errors or prints
-// nothing lets the tool call through. noAsk is for a CLI whose hooks cannot ask (Codex: "ask"
-// lets the call through), where asking becomes denying.
-func (h hookEnv) guardGit(noAsk bool) {
+// parseGuardArgs reads guard-git's flags: --no-ask and --agent <provider>. gh is the provider's
+// GuardHook; nil means Claude Code's form (also for Codex, which reads it).
+func parseGuardArgs(args []string) (noAsk bool, gh provider.GuardHook, ok bool) {
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--no-ask" && !noAsk:
+			noAsk = true
+		case args[i] == "--agent" && i+1 < len(args):
+			i++
+			spec, found := provider.Get(args[i])
+			if !found {
+				return false, nil, false
+			}
+			d, _ := provider.DriverOf(spec.ID)
+			gh = d.Guard
+		default:
+			return false, nil, false
+		}
+	}
+	return noAsk, gh, true
+}
+
+// guardGit is the pre-tool layer; it returns the hook's exit code. Any failure becomes "ask": a
+// hook that errors or prints nothing lets the tool call through. noAsk is for a CLI whose hooks
+// cannot ask (Codex, Gemini: "ask" lets the call through), where asking becomes denying. gh reads
+// the payload and blocks in the CLI's own form (nil: Claude Code's).
+func (h hookEnv) guardGit(noAsk bool, gh provider.GuardHook) (code int) {
 	var d guard.Decision
 	cwd, cmd := "", ""
 	home, _ := config.Home()
@@ -189,6 +212,13 @@ func (h hookEnv) guardGit(noAsk bool) {
 		if home != "" {
 			guard.Log{Path: guard.DefaultLogPath(home)}.Record(h.now(), "pre-tool", d, cwd, cmd)
 		}
+		if gh != nil && d.Verdict == guard.Deny {
+			out, errOut, c := gh.Block("squadrn guard: " + d.Reason)
+			_, _ = io.WriteString(h.stdout, out)
+			_, _ = io.WriteString(h.stderr, errOut)
+			code = c
+			return
+		}
 		h.writeDecision(d)
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), hookDeadline)
@@ -196,33 +226,49 @@ func (h hookEnv) guardGit(noAsk bool) {
 	raw, err := h.readInput()
 	if err != nil {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "guard cannot read the hook input"}
-		return
+		return exitOK
 	}
-	var in hookInput
-	if err := json.Unmarshal(raw, &in); err != nil {
-		d = guard.Decision{Verdict: guard.Ask, Reason: "guard received invalid hook input"}
-		return
+	var call provider.ToolCall
+	if gh != nil {
+		if call, err = gh.ParseTool(raw); err != nil {
+			d = guard.Decision{Verdict: guard.Ask, Reason: "guard received invalid hook input"}
+			return exitOK
+		}
+	} else {
+		var in hookInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			d = guard.Decision{Verdict: guard.Ask, Reason: "guard received invalid hook input"}
+			return exitOK
+		}
+		call = provider.ToolCall{Command: in.ToolInput.Command, Dir: in.Cwd, Tool: in.ToolName}
+		switch in.ToolName {
+		case "", "Bash":
+			call.Shell = provider.ShellSh
+		case "PowerShell":
+			call.Shell = provider.ShellPowerShell
+		}
 	}
-	cwd, cmd = in.Cwd, in.ToolInput.Command
+	cwd, cmd = call.Dir, call.Command
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
 	g, cfgErr := hookGuard("")
 	if g.Git == nil {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "guard cannot locate the home directory"}
-		return
+		return exitOK
 	}
-	switch in.ToolName {
-	case "", "Bash":
+	switch call.Shell {
+	case provider.ShellSh:
 		d = g.Decide(ctx, cmd, cwd)
-	case "PowerShell":
+	case provider.ShellPowerShell:
 		d = g.DecidePowerShell(ctx, cmd, cwd)
 	default:
-		d = guard.Decision{Verdict: guard.Ask, Reason: "the guard does not know the " + in.ToolName + " tool; confirm this command manually"}
+		d = guard.Decision{Verdict: guard.Ask, Reason: "the guard does not know the " + call.Tool + " tool; confirm this command manually"}
 	}
 	if cfgErr != nil && d.Verdict == guard.Allow && strings.Contains(strings.ToLower(cmd), "push") {
 		d = guard.Decision{Verdict: guard.Ask, Reason: "squadrn config is invalid (" + cfgErr.Error() + "), so protected branches are uncertain"}
 	}
+	return exitOK
 }
 
 func (h hookEnv) writeDecision(d guard.Decision) {

@@ -14,6 +14,8 @@ var (
 	_ provider.PrivateSettings   = Settings{}
 	_ provider.MainFilter        = Settings{}
 	_ provider.CommentedSettings = Settings{}
+	_ provider.GuardInstaller    = CLI{}
+	_ provider.GuardHook         = Guard{}
 )
 
 func init() {
@@ -27,5 +29,6 @@ func init() {
 			return c, nil
 		},
 		Settings: Settings{},
+		Guard:    Guard{},
 	})
 }
