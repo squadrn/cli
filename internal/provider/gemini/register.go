@@ -16,6 +16,8 @@ var (
 	_ provider.CommentedSettings = Settings{}
 	_ provider.GuardInstaller    = CLI{}
 	_ provider.GuardHook         = Guard{}
+	_ provider.HookEvents        = Events{}
+	_ provider.Profiler          = Profiles{}
 )
 
 func init() {
@@ -30,5 +32,7 @@ func init() {
 		},
 		Settings: Settings{},
 		Guard:    Guard{},
+		Events:   Events{},
+		Profiles: Profiles{},
 	})
 }

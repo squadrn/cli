@@ -68,10 +68,12 @@ type Pane struct {
 	Account string `json:"account"`
 	Name    string `json:"name"`
 	Command string `json:"command"`
-	// PID is the pane's process, State the agent's (OptState), Path its working directory.
+	// PID is the pane's process, State the agent's (OptState), Path its working directory and
+	// Title the title the program in it set (#{pane_title}).
 	PID   int    `json:"pid,omitempty"`
 	State string `json:"state,omitempty"`
 	Path  string `json:"-"`
+	Title string `json:"-"`
 }
 
 type Session struct {
@@ -206,7 +208,7 @@ func (t Tmux) StatePanes(ctx context.Context) ([]Pane, error) {
 func (t Tmux) listPanes(ctx context.Context, session string) ([]Pane, error) {
 	format := strings.Join([]string{
 		"#{pane_id}", q("session_name"), q(optAccount), q(optName), q("pane_current_command"),
-		"#{pane_pid}", q(OptState), q("pane_current_path"),
+		"#{pane_pid}", q(OptState), q("pane_current_path"), q("pane_title"),
 	}, fieldSep)
 	args := []string{"list-panes", "-F", format}
 	if session == "" {
@@ -223,11 +225,14 @@ func (t Tmux) listPanes(ctx context.Context, session string) ([]Pane, error) {
 	var panes []Pane
 	for _, line := range strings.Split(out, "\n") {
 		f := splitFields(line)
-		if len(f) != 8 {
+		if len(f) == 8 {
+			f = append(f, "") // a tmux reply without the title
+		}
+		if len(f) != 9 {
 			continue
 		}
 		pid, _ := strconv.Atoi(f[5])
-		panes = append(panes, Pane{ID: f[0], Session: f[1], Account: f[2], Name: f[3], Command: f[4], PID: pid, State: f[6], Path: f[7]})
+		panes = append(panes, Pane{ID: f[0], Session: f[1], Account: f[2], Name: f[3], Command: f[4], PID: pid, State: f[6], Path: f[7], Title: f[8]})
 	}
 	return panes, nil
 }

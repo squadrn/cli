@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/squadrn/squadrn/internal/grid"
 	"github.com/squadrn/squadrn/internal/inuse"
 	"github.com/squadrn/squadrn/internal/notify"
+	"github.com/squadrn/squadrn/internal/provider"
 )
 
 // agentRow is one running agent: a session squadrn started (in-use registry), a tmux pane, or
@@ -25,9 +27,11 @@ type agentRow struct {
 	Name    string `json:"name"`
 	Command string `json:"command,omitempty"`
 	PID     int    `json:"pid,omitempty"`
-	// State is working, input, failed or done when the agent's hooks reported it.
+	// State is working, input, failed or done when the agent's hooks reported it; else what the
+	// pane's title says (Gemini: input, working, ready).
 	State string `json:"state,omitempty"`
 	Cwd   string `json:"cwd,omitempty"`
+	title string
 }
 
 // running lists running agents: every session squadrn started, in a terminal or a tmux pane,
@@ -45,7 +49,7 @@ func (a *app) running(ctx context.Context) ([]agentRow, error) {
 		for _, p := range append(panes, stated...) {
 			if !seen[p.ID] {
 				seen[p.ID] = true
-				rows = append(rows, agentRow{ID: p.ID, Session: p.Session, Account: p.Account, Name: p.Name, Command: p.Command, PID: p.PID, State: p.State, Cwd: p.Path})
+				rows = append(rows, agentRow{ID: p.ID, Session: p.Session, Account: p.Account, Name: p.Name, Command: p.Command, PID: p.PID, State: p.State, Cwd: p.Path, title: p.Title})
 			}
 		}
 	}
@@ -82,6 +86,9 @@ func (a *app) running(ctx context.Context) ([]agentRow, error) {
 				r.State = ag.State
 			}
 		}
+		if r.State == "" {
+			r.State = titleState(r.Account, r.title)
+		}
 		if r.Name == "" && r.Cwd != "" {
 			e := notify.Event{Cwd: r.Cwd}
 			e.Locate(worktreeDirs())
@@ -89,6 +96,22 @@ func (a *app) running(ctx context.Context) ([]agentRow, error) {
 		}
 	}
 	return rows, nil
+}
+
+// titleState is the state the terminal title of an agent of account's provider shows; "" when
+// the provider sets none or the title is not one of its.
+func titleState(account, title string) string {
+	pid, _, _ := strings.Cut(account, "/")
+	spec, ok := provider.Get(pid)
+	if !ok || title == "" {
+		return ""
+	}
+	for prefix, state := range spec.PaneTitleStates {
+		if strings.HasPrefix(strings.TrimSpace(title), prefix) {
+			return state
+		}
+	}
+	return ""
 }
 
 // paneOf finds the pane running r's session: the same process, or the same account in the
